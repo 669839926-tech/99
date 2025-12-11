@@ -1,0 +1,154 @@
+
+import React from 'react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User } from 'lucide-react';
+import { User as UserType } from '../types';
+
+interface LayoutProps {
+  children: React.ReactNode;
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  currentUser: UserType | null;
+  onLogout: () => void;
+}
+
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout }) => {
+  const navItems = [
+    { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
+    { id: 'players', label: '球队管理', icon: Shirt },
+    { id: 'training', label: '训练计划', icon: Calendar },
+    { id: 'matches', label: '比赛日程', icon: Trophy },
+  ];
+
+  const getMobileLabel = (label: string) => {
+    if (label === '俱乐部概览') return '概览';
+    return label.substring(0, 2);
+  };
+
+  return (
+    <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
+      {/* Sidebar - Desktop */}
+      <aside className="hidden md:flex flex-col w-64 bg-bvb-black text-white h-full shadow-xl z-20">
+        <div className="p-6 flex items-center justify-center border-b border-gray-800">
+          <div className="w-12 h-12 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-xl border-4 border-white mr-3 shadow-lg">
+            WS
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-bvb-yellow tracking-tighter">顽石之光</h1>
+            <p className="text-xs text-gray-400">青训管理系统</p>
+          </div>
+        </div>
+
+        {/* User Info Snippet */}
+        {currentUser && (
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-bvb-yellow">
+                     <User className="w-5 h-5" />
+                 </div>
+                 <div>
+                     <p className="text-sm font-bold text-white truncate max-w-[120px]">{currentUser.name}</p>
+                     <p className="text-[10px] text-gray-400 uppercase font-bold">
+                         {currentUser.role === 'director' ? '青训总监' : '教练员'}
+                     </p>
+                 </div>
+            </div>
+        )}
+
+        <nav className="flex-1 p-4 space-y-2">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+                activeTab === item.id
+                  ? 'bg-bvb-yellow text-bvb-black font-bold shadow-lg transform scale-105'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              <item.icon className="w-5 h-5 mr-3" />
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-gray-800">
+          {/* Settings: Only visible if NOT a coach (i.e. Director) */}
+          {currentUser?.role !== 'coach' && (
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`w-full flex items-center p-3 rounded-lg transition-colors mb-2 ${
+                  activeTab === 'settings' 
+                   ? 'bg-gray-800 text-bvb-yellow font-bold' 
+                   : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Settings className="w-5 h-5 mr-3" />
+                设置
+              </button>
+          )}
+
+           <button 
+            onClick={onLogout}
+            className="w-full flex items-center p-3 text-red-400 hover:text-red-300 transition-colors hover:bg-red-900/20 rounded-lg"
+           >
+            <LogOut className="w-5 h-5 mr-3" />
+            登出
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content & Mobile Elements */}
+      <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
+        
+        {/* Mobile Header (Brand Only) */}
+        <header className="md:hidden bg-bvb-black text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0">
+             <div className="flex items-center">
+                <div className="w-8 h-8 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-sm mr-2 border-2 border-white">WS</div>
+                <span className="font-bold text-bvb-yellow tracking-wider">顽石之光青训</span>
+             </div>
+             <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
+        </header>
+
+        {/* Scrollable Content Area */}
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pb-24 md:pb-8 scroll-smooth">
+          <div className="max-w-7xl mx-auto h-full">
+             {children}
+          </div>
+        </main>
+
+        {/* Mobile Bottom Navigation */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bvb-black border-t-4 border-bvb-yellow z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+            <div className={`flex justify-around items-center h-16 px-1 ${currentUser?.role === 'coach' ? 'max-w-full' : ''}`}>
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 active:scale-95 ${
+                    activeTab === item.id ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <item.icon className={`w-6 h-6 ${activeTab === item.id ? 'fill-current' : ''}`} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                  <span className="text-[10px] font-bold">{getMobileLabel(item.label)}</span>
+                </button>
+              ))}
+               {/* Settings only for Director */}
+               {currentUser?.role !== 'coach' && (
+                   <button
+                      onClick={() => setActiveTab('settings')}
+                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 active:scale-95 ${
+                        activeTab === 'settings' ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
+                      }`}
+                    >
+                      <Settings className={`w-6 h-6 ${activeTab === 'settings' ? 'fill-current' : ''}`} strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
+                      <span className="text-[10px] font-bold">设置</span>
+                    </button>
+               )}
+            </div>
+            <div className="h-safe-bottom bg-bvb-black w-full"></div>
+          </nav>
+
+      </div>
+    </div>
+  );
+};
+
+export default Layout;
