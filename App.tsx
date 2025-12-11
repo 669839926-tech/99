@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import PlayerManager from './components/PlayerManager';
@@ -9,6 +10,8 @@ import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS } from './constants';
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match } from './types';
+import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
+import { Loader2 } from 'lucide-react';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -22,6 +25,56 @@ function App() {
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES); 
   const [attributeConfig, setAttributeConfig] = useState<AttributeConfig>(DEFAULT_ATTRIBUTE_CONFIG);
   const [users] = useState<User[]>(MOCK_USERS);
+
+  // Persistence State
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const isFirstRun = useRef(true);
+
+  // 1. Load Data on Mount
+  useEffect(() => {
+    const init = async () => {
+        const cloudData = await loadDataFromCloud();
+        if (cloudData) {
+            setTeams(cloudData.teams || MOCK_TEAMS);
+            setPlayers(cloudData.players || MOCK_PLAYERS);
+            setMatches(cloudData.matches || MOCK_MATCHES);
+            setTrainings(cloudData.trainings || MOCK_TRAINING);
+            setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
+        }
+        setIsInitializing(false);
+    };
+    init();
+  }, []);
+
+  // 2. Auto-Save on Change (Debounced)
+  useEffect(() => {
+    if (isInitializing) return;
+    if (isFirstRun.current) {
+        isFirstRun.current = false;
+        return;
+    }
+
+    const timer = setTimeout(async () => {
+        setIsSyncing(true);
+        try {
+            await saveDataToCloud({
+                players,
+                teams,
+                matches,
+                trainings,
+                attributeConfig
+            });
+        } catch (e) {
+            console.error("Auto-save failed", e);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, 2000); // 2 second debounce
+
+    return () => clearTimeout(timer);
+  }, [players, teams, matches, trainings, attributeConfig, isInitializing]);
+
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -186,6 +239,16 @@ function App() {
     setAttributeConfig(newConfig);
   };
 
+  // Loading Screen
+  if (isInitializing) {
+      return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+              <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
+              <p className="text-gray-500 font-bold">正在从 Vercel Blob 恢复数据...</p>
+          </div>
+      );
+  }
+
   // 1. Not Logged In -> Show Login
   if (!currentUser) {
     return <Login users={users} players={players} onLogin={handleLogin} />;
@@ -277,6 +340,7 @@ function App() {
         setActiveTab={setActiveTab} 
         currentUser={currentUser} 
         onLogout={handleLogout}
+        isSyncing={isSyncing}
     >
       {renderContent()}
     </Layout>

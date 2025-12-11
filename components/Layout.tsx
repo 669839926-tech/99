@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
@@ -9,9 +9,10 @@ interface LayoutProps {
   setActiveTab: (tab: string) => void;
   currentUser: UserType | null;
   onLogout: () => void;
+  isSyncing?: boolean; // New prop for sync status
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, isSyncing = false }) => {
   const navItems = [
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
     { id: 'players', label: '球队管理', icon: Shirt },
@@ -52,6 +53,24 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                  </div>
             </div>
         )}
+
+        {/* Sync Status Indicator */}
+        <div className="px-6 py-2 border-b border-gray-800">
+             <div className="flex items-center text-xs text-gray-400">
+                 {isSyncing ? (
+                     <>
+                        <RefreshCw className="w-3 h-3 mr-2 animate-spin text-bvb-yellow" />
+                        <span className="text-bvb-yellow">正在同步到云端...</span>
+                     </>
+                 ) : (
+                     <>
+                        <Cloud className="w-3 h-3 mr-2" />
+                        <span>数据已同步</span>
+                        <Check className="w-3 h-3 ml-1 text-green-500" />
+                     </>
+                 )}
+             </div>
+        </div>
 
         <nav className="flex-1 p-4 space-y-2">
           {navItems.map((item) => (
@@ -105,7 +124,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                 <div className="w-8 h-8 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-sm mr-2 border-2 border-white">WS</div>
                 <span className="font-bold text-bvb-yellow tracking-wider">顽石之光青训</span>
              </div>
-             <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
+             <div className="flex items-center gap-3">
+                 {/* Mobile Sync Icon */}
+                 {isSyncing ? <RefreshCw className="w-4 h-4 text-bvb-yellow animate-spin" /> : <Cloud className="w-4 h-4 text-gray-400" />}
+                 <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
+             </div>
         </header>
 
         {/* Scrollable Content Area */}
