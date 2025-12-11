@@ -2,12 +2,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { TrainingSession, Player } from '../types';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper to get the AI client instance safely.
+// In Vite/Browser environments, process.env might not be directly available at module evaluation time.
+// We initialize this lazily to prevent 'process is not defined' crashes on app startup.
+const getAiClient = () => {
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+};
 
 const TRAINING_MODEL = 'gemini-2.5-flash';
 
 export const generateTrainingPlan = async (focus: string, duration: number, intensity: string): Promise<Partial<TrainingSession>> => {
   try {
+    const ai = getAiClient();
     const prompt = `
       Create a professional youth football (soccer) training session plan.
       Focus Area: ${focus}
@@ -51,6 +57,7 @@ export const generateTrainingPlan = async (focus: string, duration: number, inte
 
 export const generateMatchStrategy = async (opponent: string, ourStrengths: string): Promise<string> => {
   try {
+    const ai = getAiClient();
      // Using a simpler text model for strategy text generation
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
@@ -73,6 +80,7 @@ export const generateMatchStrategy = async (opponent: string, ourStrengths: stri
 
 export const generatePlayerReview = async (player: Player, quarter: string, year: number): Promise<{tech: string, mental: string, summary: string}> => {
   try {
+    const ai = getAiClient();
     const statsStr = JSON.stringify(player.stats);
     const prompt = `
       Act as a professional youth football coach at Borussia Dortmund.
