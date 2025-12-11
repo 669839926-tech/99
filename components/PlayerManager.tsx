@@ -755,6 +755,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     const [recordTimeScope, setRecordTimeScope] = useState<'all' | 'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saved'>('idle');
 
     // Sync state with prop if player updates and we are not editing
     useEffect(() => {
@@ -827,7 +828,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
           lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats)) // Sync immediately
       };
       onUpdatePlayer(updatedPlayer);
-      setIsEditing(false);
+      // setIsEditing(false); // DO NOT EXIT EDIT MODE as per user request
+      
+      // Show Success Feedback
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
     };
 
     const handleDelete = () => {
@@ -1440,10 +1445,13 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
                 {isEditing ? (
                   <>
-                    <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">取消</button>
+                    <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">
+                        {isEditing ? '退出编辑' : '取消'}
+                    </button>
                     {/* Simplified: Save acts as Publish */}
-                    <button onClick={handleSave} className="px-3 py-1 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-110 text-sm flex items-center">
-                        <Save className="w-4 h-4 mr-1" /> 保存并更新
+                    <button onClick={handleSave} className={`px-3 py-1 font-bold rounded hover:brightness-110 text-sm flex items-center ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-yellow text-bvb-black'}`}>
+                        {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />} 
+                        {saveStatus === 'saved' ? '已保存' : '保存并更新'}
                     </button>
                   </>
                 ) : (
