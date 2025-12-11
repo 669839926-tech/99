@@ -34,7 +34,8 @@ export default async function handler(request, response) {
       
       const { url } = await put(DB_FILENAME, JSON.stringify(body), {
         access: 'public',
-        addRandomSuffix: false,
+        addRandomSuffix: false, // Keep file name constant
+        allowOverwrite: true,   // Explicitly allow overwriting existing file
         token,
       });
 
