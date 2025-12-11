@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw } from 'lucide-react';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -686,14 +686,14 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       const attributes = attributeConfig[category];
       if (attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
       return (
-        <div className="grid grid-cols-1 gap-4 p-2">
+        <div className="grid grid-cols-1 gap-6 p-2">
           {attributes.map(attr => {
             const value = editedPlayer.stats[category][attr.key] ?? 5;
             return (
-              <div key={attr.key} className="space-y-2">
+              <div key={attr.key} className="space-y-3">
                 <div className="flex justify-between items-center">
                   <label className="text-sm font-bold text-gray-700">{attr.label}</label>
-                  <span className={`text-sm font-black ${value >= 8 ? 'text-green-600' : value >= 6 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                  <span className={`text-lg font-black ${value >= 8 ? 'text-green-600' : value >= 6 ? 'text-yellow-600' : 'text-gray-500'}`}>
                     {value}/10
                   </span>
                 </div>
@@ -705,7 +705,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   disabled={!isEditing}
                   value={value}
                   onChange={(e) => handleStatChange(category, attr.key, parseInt(e.target.value))}
-                  className={`w-full h-2 rounded-lg appearance-none cursor-pointer ${
+                  className={`w-full h-4 rounded-lg appearance-none cursor-pointer ${
                      isEditing ? 'bg-gray-200 accent-bvb-yellow hover:bg-gray-300' : 'bg-gray-100 accent-gray-400'
                   }`}
                 />
@@ -736,7 +736,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     {categoryLabels[category]}分析
                 </div>
             </div>
-            <div className="w-full md:w-1/2 md:overflow-y-auto md:max-h-full pr-2 custom-scrollbar">
+            <div className="w-full md:w-1/2 md:overflow-y-auto md:max-h-full pr-2 custom-scrollbar pb-20 md:pb-0">
                 <div className="mb-4 text-xs text-gray-400 flex items-center justify-between">
                     <span>{isEditing ? '调整数值自动保存' : '点击右上角“编辑”按钮以调整数据'}</span>
                 </div>
@@ -851,7 +851,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             <label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label>
                             <textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} />
                         </div>
-                        <div className="mt-auto grid grid-cols-2 gap-3">
+                        <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
                             <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">
                                 {editingReviewId ? '更新草稿' : '保存草稿'}
                             </button>
@@ -894,7 +894,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         });
         const displayList = [...historyWithBalance].reverse(); // Simplified: All records
         return (
-            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col">
+            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-20 md:pb-0">
                 <div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10">
@@ -919,26 +919,26 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-white w-full h-full md:h-[90vh] md:max-w-5xl md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
+        <div className="bg-white w-full h-[100dvh] md:h-[90vh] md:max-w-5xl rounded-none md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
           {/* Header */}
           <div className="bg-bvb-black text-white p-4 flex justify-between items-center shrink-0">
              <div className="flex items-center space-x-3">
-                 <button onClick={onClose} className="md:hidden mr-2"><ChevronRight className="w-6 h-6 rotate-180" /></button>
+                 <button onClick={onClose} className="md:hidden mr-2 p-1"><ChevronLeft className="w-6 h-6" /></button>
                  <h2 className="text-xl font-bold uppercase tracking-wider flex items-center"><UserIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 球员档案</h2>
                  {isEditing && (
                      <div className="ml-4 flex items-center gap-2">
-                         {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 正在保存...</span>}
+                         {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                          {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                      </div>
                  )}
              </div>
              <div className="flex items-center space-x-3">
-                <button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow flex items-center" title="导出PDF档案">
+                <button onClick={handleExportPDF} disabled={isExporting} className="hidden md:flex p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow items-center" title="导出PDF档案">
                     {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                 </button>
                 {isEditing ? (
                   <>
-                    <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">退出编辑</button>
+                    <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">退出</button>
                     <button onClick={handleSave} className={`px-3 py-1 font-bold rounded hover:brightness-110 text-sm flex items-center ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-yellow text-bvb-black'}`}>
                         {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />} 
                         {saveStatus === 'saved' ? '已保存' : '保存'}
@@ -954,7 +954,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
              </div>
           </div>
           {/* Nav Tabs */}
-          <div className="bg-gray-100 border-b border-gray-200 shrink-0">
+          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10">
             <div className="flex overflow-x-auto no-scrollbar">
                {[
                  { id: 'overview', label: '概览', icon: Activity },
@@ -962,8 +962,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                  { id: 'tactical', label: '战术', icon: Brain },
                  { id: 'physical', label: '身体', icon: Dumbbell },
                  { id: 'mental', label: '心理', icon: CheckSquare },
-                 { id: 'reviews', label: '跟踪点评', icon: FileText },
-                 { id: 'records', label: '课时记录', icon: History },
+                 { id: 'reviews', label: '点评', icon: FileText },
+                 { id: 'records', label: '记录', icon: History },
                ].map(tab => (
                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}>
                     <tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />
@@ -973,7 +973,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </div>
           </div>
           {/* Content Area */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
              {activeTab === 'overview' && (
                <div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300">
                    <div className="w-full md:w-1/3 space-y-6">
@@ -1015,7 +1015,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                               <div className="mt-2 flex items-center text-xs text-gray-400"><Clock className="w-3 h-3 mr-1" /> 有效期至: {editedPlayer.validUntil || 'N/A'}{isExpired(editedPlayer.validUntil) && <span className="text-red-400 font-bold ml-2">(已过期)</span>}</div>
                           </div>
                       </div>
-                      <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[250px] p-2">
+                      <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2">
                           <h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4>
                           <ResponsiveContainer width="100%" height="100%">
                             <RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}>

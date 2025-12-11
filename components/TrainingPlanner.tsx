@@ -140,24 +140,24 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white w-full h-[100dvh] md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
                 <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                     <div>
-                      <h3 className="font-bold text-lg">{session.title}</h3>
+                      <h3 className="font-bold text-lg leading-tight">{session.title}</h3>
                       <p className="text-xs text-gray-400">{session.date} • {team?.name}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
-                           {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 正在保存...</span>}
+                           {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                            {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                       </div>
-                      <button onClick={onClose}><X className="w-5 h-5" /></button>
+                      <button onClick={onClose}><X className="w-6 h-6" /></button>
                     </div>
                 </div>
                 
                 {/* Tabs */}
-                <div className="flex border-b border-gray-200 shrink-0">
+                <div className="flex border-b border-gray-200 shrink-0 sticky top-0 bg-white z-10">
                     <button 
                       onClick={() => setActiveTab('attendance')}
                       className={`flex-1 py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}
@@ -172,24 +172,24 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                     </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
                     
                     {/* --- Tab 1: Attendance --- */}
                     {activeTab === 'attendance' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                           {/* Info Section */}
-                          <div className="grid grid-cols-3 gap-4 text-center">
-                              <div className="bg-gray-50 p-2 rounded">
-                                  <span className="text-xs text-gray-500 uppercase">时长</span>
-                                  <div className="font-bold">{session.duration}分钟</div>
+                          <div className="grid grid-cols-3 gap-3 text-center">
+                              <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                                  <span className="text-xs text-gray-500 uppercase font-bold">时长</span>
+                                  <div className="font-bold text-sm">{session.duration}分钟</div>
                               </div>
-                              <div className="bg-gray-50 p-2 rounded">
-                                  <span className="text-xs text-gray-500 uppercase">重点</span>
-                                  <div className="font-bold">{session.focus}</div>
+                              <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                                  <span className="text-xs text-gray-500 uppercase font-bold">重点</span>
+                                  <div className="font-bold text-sm truncate">{session.focus}</div>
                               </div>
-                              <div className="bg-gray-50 p-2 rounded">
-                                  <span className="text-xs text-gray-500 uppercase">强度</span>
-                                  <div className={`font-bold ${
+                              <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                                  <span className="text-xs text-gray-500 uppercase font-bold">强度</span>
+                                  <div className={`font-bold text-sm ${
                                       session.intensity === 'High' ? 'text-red-600' : 'text-green-600'
                                   }`}>{session.intensity === 'High' ? '高' : session.intensity === 'Medium' ? '中' : '低'}</div>
                               </div>
@@ -206,53 +206,56 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                                   </div>
                               </div>
                               
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                   {teamPlayers.map(player => {
                                       const status = getStatus(player.id);
                                       return (
-                                          <div key={player.id} className="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                                              <div className="flex items-center">
-                                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold mr-3 border-2 ${
-                                                      status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' :
-                                                      status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
-                                                      status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' :
-                                                      'bg-gray-50 border-gray-200 text-gray-400'
-                                                  }`}>
-                                                      {player.name.charAt(0)}
-                                                  </div>
-                                                  <div>
-                                                      <div className="font-bold text-gray-800">{player.name}</div>
-                                                      <div className="text-[10px] flex items-center gap-2">
-                                                          {status === 'Present' && <span className="text-green-600 font-bold">正常参训 (-1 课时)</span>}
-                                                          {status === 'Leave' && <span className="text-yellow-600 font-bold">请假 (消耗额度/扣课时)</span>}
-                                                          {status === 'Injury' && <span className="text-red-600 font-bold">伤停 (不扣费)</span>}
-                                                          {(status === 'Absent' || !status) && <span className="text-gray-400">未出席 / 缺席</span>}
+                                          <div key={player.id} className="flex flex-col p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
+                                              <div className="flex items-center justify-between mb-3">
+                                                  <div className="flex items-center">
+                                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mr-2 border-2 ${
+                                                          status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' :
+                                                          status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' :
+                                                          status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' :
+                                                          'bg-gray-50 border-gray-200 text-gray-400'
+                                                      }`}>
+                                                          {player.name.charAt(0)}
                                                       </div>
+                                                      <div>
+                                                          <div className="font-bold text-gray-800 text-sm">{player.name}</div>
+                                                          <div className="text-[10px] text-gray-400">#{player.number}</div>
+                                                      </div>
+                                                  </div>
+                                                  <div className="text-[10px] font-bold">
+                                                      {status === 'Present' && <span className="text-green-600">正常参训</span>}
+                                                      {status === 'Leave' && <span className="text-yellow-600">请假</span>}
+                                                      {status === 'Injury' && <span className="text-red-600">伤停</span>}
+                                                      {(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}
                                                   </div>
                                               </div>
                                               
-                                              <div className="flex bg-gray-100 p-1 rounded-lg gap-1">
+                                              <div className="flex bg-gray-50 p-1 rounded-lg gap-1">
                                                   <button 
                                                       onClick={() => setPlayerStatus(player.id, 'Present')}
-                                                      className={`p-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}
+                                                      className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}
                                                   >
                                                       <CheckCircle className="w-5 h-5" />
                                                   </button>
                                                   <button 
                                                       onClick={() => setPlayerStatus(player.id, 'Leave')}
-                                                      className={`p-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}
+                                                      className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}
                                                   >
                                                       <Clock className="w-5 h-5" />
                                                   </button>
                                                   <button 
                                                       onClick={() => setPlayerStatus(player.id, 'Injury')}
-                                                      className={`p-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-sm text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}
+                                                      className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-sm text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}
                                                   >
                                                       <AlertCircle className="w-5 h-5" />
                                                   </button>
                                                   <button 
                                                       onClick={() => setPlayerStatus(player.id, 'Absent')}
-                                                      className={`p-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-sm text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-200'}`}
+                                                      className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-sm text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-200'}`}
                                                   >
                                                       <Ban className="w-5 h-5" />
                                                   </button>
@@ -286,7 +289,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                                 <div className="relative">
                                     <textarea 
                                         disabled={!canEditLog || logStatus === 'Reviewed'}
-                                        className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100"
+                                        className="w-full h-40 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100"
                                         placeholder="请描述球队整体训练状态，以及教案实际执行效果..."
                                         value={coachFeedback}
                                         onChange={e => setCoachFeedback(e.target.value)}
@@ -298,7 +301,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                                                 disabled={!coachFeedback.trim()}
                                                 className="bg-bvb-black text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 flex items-center disabled:opacity-50"
                                             >
-                                                <Send className="w-3 h-3 mr-1" /> 提交日志
+                                                <Send className="w-3 h-3 mr-1" /> 提交
                                             </button>
                                         </div>
                                     )}
@@ -314,7 +317,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                                 {isDirector ? (
                                     <div className="relative">
                                         <textarea 
-                                            className="w-full h-24 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors"
+                                            className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors"
                                             placeholder="请对本次训练及教练反馈进行点评..."
                                             value={directorReview}
                                             onChange={e => setDirectorReview(e.target.value)}
@@ -341,7 +344,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                 </div>
 
                 {activeTab === 'attendance' && (
-                    <div className="bg-gray-50 p-4 border-t flex justify-end shrink-0">
+                    <div className="bg-gray-50 p-4 border-t flex justify-end shrink-0 hidden md:flex">
                         <button 
                           onClick={handleForceSave} 
                           className="px-6 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 transition-colors flex items-center"
@@ -349,12 +352,6 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                            {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <RefreshCw className={`w-4 h-4 mr-2 ${saveStatus === 'saving' ? 'animate-spin' : ''}`} />}
                            保存考勤并更新
                         </button>
-                    </div>
-                )}
-                {activeTab === 'log' && (
-                    <div className="bg-gray-50 p-4 border-t flex justify-between items-center text-xs text-gray-400 shrink-0">
-                         <span>日志状态: {logStatus}</span>
-                         <button onClick={onClose} className="font-bold hover:text-gray-600">关闭</button>
                     </div>
                 )}
             </div>
@@ -707,11 +704,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               {/* View Content */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
                  {timeScope === 'month' ? (
-                     <div className="grid grid-cols-7 border-l border-t border-gray-200">
-                         {['日','一','二','三','四','五','六'].map(d => (
-                             <div key={d} className="py-2 text-center text-xs font-bold text-gray-400 bg-gray-50 border-r border-b border-gray-200">{d}</div>
-                         ))}
-                         {renderCalendar()}
+                     <div className="overflow-x-auto">
+                        <div className="grid grid-cols-7 border-l border-t border-gray-200 min-w-[700px] md:min-w-0">
+                            {['日','一','二','三','四','五','六'].map(d => (
+                                <div key={d} className="py-2 text-center text-xs font-bold text-gray-400 bg-gray-50 border-r border-b border-gray-200">{d}</div>
+                            ))}
+                            {renderCalendar()}
+                        </div>
                      </div>
                  ) : (
                      <div className="p-4">
@@ -792,8 +791,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
       {/* Add Modal */}
       {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
+              <div className="bg-white w-full h-[100dvh] md:h-auto md:max-w-lg md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
                   <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                       <h3 className="font-bold flex items-center">
                           <Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建训练计划
@@ -801,7 +800,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                       <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto p-6">
+                  <div className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6">
                       <form onSubmit={handleSubmit} className="space-y-4">
                           {/* AI Generator Banner */}
                           <div className="bg-gradient-to-r from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-100 flex justify-between items-center">

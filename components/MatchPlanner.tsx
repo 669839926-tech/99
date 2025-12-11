@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Match, Player, Team, MatchDetails, MatchEvent, MatchEventType } from '../types';
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Download, Sun, Cloud, CloudRain, CloudSnow, Wind, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Download, Sun, Cloud, CloudRain, CloudSnow, Wind, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -235,7 +235,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
     ) : 'border-gray-300'}`}>
         
         {/* Actions Top Right */}
-        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-3 right-3 flex gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
             <button 
                 onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }}
                 className="p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"
@@ -256,7 +256,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
             <span className="text-xs font-bold uppercase text-gray-400 flex items-center">
                 <Calendar className="w-3 h-3 mr-1" /> {match.date} • {match.time}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pr-12 md:pr-0">
                 <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-200 text-gray-600'}`}>
                     {getLocationLabel(match.location)}
                 </span>
@@ -296,7 +296,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
   );
 
   return (
-    <div className="space-y-8 relative">
+    <div className="space-y-8 relative pb-20 md:pb-0">
       <div className="flex justify-between items-center">
         <div>
             <h2 className="text-3xl font-black text-bvb-black uppercase">比赛日中心</h2>
@@ -341,15 +341,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
       {/* 1. Add Match Modal */}
       {showAddModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                  <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
+              <div className="bg-white w-full h-[100dvh] md:h-auto md:max-w-md rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
+                  <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                       <h3 className="font-bold flex items-center">
                           <Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 录入新比赛
                       </h3>
                       <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
                   </div>
-                  <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
+                  <form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto">
                       <div>
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">比赛名称 (标题)</label>
                           <input 
@@ -447,19 +447,20 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
       {/* 2. Detailed Edit / Log Modal */}
       {editingMatch && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh]">
+           <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
+              <div className="bg-white w-full h-[100dvh] md:h-auto md:max-w-4xl rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:h-[85vh]">
                   <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                       <div className="flex items-center gap-3">
+                        <button onClick={() => setEditingMatch(null)} className="md:hidden"><ChevronLeft className="w-6 h-6" /></button>
                         <div>
-                            <h3 className="font-bold flex items-center text-lg">
+                            <h3 className="font-bold flex items-center text-lg leading-tight">
                                 <FileText className="w-5 h-5 mr-2 text-bvb-yellow" />
                                 {editingMatch.status === 'Completed' ? '赛后总结与日志' : '编辑比赛详情'}
                             </h3>
                             <p className="text-xs text-gray-400 mt-1">{editingMatch.opponent} | {editingMatch.date}</p>
                         </div>
                         <div className="flex items-center gap-2 ml-4">
-                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 正在保存...</span>}
+                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                             {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                         </div>
                       </div>
@@ -467,21 +468,21 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                          <button 
                             onClick={handleExportReport}
                             disabled={isExporting}
-                            className="bg-gray-800 hover:bg-gray-700 text-bvb-yellow px-3 py-1.5 rounded text-xs font-bold flex items-center"
+                            className="hidden md:flex bg-gray-800 hover:bg-gray-700 text-bvb-yellow px-3 py-1.5 rounded text-xs font-bold items-center"
                          >
                             {isExporting ? '导出中...' : <><Download className="w-3 h-3 mr-1" /> 导出战报</>}
                          </button>
-                         <button onClick={() => setEditingMatch(null)}><X className="w-5 h-5" /></button>
+                         <button onClick={() => setEditingMatch(null)} className="hidden md:block"><X className="w-5 h-5" /></button>
                       </div>
                   </div>
                   
                   {/* Tabs */}
-                  <div className="bg-gray-100 border-b border-gray-200 flex space-x-1 p-1 shrink-0">
+                  <div className="bg-gray-100 border-b border-gray-200 flex space-x-1 p-1 shrink-0 sticky top-0 z-10">
                       {[
-                          { id: 'info', label: '基础信息/环境', icon: MapPin },
-                          { id: 'lineup', label: '阵容名单', icon: Users },
-                          { id: 'events', label: '关键事件', icon: Activity },
-                          { id: 'report', label: '赛后总结', icon: FileText },
+                          { id: 'info', label: '基础', icon: MapPin },
+                          { id: 'lineup', label: '阵容', icon: Users },
+                          { id: 'events', label: '事件', icon: Activity },
+                          { id: 'report', label: '总结', icon: FileText },
                       ].map(tab => (
                           <button
                             key={tab.id}
@@ -490,19 +491,19 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                                 activeTab === tab.id ? 'bg-white shadow text-bvb-black' : 'text-gray-500 hover:text-gray-700'
                             }`}
                           >
-                              <tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />
-                              {tab.label}
+                              <tab.icon className={`w-4 h-4 mr-1 md:mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />
+                              <span className="text-xs md:text-sm">{tab.label}</span>
                           </button>
                       ))}
                   </div>
 
-                  <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+                  <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-gray-50 pb-24 md:pb-6">
                     <form id="match-log-form" onSubmit={handleEditSubmit} className="space-y-6 h-full flex flex-col">
                         
                         {/* TAB 1: INFO & ENVIRONMENT */}
                         {activeTab === 'info' && (
                             <div className="space-y-6 animate-in slide-in-from-right-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
                                         <h4 className="font-bold text-gray-800 mb-3 text-sm uppercase">比赛信息</h4>
                                         <div className="space-y-3">
@@ -681,7 +682,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                                 {/* Add Event Form */}
                                 <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 shrink-0">
                                     <h4 className="font-bold text-gray-800 mb-3 text-sm uppercase">添加关键事件</h4>
-                                    <div className="flex gap-2 items-end">
+                                    <div className="flex flex-wrap gap-2 items-end">
                                         <div className="w-20">
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">时间(分)</label>
                                             <input 
@@ -691,7 +692,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                                                 onChange={e => setNewEvent({...newEvent, minute: parseInt(e.target.value)})}
                                             />
                                         </div>
-                                        <div className="w-32">
+                                        <div className="w-24 flex-1">
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">事件类型</label>
                                             <select 
                                                 className="w-full p-2 border rounded text-sm"
@@ -705,7 +706,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                                                 <option value="Sub">换人 🔄</option>
                                             </select>
                                         </div>
-                                        <div className="flex-1">
+                                        <div className="w-full md:w-auto md:flex-1">
                                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">球员</label>
                                             <select 
                                                 className="w-full p-2 border rounded text-sm"
@@ -719,7 +720,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                                             </select>
                                         </div>
                                         {newEvent.type === 'Sub' && (
-                                            <div className="flex-1">
+                                            <div className="w-full md:w-auto md:flex-1">
                                                 <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">换下球员</label>
                                                 <select 
                                                     className="w-full p-2 border rounded text-sm"
@@ -737,7 +738,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                                             type="button" 
                                             onClick={handleAddEvent}
                                             disabled={!newEvent.playerId}
-                                            className="px-4 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 disabled:opacity-50"
+                                            className="w-full md:w-auto px-4 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 disabled:opacity-50"
                                         >
                                             添加
                                         </button>
@@ -804,7 +805,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                         )}
 
                         {/* Footer Save Button */}
-                        <div className="pt-2 mt-auto">
+                        <div className="pt-2 mt-auto hidden md:block">
                             <button type="button" onClick={handleForceSave} className={`w-full py-3 font-bold rounded-lg flex justify-center items-center shadow-lg transform active:scale-[0.99] transition-all ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-black text-white hover:bg-gray-800'}`}>
                                 {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />} 
                                 {saveStatus === 'saved' ? '所有更改已保存' : '立即保存所有更改'}

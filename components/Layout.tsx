@@ -119,54 +119,58 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
         
         {/* Mobile Header (Brand Only) */}
-        <header className="md:hidden bg-bvb-black text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0">
+        <header className="md:hidden bg-bvb-black text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0 sticky top-0">
              <div className="flex items-center">
                 <div className="w-8 h-8 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-sm mr-2 border-2 border-white">WS</div>
-                <span className="font-bold text-bvb-yellow tracking-wider">顽石之光青训</span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-bvb-yellow tracking-wider text-sm leading-tight">顽石之光</span>
+                  <span className="text-[10px] text-gray-400 leading-tight">青训管理</span>
+                </div>
              </div>
              <div className="flex items-center gap-3">
                  {/* Mobile Sync Icon */}
-                 {isSyncing ? <RefreshCw className="w-4 h-4 text-bvb-yellow animate-spin" /> : <Cloud className="w-4 h-4 text-gray-400" />}
+                 {isSyncing ? <RefreshCw className="w-4 h-4 text-bvb-yellow animate-spin" /> : <Cloud className="w-4 h-4 text-gray-500" />}
                  <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
              </div>
         </header>
 
         {/* Scrollable Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pb-24 md:pb-8 scroll-smooth">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pb-28 md:pb-8 scroll-smooth">
           <div className="max-w-7xl mx-auto h-full">
              {children}
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bvb-black border-t-4 border-bvb-yellow z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-            <div className={`flex justify-around items-center h-16 px-1 ${currentUser?.role === 'coach' ? 'max-w-full' : ''}`}>
+        {/* Mobile Bottom Navigation - Enhanced */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bvb-black/95 backdrop-blur-md border-t border-gray-800 z-30 pb-safe">
+            <div className={`flex justify-around items-center h-16 px-1`}>
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 active:scale-95 ${
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-90 ${
                     activeTab === item.id ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
                   <item.icon className={`w-6 h-6 ${activeTab === item.id ? 'fill-current' : ''}`} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-                  <span className="text-[10px] font-bold">{getMobileLabel(item.label)}</span>
+                  <span className="text-[10px] font-bold scale-90 origin-center">{getMobileLabel(item.label)}</span>
                 </button>
               ))}
                {/* Settings only for Director */}
                {currentUser?.role !== 'coach' && (
                    <button
                       onClick={() => setActiveTab('settings')}
-                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 active:scale-95 ${
+                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-90 ${
                         activeTab === 'settings' ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
                       }`}
                     >
                       <Settings className={`w-6 h-6 ${activeTab === 'settings' ? 'fill-current' : ''}`} strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
-                      <span className="text-[10px] font-bold">设置</span>
+                      <span className="text-[10px] font-bold scale-90 origin-center">设置</span>
                     </button>
                )}
             </div>
-            <div className="h-safe-bottom bg-bvb-black w-full"></div>
+            {/* Safe area spacer for iPhone Home Bar */}
+            <div className="h-[env(safe-area-inset-bottom)] w-full bg-bvb-black"></div>
           </nav>
 
       </div>
