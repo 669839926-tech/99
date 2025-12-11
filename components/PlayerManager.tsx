@@ -198,7 +198,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   };
 
   // Helper: Calculate Overall Rating (1-10)
-  const getOverallRating = (player: Player) => {
+  const getOverallRating = (player: Player): string => {
     const sourceStats = player.lastPublishedStats || player.stats;
 
     let total = 0;
@@ -211,7 +211,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         });
       }
     });
-    return count === 0 ? 0 : (total / count).toFixed(1);
+    return count === 0 ? '0.0' : (total / count).toFixed(1);
   };
 
   // Helper: Calculate Attendance Rate with Scope
@@ -828,11 +828,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
           lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats)) // Sync immediately
       };
       onUpdatePlayer(updatedPlayer);
-      // setIsEditing(false); // DO NOT EXIT EDIT MODE as per user request
       
       // Show Success Feedback
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
+      
+      // IMPORTANT: Do NOT call setIsEditing(false) here, as per user request to stay in edit mode
     };
 
     const handleDelete = () => {
@@ -1446,7 +1447,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 {isEditing ? (
                   <>
                     <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">
-                        {isEditing ? '退出编辑' : '取消'}
+                        退出编辑
                     </button>
                     {/* Simplified: Save acts as Publish */}
                     <button onClick={handleSave} className={`px-3 py-1 font-bold rounded hover:brightness-110 text-sm flex items-center ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-yellow text-bvb-black'}`}>
@@ -1971,8 +1972,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                               <div className="flex items-end justify-between mt-2">
                                   <div className="flex items-center gap-2">
                                      <div className={`text-sm font-black px-2 py-0.5 rounded flex items-center ${
-                                         parseFloat(overallRating as string) >= 8 ? 'bg-green-100 text-green-700' :
-                                         parseFloat(overallRating as string) >= 6 ? 'bg-yellow-100 text-yellow-700' :
+                                         parseFloat(overallRating) >= 8 ? 'bg-green-100 text-green-700' :
+                                         parseFloat(overallRating) >= 6 ? 'bg-yellow-100 text-yellow-700' :
                                          'bg-gray-100 text-gray-600'
                                      }`}>
                                          {overallRating} <span className="text-[9px] opacity-70 ml-1 font-bold">OVR</span>
