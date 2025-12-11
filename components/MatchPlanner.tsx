@@ -1,7 +1,7 @@
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Match, Player, Team, MatchDetails, MatchEvent, MatchEventType } from '../types';
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Download, Sun, Cloud, CloudRain, CloudSnow, Wind, Users, Activity, Flag, Tag, Loader2, Clock } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Download, Sun, Cloud, CloudRain, CloudSnow, Wind, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -22,11 +22,25 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
   const [strategy, setStrategy] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // Modals State
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   
+  // Auto-Save Effect for Editing Match
+  useEffect(() => {
+    if (!editingMatch) return;
+
+    const timer = setTimeout(() => {
+        setSaveStatus('saving');
+        onUpdateMatch(editingMatch);
+        setTimeout(() => setSaveStatus('saved'), 800);
+    }, 1500); // 1.5s debounce
+
+    return () => clearTimeout(timer);
+  }, [editingMatch]);
+
   // Detailed Edit State
   const [activeTab, setActiveTab] = useState<TabType>('info');
   
@@ -110,6 +124,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
   const handleEditSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+      // Force immediate save on manual submit
       if(editingMatch) {
           // If changed to Home during edit, clear address
           const isHome = editingMatch.location === 'Home';
@@ -122,6 +137,13 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
           onUpdateMatch(finalMatch);
           setEditingMatch(null);
       }
+  };
+  
+  const handleForceSave = () => {
+       if (editingMatch) {
+           onUpdateMatch(editingMatch);
+           setSaveStatus('saved');
+       }
   };
 
   const handleAddEvent = () => {
@@ -428,12 +450,18 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
               <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[85vh]">
                   <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
-                      <div>
-                        <h3 className="font-bold flex items-center text-lg">
-                             <FileText className="w-5 h-5 mr-2 text-bvb-yellow" />
-                             {editingMatch.status === 'Completed' ? '赛后总结与日志' : '编辑比赛详情'}
-                        </h3>
-                        <p className="text-xs text-gray-400 mt-1">{editingMatch.opponent} | {editingMatch.date}</p>
+                      <div className="flex items-center gap-3">
+                        <div>
+                            <h3 className="font-bold flex items-center text-lg">
+                                <FileText className="w-5 h-5 mr-2 text-bvb-yellow" />
+                                {editingMatch.status === 'Completed' ? '赛后总结与日志' : '编辑比赛详情'}
+                            </h3>
+                            <p className="text-xs text-gray-400 mt-1">{editingMatch.opponent} | {editingMatch.date}</p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 正在保存...</span>}
+                            {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
+                        </div>
                       </div>
                       <div className="flex items-center space-x-2">
                          <button 
@@ -777,8 +805,9 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
                         {/* Footer Save Button */}
                         <div className="pt-2 mt-auto">
-                            <button type="submit" className="w-full py-3 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 flex justify-center items-center shadow-lg transform active:scale-[0.99] transition-all">
-                                <Save className="w-4 h-4 mr-2" /> 保存所有更改
+                            <button type="button" onClick={handleForceSave} className={`w-full py-3 font-bold rounded-lg flex justify-center items-center shadow-lg transform active:scale-[0.99] transition-all ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-black text-white hover:bg-gray-800'}`}>
+                                {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <Save className="w-4 h-4 mr-2" />} 
+                                {saveStatus === 'saved' ? '所有更改已保存' : '立即保存所有更改'}
                             </button>
                         </div>
                     </form>

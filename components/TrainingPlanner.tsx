@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 
@@ -342,6 +343,31 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const [coachFeedback, setCoachFeedback] = useState(selectedSession.coachFeedback || '');
       const [directorReview, setDirectorReview] = useState(selectedSession.directorReview || '');
       const [logStatus, setLogStatus] = useState(selectedSession.submissionStatus || 'Planned');
+      const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+      // Auto-Save Effect
+      useEffect(() => {
+          const timer = setTimeout(() => {
+              setSaveStatus('saving');
+              
+              // Construct update object
+              const updatedSession = {
+                  ...selectedSession,
+                  attendance: localAttendance,
+                  coachFeedback,
+                  directorReview,
+                  // Do not update status here unless explicitly handled by buttons,
+                  // but we want to ensure latest text is saved.
+                  // Status updates are handled by specific buttons.
+              };
+              
+              onUpdateTraining(updatedSession, localAttendance);
+              
+              setTimeout(() => setSaveStatus('saved'), 800);
+          }, 1500); // 1.5s debounce
+
+          return () => clearTimeout(timer);
+      }, [localAttendance, coachFeedback, directorReview]);
 
       // Permissions
       const isDirector = currentUser?.role === 'director';
@@ -370,32 +396,36 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           setLocalAttendance(allPresent);
       };
 
-      const handleSaveAttendance = () => {
-          onUpdateTraining(selectedSession, localAttendance);
-          setSelectedSession({ ...selectedSession, attendance: localAttendance });
+      // Explicit Save (forces immediate update)
+      const handleForceSave = () => {
+          onUpdateTraining({ ...selectedSession, attendance: localAttendance, coachFeedback, directorReview }, localAttendance);
+          setSaveStatus('saved');
       };
 
       const handleSubmitLog = () => {
           const updatedSession = { 
               ...selectedSession, 
               coachFeedback, 
+              directorReview,
               submissionStatus: 'Submitted' as const
           };
-          // We use onUpdateTraining to save everything (reusing the prop, ideally name should be generic)
           onUpdateTraining(updatedSession, localAttendance);
           setSelectedSession(updatedSession);
           setLogStatus('Submitted');
+          setSaveStatus('saved');
       };
 
       const handleDirectorApprove = () => {
           const updatedSession = {
               ...selectedSession,
+              coachFeedback,
               directorReview,
               submissionStatus: 'Reviewed' as const
           };
           onUpdateTraining(updatedSession, localAttendance);
           setSelectedSession(updatedSession);
           setLogStatus('Reviewed');
+          setSaveStatus('saved');
       };
 
       return (
@@ -406,7 +436,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         <h3 className="font-bold text-lg">{selectedSession.title}</h3>
                         <p className="text-xs text-gray-400">{selectedSession.date} • {team?.name}</p>
                       </div>
-                      <button onClick={() => setSelectedSession(null)}><X className="w-5 h-5" /></button>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                             {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 正在保存...</span>}
+                             {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
+                        </div>
+                        <button onClick={() => setSelectedSession(null)}><X className="w-5 h-5" /></button>
+                      </div>
                   </div>
                   
                   {/* Tabs */}
@@ -596,10 +632,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   {activeTab === 'attendance' && (
                       <div className="bg-gray-50 p-4 border-t flex justify-end">
                           <button 
-                            onClick={handleSaveAttendance} 
-                            className="px-6 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 transition-colors"
+                            onClick={handleForceSave} 
+                            className="px-6 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 transition-colors flex items-center"
                           >
-                              保存考勤并更新课时
+                             {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <RefreshCw className={`w-4 h-4 mr-2 ${saveStatus === 'saving' ? 'animate-spin' : ''}`} />}
+                             保存考勤并更新
                           </button>
                       </div>
                   )}
