@@ -24,511 +24,146 @@ interface PlayerManagerProps {
   initialFilter?: string;
 }
 
-const PlayerManager: React.FC<PlayerManagerProps> = ({ 
-  teams, 
-  players, 
-  trainings = [],
-  attributeConfig,
-  currentUser,
-  onAddPlayer, 
-  onBulkAddPlayers,
-  onAddTeam, 
-  onUpdatePlayer, 
-  onDeletePlayer,
-  onBulkDeletePlayers,
-  onTransferPlayers,
-  onAddPlayerReview,
-  onRechargePlayer,
-  initialFilter
-}) => {
-  
-  // Permissions Logic
-  const isDirector = currentUser?.role === 'director';
-  const isCoach = currentUser?.role === 'coach';
-  
-  // If coach, restrict team selection to assigned team
-  const availableTeams = isCoach 
-    ? teams.filter(t => t.id === currentUser?.teamId) 
-    : teams;
+// --- Helper Functions (Extracted to prevent re-creation) ---
 
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
-  
-  // Filter States
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterPos, setFilterPos] = useState<string>('全部');
-  const [showDraftsOnly, setShowDraftsOnly] = useState(false); // Changed from Pending to Drafts
-
-  // Handle Initial Filter from Dashboard Navigation
-  useEffect(() => {
-    if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') {
-        setShowDraftsOnly(true);
-    } else {
-        setShowDraftsOnly(false);
-    }
-  }, [initialFilter]);
-
-  // Initialize selectedTeamId based on role
-  useEffect(() => {
-    if (isCoach && currentUser?.teamId) {
-        setSelectedTeamId(currentUser.teamId);
-    } else if (!selectedTeamId && teams.length > 0) {
-        setSelectedTeamId(teams[0].id);
-    }
-  }, [teams, currentUser, isCoach]);
-
-  const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
-  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-
-  // Sync selectedPlayer with players prop updates to ensure fresh data in modal
-  // NOTE: When auto-save is active (isEditing), we might want to suppress this to avoid overwriting typed chars, 
-  // but since we push updates up, the prop should match local state eventually.
-  // We handle the conflict in the Modal component.
-  useEffect(() => {
-      if (selectedPlayer) {
-          const updated = players.find(p => p.id === selectedPlayer.id);
-          if (updated && updated !== selectedPlayer) {
-             // We only update here if we are NOT editing in the child modal, 
-             // but since this is the parent, we can just pass the fresh prop.
-             // The child modal handles the "don't overwrite while editing" logic.
-              setSelectedPlayer(updated);
-          }
-      }
-  }, [players]); // Removed selectedPlayer from dependency to avoid loop, rely on ID match
-  
-  // File Input Ref
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Selection Mode State
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  // Modals
-  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [showAddTeamModal, setShowAddTeamModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showRechargeModal, setShowRechargeModal] = useState(false);
-  const [rechargePlayerId, setRechargePlayerId] = useState<string | null>(null);
-
-  // Reset selection when changing teams
-  useEffect(() => {
-    setSelectedIds(new Set());
-    setIsSelectionMode(false);
-  }, [selectedTeamId]);
-
-  const selectedTeam = teams.find(t => t.id === selectedTeamId);
-
-  // New Player Form State
-  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({
-    name: '',
-    gender: '男',
-    idCard: '',
-    birthDate: '',
-    position: Position.MID,
-    number: 0,
-    age: 0,
-    image: '',
-    teamId: '',
-    isCaptain: false
-  });
-
-  // Recharge Form State
-  const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
-
-  // ID Card Parsing Logic
-  const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const id = e.target.value;
-    const updates: Partial<Player> = { idCard: id };
-
-    if (id.length === 18) {
-      // Parse Birth Date (YYYYMMDD) - chars 6-13
-      const year = parseInt(id.substring(6, 10));
-      const month = parseInt(id.substring(10, 12));
-      const day = parseInt(id.substring(12, 14));
-      
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
-        const birthDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        updates.birthDate = birthDateStr;
-
-        // Calc Age
-        const today = new Date();
-        let age = today.getFullYear() - year;
-        const m = today.getMonth() + 1 - month;
-        if (m < 0 || (m === 0 && today.getDate() < day)) {
-            age--;
-        }
-        updates.age = age;
-      }
-
-      // Parse Gender (17th digit, odd=Male, even=Female)
-      const genderDigit = parseInt(id.charAt(16));
-      if (!isNaN(genderDigit)) {
-        updates.gender = genderDigit % 2 === 1 ? '男' : '女';
-      }
-    }
-    
-    setNewPlayer(prev => ({ ...prev, ...updates }));
-  };
-
-  // Image Upload Logic
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewPlayer(prev => ({ ...prev, image: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Birthday Helper
-  const getBirthdayStatus = (dateStr: string) => {
-    if (!dateStr) return null;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    
-    const [y, m, d] = dateStr.split('-').map(Number);
-    if (!y || !m || !d) return null;
-
-    let nextBirthday = new Date(today.getFullYear(), m - 1, d);
-    if (nextBirthday < today) {
-        nextBirthday.setFullYear(today.getFullYear() + 1);
-    }
-
-    const diffTime = nextBirthday.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return { label: '今天生日', color: 'bg-pink-500' };
-    if (diffDays <= 7) return { label: `${diffDays}天后生日`, color: 'bg-blue-500' };
-    return null;
-  };
-
-  // Helper: Calculate Overall Rating (1-10)
-  const getOverallRating = (player: Player): string => {
-    const sourceStats = player.lastPublishedStats || player.stats;
-
-    let total = 0;
-    let count = 0;
-    (['technical', 'tactical', 'physical', 'mental'] as AttributeCategory[]).forEach(cat => {
-      if (sourceStats[cat]) {
-        Object.values(sourceStats[cat]).forEach(val => {
-            total += val;
-            count++;
-        });
-      }
-    });
-    return count === 0 ? '0.0' : (total / count).toFixed(1);
-  };
-
-  // Helper: Calculate Attendance Rate with Scope
-  const getAttendanceRate = (player: Player, scope: 'month' | 'quarter' | 'year') => {
-      if (!trainings || trainings.length === 0) return 0;
-      
-      const now = new Date();
-      let startDate = new Date();
-
-      if (scope === 'month') {
-        startDate.setMonth(now.getMonth() - 1);
-      } else if (scope === 'quarter') {
-        startDate.setMonth(now.getMonth() - 3);
-      } else {
-        startDate.setFullYear(now.getFullYear() - 1);
-      }
-
-      // Filter sessions that belong to the player's team AND fall within date range
-      const validSessions = trainings.filter(t => {
-          const tDate = new Date(t.date);
-          return t.teamId === player.teamId && tDate >= startDate && tDate <= now;
+const getOverallRating = (player: Player): string => {
+  const sourceStats = player.lastPublishedStats || player.stats;
+  let total = 0;
+  let count = 0;
+  (['technical', 'tactical', 'physical', 'mental'] as AttributeCategory[]).forEach(cat => {
+    if (sourceStats[cat]) {
+      Object.values(sourceStats[cat]).forEach(val => {
+          total += val;
+          count++;
       });
-      
-      if (validSessions.length === 0) return 0;
-      
-      const presentCount = validSessions.filter(t => 
-        t.attendance?.some(r => r.playerId === player.id && r.status === 'Present')
-      ).length;
-
-      return Math.round((presentCount / validSessions.length) * 100);
-  };
-
-  // Validity Checker
-  const isExpired = (dateStr?: string) => {
-      if (!dateStr) return true;
-      return new Date(dateStr) < new Date();
-  };
-
-  // New Team Form State
-  const [newTeam, setNewTeam] = useState<Partial<Team>>({
-    name: '',
-    level: 'U17',
-    description: ''
+    }
   });
+  return count === 0 ? '0.0' : (total / count).toFixed(1);
+};
 
-  const filteredPlayers = players.filter(p => {
-    // Allow Director to see all teams when filtering for drafts/pending items
-    const shouldIgnoreTeamFilter = showDraftsOnly && isDirector;
-    const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
-
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPos = filterPos === '全部' || p.position === filterPos;
+const calculateAttendanceRate = (player: Player, trainings: TrainingSession[], scope: 'month' | 'quarter' | 'year') => {
+    if (!trainings || trainings.length === 0) return 0;
     
-    // Draft/Pending Filter Logic
-    if (showDraftsOnly) {
-        // Look for Draft or Submitted (treating submitted as draft in this new workflow)
-        const hasDraftReviews = p.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
-        const hasDraftStats = p.statsStatus === 'Draft' || p.statsStatus === 'Submitted';
-        
-        // If it doesn't have draft items, filter it out
-        if (!hasDraftReviews && !hasDraftStats) return false;
-    }
+    const now = new Date();
+    let startDate = new Date();
 
-    return matchesTeam && matchesSearch && matchesPos;
-  }).sort((a, b) => {
-    // Sort logic: Birthday Today first, then Captain, then others by number
-    const statusA = getBirthdayStatus(a.birthDate);
-    const statusB = getBirthdayStatus(b.birthDate);
-    
-    const isTodayA = statusA?.label === '今天生日';
-    const isTodayB = statusB?.label === '今天生日';
-
-    if (isTodayA && !isTodayB) return -1;
-    if (!isTodayA && isTodayB) return 1;
-
-    // Captain priority
-    if (a.isCaptain && !b.isCaptain) return -1;
-    if (!a.isCaptain && b.isCaptain) return 1;
-
-    // Secondary sort by jersey number
-    return (a.number || 0) - (b.number || 0);
-  });
-
-  const toggleSelection = (id: string) => {
-    const newSet = new Set(selectedIds);
-    if (newSet.has(id)) {
-        newSet.delete(id);
+    if (scope === 'month') {
+      startDate.setMonth(now.getMonth() - 1);
+    } else if (scope === 'quarter') {
+      startDate.setMonth(now.getMonth() - 3);
     } else {
-        newSet.add(id);
+      startDate.setFullYear(now.getFullYear() - 1);
     }
-    setSelectedIds(newSet);
-  };
 
-  const handleSelectAll = () => {
-    if (selectedIds.size === filteredPlayers.length) {
-        setSelectedIds(new Set());
-    } else {
-        setSelectedIds(new Set(filteredPlayers.map(p => p.id)));
-    }
-  };
-
-  const executeBulkDelete = () => {
-      onBulkDeletePlayers(Array.from(selectedIds));
-      setSelectedIds(new Set());
-      setIsSelectionMode(false);
-  };
-
-  const generateDefaultStats = (): PlayerStats => {
-    const stats: any = {
-        technical: {},
-        tactical: {},
-        physical: {},
-        mental: {}
-    };
-    
-    // Initialize defaults to 5 for all configured attributes (scale 1-10)
-    Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary') return;
-        const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => {
-            stats[category][attr.key] = 5;
-        });
+    const validSessions = trainings.filter(t => {
+        const tDate = new Date(t.date);
+        return t.teamId === player.teamId && tDate >= startDate && tDate <= now;
     });
-
-    return stats;
-  };
-
-  const handleAddPlayerSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const finalTeamId = newPlayer.teamId || selectedTeamId;
     
-    if (newPlayer.name && newPlayer.number && finalTeamId) {
-        const defaultStats = generateDefaultStats();
-        const p: Player = {
-            id: Date.now().toString(),
-            teamId: finalTeamId,
-            name: newPlayer.name,
-            gender: newPlayer.gender || '男',
-            idCard: newPlayer.idCard || '',
-            birthDate: newPlayer.birthDate || '',
-            number: newPlayer.number,
-            position: newPlayer.position as Position,
-            isCaptain: newPlayer.isCaptain || false,
-            age: newPlayer.age || 16,
-            height: 175, 
-            weight: 70, 
-            goals: 0,
-            assists: 0,
-            appearances: 0,
-            image: newPlayer.image || `https://picsum.photos/200/200?random=${Date.now()}`,
-            stats: defaultStats,
-            statsStatus: 'Published', // Defaults to published for new players
-            lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), 
-            reviews: [],
-            credits: 0,
-            validUntil: new Date().toISOString().split('T')[0],
-            leaveQuota: 0,
-            leavesUsed: 0,
-            rechargeHistory: []
-        };
-        onAddPlayer(p);
-        setShowAddPlayerModal(false);
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false });
-    }
-  };
+    if (validSessions.length === 0) return 0;
+    
+    const presentCount = validSessions.filter(t => 
+      t.attendance?.some(r => r.playerId === player.id && r.status === 'Present')
+    ).length;
 
-  const handleAddTeamSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newTeam.name && newTeam.level) {
-      const t: Team = {
-        id: `t-${Date.now()}`,
-        name: newTeam.name!,
-        level: newTeam.level!,
-        description: newTeam.description || '新组建的梯队'
-      };
-      onAddTeam(t);
-      setSelectedTeamId(t.id);
-      setShowAddTeamModal(false);
-      setNewTeam({ name: '', level: 'U17', description: '' });
-    }
-  };
+    return Math.round((presentCount / validSessions.length) * 100);
+};
 
-  const openRechargeModal = (e: React.MouseEvent, playerId: string) => {
-      e.stopPropagation();
-      setRechargePlayerId(playerId);
-      setRechargeData({ amount: 50, quota: 3 });
-      setShowRechargeModal(true);
-  };
-
-  const handleRechargeSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (rechargePlayerId) {
-          onRechargePlayer(rechargePlayerId, rechargeData.amount, rechargeData.quota);
-          setShowRechargeModal(false);
-          setRechargePlayerId(null);
-      }
-  };
-
-  const getPosColor = (pos: Position) => {
-      switch(pos) {
-          case Position.GK: return 'bg-yellow-500 text-white border-yellow-500';
-          case Position.DEF: return 'bg-blue-600 text-white border-blue-600';
-          case Position.MID: return 'bg-green-600 text-white border-green-600';
-          case Position.FWD: return 'bg-red-600 text-white border-red-600';
-          default: return 'bg-gray-500 border-gray-500';
-      }
-  };
+const getBirthdayStatus = (dateStr: string) => {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0,0,0,0);
   
-  const getStatusColor = (status?: ApprovalStatus) => {
-      switch(status) {
-          case 'Published': return 'bg-green-100 text-green-700 border-green-200';
-          case 'Submitted': return 'bg-blue-100 text-blue-700 border-blue-200';
-          default: return 'bg-gray-100 text-gray-500 border-gray-200';
-      }
-  };
-  
-  const getStatusLabel = (status?: ApprovalStatus) => {
-      switch(status) {
-          case 'Published': return '已发布';
-          case 'Submitted': return '待审核';
-          default: return '草稿';
-      }
-  };
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return null;
 
-  // ... (Import Modal and Transfer Modal code omitted for brevity as no changes requested in them)
-  const ImportPlayersModal = () => {
-      // ... (Same as before)
-      return null;
+  let nextBirthday = new Date(today.getFullYear(), m - 1, d);
+  if (nextBirthday < today) {
+      nextBirthday.setFullYear(today.getFullYear() + 1);
   }
-  const TransferModal = ({ onClose }: { onClose: () => void }) => {
-      // ... (Same as before)
-      return null;
-  }
-  const RechargeModal = () => {
-      const player = players.find(p => p.id === rechargePlayerId);
-      if (!player) return null;
-      return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold flex items-center">
-                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
-                        课时充值
-                    </h3>
-                    <button onClick={() => setShowRechargeModal(false)}><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6">
-                    <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded">
-                        <span className="font-bold text-gray-700">{player.name}</span>
-                        <span className="text-xs text-gray-500">当前余额: {player.credits || 0}</span>
-                    </div>
-                    <form onSubmit={handleRechargeSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.amount}
-                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
-                                min={1}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">周期内允许请假次数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.quota}
-                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
-                                min={0}
-                            />
-                            <p className="text-[10px] text-gray-400 mt-1">
-                                有效期将自动延长至一年后。达到请假次数上限后将正常扣课时。
-                            </p>
-                        </div>
-                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
-                            确认充值
-                        </button>
-                    </form>
-                </div>
-            </div>
-          </div>
-      );
-  };
 
-  // ------------------------------------------------------------------
-  // Player Details Component
-  // ------------------------------------------------------------------
+  const diffTime = nextBirthday.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
-  const PlayerDetailModal = ({ player, onClose }: { player: Player; onClose: () => void }) => {
+  if (diffDays === 0) return { label: '今天生日', color: 'bg-pink-500' };
+  if (diffDays <= 7) return { label: `${diffDays}天后生日`, color: 'bg-blue-500' };
+  return null;
+};
+
+const isExpired = (dateStr?: string) => {
+    if (!dateStr) return true;
+    return new Date(dateStr) < new Date();
+};
+
+const getPosColor = (pos: Position) => {
+    switch(pos) {
+        case Position.GK: return 'bg-yellow-500 text-white border-yellow-500';
+        case Position.DEF: return 'bg-blue-600 text-white border-blue-600';
+        case Position.MID: return 'bg-green-600 text-white border-green-600';
+        case Position.FWD: return 'bg-red-600 text-white border-red-600';
+        default: return 'bg-gray-500 border-gray-500';
+    }
+};
+
+const getStatusColor = (status?: ApprovalStatus) => {
+    switch(status) {
+        case 'Published': return 'bg-green-100 text-green-700 border-green-200';
+        case 'Submitted': return 'bg-blue-100 text-blue-700 border-blue-200';
+        default: return 'bg-gray-100 text-gray-500 border-gray-200';
+    }
+};
+
+const getStatusLabel = (status?: ApprovalStatus) => {
+    switch(status) {
+        case 'Published': return '已发布';
+        case 'Submitted': return '待审核';
+        default: return '草稿';
+    }
+};
+
+// --- PlayerDetailModal (Extracted) ---
+
+interface PlayerDetailModalProps {
+    player: Player;
+    onClose: () => void;
+    teams: Team[];
+    trainings: TrainingSession[];
+    attributeConfig: AttributeConfig;
+    currentUser: User | null;
+    onUpdatePlayer: (player: Player) => void;
+    onDeletePlayer: (playerId: string) => void;
+    initialFilter?: string;
+}
+
+const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
+    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter 
+}) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records'>('overview');
     const [detailAttendanceScope, setDetailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
-    const [recordTimeScope, setRecordTimeScope] = useState<'all' | 'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-    // Auto-Save Effect
+    const isCoach = currentUser?.role === 'coach';
+    const isDirector = currentUser?.role === 'director';
+
+    // 1. Sync prop to state when NOT editing (prevents overwriting user input)
     useEffect(() => {
-        // Only auto-save if editing
-        if (!isEditing) {
-            setEditedPlayer(JSON.parse(JSON.stringify(player)));
-            return;
+        if (!isEditing && player) {
+             // Simple check to avoid unnecessary state updates if objects are effectively same
+             if (JSON.stringify(editedPlayer) !== JSON.stringify(player)) {
+                 setEditedPlayer(JSON.parse(JSON.stringify(player)));
+             }
         }
+    }, [player, isEditing]);
+
+    // 2. Auto-Save Effect (Only when editing and state changes)
+    useEffect(() => {
+        if (!isEditing) return;
 
         const timer = setTimeout(() => {
-            // Check if there are changes to save by simple comparison or dirty flag
-            // For now, we save on debounced change if editing
             setSaveStatus('saving');
             const updatedPlayer = {
                 ...editedPlayer,
@@ -537,21 +172,19 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             };
             onUpdatePlayer(updatedPlayer);
             
-            // Artificial delay for UX perception of save
             setTimeout(() => setSaveStatus('saved'), 800);
-        }, 1200); // 1.2s debounce for better responsiveness
+        }, 1200); // 1.2s debounce
 
         return () => clearTimeout(timer);
     }, [editedPlayer, isEditing]);
 
-    // Set active tab to reviews if filter is pending reviews
     useEffect(() => {
         if (initialFilter === 'pending_reviews') {
             setActiveTab('reviews');
         } else if (initialFilter === 'pending_stats') {
             setActiveTab('overview'); 
         }
-    }, []);
+    }, [initialFilter]);
 
     // Review Form State
     const [newReview, setNewReview] = useState<Partial<PlayerReview>>({
@@ -589,10 +222,9 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       { subject: '心理', A: getAvg('mental'), fullMark: 10 },
     ];
 
-    const attendanceRate = getAttendanceRate(player, detailAttendanceScope);
+    const attendanceRate = calculateAttendanceRate(player, trainings, detailAttendanceScope);
 
     const handleSave = () => {
-      // Force immediate save
       const updatedPlayer = {
           ...editedPlayer,
           statsStatus: 'Published' as ApprovalStatus,
@@ -631,7 +263,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       }));
     };
 
-    // ... (Ai review generation logic same as before) ...
     const handleGenerateAiReview = async () => {
         setIsGeneratingReview(true);
         try {
@@ -657,7 +288,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 }
                 return r;
             });
-            // Update local state, which triggers auto-save effect
             setEditedPlayer({ ...editedPlayer, reviews: updatedReviews });
             setEditingReviewId(null);
         } else {
@@ -716,7 +346,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       );
     };
 
-    // ... (renderCategoryContent same as before) ...
     const renderCategoryContent = (category: AttributeCategory) => {
       const radarData = attributeConfig[category].map(attr => ({
         subject: attr.label, value: editedPlayer.stats[category][attr.key] || 0, fullMark: 10
@@ -746,7 +375,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       );
     };
 
-    // ... (renderReviews same as before) ...
     const renderReviews = () => {
         const sortedReviews = [...(editedPlayer.reviews || [])].sort((a,b) => b.year - a.year || b.quarter.localeCompare(a.quarter));
         const groupedReviews = sortedReviews.reduce((acc, review) => {
@@ -757,7 +385,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
         return (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col md:flex-row gap-6 pb-24 md:pb-10">
-                {/* Timeline */}
                 <div className="w-full md:w-1/2 space-y-6 md:overflow-y-auto md:max-h-[600px] pr-2 custom-scrollbar border-b md:border-b-0 pb-6 md:pb-0 border-gray-100 shrink-0">
                     <h3 className="font-bold text-gray-800 flex items-center sticky top-0 bg-white z-10 py-2">
                         <FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 历史点评归档
@@ -792,7 +419,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">季度总结</h4>
                                                 <p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded italic border-l-2 border-bvb-yellow">{review.summary || '（未填写）'}</p>
                                             </div>
-                                            {/* Action Buttons */}
                                             <div className="flex justify-end pt-2 gap-2 border-t border-gray-100">
                                                 {(review.status === 'Draft' || review.status === 'Submitted' || review.status === 'Published') && (
                                                     <button onClick={() => handleEditReview(review)} className="text-xs bg-bvb-yellow text-bvb-black px-3 py-1.5 rounded font-bold hover:brightness-105 flex items-center shadow-sm">
@@ -812,7 +438,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         </div>
                     ))}
                 </div>
-                {/* Form */}
                 <div className="w-full md:w-1/2 bg-gray-50 p-6 rounded-xl border border-gray-200 flex flex-col shrink-0">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-gray-800">{editingReviewId ? '编辑季度点评' : '新增季度点评'}</h3>
@@ -865,10 +490,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         );
     };
 
-    // ... (renderRecords same as before) ...
     const renderRecords = () => {
-         // ... (Logic simplified for brevity, assume same structure as previous code) ...
-        // ... Re-implementing simplified version to ensure no missing logic ...
         type Event = { id: string; date: string; type: 'recharge' | 'training'; status?: string; amount: number; desc: string; quotaAdded?: number; };
         const events: Event[] = [];
         (editedPlayer.rechargeHistory || []).forEach(r => events.push({ id: `rech-${r.id}`, date: r.date, type: 'recharge', amount: r.amount, desc: `充值 ${r.amount} 课时 (含请假额度 ${r.quotaAdded}次)`, quotaAdded: r.quotaAdded }));
@@ -892,7 +514,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             }
             return { ...e, balanceAfter: balance };
         });
-        const displayList = [...historyWithBalance].reverse(); // Simplified: All records
+        const displayList = [...historyWithBalance].reverse();
         return (
             <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-20 md:pb-0">
                 <div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl">
@@ -1036,17 +658,360 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
              {activeTab === 'reviews' && renderReviews()}
              {activeTab === 'records' && renderRecords()}
           </div>
-           {/* Export PDF Hidden Area (omitted for brevity, assume same) */}
            <div id="player-profile-export" className="absolute left-[-9999px] top-0 w-[1000px] bg-white text-black p-12 z-[-1000] font-sans">
-               {/* Same content structure as previous version for export */}
                <h1 className="text-4xl font-black">{player.name}</h1>
            </div>
         </div>
       </div>
     );
+};
+
+// --- PlayerManager (Main Component) ---
+
+const PlayerManager: React.FC<PlayerManagerProps> = ({ 
+  teams, 
+  players, 
+  trainings = [],
+  attributeConfig,
+  currentUser,
+  onAddPlayer, 
+  onBulkAddPlayers,
+  onAddTeam, 
+  onUpdatePlayer, 
+  onDeletePlayer,
+  onBulkDeletePlayers,
+  onTransferPlayers,
+  onAddPlayerReview,
+  onRechargePlayer,
+  initialFilter
+}) => {
+  
+  const isDirector = currentUser?.role === 'director';
+  const isCoach = currentUser?.role === 'coach';
+  
+  const availableTeams = isCoach 
+    ? teams.filter(t => t.id === currentUser?.teamId) 
+    : teams;
+
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPos, setFilterPos] = useState<string>('全部');
+  const [showDraftsOnly, setShowDraftsOnly] = useState(false);
+
+  useEffect(() => {
+    if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') {
+        setShowDraftsOnly(true);
+    } else {
+        setShowDraftsOnly(false);
+    }
+  }, [initialFilter]);
+
+  useEffect(() => {
+    if (isCoach && currentUser?.teamId) {
+        setSelectedTeamId(currentUser.teamId);
+    } else if (!selectedTeamId && teams.length > 0) {
+        setSelectedTeamId(teams[0].id);
+    }
+  }, [teams, currentUser, isCoach]);
+
+  const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+  const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
+
+  // Sync selectedPlayer with players prop updates
+  useEffect(() => {
+      if (selectedPlayer) {
+          const updated = players.find(p => p.id === selectedPlayer.id);
+          if (updated && updated !== selectedPlayer) {
+              setSelectedPlayer(updated);
+          }
+      }
+  }, [players]);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showAddTeamModal, setShowAddTeamModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [rechargePlayerId, setRechargePlayerId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
+  }, [selectedTeamId]);
+
+  const selectedTeam = teams.find(t => t.id === selectedTeamId);
+
+  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({
+    name: '',
+    gender: '男',
+    idCard: '',
+    birthDate: '',
+    position: Position.MID,
+    number: 0,
+    age: 0,
+    image: '',
+    teamId: '',
+    isCaptain: false
+  });
+
+  const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
+
+  const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const id = e.target.value;
+    const updates: Partial<Player> = { idCard: id };
+
+    if (id.length === 18) {
+      const year = parseInt(id.substring(6, 10));
+      const month = parseInt(id.substring(10, 12));
+      const day = parseInt(id.substring(12, 14));
+      
+      if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+        const birthDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        updates.birthDate = birthDateStr;
+
+        const today = new Date();
+        let age = today.getFullYear() - year;
+        const m = today.getMonth() + 1 - month;
+        if (m < 0 || (m === 0 && today.getDate() < day)) {
+            age--;
+        }
+        updates.age = age;
+      }
+
+      const genderDigit = parseInt(id.charAt(16));
+      if (!isNaN(genderDigit)) {
+        updates.gender = genderDigit % 2 === 1 ? '男' : '女';
+      }
+    }
+    
+    setNewPlayer(prev => ({ ...prev, ...updates }));
   };
 
-  // ... (Main Render Return same as previous) ...
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewPlayer(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const [newTeam, setNewTeam] = useState<Partial<Team>>({
+    name: '',
+    level: 'U17',
+    description: ''
+  });
+
+  const filteredPlayers = players.filter(p => {
+    const shouldIgnoreTeamFilter = showDraftsOnly && isDirector;
+    const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
+
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPos = filterPos === '全部' || p.position === filterPos;
+    
+    if (showDraftsOnly) {
+        const hasDraftReviews = p.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
+        const hasDraftStats = p.statsStatus === 'Draft' || p.statsStatus === 'Submitted';
+        if (!hasDraftReviews && !hasDraftStats) return false;
+    }
+
+    return matchesTeam && matchesSearch && matchesPos;
+  }).sort((a, b) => {
+    const statusA = getBirthdayStatus(a.birthDate);
+    const statusB = getBirthdayStatus(b.birthDate);
+    
+    const isTodayA = statusA?.label === '今天生日';
+    const isTodayB = statusB?.label === '今天生日';
+
+    if (isTodayA && !isTodayB) return -1;
+    if (!isTodayA && isTodayB) return 1;
+
+    if (a.isCaptain && !b.isCaptain) return -1;
+    if (!a.isCaptain && b.isCaptain) return 1;
+
+    return (a.number || 0) - (b.number || 0);
+  });
+
+  const toggleSelection = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+        newSet.delete(id);
+    } else {
+        newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredPlayers.length) {
+        setSelectedIds(new Set());
+    } else {
+        setSelectedIds(new Set(filteredPlayers.map(p => p.id)));
+    }
+  };
+
+  const executeBulkDelete = () => {
+      onBulkDeletePlayers(Array.from(selectedIds));
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+  };
+
+  const generateDefaultStats = (): PlayerStats => {
+    const stats: any = {
+        technical: {},
+        tactical: {},
+        physical: {},
+        mental: {}
+    };
+    
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => {
+            stats[category][attr.key] = 5;
+        });
+    });
+
+    return stats;
+  };
+
+  const handleAddPlayerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const finalTeamId = newPlayer.teamId || selectedTeamId;
+    
+    if (newPlayer.name && newPlayer.number && finalTeamId) {
+        const defaultStats = generateDefaultStats();
+        const p: Player = {
+            id: Date.now().toString(),
+            teamId: finalTeamId,
+            name: newPlayer.name,
+            gender: newPlayer.gender || '男',
+            idCard: newPlayer.idCard || '',
+            birthDate: newPlayer.birthDate || '',
+            number: newPlayer.number,
+            position: newPlayer.position as Position,
+            isCaptain: newPlayer.isCaptain || false,
+            age: newPlayer.age || 16,
+            height: 175, 
+            weight: 70, 
+            goals: 0,
+            assists: 0,
+            appearances: 0,
+            image: newPlayer.image || `https://picsum.photos/200/200?random=${Date.now()}`,
+            stats: defaultStats,
+            statsStatus: 'Published',
+            lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), 
+            reviews: [],
+            credits: 0,
+            validUntil: new Date().toISOString().split('T')[0],
+            leaveQuota: 0,
+            leavesUsed: 0,
+            rechargeHistory: []
+        };
+        onAddPlayer(p);
+        setShowAddPlayerModal(false);
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false });
+    }
+  };
+
+  const handleAddTeamSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newTeam.name && newTeam.level) {
+      const t: Team = {
+        id: `t-${Date.now()}`,
+        name: newTeam.name!,
+        level: newTeam.level!,
+        description: newTeam.description || '新组建的梯队'
+      };
+      onAddTeam(t);
+      setSelectedTeamId(t.id);
+      setShowAddTeamModal(false);
+      setNewTeam({ name: '', level: 'U17', description: '' });
+    }
+  };
+
+  const openRechargeModal = (e: React.MouseEvent, playerId: string) => {
+      e.stopPropagation();
+      setRechargePlayerId(playerId);
+      setRechargeData({ amount: 50, quota: 3 });
+      setShowRechargeModal(true);
+  };
+
+  const handleRechargeSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (rechargePlayerId) {
+          onRechargePlayer(rechargePlayerId, rechargeData.amount, rechargeData.quota);
+          setShowRechargeModal(false);
+          setRechargePlayerId(null);
+      }
+  };
+
+  const ImportPlayersModal = () => {
+      return null; // Implementation omitted for brevity
+  }
+  const TransferModal = ({ onClose }: { onClose: () => void }) => {
+      return null; // Implementation omitted for brevity
+  }
+  const RechargeModal = () => {
+      const player = players.find(p => p.id === rechargePlayerId);
+      if (!player) return null;
+      return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
+                    <h3 className="font-bold flex items-center">
+                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
+                        课时充值
+                    </h3>
+                    <button onClick={() => setShowRechargeModal(false)}><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-6">
+                    <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded">
+                        <span className="font-bold text-gray-700">{player.name}</span>
+                        <span className="text-xs text-gray-500">当前余额: {player.credits || 0}</span>
+                    </div>
+                    <form onSubmit={handleRechargeSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
+                            <input 
+                                type="number"
+                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
+                                value={rechargeData.amount}
+                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
+                                min={1}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">周期内允许请假次数</label>
+                            <input 
+                                type="number"
+                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
+                                value={rechargeData.quota}
+                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
+                                min={0}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">
+                                有效期将自动延长至一年后。达到请假次数上限后将正常扣课时。
+                            </p>
+                        </div>
+                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
+                            确认充值
+                        </button>
+                    </form>
+                </div>
+            </div>
+          </div>
+      );
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] md:h-auto gap-6 relative">
       {/* Sidebar */}
@@ -1097,7 +1062,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 const birthdayStatus = getBirthdayStatus(player.birthDate);
                 const isSelected = selectedIds.has(player.id);
                 const overallRating = getOverallRating(player);
-                const attendanceRate = getAttendanceRate(player, attendanceScope);
+                const attendanceRate = calculateAttendanceRate(player, trainings, attendanceScope);
                 const isExpiredValid = isExpired(player.validUntil);
                 const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
                 const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted';
@@ -1139,7 +1104,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         </div>
       </div>
 
-      {/* Modals */}
       {showAddPlayerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -1235,8 +1199,20 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       {showTransferModal && <TransferModal onClose={() => setShowTransferModal(false)} />}
       {showRechargeModal && <RechargeModal />}
       
-      {/* Player Detail Modal */}
-      {selectedPlayer && <PlayerDetailModal player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
+      {/* Player Detail Modal (Top Level) */}
+      {selectedPlayer && (
+        <PlayerDetailModal 
+            player={selectedPlayer} 
+            onClose={() => setSelectedPlayer(null)} 
+            teams={teams}
+            trainings={trainings}
+            attributeConfig={attributeConfig}
+            currentUser={currentUser}
+            onUpdatePlayer={onUpdatePlayer}
+            onDeletePlayer={onDeletePlayer}
+            initialFilter={initialFilter}
+        />
+      )}
       
     </div>
   );
