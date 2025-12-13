@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays } from 'lucide-react';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -145,6 +145,25 @@ const getStatusLabel = (status?: ApprovalStatus) => {
     }
 };
 
+const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
+    const stats: any = {
+        technical: {},
+        tactical: {},
+        physical: {},
+        mental: {}
+    };
+    
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => {
+            stats[category][attr.key] = 5;
+        });
+    });
+
+    return stats;
+};
+
 // --- Extracted Modals ---
 
 interface RechargeModalProps {
@@ -206,6 +225,251 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                             确认充值
                         </button>
                     </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface ImportPlayersModalProps {
+    teams: Team[];
+    attributeConfig: AttributeConfig;
+    onImport: (players: Player[]) => void;
+    onClose: () => void;
+}
+
+const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attributeConfig, onImport, onClose }) => {
+    const [csvContent, setCsvContent] = useState('');
+    const [parsedPlayers, setParsedPlayers] = useState<Partial<Player>[]>([]);
+    const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id || '');
+    const [step, setStep] = useState<'upload' | 'preview'>('upload');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleDownloadTemplate = () => {
+        const headers = "姓名,球衣号码,场上位置,身份证号,入队时间,就读学校,家长姓名,联系电话\n";
+        const example = "张三,10,中场,110101201001011234,2023-01-01,实验小学,张父,13800138000\n";
+        const content = headers + example;
+        const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', '球员导入模版.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const text = evt.target?.result as string;
+            setCsvContent(text);
+            parseCSV(text);
+        };
+        reader.readAsText(file);
+    };
+
+    const parseCSV = (text: string) => {
+        const lines = text.split('\n');
+        const players: Partial<Player>[] = [];
+        
+        // Skip header row
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // Handle simple CSV splitting (doesn't handle quoted commas perfectly, but sufficient for template)
+            const cols = line.split(',').map(c => c.trim());
+            
+            // Map columns: Name, Number, Position, IDCard, JoinDate, School, ParentName, ParentPhone
+            if (cols.length >= 2) {
+                const name = cols[0];
+                const number = parseInt(cols[1]) || 0;
+                let positionStr = cols[2];
+                const idCard = cols[3] || '';
+                const joinDate = cols[4] || '';
+                const school = cols[5] || '';
+                const parentName = cols[6] || '';
+                const parentPhone = cols[7] || '';
+
+                // Normalize Position
+                let position: Position = Position.MID;
+                if (positionStr.includes('门')) position = Position.GK;
+                else if (positionStr.includes('卫')) position = Position.DEF;
+                else if (positionStr.includes('锋')) position = Position.FWD;
+
+                // Simple Age/Gender from ID Card
+                let gender: '男' | '女' = '男';
+                let age = 10;
+                let birthDate = '';
+
+                if (idCard.length === 18) {
+                    const year = parseInt(idCard.substring(6, 10));
+                    const month = parseInt(idCard.substring(10, 12));
+                    const day = parseInt(idCard.substring(12, 14));
+                    const gVal = parseInt(idCard.charAt(16));
+                    if (!isNaN(year)) {
+                        age = new Date().getFullYear() - year;
+                        birthDate = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                    }
+                    if (!isNaN(gVal)) gender = gVal % 2 === 1 ? '男' : '女';
+                }
+
+                players.push({
+                    name,
+                    number,
+                    position,
+                    idCard,
+                    gender,
+                    age,
+                    birthDate,
+                    joinDate,
+                    school,
+                    parentName,
+                    parentPhone
+                });
+            }
+        }
+        setParsedPlayers(players);
+        setStep('preview');
+    };
+
+    const handleConfirmImport = () => {
+        if (!selectedTeamId) {
+            alert('请选择归属梯队');
+            return;
+        }
+
+        const defaultStats = generateDefaultStats(attributeConfig);
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+
+        const newPlayers: Player[] = parsedPlayers.map(p => ({
+            ...p,
+            id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            teamId: selectedTeamId,
+            isCaptain: false,
+            height: 0,
+            weight: 0,
+            goals: 0,
+            assists: 0,
+            appearances: 0,
+            image: `https://picsum.photos/200/200?random=${Math.random()}`, // Placeholder
+            stats: defaultStats,
+            statsStatus: 'Published',
+            lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)),
+            reviews: [],
+            credits: 0,
+            validUntil: nextYear.toISOString().split('T')[0],
+            leaveQuota: 0,
+            leavesUsed: 0,
+            rechargeHistory: []
+        } as Player));
+
+        onImport(newPlayers);
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                    <h3 className="font-bold flex items-center"><FileSpreadsheet className="w-5 h-5 mr-2 text-bvb-yellow" /> 批量导入球员</h3>
+                    <button onClick={onClose}><X className="w-5 h-5" /></button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto">
+                    {step === 'upload' ? (
+                        <div className="space-y-6">
+                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col items-center justify-center text-center space-y-3">
+                                <FileDown className="w-10 h-10 text-gray-400" />
+                                <div>
+                                    <h4 className="font-bold text-gray-700">第一步：下载模版</h4>
+                                    <p className="text-xs text-gray-500">请下载标准CSV模版，按格式填写球员信息。</p>
+                                </div>
+                                <button onClick={handleDownloadTemplate} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold hover:bg-gray-100 hover:text-bvb-black transition-colors shadow-sm">
+                                    下载 CSV 模版
+                                </button>
+                            </div>
+
+                            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 flex flex-col items-center justify-center text-center space-y-3 relative">
+                                <Upload className="w-10 h-10 text-blue-400" />
+                                <div>
+                                    <h4 className="font-bold text-blue-900">第二步：上传文件</h4>
+                                    <p className="text-xs text-blue-600">选择填写好的 CSV 文件进行解析。</p>
+                                </div>
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    accept=".csv" 
+                                    onChange={handleFileUpload} 
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                />
+                                <button className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm pointer-events-none">
+                                    选择文件
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <div className="flex items-center">
+                                    <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
+                                    <span className="font-bold text-sm">成功解析 {parsedPlayers.length} 名球员数据</span>
+                                </div>
+                                <button onClick={() => setStep('upload')} className="text-xs text-gray-500 hover:underline">重新上传</button>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">选择导入梯队</label>
+                                <select 
+                                    className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold"
+                                    value={selectedTeamId}
+                                    onChange={e => setSelectedTeamId(e.target.value)}
+                                >
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="max-h-[300px] overflow-y-auto border rounded-lg">
+                                <table className="w-full text-xs text-left">
+                                    <thead className="bg-gray-100 font-bold text-gray-600 sticky top-0">
+                                        <tr>
+                                            <th className="p-2 border-b">姓名</th>
+                                            <th className="p-2 border-b">号码</th>
+                                            <th className="p-2 border-b">位置</th>
+                                            <th className="p-2 border-b">年龄</th>
+                                            <th className="p-2 border-b">家长</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {parsedPlayers.map((p, i) => (
+                                            <tr key={i} className="hover:bg-gray-50">
+                                                <td className="p-2 font-bold">{p.name}</td>
+                                                <td className="p-2">{p.number}</td>
+                                                <td className="p-2">{p.position}</td>
+                                                <td className="p-2">{p.age}</td>
+                                                <td className="p-2">{p.parentName} {p.parentPhone}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t flex justify-end space-x-2 shrink-0">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-300">取消</button>
+                    {step === 'preview' && (
+                        <button onClick={handleConfirmImport} className="px-4 py-2 bg-bvb-black text-white rounded-lg text-sm font-bold hover:bg-gray-800 flex items-center">
+                            <Upload className="w-4 h-4 mr-2" /> 确认导入
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -832,6 +1096,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPos, setFilterPos] = useState<string>('全部');
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
+  const [isExportingList, setIsExportingList] = useState(false);
 
   useEffect(() => {
     if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') {
@@ -1002,23 +1267,16 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       setIsSelectionMode(false);
   };
 
-  const generateDefaultStats = (): PlayerStats => {
-    const stats: any = {
-        technical: {},
-        tactical: {},
-        physical: {},
-        mental: {}
-    };
-    
-    Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary') return;
-        const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => {
-            stats[category][attr.key] = 5;
-        });
-    });
-
-    return stats;
+  const handleExportPlayerList = async () => {
+      setIsExportingList(true);
+      try {
+          const exportTitle = selectedTeam ? `${selectedTeam.name}_球员名单` : '全部球员名单';
+          await exportToPDF('player-list-export', exportTitle);
+      } catch (e) {
+          alert('导出失败，请重试');
+      } finally {
+          setIsExportingList(false);
+      }
   };
 
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
@@ -1026,7 +1284,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     const finalTeamId = newPlayer.teamId || selectedTeamId;
     
     if (newPlayer.name && newPlayer.number && finalTeamId) {
-        const defaultStats = generateDefaultStats();
+        const defaultStats = generateDefaultStats(attributeConfig);
         const p: Player = {
             id: Date.now().toString(),
             teamId: finalTeamId,
@@ -1095,9 +1353,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       }
   };
 
-  const ImportPlayersModal = () => {
-      return null; // Implementation omitted for brevity
-  }
   const TransferModal = ({ onClose }: { onClose: () => void }) => {
       return null; // Implementation omitted for brevity
   }
@@ -1132,8 +1387,19 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
            </div>
            <div className="flex gap-2 w-full sm:w-auto">
                <button onClick={() => setIsSelectionMode(!isSelectionMode)} className={`p-2 rounded-lg border ${isSelectionMode ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-500 hover:bg-gray-50'}`} title="批量管理"><CheckSquare className="w-5 h-5" /></button>
-               {isDirector && <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-bvb-black" title="批量导入球员"><FileSpreadsheet className="w-5 h-5" /></button>}
-               {isDirector && <button onClick={() => setShowAddPlayerModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg hover:brightness-105 shadow-sm"><Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员</button>}
+               {isDirector && (
+                   <>
+                        <button onClick={handleExportPlayerList} disabled={isExportingList} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-bvb-black" title="导出球员名单PDF">
+                            {isExportingList ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />}
+                        </button>
+                        <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-bvb-black" title="批量导入球员">
+                            <FileSpreadsheet className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => setShowAddPlayerModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg hover:brightness-105 shadow-sm">
+                            <Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员
+                        </button>
+                   </>
+               )}
            </div>
         </div>
         {showDraftsOnly && <div className="bg-blue-50 border border-blue-100 text-blue-700 px-4 py-2 rounded-lg mb-4 text-sm flex items-center justify-between"><div className="flex items-center font-bold"><ClipboardCheck className="w-4 h-4 mr-2" />{isDirector ? '存在未发布的草稿' : '本队未发布的草稿'} ({filteredPlayers.length})</div><button onClick={() => setShowDraftsOnly(false)} className="text-xs hover:underline">清除筛选</button></div>}
@@ -1309,7 +1575,14 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         </div>
       )}
 
-      {showImportModal && <ImportPlayersModal />}
+      {showImportModal && (
+          <ImportPlayersModal 
+            teams={teams}
+            attributeConfig={attributeConfig}
+            onImport={onBulkAddPlayers}
+            onClose={() => setShowImportModal(false)}
+          />
+      )}
       {showTransferModal && <TransferModal onClose={() => setShowTransferModal(false)} />}
       
       {/* Modals rendered here to ensure they are top-level regarding React tree context, 
@@ -1335,6 +1608,69 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             initialFilter={initialFilter}
         />
       )}
+
+      {/* Hidden Export Template for Player List */}
+      <div id="player-list-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
+             <div className="flex items-center">
+                 <div className="w-16 h-16 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-black text-2xl border-4 border-black mr-4">WS</div>
+                 <div>
+                     <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
+                     <p className="text-xl text-gray-500 font-bold mt-1">{selectedTeam ? selectedTeam.name : '全员'} - 球员大名单</p>
+                 </div>
+             </div>
+             <div className="text-right">
+                 <div className="text-sm font-bold text-gray-400 uppercase">导出日期</div>
+                 <div className="text-2xl font-black">{new Date().toLocaleDateString()}</div>
+             </div>
+          </div>
+
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-100 border-b-2 border-gray-300">
+              <tr>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">姓名</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">号码</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">位置</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">年龄</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">入队时间/球龄</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">就读学校</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">家长联系方式</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredPlayers.map((p, idx) => (
+                 <tr key={p.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                    <td className="p-3 font-bold text-gray-900">{p.name} {p.isCaptain && '(C)'}</td>
+                    <td className="p-3 font-mono font-bold text-gray-700">#{p.number}</td>
+                    <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${getPosColor(p.position)}`}>{p.position}</span></td>
+                    <td className="p-3 text-sm">{p.age} 岁</td>
+                    <td className="p-3 text-sm">
+                        {p.joinDate ? (
+                            <div>
+                                <span>{p.joinDate}</span>
+                                <span className="text-xs text-gray-400 block">{calculateTenure(p.joinDate)}</span>
+                            </div>
+                        ) : '-'}
+                    </td>
+                    <td className="p-3 text-sm">{p.school || '-'}</td>
+                    <td className="p-3 text-sm">
+                        {p.parentName ? (
+                            <div>
+                                <span className="font-bold">{p.parentName}</span>
+                                <span className="block text-xs font-mono">{p.parentPhone}</span>
+                            </div>
+                        ) : '-'}
+                    </td>
+                 </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400">
+              <span>共 {filteredPlayers.length} 名球员</span>
+              <span>© 顽石之光足球俱乐部 - 内部资料</span>
+          </div>
+      </div>
       
     </div>
   );
