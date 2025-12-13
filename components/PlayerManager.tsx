@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft } from 'lucide-react';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -24,7 +24,31 @@ interface PlayerManagerProps {
   initialFilter?: string;
 }
 
-// --- Helper Functions (Extracted to prevent re-creation) ---
+// --- Helper Functions ---
+
+const calculateTenure = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const start = new Date(dateStr);
+    const now = new Date();
+    if (isNaN(start.getTime())) return null;
+
+    let years = now.getFullYear() - start.getFullYear();
+    let months = now.getMonth() - start.getMonth();
+
+    if (months < 0) {
+        years--;
+        months += 12;
+    }
+
+    if (years < 0) return '刚刚入队';
+    if (years === 0 && months === 0) return '不满1个月';
+
+    let result = '';
+    if (years > 0) result += `${years}年`;
+    if (months > 0) result += `${months}个月`;
+    
+    return result;
+};
 
 const getOverallRating = (player: Player): string => {
   const sourceStats = player.lastPublishedStats || player.stats;
@@ -121,7 +145,72 @@ const getStatusLabel = (status?: ApprovalStatus) => {
     }
 };
 
-// --- PlayerDetailModal (Extracted) ---
+// --- Extracted Modals ---
+
+interface RechargeModalProps {
+    player: Player | undefined;
+    onClose: () => void;
+    onSubmit: (amount: number, quota: number) => void;
+}
+
+const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit }) => {
+    const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
+    
+    if (!player) return null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(rechargeData.amount, rechargeData.quota);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
+                    <h3 className="font-bold flex items-center">
+                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
+                        课时充值
+                    </h3>
+                    <button onClick={onClose}><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-6">
+                    <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded">
+                        <span className="font-bold text-gray-700">{player.name}</span>
+                        <span className="text-xs text-gray-500">当前余额: {player.credits || 0}</span>
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
+                            <input 
+                                type="number"
+                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
+                                value={rechargeData.amount}
+                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
+                                min={1}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">周期内允许请假次数</label>
+                            <input 
+                                type="number"
+                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
+                                value={rechargeData.quota}
+                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
+                                min={0}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">
+                                有效期将自动延长至一年后。达到请假次数上限后将正常扣课时。
+                            </p>
+                        </div>
+                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
+                            确认充值
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 interface PlayerDetailModalProps {
     player: Player;
@@ -149,17 +238,17 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const isCoach = currentUser?.role === 'coach';
     const isDirector = currentUser?.role === 'director';
 
-    // 1. Sync prop to state when NOT editing (prevents overwriting user input)
+    // 1. Sync prop to state when NOT editing
     useEffect(() => {
         if (!isEditing && player) {
-             // Simple check to avoid unnecessary state updates if objects are effectively same
-             if (JSON.stringify(editedPlayer) !== JSON.stringify(player)) {
+             // Only update if IDs match to avoid overwriting with stale data during transition
+             if (player.id === editedPlayer.id && JSON.stringify(editedPlayer) !== JSON.stringify(player)) {
                  setEditedPlayer(JSON.parse(JSON.stringify(player)));
              }
         }
     }, [player, isEditing]);
 
-    // 2. Auto-Save Effect (Only when editing and state changes)
+    // 2. Auto-Save Effect
     useEffect(() => {
         if (!isEditing) return;
 
@@ -173,7 +262,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             onUpdatePlayer(updatedPlayer);
             
             setTimeout(() => setSaveStatus('saved'), 800);
-        }, 1200); // 1.2s debounce
+        }, 1200);
 
         return () => clearTimeout(timer);
     }, [editedPlayer, isEditing]);
@@ -541,7 +630,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-white w-full h-[100dvh] md:h-[90vh] md:max-w-5xl rounded-none md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
+        <div className="bg-white w-full h-full md:h-[90vh] md:max-w-5xl rounded-none md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
           {/* Header */}
           <div className="bg-bvb-black text-white p-4 flex justify-between items-center shrink-0">
              <div className="flex items-center space-x-3">
@@ -628,6 +717,51 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            <div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span><span className="font-bold">{editedPlayer.gender}</span></div>
                            <div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{editedPlayer.age} 岁</span></div>
                       </div>
+                      
+                      {/* Detailed Info Card (School, Parent, Join Date) */}
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">详细资料</h4>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+                                <div className="flex flex-col">
+                                    <span className="text-gray-500 text-xs flex items-center"><CalendarDays className="w-3 h-3 mr-1"/> 入队时间</span>
+                                    {isEditing ? 
+                                        <input type="date" className="p-1 border rounded text-xs bg-white" value={editedPlayer.joinDate || ''} onChange={e => setEditedPlayer({...editedPlayer, joinDate: e.target.value})} /> 
+                                        : (
+                                            <div>
+                                                <span className="font-bold">{editedPlayer.joinDate || '-'}</span>
+                                                {editedPlayer.joinDate && calculateTenure(editedPlayer.joinDate) && (
+                                                    <div className="text-[10px] text-bvb-black bg-bvb-yellow px-1.5 py-0.5 rounded w-max mt-1 font-bold">
+                                                        球龄: {calculateTenure(editedPlayer.joinDate)}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    }
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-gray-500 text-xs flex items-center"><School className="w-3 h-3 mr-1"/> 就读学校</span>
+                                    {isEditing ? 
+                                        <input className="p-1 border rounded text-xs bg-white" placeholder="学校名称" value={editedPlayer.school || ''} onChange={e => setEditedPlayer({...editedPlayer, school: e.target.value})} /> 
+                                        : <span className="font-bold truncate">{editedPlayer.school || '-'}</span>
+                                    }
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-gray-500 text-xs flex items-center"><UserIcon className="w-3 h-3 mr-1"/> 家长姓名</span>
+                                    {isEditing ? 
+                                        <input className="p-1 border rounded text-xs bg-white" placeholder="姓名" value={editedPlayer.parentName || ''} onChange={e => setEditedPlayer({...editedPlayer, parentName: e.target.value})} /> 
+                                        : <span className="font-bold">{editedPlayer.parentName || '-'}</span>
+                                    }
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-gray-500 text-xs flex items-center"><Phone className="w-3 h-3 mr-1"/> 联系方式</span>
+                                    {isEditing ? 
+                                        <input className="p-1 border rounded text-xs bg-white" placeholder="电话号码" value={editedPlayer.parentPhone || ''} onChange={e => setEditedPlayer({...editedPlayer, parentPhone: e.target.value})} /> 
+                                        : <span className="font-bold font-mono">{editedPlayer.parentPhone || '-'}</span>
+                                    }
+                                </div>
+                            </div>
+                      </div>
+
                    </div>
                   <div className="w-full md:w-2/3 flex flex-col space-y-4">
                       <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl p-4 shadow-md flex justify-between items-center relative overflow-hidden">
@@ -737,6 +871,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  
+  // Recharge Modal State moved to top level logic, we just trigger it here via boolean
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [rechargePlayerId, setRechargePlayerId] = useState<string | null>(null);
 
@@ -757,10 +893,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     age: 0,
     image: '',
     teamId: '',
-    isCaptain: false
+    isCaptain: false,
+    joinDate: '',
+    school: '',
+    parentName: '',
+    parentPhone: ''
   });
-
-  const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
 
   const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const id = e.target.value;
@@ -914,11 +1052,16 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             validUntil: new Date().toISOString().split('T')[0],
             leaveQuota: 0,
             leavesUsed: 0,
-            rechargeHistory: []
+            rechargeHistory: [],
+            // New Fields
+            joinDate: newPlayer.joinDate,
+            school: newPlayer.school,
+            parentName: newPlayer.parentName,
+            parentPhone: newPlayer.parentPhone
         };
         onAddPlayer(p);
         setShowAddPlayerModal(false);
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false });
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '' });
     }
   };
 
@@ -941,14 +1084,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const openRechargeModal = (e: React.MouseEvent, playerId: string) => {
       e.stopPropagation();
       setRechargePlayerId(playerId);
-      setRechargeData({ amount: 50, quota: 3 });
       setShowRechargeModal(true);
   };
 
-  const handleRechargeSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
+  const handleRechargeSubmit = (amount: number, quota: number) => {
       if (rechargePlayerId) {
-          onRechargePlayer(rechargePlayerId, rechargeData.amount, rechargeData.quota);
+          onRechargePlayer(rechargePlayerId, amount, quota);
           setShowRechargeModal(false);
           setRechargePlayerId(null);
       }
@@ -960,57 +1101,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const TransferModal = ({ onClose }: { onClose: () => void }) => {
       return null; // Implementation omitted for brevity
   }
-  const RechargeModal = () => {
-      const player = players.find(p => p.id === rechargePlayerId);
-      if (!player) return null;
-      return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold flex items-center">
-                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
-                        课时充值
-                    </h3>
-                    <button onClick={() => setShowRechargeModal(false)}><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6">
-                    <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded">
-                        <span className="font-bold text-gray-700">{player.name}</span>
-                        <span className="text-xs text-gray-500">当前余额: {player.credits || 0}</span>
-                    </div>
-                    <form onSubmit={handleRechargeSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.amount}
-                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
-                                min={1}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">周期内允许请假次数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.quota}
-                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
-                                min={0}
-                            />
-                            <p className="text-[10px] text-gray-400 mt-1">
-                                有效期将自动延长至一年后。达到请假次数上限后将正常扣课时。
-                            </p>
-                        </div>
-                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
-                            确认充值
-                        </button>
-                    </form>
-                </div>
-            </div>
-          </div>
-      );
-  };
 
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] md:h-auto gap-6 relative">
@@ -1111,7 +1201,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 <h3 className="font-bold flex items-center"><Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 录入新球员</h3>
                 <button onClick={() => setShowAddPlayerModal(false)}><X className="w-5 h-5" /></button>
             </div>
-            <form onSubmit={handleAddPlayerSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleAddPlayerSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-center mb-4">
                 <div className="relative group cursor-pointer w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 hover:border-bvb-yellow transition-colors" onClick={() => fileInputRef.current?.click()}>
                    {newPlayer.image ? <img src={newPlayer.image} className="w-full h-full object-cover" /> : <Upload className="w-8 h-8 text-gray-400" />}
@@ -1161,6 +1251,30 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                       </select>
                   </div>
               </div>
+
+              {/* New Family/Info Section */}
+              <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-4 space-y-3">
+                  <h4 className="text-xs font-bold text-gray-500 uppercase">教育与家庭信息</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                       <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">入队时间</label>
+                            <input type="date" className="w-full p-2 border rounded text-xs bg-white focus:outline-none" value={newPlayer.joinDate || ''} onChange={e => setNewPlayer({...newPlayer, joinDate: e.target.value})} />
+                       </div>
+                       <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">就读学校</label>
+                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="学校名称" value={newPlayer.school || ''} onChange={e => setNewPlayer({...newPlayer, school: e.target.value})} />
+                       </div>
+                       <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">家长姓名</label>
+                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="家长姓名" value={newPlayer.parentName || ''} onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})} />
+                       </div>
+                       <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">联系电话</label>
+                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="手机号码" value={newPlayer.parentPhone || ''} onChange={e => setNewPlayer({...newPlayer, parentPhone: e.target.value})} />
+                       </div>
+                  </div>
+              </div>
+
               <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">确认录入</button>
             </form>
           </div>
@@ -1197,9 +1311,17 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
       {showImportModal && <ImportPlayersModal />}
       {showTransferModal && <TransferModal onClose={() => setShowTransferModal(false)} />}
-      {showRechargeModal && <RechargeModal />}
       
-      {/* Player Detail Modal (Top Level) */}
+      {/* Modals rendered here to ensure they are top-level regarding React tree context, 
+          though technically still inside PlayerManager, they are not defined inside it anymore. */}
+      {showRechargeModal && (
+        <RechargeModal 
+            player={players.find(p => p.id === rechargePlayerId)}
+            onClose={() => setShowRechargeModal(false)}
+            onSubmit={handleRechargeSubmit}
+        />
+      )}
+      
       {selectedPlayer && (
         <PlayerDetailModal 
             player={selectedPlayer} 

@@ -135,20 +135,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
         </header>
 
         {/* Scrollable Content Area */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pb-28 md:pb-8 scroll-smooth">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pb-32 md:pb-8 scroll-smooth">
           <div className="max-w-7xl mx-auto h-full">
              {children}
           </div>
         </main>
 
-        {/* Mobile Bottom Navigation - Enhanced */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bvb-black/95 backdrop-blur-md border-t border-gray-800 z-30 pb-safe">
+        {/* Mobile Bottom Navigation - Enhanced Glassmorphism */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-bvb-black/90 backdrop-blur-md border-t border-gray-800 z-30 pb-safe transition-all duration-300">
             <div className={`flex justify-around items-center h-16 px-1`}>
               {navItems.map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-90 ${
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95 ${
                     activeTab === item.id ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
@@ -160,7 +160,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                {currentUser?.role !== 'coach' && (
                    <button
                       onClick={() => setActiveTab('settings')}
-                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-90 ${
+                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95 ${
                         activeTab === 'settings' ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
                       }`}
                     >
@@ -170,7 +170,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                )}
             </div>
             {/* Safe area spacer for iPhone Home Bar */}
-            <div className="h-[env(safe-area-inset-bottom)] w-full bg-bvb-black"></div>
+            <div className="h-[env(safe-area-inset-bottom)] w-full"></div>
           </nav>
 
       </div>

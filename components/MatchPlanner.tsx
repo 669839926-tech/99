@@ -215,17 +215,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
       return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
   };
 
-  const getWeatherIcon = (w: string) => {
-      switch(w) {
-          case 'Sunny': return <Sun className="w-4 h-4 text-orange-500" />;
-          case 'Cloudy': return <Cloud className="w-4 h-4 text-gray-500" />;
-          case 'Rainy': return <CloudRain className="w-4 h-4 text-blue-500" />;
-          case 'Snowy': return <CloudSnow className="w-4 h-4 text-cyan-300" />;
-          case 'Windy': return <Wind className="w-4 h-4 text-gray-400" />;
-          default: return <Sun className="w-4 h-4" />;
-      }
-  };
-
   // --- Components ---
 
   const MatchCard: React.FC<{ match: Match }> = ({ match }) => (
@@ -342,14 +331,14 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
       {/* 1. Add Match Modal */}
       {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full h-[100dvh] md:h-auto md:max-w-md rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
+              <div className="bg-white w-full h-full md:h-auto md:max-w-md rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
                   <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                       <h3 className="font-bold flex items-center">
                           <Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 录入新比赛
                       </h3>
                       <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
                   </div>
-                  <form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto">
+                  <form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto pb-24 md:pb-6">
                       <div>
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">比赛名称 (标题)</label>
                           <input 
@@ -448,14 +437,14 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
       {/* 2. Detailed Edit / Log Modal */}
       {editingMatch && (
            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full h-[100dvh] md:h-auto md:max-w-4xl rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:h-[85vh]">
+              <div className="bg-white w-full h-full md:h-auto md:max-w-4xl rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:h-[85vh]">
                   <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                       <div className="flex items-center gap-3">
                         <button onClick={() => setEditingMatch(null)} className="md:hidden"><ChevronLeft className="w-6 h-6" /></button>
                         <div>
                             <h3 className="font-bold flex items-center text-lg leading-tight">
                                 <FileText className="w-5 h-5 mr-2 text-bvb-yellow" />
-                                {editingMatch.status === 'Completed' ? '赛后总结与日志' : '编辑比赛详情'}
+                                {editingMatch.status === 'Completed' ? '赛后总结' : '编辑详情'}
                             </h3>
                             <p className="text-xs text-gray-400 mt-1">{editingMatch.opponent} | {editingMatch.date}</p>
                         </div>
@@ -477,7 +466,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                   </div>
                   
                   {/* Tabs */}
-                  <div className="bg-gray-100 border-b border-gray-200 flex space-x-1 p-1 shrink-0 sticky top-0 z-10">
+                  <div className="bg-gray-100 border-b border-gray-200 flex space-x-1 p-1 shrink-0 sticky top-0 z-10 overflow-x-auto no-scrollbar">
                       {[
                           { id: 'info', label: '基础', icon: MapPin },
                           { id: 'lineup', label: '阵容', icon: Users },
@@ -487,7 +476,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                           <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as TabType)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center transition-all ${
+                            className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center transition-all min-w-[80px] ${
                                 activeTab === tab.id ? 'bg-white shadow text-bvb-black' : 'text-gray-500 hover:text-gray-700'
                             }`}
                           >

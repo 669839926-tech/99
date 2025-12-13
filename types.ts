@@ -81,6 +81,12 @@ export interface Player {
   appearances: number;
   image: string;
   
+  // New Fields
+  joinDate?: string;      // 入队时间
+  school?: string;        // 就读学校
+  parentName?: string;    // 家长姓名
+  parentPhone?: string;   // 联系方式
+
   // Stats System
   stats: PlayerStats; // Current working copy (Draft/Submitted)
   statsStatus?: ApprovalStatus; // Status of the working copy

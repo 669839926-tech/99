@@ -1,9 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { exportToPDF } from '../services/pdfService';
 
 interface TrainingPlannerProps {
   trainings: TrainingSession[];
@@ -25,10 +26,11 @@ interface SessionDetailModalProps {
     players: Player[];
     currentUser: User | null;
     onUpdate: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
+    onDuplicate: (session: TrainingSession) => void;
     onClose: () => void;
 }
 
-const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onClose }) => {
+const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onDuplicate, onClose }) => {
     const [activeTab, setActiveTab] = useState<'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -141,7 +143,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-            <div className="bg-white w-full h-[100dvh] md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
+            <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
                 <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                     <div>
                       <h3 className="font-bold text-lg leading-tight">{session.title}</h3>
@@ -152,6 +154,9 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                            {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                       </div>
+                      <button onClick={() => onDuplicate(session)} className="p-1 hover:text-bvb-yellow" title="复制训练计划">
+                          <Copy className="w-5 h-5" />
+                      </button>
                       <button onClick={onClose}><X className="w-6 h-6" /></button>
                     </div>
                 </div>
@@ -369,6 +374,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Sync selectedSession with trainings prop when it updates (e.g. after auto-save)
   // This ensures the modal receives the latest data without closing/resetting if we pass it correctly
@@ -605,6 +611,21 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       setFormData(prev => ({ ...prev, drills: prev.drills.filter((_, i) => i !== idx) }));
   };
 
+  const handleDuplicateSession = (session: TrainingSession) => {
+      setFormData({
+          teamId: session.teamId,
+          title: `${session.title} (复制)`,
+          focus: session.focus,
+          focusCustom: '', // If it was custom, we could map it, but simplicity first
+          duration: session.duration,
+          intensity: session.intensity,
+          date: new Date().toISOString().split('T')[0], // Default to today
+          drills: [...session.drills]
+      });
+      setSelectedSession(null); // Close detail
+      setShowAddModal(true); // Open add
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if (formData.title && formData.teamId) {
@@ -661,6 +682,17 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       }
   };
 
+  const handleExportPDF = async () => {
+      setIsExporting(true);
+      try {
+          await exportToPDF('training-plan-export', `训练计划_${dateLabel.replace(/\s+/g, '_')}`);
+      } catch (e) {
+          alert('导出失败');
+      } finally {
+          setIsExporting(false);
+      }
+  };
+
   return (
     <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
@@ -675,6 +707,17 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 <button onClick={() => setTimeScope('quarter')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${timeScope === 'quarter' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>季视图</button>
                 <button onClick={() => setTimeScope('year')} className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${timeScope === 'year' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>年视图</button>
             </div>
+            
+            <button 
+                onClick={handleExportPDF}
+                disabled={isExporting}
+                className="flex items-center px-3 py-2 bg-gray-800 text-bvb-yellow text-xs font-bold rounded-lg hover:bg-gray-700 transition-colors"
+                title="导出为 PDF"
+            >
+                {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+                导出计划
+            </button>
+
             <button 
                 onClick={() => setShowAddModal(true)}
                 className="flex items-center px-4 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-md"
@@ -792,7 +835,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       {/* Add Modal */}
       {showAddModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full h-[100dvh] md:h-auto md:max-w-lg md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
+              <div className="bg-white w-full h-full md:h-auto md:max-w-lg md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
                   <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                       <h3 className="font-bold flex items-center">
                           <Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建训练计划
@@ -937,9 +980,120 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             players={players}
             currentUser={currentUser}
             onUpdate={onUpdateTraining}
+            onDuplicate={handleDuplicateSession}
             onClose={() => setSelectedSession(null)}
          />
       )}
+
+      {/* Hidden Export Template */}
+      <div id="training-plan-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
+          {/* Header */}
+          <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
+             <div className="flex items-center">
+                 <div className="w-16 h-16 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-black text-2xl border-4 border-black mr-4">WS</div>
+                 <div>
+                     <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
+                     <p className="text-xl text-gray-500 font-bold mt-1">青训教案总表 / Training Plan Schedule</p>
+                 </div>
+             </div>
+             <div className="text-right">
+                 <div className="text-sm font-bold text-gray-400 uppercase">时间范围</div>
+                 <div className="text-2xl font-black">{dateLabel}</div>
+             </div>
+          </div>
+
+          {/* Training Focus Analysis Section */}
+          <div className="mb-8 flex gap-8">
+              <div className="w-1/3 bg-gray-50 p-6 rounded-lg border border-gray-100 flex flex-col justify-center">
+                  <h3 className="font-bold text-lg mb-2">数据概览</h3>
+                  <div className="space-y-2">
+                      <div className="flex justify-between">
+                          <span className="text-gray-500 text-sm">总课时数</span>
+                          <span className="font-black">{filteredSessions.length} 节</span>
+                      </div>
+                      <div className="flex justify-between">
+                          <span className="text-gray-500 text-sm">平均时长</span>
+                          <span className="font-black">{Math.round(filteredSessions.reduce((acc, s) => acc + s.duration, 0) / (filteredSessions.length || 1))} 分钟</span>
+                      </div>
+                  </div>
+              </div>
+              <div className="w-2/3 h-64 border border-gray-100 rounded-lg p-2">
+                  <h3 className="font-bold text-sm text-gray-500 uppercase absolute ml-2 mt-2">训练重点分布</h3>
+                  {statsData.length > 0 && (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie 
+                                    data={statsData} 
+                                    dataKey="value" 
+                                    nameKey="name" 
+                                    cx="50%" 
+                                    cy="50%" 
+                                    outerRadius={80} 
+                                    innerRadius={50}
+                                    paddingAngle={2}
+                                    labelLine={false}
+                                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                                >
+                                    {statsData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={['#FDE100', '#000000', '#4B5563', '#9CA3AF', '#D1D5DB'][index % 5]} />
+                                    ))}
+                                </Pie>
+                                <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: '12px' }}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                  )}
+              </div>
+          </div>
+          
+          {/* Table */}
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-100 border-b-2 border-gray-300">
+              <tr>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">日期/时间</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">梯队</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">训练主题</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600">重点</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600 w-[35%]">主要内容 (Drills)</th>
+                 <th className="p-3 font-black text-sm uppercase text-gray-600 text-center">强度</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSessions.map((session, idx) => {
+                 const team = teams.find(t => t.id === session.teamId);
+                 return (
+                     <tr key={session.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <td className="p-3 align-top">
+                            <div className="font-bold text-gray-900">{session.date}</div>
+                            <div className="text-xs text-gray-500 font-mono mt-1">{session.duration} min</div>
+                        </td>
+                        <td className="p-3 align-top font-bold">{team?.level}</td>
+                        <td className="p-3 align-top font-bold text-gray-800">{session.title}</td>
+                        <td className="p-3 align-top text-sm">{session.focus}</td>
+                        <td className="p-3 align-top">
+                            <ul className="list-disc list-inside text-xs space-y-1 text-gray-700">
+                                {session.drills.map((d, i) => <li key={i}>{d}</li>)}
+                            </ul>
+                        </td>
+                        <td className="p-3 align-top text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                session.intensity === 'High' ? 'bg-red-100 text-red-700' :
+                                session.intensity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-green-100 text-green-700'
+                            }`}>
+                                {session.intensity}
+                            </span>
+                        </td>
+                     </tr>
+                 );
+              })}
+            </tbody>
+          </table>
+          
+          <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400">
+              <span>导出时间: {new Date().toLocaleString()}</span>
+              <span>© 顽石之光足球俱乐部 - 内部训练资料</span>
+          </div>
+      </div>
     </div>
   );
 };
