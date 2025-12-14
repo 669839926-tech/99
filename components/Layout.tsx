@@ -90,20 +90,18 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
         </nav>
 
         <div className="p-4 border-t border-gray-800">
-          {/* Settings: Only visible if NOT a coach (i.e. Director) */}
-          {currentUser?.role !== 'coach' && (
-              <button 
-                onClick={() => setActiveTab('settings')}
-                className={`w-full flex items-center p-3 rounded-lg transition-colors mb-2 ${
-                  activeTab === 'settings' 
-                   ? 'bg-gray-800 text-bvb-yellow font-bold' 
-                   : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Settings className="w-5 h-5 mr-3" />
-                设置
-              </button>
-          )}
+          {/* Settings: Visible for both Directors and Coaches (Coaches see limited options) */}
+          <button 
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center p-3 rounded-lg transition-colors mb-2 ${
+              activeTab === 'settings' 
+               ? 'bg-gray-800 text-bvb-yellow font-bold' 
+               : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Settings className="w-5 h-5 mr-3" />
+            设置
+          </button>
 
            <button 
             onClick={onLogout}
@@ -156,18 +154,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                   <span className="text-[10px] font-bold scale-90 origin-center">{getMobileLabel(item.label)}</span>
                 </button>
               ))}
-               {/* Settings only for Director */}
-               {currentUser?.role !== 'coach' && (
-                   <button
-                      onClick={() => setActiveTab('settings')}
-                      className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95 ${
-                        activeTab === 'settings' ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
-                      }`}
-                    >
-                      <Settings className={`w-6 h-6 ${activeTab === 'settings' ? 'fill-current' : ''}`} strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
-                      <span className="text-[10px] font-bold scale-90 origin-center">设置</span>
-                    </button>
-               )}
+               {/* Settings now accessible on mobile for all */}
+               <button
+                  onClick={() => setActiveTab('settings')}
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95 ${
+                    activeTab === 'settings' ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  <Settings className={`w-6 h-6 ${activeTab === 'settings' ? 'fill-current' : ''}`} strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
+                  <span className="text-[10px] font-bold scale-90 origin-center">设置</span>
+                </button>
             </div>
             {/* Safe area spacer for iPhone Home Bar */}
             <div className="h-[env(safe-area-inset-bottom)] w-full"></div>

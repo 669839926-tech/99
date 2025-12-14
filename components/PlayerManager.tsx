@@ -15,6 +15,7 @@ interface PlayerManagerProps {
   onAddPlayer: (player: Player) => void;
   onBulkAddPlayers: (players: Player[]) => void;
   onAddTeam: (team: Team) => void;
+  onDeleteTeam: (teamId: string) => void;
   onUpdatePlayer: (player: Player) => void;
   onDeletePlayer: (playerId: string) => void;
   onBulkDeletePlayers: (playerIds: string[]) => void;
@@ -174,11 +175,7 @@ const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => 
     return stats;
 };
 
-// --- Extracted Modals (Recharge, Import, Detail) - KEPT AS IS ---
-// (Modals omitted for brevity, assuming they are defined same as previous file version)
-// ... Include RechargeModal, ImportPlayersModal, PlayerDetailModal components here ...
-// For the sake of the XML replacement, I must include them or the file breaks.
-// I will include the full content to ensure correctness.
+// --- Extracted Modals ---
 
 interface RechargeModalProps {
     player: Player | undefined;
@@ -239,6 +236,45 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                             确认充值
                         </button>
                     </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface TransferModalProps {
+    teams: Team[];
+    count: number;
+    onClose: () => void;
+    onConfirm: (targetTeamId: string) => void;
+}
+
+const TransferModal: React.FC<TransferModalProps> = ({ teams, count, onClose, onConfirm }) => {
+    const [targetId, setTargetId] = useState(teams[0]?.id || 'unassigned');
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+                <h3 className="font-bold text-lg mb-2 flex items-center"><ArrowRightLeft className="w-5 h-5 mr-2 text-bvb-yellow"/>批量移交球员</h3>
+                <p className="text-sm text-gray-500 mb-4">即将把选中的 <span className="font-bold text-bvb-black">{count}</span> 名球员移交至：</p>
+                
+                <select 
+                    className="w-full p-2 border rounded-lg mb-6 text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                    value={targetId}
+                    onChange={(e) => setTargetId(e.target.value)}
+                >
+                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    <option value="unassigned">待分配 (Unassigned)</option>
+                </select>
+
+                <div className="flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">取消</button>
+                    <button 
+                        onClick={() => onConfirm(targetId)} 
+                        className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800"
+                    >
+                        确认移交
+                    </button>
                 </div>
             </div>
         </div>
@@ -591,8 +627,10 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     };
 
     const handleDelete = () => {
-      onDeletePlayer(player.id);
-      onClose();
+      if (confirm('确定要删除这名球员吗？此操作不可撤销。')) {
+          onDeletePlayer(player.id);
+          onClose();
+      }
     };
 
     const handleExportPDF = async () => {
@@ -926,7 +964,16 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             {isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}
                             <div className="flex justify-center items-center mt-2 space-x-2">
                                 <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>
-                                {isEditing ? <select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="text-xs bg-gray-100 p-1 rounded border" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select> : <span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name}</span>}
+                                {isEditing ? (
+                                    <select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="text-xs bg-gray-100 p-1 rounded border" disabled={isCoach}>
+                                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                        <option value="unassigned">待分配</option>
+                                    </select>
+                                ) : (
+                                    <span className="text-sm font-bold text-gray-500">
+                                        {teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}
+                                    </span>
+                                )}
                             </div>
                           </div>
                       </div>
@@ -1015,6 +1062,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                   </div>
                </div>
              )}
+             {/* ... Other Tabs render logic is unchanged, just omitted for brevity in XML if possible, but keeping context to be safe */}
              {activeTab === 'technical' && renderCategoryContent('technical')}
              {activeTab === 'tactical' && renderCategoryContent('tactical')}
              {activeTab === 'physical' && renderCategoryContent('physical')}
@@ -1032,7 +1080,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            <h1 className="text-5xl font-black uppercase tracking-tight text-gray-900 mb-2">{editedPlayer.name}</h1>
                            <div className="flex items-center gap-3 text-xl font-bold text-gray-500">
                                <span className="bg-bvb-yellow text-black px-3 py-1 rounded">#{editedPlayer.number}</span>
-                               <span>{teams.find(t => t.id === editedPlayer.teamId)?.name}</span>
+                               <span>{teams.find(t => t.id === editedPlayer.teamId)?.name || '待分配'}</span>
                                <span className="text-gray-300">|</span>
                                <span>{editedPlayer.position}</span>
                            </div>
@@ -1105,6 +1153,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   onAddPlayer, 
   onBulkAddPlayers,
   onAddTeam, 
+  onDeleteTeam, // Destructure new prop
   onUpdatePlayer, 
   onDeletePlayer,
   onBulkDeletePlayers,
@@ -1139,13 +1188,29 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
   }, [initialFilter]);
 
+  // Handle Team Selection Logic
   useEffect(() => {
+    // 1. If Coach, force to their team
     if (isCoach && currentUser?.teamId) {
         setSelectedTeamId(currentUser.teamId);
+        return;
+    } 
+    
+    // 2. If Director, and current selection is invalid (deleted team), fallback
+    const teamExists = teams.some(t => t.id === selectedTeamId);
+    const isUnassigned = selectedTeamId === 'unassigned';
+
+    if (!teamExists && !isUnassigned) {
+        // Current selection is invalid (e.g. deleted)
+        if (teams.length > 0) {
+            setSelectedTeamId(teams[0].id);
+        } else {
+            setSelectedTeamId('unassigned');
+        }
     } else if (!selectedTeamId && teams.length > 0) {
-        setSelectedTeamId(teams[0].id);
+         setSelectedTeamId(teams[0].id);
     }
-  }, [teams, currentUser, isCoach]);
+  }, [teams, currentUser, isCoach, selectedTeamId]);
 
   const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
@@ -1288,9 +1353,18 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   };
 
   const executeBulkDelete = () => {
-      onBulkDeletePlayers(Array.from(selectedIds));
+      if (confirm(`确定要删除选中的 ${selectedIds.size} 名球员吗？`)) {
+          onBulkDeletePlayers(Array.from(selectedIds));
+          setSelectedIds(new Set());
+          setIsSelectionMode(false);
+      }
+  };
+
+  const handleTransferConfirm = (targetTeamId: string) => {
+      onTransferPlayers(Array.from(selectedIds), targetTeamId);
       setSelectedIds(new Set());
       setIsSelectionMode(false);
+      setShowTransferModal(false);
   };
 
   const handleExportPlayerList = async () => {
@@ -1371,11 +1445,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       }
   };
 
-  const TransferModal = ({ onClose }: { onClose: () => void }) => {
-      // Basic mock implementation of transfer logic
-      return null;
-  }
-
   // --- Render Function ---
 
   return (
@@ -1388,9 +1457,46 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         </div>
         <div className="md:hidden overflow-x-auto pb-2 flex space-x-2 no-scrollbar">
             {availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === team.id ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{team.name}</button>)}
+            <button onClick={() => setSelectedTeamId('unassigned')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'unassigned' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>待分配</button>
         </div>
         <div className="hidden md:flex flex-col space-y-2">
-            {availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 ${selectedTeamId === team.id ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}><h3 className={`font-bold ${selectedTeamId === team.id ? 'text-bvb-black' : ''}`}>{team.name}</h3><p className="text-xs text-gray-400 mt-1">{team.description}</p></button>)}
+            {availableTeams.map(team => (
+                <div key={team.id} className="relative group">
+                    <button 
+                        onClick={() => setSelectedTeamId(team.id)} 
+                        className={`w-full text-left p-4 rounded-xl transition-all border-l-4 ${selectedTeamId === team.id ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}
+                    >
+                        <h3 className={`font-bold ${selectedTeamId === team.id ? 'text-bvb-black' : ''}`}>{team.name}</h3>
+                        <p className="text-xs text-gray-400 mt-1">{team.description}</p>
+                    </button>
+                    {isDirector && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm('确定要删除这支球队吗？删除后该队球员将自动转入“待分配”列表，不会被删除。')) {
+                                    onDeleteTeam(team.id);
+                                }
+                            }}
+                            className="absolute top-4 right-2 p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white/50 rounded-full"
+                            title="删除球队"
+                        >
+                            <Trash2 className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            ))}
+            
+            {/* Unassigned Button */}
+            <button 
+                onClick={() => setSelectedTeamId('unassigned')} 
+                className={`w-full text-left p-4 rounded-xl transition-all border-l-4 mt-2 ${selectedTeamId === 'unassigned' ? 'bg-white border-gray-400 shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}
+            >
+                <div className="flex justify-between items-center">
+                    <h3 className={`font-bold ${selectedTeamId === 'unassigned' ? 'text-gray-800' : ''}`}>待分配球员</h3>
+                    <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{players.filter(p => p.teamId === 'unassigned').length}</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">暂无归属梯队的球员</p>
+            </button>
         </div>
       </div>
       
@@ -1493,7 +1599,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             const isExpiredValid = isExpired(player.validUntil);
                             const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
                             const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted';
-                            const teamName = teams.find(t => t.id === player.teamId)?.name;
+                            const teamName = teams.find(t => t.id === player.teamId)?.name || (player.teamId === 'unassigned' ? '待分配' : '未知');
 
                             return (
                                 <tr 
@@ -1526,7 +1632,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                     </td>
                                     <td className="p-4">
                                         <div className="flex flex-col items-start gap-1">
-                                            <span className="text-xs font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">{teamName}</span>
+                                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${player.teamId === 'unassigned' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'}`}>{teamName}</span>
                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getPosColorLight(player.position)}`}>{player.position}</span>
                                         </div>
                                     </td>
@@ -1570,7 +1676,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                             {!hasDraftReviews && !hasDraftStats && <span className="text-[10px] text-gray-400">正常</span>}
                                         </div>
                                     </td>
-                                    <td className="p-4 text-right">
+                                    <td className="p-4 text-right flex justify-end gap-2">
                                         <button 
                                             onClick={(e) => openRechargeModal(e, player.id)} 
                                             className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" 
@@ -1578,6 +1684,20 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                         >
                                             <CreditCard className="w-4 h-4" />
                                         </button>
+                                        {isDirector && (
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (confirm('确定要删除这名球员吗？此操作不可撤销。')) {
+                                                        onDeletePlayer(player.id);
+                                                    }
+                                                }}
+                                                className="p-1.5 bg-white border border-gray-200 rounded text-red-400 hover:bg-red-50 hover:border-red-200 transition-colors shadow-sm" 
+                                                title="删除球员"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             );
@@ -1606,7 +1726,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     const isExpiredValid = isExpired(player.validUntil);
                     const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
                     const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted';
-                    const teamName = teams.find(t => t.id === player.teamId)?.name;
+                    const teamName = teams.find(t => t.id === player.teamId)?.name || (player.teamId === 'unassigned' ? '待分配' : '未知');
+                    
                     return (
                     <div key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer border relative group flex flex-col ${isSelected ? 'border-bvb-yellow ring-2 ring-bvb-yellow/50' : 'border-gray-200 hover:border-bvb-yellow'}`}>
                         {isSelectionMode && <div className={`absolute top-2 left-2 w-6 h-6 rounded border-2 z-30 flex items-center justify-center transition-colors ${isSelected ? 'bg-bvb-yellow border-bvb-yellow' : 'bg-white border-gray-300'}`}>{isSelected && <CheckSquare className="w-4 h-4 text-bvb-black" />}</div>}
@@ -1619,7 +1740,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             </div>
                             <div className="flex-1 flex flex-col justify-between py-0.5">
                                 <div className="flex justify-between items-start">
-                                    <div className="pr-2"><h3 className="font-bold text-gray-900 text-lg leading-tight line-clamp-1">{player.name}</h3><div className="flex flex-wrap items-center gap-1 mt-0.5"><span className="text-[10px] text-gray-400 font-bold bg-gray-100 px-1 rounded">{teamName}</span><span className="text-[10px] text-gray-400">#{player.number}</span></div></div>
+                                    <div className="pr-2"><h3 className="font-bold text-gray-900 text-lg leading-tight line-clamp-1">{player.name}</h3><div className="flex flex-wrap items-center gap-1 mt-0.5"><span className={`text-[10px] font-bold px-1 rounded ${player.teamId === 'unassigned' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>{teamName}</span><span className="text-[10px] text-gray-400">#{player.number}</span></div></div>
                                     <div className="flex flex-col items-end"><span className={`text-xl font-black ${parseFloat(overallRating) >= 8 ? 'text-green-500' : parseFloat(overallRating) >= 6 ? 'text-yellow-500' : 'text-gray-400'}`}>{overallRating}</span><span className="text-[9px] text-gray-300 uppercase font-bold">Rating</span></div>
                                 </div>
                                 <div className="mt-2 space-y-1">
@@ -1653,6 +1774,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 <button onClick={() => setShowAddPlayerModal(false)}><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleAddPlayerSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* ... Image Input Omitted for Brevity (unchanged) ... */}
               <div className="flex justify-center mb-4">
                 <div className="relative group cursor-pointer w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 hover:border-bvb-yellow transition-colors" onClick={() => fileInputRef.current?.click()}>
                    {newPlayer.image ? <img src={newPlayer.image} className="w-full h-full object-cover" /> : <Upload className="w-8 h-8 text-gray-400" />}
@@ -1660,6 +1782,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 </div>
                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                   <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名</label>
@@ -1674,6 +1797,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号 (自动解析生日/性别)</label>
                   <input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none tracking-widest font-mono" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} placeholder="18位身份证号码" />
               </div>
+              {/* ... Gender/Age Display (unchanged) ... */}
               <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
                   <div>
                       <span className="block text-xs font-bold text-gray-400 uppercase">性别</span>
@@ -1688,6 +1812,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                       <span className="font-bold text-sm">{newPlayer.birthDate || '-'}</span>
                   </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                   <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">场上位置</label>
@@ -1699,11 +1824,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label>
                       <select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={newPlayer.teamId || selectedTeamId} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})} disabled={isCoach}>
                           {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          <option value="unassigned">待分配</option>
                       </select>
                   </div>
               </div>
 
-              {/* New Family/Info Section */}
+              {/* New Family/Info Section (unchanged) */}
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-4 space-y-3">
                   <h4 className="text-xs font-bold text-gray-500 uppercase">教育与家庭信息</h4>
                   <div className="grid grid-cols-2 gap-4">
@@ -1732,6 +1858,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         </div>
       )}
 
+      {/* ... Other Modals (AddTeam, Import, etc) are identical ... */}
       {showAddTeamModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -1768,7 +1895,15 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             onClose={() => setShowImportModal(false)}
           />
       )}
-      {showTransferModal && <TransferModal onClose={() => setShowTransferModal(false)} />}
+      
+      {showTransferModal && (
+          <TransferModal 
+              teams={teams} 
+              count={selectedIds.size} 
+              onClose={() => setShowTransferModal(false)} 
+              onConfirm={handleTransferConfirm} 
+          />
+      )}
       
       {showRechargeModal && (
         <RechargeModal 

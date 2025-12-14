@@ -1,25 +1,43 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users } from 'lucide-react';
-import { MOCK_USERS } from '../constants'; // Import mock users directly if you want to initialize, or handle via App props better in a real app. For this structure, we'll maintain local state simulation.
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
   onUpdateConfig: (newConfig: AttributeConfig) => void;
+  currentUser: User | null;
+  users: User[];
+  onAddUser: (user: User) => void;
+  onDeleteUser: (userId: string) => void;
+  onResetUserPassword: (userId: string) => void;
+  onUpdateUserPassword: (userId: string, newPass: string) => void;
 }
 
-// Simulated local user management since it's not lifted to App in original props but requested as feature
-const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) => {
+const Settings: React.FC<SettingsProps> = ({ 
+    attributeConfig, 
+    onUpdateConfig, 
+    currentUser,
+    users,
+    onAddUser,
+    onDeleteUser,
+    onResetUserPassword,
+    onUpdateUserPassword
+}) => {
+  const isDirector = currentUser?.role === 'director';
+
   const [localConfig, setLocalConfig] = useState<AttributeConfig>(JSON.parse(JSON.stringify(attributeConfig)));
-  const [activeTab, setActiveTab] = useState<'attributes' | 'drills' | 'users'>('attributes');
+  
+  // Tabs: Coaches only see "Account", Directors see everything
+  const [activeTab, setActiveTab] = useState<'attributes' | 'drills' | 'users' | 'account'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
-  // Local User Management State
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', password: '123' });
+  // User Management State (New User Form)
+  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach' });
 
+  // Change Password State
+  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
 
   const categoryLabels: Record<AttributeCategory, string> = {
     technical: '技术能力',
@@ -52,17 +70,31 @@ const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) 
       setNewItemName('');
   };
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleCreateUser = (e: React.FormEvent) => {
       e.preventDefault();
       if(newUser.username && newUser.name) {
-          setUsers(prev => [...prev, { ...newUser, id: `u-${Date.now()}` } as User]);
-          setNewUser({ username: '', name: '', role: 'coach', password: '123' });
+          const user: User = { 
+              ...newUser, 
+              id: `u-${Date.now()}`,
+              password: '123' // Enforce default
+          } as User;
+          
+          onAddUser(user);
+          setNewUser({ username: '', name: '', role: 'coach' });
+          alert(`用户 ${user.name} 已创建，默认密码为 123`);
       }
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUserClick = (id: string) => {
       if(confirm('确定要删除该用户吗？')) {
-          setUsers(prev => prev.filter(u => u.id !== id));
+          onDeleteUser(id);
+      }
+  };
+
+  const handleResetPasswordClick = (id: string) => {
+      if (confirm('确定要重置该用户的密码吗？重置后密码将恢复为默认值 "123"。')) {
+          onResetUserPassword(id);
+          alert('密码已重置为 123');
       }
   };
 
@@ -84,9 +116,34 @@ const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) 
       }
   };
 
-  const handleSave = () => {
+  const handleChangeOwnPassword = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (passwordForm.new !== passwordForm.confirm) {
+          alert('两次输入的新密码不一致');
+          return;
+      }
+      if (passwordForm.new.length < 3) {
+          alert('密码长度至少需要3位');
+          return;
+      }
+      
+      // In a real app, verify old password via API. 
+      // Here we check against currentUser prop (which is client-side state)
+      if (currentUser && currentUser.password !== passwordForm.current) {
+          alert('当前密码输入错误');
+          return;
+      }
+
+      if (currentUser) {
+          onUpdateUserPassword(currentUser.id, passwordForm.new);
+          alert('密码修改成功');
+          setPasswordForm({ current: '', new: '', confirm: '' });
+      }
+  };
+
+  const handleSaveConfig = () => {
     onUpdateConfig(localConfig);
-    alert('设置已保存！');
+    alert('配置设置已保存！');
   };
 
   return (
@@ -94,42 +151,196 @@ const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) 
       <div className="flex justify-between items-center">
         <div>
            <h2 className="text-3xl font-black text-bvb-black uppercase">系统设置</h2>
-           <p className="text-gray-500">自定义评价体系与训练内容库。</p>
+           <p className="text-gray-500">
+               {isDirector ? '自定义评价体系、训练内容库及用户管理。' : '管理您的个人账户安全。'}
+           </p>
         </div>
-        <button 
-          onClick={handleSave}
-          className="flex items-center px-6 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 transition-colors"
-        >
-          <Save className="w-5 h-5 mr-2" />
-          保存更改
-        </button>
+        {/* Only show "Save Config" button if NOT in Account tab (Account tab has its own form button) */}
+        {isDirector && activeTab !== 'account' && activeTab !== 'users' && (
+            <button 
+            onClick={handleSaveConfig}
+            className="flex items-center px-6 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 transition-colors"
+            >
+            <Save className="w-5 h-5 mr-2" />
+            保存配置更改
+            </button>
+        )}
       </div>
 
-      <div className="flex gap-4 border-b border-gray-200">
+      {/* Tabs */}
+      <div className="flex gap-4 border-b border-gray-200 overflow-x-auto">
           <button 
-            onClick={() => setActiveTab('attributes')} 
-            className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
+            onClick={() => setActiveTab('account')} 
+            className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'account' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
           >
-              <Target className="w-4 h-4 mr-2" /> 球员能力模型
+              <Lock className="w-4 h-4 mr-2" /> 个人安全
           </button>
-          <button 
-            onClick={() => setActiveTab('drills')} 
-            className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
-          >
-              <Book className="w-4 h-4 mr-2" /> 训练内容库
-          </button>
-          <button 
-            onClick={() => setActiveTab('users')} 
-            className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
-          >
-              <Users className="w-4 h-4 mr-2" /> 用户权限管理
-          </button>
+          
+          {isDirector && (
+              <>
+                <button 
+                    onClick={() => setActiveTab('users')} 
+                    className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
+                >
+                    <Users className="w-4 h-4 mr-2" /> 用户权限管理
+                </button>
+                <button 
+                    onClick={() => setActiveTab('attributes')} 
+                    className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
+                >
+                    <Target className="w-4 h-4 mr-2" /> 球员能力模型
+                </button>
+                <button 
+                    onClick={() => setActiveTab('drills')} 
+                    className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
+                >
+                    <Book className="w-4 h-4 mr-2" /> 训练内容库
+                </button>
+              </>
+          )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row min-h-[500px]">
         
-        {/* === Attributes Logic === */}
-        {activeTab === 'attributes' && (
+        {/* === TAB: ACCOUNT SECURITY (For Everyone) === */}
+        {activeTab === 'account' && (
+            <div className="flex-1 p-6 flex flex-col items-center justify-center">
+                <div className="w-full max-w-md bg-gray-50 p-8 rounded-xl border border-gray-200">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                        <KeyRound className="w-5 h-5 mr-2 text-bvb-yellow" />
+                        修改登录密码
+                    </h3>
+                    <form onSubmit={handleChangeOwnPassword} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">当前密码</label>
+                            <input 
+                                type="password"
+                                required
+                                className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                value={passwordForm.current}
+                                onChange={e => setPasswordForm({...passwordForm, current: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">新密码</label>
+                            <input 
+                                type="password"
+                                required
+                                minLength={3}
+                                className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                value={passwordForm.new}
+                                onChange={e => setPasswordForm({...passwordForm, new: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">确认新密码</label>
+                            <input 
+                                type="password"
+                                required
+                                minLength={3}
+                                className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                value={passwordForm.confirm}
+                                onChange={e => setPasswordForm({...passwordForm, confirm: e.target.value})}
+                            />
+                        </div>
+                        <button type="submit" className="w-full bg-bvb-black text-white font-bold py-3 rounded-lg hover:bg-gray-800 transition-colors mt-4">
+                            更新密码
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )}
+
+        {/* === TAB: USER MANAGEMENT (Director Only) === */}
+        {activeTab === 'users' && isDirector && (
+             <div className="flex-1 p-6">
+                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
+                    <Users className="w-5 h-5 mr-2 text-bvb-yellow" />
+                    用户与角色管理
+                </h3>
+                
+                {/* Add User Form */}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                    <h4 className="font-bold text-sm text-gray-700 mb-3">新增用户</h4>
+                    <form onSubmit={handleCreateUser} className="grid grid-cols-4 gap-3">
+                        <input 
+                            placeholder="用户名" 
+                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                            value={newUser.username}
+                            onChange={e => setNewUser({...newUser, username: e.target.value})}
+                        />
+                         <input 
+                            placeholder="显示名称" 
+                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                            value={newUser.name}
+                            onChange={e => setNewUser({...newUser, name: e.target.value})}
+                        />
+                         <select 
+                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                            value={newUser.role}
+                            onChange={e => setNewUser({...newUser, role: e.target.value as any})}
+                        >
+                            <option value="coach">教练员</option>
+                            <option value="director">青训总监</option>
+                        </select>
+                        <button className="bg-bvb-black text-white font-bold rounded hover:bg-gray-800">
+                            添加
+                        </button>
+                    </form>
+                    <p className="text-[10px] text-gray-400 mt-2 flex items-center">
+                        * 默认初始密码为 <span className="font-mono bg-gray-200 px-1 rounded ml-1 text-gray-600">123</span>，请提醒用户登录后尽快修改。
+                    </p>
+                </div>
+
+                {/* User List */}
+                <div className="space-y-2">
+                    <div className="grid grid-cols-4 text-xs font-bold text-gray-400 uppercase px-4 py-2 bg-gray-50 border border-gray-100 rounded-t-lg">
+                        <div>用户名</div>
+                        <div>姓名</div>
+                        <div>角色</div>
+                        <div className="text-right">操作</div>
+                    </div>
+                    {users.map(u => (
+                        <div key={u.id} className="grid grid-cols-4 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50">
+                            <div className="font-mono text-sm">{u.username}</div>
+                            <div className="font-bold text-sm text-gray-800 flex items-center">
+                                {u.name}
+                                {u.id === currentUser?.id && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded">Me</span>}
+                            </div>
+                            <div>
+                                <span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                    {u.role === 'director' ? '总监' : '教练'}
+                                </span>
+                            </div>
+                            <div className="text-right flex justify-end gap-2">
+                                {/* Can't delete self */}
+                                {u.id !== currentUser?.id && (
+                                    <>
+                                        <button 
+                                            onClick={() => handleResetPasswordClick(u.id)}
+                                            className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50"
+                                            title="重置密码为 123"
+                                        >
+                                            <RotateCcw className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={() => handleDeleteUserClick(u.id)}
+                                            className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                                            title="删除用户"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+             </div>
+        )}
+        
+        {/* === TAB: ATTRIBUTES CONFIG (Director Only) === */}
+        {activeTab === 'attributes' && isDirector && (
             <>
                 {/* Category Sidebar */}
                 <div className="md:w-64 bg-gray-50 border-r border-gray-200 p-4 space-y-2">
@@ -181,7 +392,7 @@ const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) 
                     {localConfig[activeCategory].length > 0 ? (
                     localConfig[activeCategory].map((attr) => (
                         <div key={attr.key} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow group">
-                        <span className="font-bold text-gray-700">{attr.label}</span>
+                        <span className="bold text-gray-700 font-bold">{attr.label}</span>
                         <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <span className="text-xs text-gray-300 font-mono mr-2">{attr.key}</span>
                             <button 
@@ -202,8 +413,8 @@ const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) 
             </>
         )}
 
-        {/* === Drill Library Logic === */}
-        {activeTab === 'drills' && (
+        {/* === TAB: DRILL LIBRARY (Director Only) === */}
+        {activeTab === 'drills' && isDirector && (
             <div className="flex-1 p-6">
                  <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
                     <Book className="w-5 h-5 mr-2 text-bvb-yellow" />
@@ -249,77 +460,6 @@ const Settings: React.FC<SettingsProps> = ({ attributeConfig, onUpdateConfig }) 
                      )}
                 </div>
             </div>
-        )}
-
-        {/* === User Management Logic (New) === */}
-        {activeTab === 'users' && (
-             <div className="flex-1 p-6">
-                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center">
-                    <Users className="w-5 h-5 mr-2 text-bvb-yellow" />
-                    用户与角色管理
-                </h3>
-                
-                {/* Add User Form */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-                    <h4 className="font-bold text-sm text-gray-700 mb-3">新增用户</h4>
-                    <form onSubmit={handleAddUser} className="grid grid-cols-4 gap-3">
-                        <input 
-                            placeholder="用户名" 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.username}
-                            onChange={e => setNewUser({...newUser, username: e.target.value})}
-                        />
-                         <input 
-                            placeholder="显示名称" 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.name}
-                            onChange={e => setNewUser({...newUser, name: e.target.value})}
-                        />
-                         <select 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.role}
-                            onChange={e => setNewUser({...newUser, role: e.target.value as any})}
-                        >
-                            <option value="coach">教练员</option>
-                            <option value="director">青训总监</option>
-                        </select>
-                        <button className="bg-bvb-black text-white font-bold rounded hover:bg-gray-800">
-                            添加
-                        </button>
-                    </form>
-                </div>
-
-                {/* User List */}
-                <div className="space-y-2">
-                    <div className="grid grid-cols-4 text-xs font-bold text-gray-400 uppercase px-4 py-2 bg-gray-50 border border-gray-100 rounded-t-lg">
-                        <div>用户名</div>
-                        <div>姓名</div>
-                        <div>角色</div>
-                        <div className="text-right">操作</div>
-                    </div>
-                    {users.map(u => (
-                        <div key={u.id} className="grid grid-cols-4 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50">
-                            <div className="font-mono text-sm">{u.username}</div>
-                            <div className="font-bold text-sm text-gray-800">{u.name}</div>
-                            <div>
-                                <span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                    {u.role === 'director' ? '总监' : '教练'}
-                                </span>
-                            </div>
-                            <div className="text-right">
-                                {u.username !== 'admin' && (
-                                    <button 
-                                        onClick={() => handleDeleteUser(u.id)}
-                                        className="text-gray-400 hover:text-red-500"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                </div>
-             </div>
         )}
 
       </div>

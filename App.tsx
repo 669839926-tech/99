@@ -24,7 +24,9 @@ function App() {
   const [trainings, setTrainings] = useState<TrainingSession[]>(MOCK_TRAINING);
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES); 
   const [attributeConfig, setAttributeConfig] = useState<AttributeConfig>(DEFAULT_ATTRIBUTE_CONFIG);
-  const [users] = useState<User[]>(MOCK_USERS);
+  
+  // User Management State (Lifted from Settings/Mock)
+  const [users, setUsers] = useState<User[]>(MOCK_USERS);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -41,6 +43,8 @@ function App() {
             setMatches(cloudData.matches || MOCK_MATCHES);
             setTrainings(cloudData.trainings || MOCK_TRAINING);
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
+            // In a real app, users would also be loaded from DB. 
+            // For this demo, we use initial mock users or could persist them too if schema allows.
         }
         setIsInitializing(false);
     };
@@ -150,6 +154,31 @@ function App() {
 
   const handleUpdateMatch = (updatedMatch: Match) => {
       setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
+  };
+
+  // --- User Management Logic (App Level) ---
+  const handleAddUser = (user: User) => {
+      setUsers(prev => [...prev, user]);
+  };
+
+  const handleDeleteUser = (userId: string) => {
+      setUsers(prev => prev.filter(u => u.id !== userId));
+  };
+
+  const handleResetUserPassword = (userId: string) => {
+      setUsers(prev => prev.map(u => 
+          u.id === userId ? { ...u, password: '123' } : u
+      ));
+  };
+
+  const handleUpdateUserPassword = (userId: string, newPassword: string) => {
+      setUsers(prev => prev.map(u => 
+          u.id === userId ? { ...u, password: newPassword } : u
+      ));
+      // Also update current user session if it's the same user
+      if (currentUser && currentUser.id === userId) {
+          setCurrentUser(prev => prev ? { ...prev, password: newPassword } : null);
+      }
   };
 
   // --- Recharge / Credit Logic ---
@@ -294,6 +323,13 @@ function App() {
             onAddPlayer={handleAddPlayer} 
             onBulkAddPlayers={handleBulkAddPlayers}
             onAddTeam={handleAddTeam}
+            onDeleteTeam={(teamId) => {
+                // Delete Team Logic
+                if (confirm('确定要删除这支球队吗？删除后该队球员将自动转入“待分配”列表，不会被删除。')) {
+                    setTeams(prev => prev.filter(t => t.id !== teamId));
+                    setPlayers(prev => prev.map(p => p.teamId === teamId ? { ...p, teamId: 'unassigned' } : p));
+                }
+            }}
             onUpdatePlayer={handleUpdatePlayer}
             onDeletePlayer={handleDeletePlayer}
             onBulkDeletePlayers={handleBulkDeletePlayers}
@@ -328,7 +364,16 @@ function App() {
             />
         );
       case 'settings':
-        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} />;
+        return <Settings 
+                  attributeConfig={attributeConfig} 
+                  onUpdateConfig={handleUpdateAttributeConfig}
+                  currentUser={currentUser}
+                  users={users}
+                  onAddUser={handleAddUser}
+                  onDeleteUser={handleDeleteUser}
+                  onResetUserPassword={handleResetUserPassword}
+                  onUpdateUserPassword={handleUpdateUserPassword}
+               />;
       default:
         return <Dashboard players={players} matches={matches} trainings={trainings} teams={teams} currentUser={currentUser} />;
     }
