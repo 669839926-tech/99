@@ -1,13 +1,13 @@
-
 import React, { useState } from 'react';
-import { AttributeConfig, AttributeCategory, User } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload } from 'lucide-react';
+import { AttributeConfig, AttributeCategory, User, Team } from '../types';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, KeyRound, Image as ImageIcon, Upload, Users, RotateCcw, Lock, Target } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
   onUpdateConfig: (newConfig: AttributeConfig) => void;
   currentUser: User | null;
   users: User[];
+  teams: Team[]; // Added teams prop
   onAddUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
   onResetUserPassword: (userId: string) => void;
@@ -21,6 +21,7 @@ const Settings: React.FC<SettingsProps> = ({
     onUpdateConfig, 
     currentUser,
     users,
+    teams,
     onAddUser,
     onDeleteUser,
     onResetUserPassword,
@@ -38,7 +39,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [newItemName, setNewItemName] = useState('');
 
   // User Management State (New User Form)
-  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach' });
+  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamId: '' });
 
   // Change Password State
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
@@ -80,11 +81,13 @@ const Settings: React.FC<SettingsProps> = ({
           const user: User = { 
               ...newUser, 
               id: `u-${Date.now()}`,
-              password: '123' // Enforce default
+              password: '123', // Enforce default
+              // Ensure teamId is only set if role is coach
+              teamId: newUser.role === 'coach' ? newUser.teamId : undefined
           } as User;
           
           onAddUser(user);
-          setNewUser({ username: '', name: '', role: 'coach' });
+          setNewUser({ username: '', name: '', role: 'coach', teamId: '' });
           alert(`用户 ${user.name} 已创建，默认密码为 123`);
       }
   };
@@ -325,30 +328,52 @@ const Settings: React.FC<SettingsProps> = ({
                 {/* Add User Form */}
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
                     <h4 className="font-bold text-sm text-gray-700 mb-3">新增用户</h4>
-                    <form onSubmit={handleCreateUser} className="grid grid-cols-4 gap-3">
-                        <input 
-                            placeholder="用户名" 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.username}
-                            onChange={e => setNewUser({...newUser, username: e.target.value})}
-                        />
-                         <input 
-                            placeholder="显示名称" 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.name}
-                            onChange={e => setNewUser({...newUser, name: e.target.value})}
-                        />
-                         <select 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.role}
-                            onChange={e => setNewUser({...newUser, role: e.target.value as any})}
-                        >
-                            <option value="coach">教练员</option>
-                            <option value="director">青训总监</option>
-                        </select>
-                        <button className="bg-bvb-black text-white font-bold rounded hover:bg-gray-800">
-                            添加
-                        </button>
+                    <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div className="md:col-span-3">
+                            <input 
+                                placeholder="用户名" 
+                                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                value={newUser.username}
+                                onChange={e => setNewUser({...newUser, username: e.target.value})}
+                            />
+                        </div>
+                        <div className="md:col-span-3">
+                             <input 
+                                placeholder="显示名称" 
+                                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                value={newUser.name}
+                                onChange={e => setNewUser({...newUser, name: e.target.value})}
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                             <select 
+                                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow bg-white"
+                                value={newUser.role}
+                                onChange={e => setNewUser({...newUser, role: e.target.value as any})}
+                            >
+                                <option value="coach">教练员</option>
+                                <option value="director">青训总监</option>
+                            </select>
+                        </div>
+                        <div className="md:col-span-3">
+                            {newUser.role === 'coach' && (
+                                <select 
+                                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow bg-white"
+                                    value={newUser.teamId || ''}
+                                    onChange={e => setNewUser({...newUser, teamId: e.target.value})}
+                                >
+                                    <option value="">选择执教球队...</option>
+                                    {teams.map(t => (
+                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                    ))}
+                                </select>
+                            )}
+                        </div>
+                        <div className="md:col-span-1">
+                            <button className="w-full bg-bvb-black text-white font-bold py-2 rounded hover:bg-gray-800">
+                                添加
+                            </button>
+                        </div>
                     </form>
                     <p className="text-[10px] text-gray-400 mt-2 flex items-center">
                         * 默认初始密码为 <span className="font-mono bg-gray-200 px-1 rounded ml-1 text-gray-600">123</span>，请提醒用户登录后尽快修改。
@@ -374,6 +399,11 @@ const Settings: React.FC<SettingsProps> = ({
                                 <span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                     {u.role === 'director' ? '总监' : '教练'}
                                 </span>
+                                {u.role === 'coach' && u.teamId && (
+                                    <span className="ml-2 text-xs text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded">
+                                        {teams.find(t => t.id === u.teamId)?.name || '未知球队'}
+                                    </span>
+                                )}
                             </div>
                             <div className="text-right flex justify-end gap-2">
                                 {/* Can't delete self */}
