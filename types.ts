@@ -70,33 +70,6 @@ export interface PlayerPhoto {
     caption?: string;
 }
 
-// --- NEW: Testing & Home Training Types ---
-
-export interface HomeTrainingRecord {
-    id: string;
-    playerId: string;
-    date: string; // YYYY-MM-DD
-    count: number; // Replaced duration with count/sets
-    content?: string; // Optional description
-    imageUrl?: string; // Optional proof photo
-}
-
-export interface SkillTest {
-    id: string;
-    name: string; // e.g. "颠球", "30米冲刺"
-    unit: string; // e.g. "个", "秒", "cm"
-    category: 'technical' | 'physical';
-}
-
-export interface SkillTestRecord {
-    id: string;
-    playerId: string;
-    testId: string; // Links to SkillTest.id
-    date: string;
-    value: number; // The result
-    notes?: string;
-}
-
 export interface Player {
   id: string;
   teamId: string; // Links player to a team

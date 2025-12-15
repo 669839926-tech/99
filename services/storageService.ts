@@ -7,10 +7,6 @@ export interface AppData {
     attributeConfig: any;
     announcements: any[];
     appLogo?: string;
-    // New Data
-    skillTests?: any[];
-    skillTestRecords?: any[];
-    homeTrainingRecords?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

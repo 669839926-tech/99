@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, Timer } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
@@ -19,7 +19,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
     { id: 'players', label: '球队管理', icon: Shirt },
     { id: 'training', label: '训练计划', icon: Calendar },
-    { id: 'testing', label: '球员测试', icon: Timer }, // New Item
     { id: 'matches', label: '比赛日程', icon: Trophy },
   ];
 
