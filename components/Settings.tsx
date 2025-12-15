@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, KeyRound, Image as ImageIcon, Upload, Users, RotateCcw, Lock, Target } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, KeyRound, Image as ImageIcon, Upload, Users, RotateCcw, Lock, Target, CheckSquare, Square } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
   onUpdateConfig: (newConfig: AttributeConfig) => void;
   currentUser: User | null;
   users: User[];
-  teams: Team[]; // Added teams prop
+  teams: Team[];
   onAddUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
   onResetUserPassword: (userId: string) => void;
@@ -39,7 +39,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [newItemName, setNewItemName] = useState('');
 
   // User Management State (New User Form)
-  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamId: '' });
+  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [] });
 
   // Change Password State
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
@@ -82,14 +82,25 @@ const Settings: React.FC<SettingsProps> = ({
               ...newUser, 
               id: `u-${Date.now()}`,
               password: '123', // Enforce default
-              // Ensure teamId is only set if role is coach
-              teamId: newUser.role === 'coach' ? newUser.teamId : undefined
+              // Ensure teamIds are only set if role is coach
+              teamIds: newUser.role === 'coach' ? (newUser.teamIds || []) : undefined
           } as User;
           
           onAddUser(user);
-          setNewUser({ username: '', name: '', role: 'coach', teamId: '' });
+          setNewUser({ username: '', name: '', role: 'coach', teamIds: [] });
           alert(`用户 ${user.name} 已创建，默认密码为 123`);
       }
+  };
+
+  const toggleTeamSelection = (teamId: string) => {
+      setNewUser(prev => {
+          const currentTeams = prev.teamIds || [];
+          if (currentTeams.includes(teamId)) {
+              return { ...prev, teamIds: currentTeams.filter(id => id !== teamId) };
+          } else {
+              return { ...prev, teamIds: [...currentTeams, teamId] };
+          }
+      });
   };
 
   const handleDeleteUserClick = (id: string) => {
@@ -355,23 +366,32 @@ const Settings: React.FC<SettingsProps> = ({
                                 <option value="director">青训总监</option>
                             </select>
                         </div>
-                        <div className="md:col-span-3">
+                        <div className="md:col-span-4">
                             {newUser.role === 'coach' && (
-                                <select 
-                                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow bg-white"
-                                    value={newUser.teamId || ''}
-                                    onChange={e => setNewUser({...newUser, teamId: e.target.value})}
-                                >
-                                    <option value="">选择执教球队...</option>
-                                    {teams.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                </select>
+                                <div className="border rounded bg-white p-2 max-h-32 overflow-y-auto">
+                                    <p className="text-xs font-bold text-gray-400 mb-2 uppercase">选择管理球队 (可多选)</p>
+                                    <div className="space-y-1">
+                                        {teams.map(t => {
+                                            const isSelected = (newUser.teamIds || []).includes(t.id);
+                                            return (
+                                                <div 
+                                                    key={t.id} 
+                                                    onClick={() => toggleTeamSelection(t.id)}
+                                                    className={`flex items-center text-sm cursor-pointer p-1 rounded hover:bg-gray-50 ${isSelected ? 'text-bvb-black font-bold' : 'text-gray-600'}`}
+                                                >
+                                                    {isSelected ? <CheckSquare className="w-4 h-4 mr-2 text-bvb-yellow fill-current" /> : <Square className="w-4 h-4 mr-2 text-gray-300" />}
+                                                    {t.name}
+                                                </div>
+                                            );
+                                        })}
+                                        {teams.length === 0 && <span className="text-xs text-gray-400">无可用球队</span>}
+                                    </div>
+                                </div>
                             )}
                         </div>
-                        <div className="md:col-span-1">
-                            <button className="w-full bg-bvb-black text-white font-bold py-2 rounded hover:bg-gray-800">
-                                添加
+                        <div className="md:col-span-12 flex justify-end mt-2">
+                            <button className="bg-bvb-black text-white font-bold py-2 px-6 rounded hover:bg-gray-800 text-sm">
+                                创建用户
                             </button>
                         </div>
                     </form>
@@ -385,7 +405,7 @@ const Settings: React.FC<SettingsProps> = ({
                     <div className="grid grid-cols-4 text-xs font-bold text-gray-400 uppercase px-4 py-2 bg-gray-50 border border-gray-100 rounded-t-lg">
                         <div>用户名</div>
                         <div>姓名</div>
-                        <div>角色</div>
+                        <div>角色 / 管理球队</div>
                         <div className="text-right">操作</div>
                     </div>
                     {users.map(u => (
@@ -396,13 +416,23 @@ const Settings: React.FC<SettingsProps> = ({
                                 {u.id === currentUser?.id && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded">Me</span>}
                             </div>
                             <div>
-                                <span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                <span className={`text-xs px-2 py-0.5 rounded font-bold mr-2 ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                     {u.role === 'director' ? '总监' : '教练'}
                                 </span>
-                                {u.role === 'coach' && u.teamId && (
-                                    <span className="ml-2 text-xs text-gray-500 border border-gray-200 px-1.5 py-0.5 rounded">
-                                        {teams.find(t => t.id === u.teamId)?.name || '未知球队'}
-                                    </span>
+                                {u.role === 'coach' && u.teamIds && u.teamIds.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {u.teamIds.map(tid => {
+                                            const tName = teams.find(t => t.id === tid)?.name || '未知';
+                                            return (
+                                                <span key={tid} className="text-[10px] text-gray-600 border border-gray-200 px-1.5 py-0.5 rounded bg-gray-50">
+                                                    {tName}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {u.role === 'coach' && (!u.teamIds || u.teamIds.length === 0) && (
+                                    <span className="text-[10px] text-gray-400 italic">未分配球队</span>
                                 )}
                             </div>
                             <div className="text-right flex justify-end gap-2">
