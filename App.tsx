@@ -275,33 +275,26 @@ function App() {
               }
           };
 
+          // Revert old effects
           oldAttendance.forEach(record => {
               if (record.status === 'Present') {
                   modifyPlayer(record.playerId, p => ({ ...p, credits: p.credits + 1 }));
               } else if (record.status === 'Leave') {
-                  modifyPlayer(record.playerId, p => {
-                      if (p.leavesUsed > p.leaveQuota) {
-                           return { ...p, leavesUsed: p.leavesUsed - 1, credits: p.credits + 1 };
-                      } else if (p.leavesUsed > 0) {
-                           return { ...p, leavesUsed: p.leavesUsed - 1 };
-                      }
-                      return p;
-                  });
+                  // Only decrease leave count, do not refund credit (as leave no longer deducts)
+                  modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: Math.max(0, p.leavesUsed - 1) }));
               }
           });
 
+          // Apply new effects
           newAttendance.forEach(record => {
               if (record.status === 'Present') {
+                  // Present: Deduct 1 credit
                   modifyPlayer(record.playerId, p => ({ ...p, credits: p.credits - 1 }));
               } else if (record.status === 'Leave') {
-                  modifyPlayer(record.playerId, p => {
-                      if (p.leavesUsed < p.leaveQuota) {
-                          return { ...p, leavesUsed: p.leavesUsed + 1 };
-                      } else {
-                          return { ...p, credits: p.credits - 1, leavesUsed: p.leavesUsed + 1 };
-                      }
-                  });
+                  // Leave: No credit deduction, just track count
+                  modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: p.leavesUsed + 1 }));
               }
+              // Injury & Absent: No credit deduction, no leave count change
           });
 
           return updatedPlayers;

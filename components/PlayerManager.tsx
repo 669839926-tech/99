@@ -928,7 +928,12 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             if (e.type === 'recharge') { balance += e.amount; quota = e.quotaAdded ?? 0; used = 0; } 
             else if (e.type === 'training') {
                 if (e.status === 'Present') { balance -= 1; e.amount = -1; } 
-                else if (e.status === 'Leave') { if (used < quota) { used++; e.amount = 0; e.desc += ' (消耗额度)'; } else { balance -= 1; e.amount = -1; e.desc += ' (超额扣课时)'; } }
+                else if (e.status === 'Leave') { 
+                    used++; 
+                    e.amount = 0; 
+                    e.desc += ' (消耗额度)'; 
+                } 
+                // Injury and Absent do not affect balance
             }
             return { ...e, balanceAfter: balance };
         });
