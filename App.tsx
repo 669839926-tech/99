@@ -257,6 +257,24 @@ function App() {
     }));
   };
 
+  const handleDeleteRecharge = (playerId: string, rechargeId: string) => {
+      if (!confirm('确定要删除这条充值记录吗？\n删除后将扣除相应的课时余额。')) return;
+
+      setPlayers(prev => prev.map(p => {
+          if (p.id === playerId) {
+              const record = p.rechargeHistory?.find(r => r.id === rechargeId);
+              if (!record) return p;
+              
+              return {
+                  ...p,
+                  credits: (p.credits || 0) - record.amount,
+                  rechargeHistory: p.rechargeHistory.filter(r => r.id !== rechargeId)
+              };
+          }
+          return p;
+      }));
+  };
+
   const handleAddTraining = (session: TrainingSession) => {
     setTrainings(prev => [...prev, session]);
   };
@@ -389,6 +407,7 @@ function App() {
             onAddPlayerReview={handleAddPlayerReview}
             onRechargePlayer={handleRechargePlayer}
             onBulkRechargePlayers={handleBulkRechargePlayers}
+            onDeleteRecharge={handleDeleteRecharge}
             initialFilter={navigationParams.filter}
             appLogo={appLogo}
           />

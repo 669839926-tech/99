@@ -23,6 +23,7 @@ interface PlayerManagerProps {
   onAddPlayerReview: (playerId: string, review: PlayerReview) => void;
   onRechargePlayer: (playerId: string, amount: number, leaveQuota: number) => void;
   onBulkRechargePlayers: (playerIds: string[], amount: number, leaveQuota: number) => void;
+  onDeleteRecharge: (playerId: string, rechargeId: string) => void;
   initialFilter?: string;
   appLogo?: string;
 }
@@ -596,10 +597,11 @@ interface PlayerDetailModalProps {
     onDeletePlayer: (playerId: string) => void;
     initialFilter?: string;
     appLogo?: string;
+    onDeleteRecharge: (playerId: string, rechargeId: string) => void;
 }
 
 const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
-    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo 
+    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge
 }) => {
     // Implementation same as previous version (Full code preserved in memory, kept here for completeness)
     const [isEditing, setIsEditing] = useState(false);
@@ -696,6 +698,16 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
           onDeletePlayer(player.id);
           onClose();
       }
+    };
+
+    const handleDeleteRechargeAction = (rechargeId: string) => {
+         onDeleteRecharge(player.id, rechargeId);
+         // Manually update local state to reflect deletion immediately to improve UX
+         setEditedPlayer(prev => ({
+             ...prev,
+             credits: (prev.credits || 0) - (prev.rechargeHistory?.find(r => r.id === rechargeId)?.amount || 0),
+             rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || []
+         }));
     };
 
     const handleExportPDF = async () => {
@@ -909,9 +921,9 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     };
 
     const renderRecords = () => {
-        type Event = { id: string; date: string; type: 'recharge' | 'training'; status?: string; amount: number; desc: string; quotaAdded?: number; };
+        type Event = { id: string; originalId?: string; date: string; type: 'recharge' | 'training'; status?: string; amount: number; desc: string; quotaAdded?: number; };
         const events: Event[] = [];
-        (editedPlayer.rechargeHistory || []).forEach(r => events.push({ id: `rech-${r.id}`, date: r.date, type: 'recharge', amount: r.amount, desc: `充值 ${r.amount} 课时 (含请假额度 ${r.quotaAdded}次)`, quotaAdded: r.quotaAdded }));
+        (editedPlayer.rechargeHistory || []).forEach(r => events.push({ id: `rech-${r.id}`, originalId: r.id, date: r.date, type: 'recharge', amount: r.amount, desc: `充值 ${r.amount} 课时 (含请假额度 ${r.quotaAdded}次)`, quotaAdded: r.quotaAdded }));
         trainings.forEach(t => {
             const record = t.attendance?.find(r => r.playerId === editedPlayer.id);
             if (record && record.status !== 'Absent') {
@@ -943,16 +955,37 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                 <div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10">
-                            <tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">类型</th><th className="px-4 py-3">详情</th><th className="px-4 py-3 text-right">变动</th><th className="px-4 py-3 text-right">结余</th></tr>
+                            <tr>
+                                <th className="px-4 py-3">日期</th>
+                                <th className="px-4 py-3">类型</th>
+                                <th className="px-4 py-3">详情</th>
+                                <th className="px-4 py-3 text-right">变动</th>
+                                <th className="px-4 py-3 text-right">结余</th>
+                                <th className="px-4 py-3 w-10"></th>
+                            </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {displayList.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
+                                <tr key={item.id} className="hover:bg-gray-50 group">
                                     <td className="px-4 py-3 whitespace-nowrap text-gray-600 font-mono text-xs">{item.date}</td>
                                     <td className="px-4 py-3">{item.type === 'recharge' ? '充值' : item.status}</td>
                                     <td className="px-4 py-3 text-gray-700">{item.desc}</td>
                                     <td className={`px-4 py-3 text-right font-bold ${item.amount > 0 ? 'text-green-600' : item.amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>{item.amount > 0 ? `+${item.amount}` : item.amount}</td>
                                     <td className="px-4 py-3 text-right font-mono font-bold text-gray-800">{item.balanceAfter}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        {item.type === 'recharge' && (
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if(item.originalId) handleDeleteRechargeAction(item.originalId);
+                                                }}
+                                                className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                                title="删除记录"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -1231,6 +1264,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   onAddPlayerReview,
   onRechargePlayer,
   onBulkRechargePlayers,
+  onDeleteRecharge,
   initialFilter,
   appLogo
 }) => {
@@ -2011,6 +2045,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             onDeletePlayer={onDeletePlayer}
             initialFilter={initialFilter}
             appLogo={appLogo}
+            onDeleteRecharge={onDeleteRecharge}
         />
       )}
 
