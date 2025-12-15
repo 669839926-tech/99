@@ -24,6 +24,7 @@ interface PlayerManagerProps {
   onRechargePlayer: (playerId: string, amount: number, leaveQuota: number) => void;
   onBulkRechargePlayers: (playerIds: string[], amount: number, leaveQuota: number) => void;
   initialFilter?: string;
+  appLogo?: string;
 }
 
 // --- Helper Functions ---
@@ -594,10 +595,11 @@ interface PlayerDetailModalProps {
     onUpdatePlayer: (player: Player) => void;
     onDeletePlayer: (playerId: string) => void;
     initialFilter?: string;
+    appLogo?: string;
 }
 
 const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
-    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter 
+    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo 
 }) => {
     // Implementation same as previous version (Full code preserved in memory, kept here for completeness)
     const [isEditing, setIsEditing] = useState(false);
@@ -1151,7 +1153,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                    </div>
                    <div className="text-right">
                        <div className="flex justify-end mb-2">
-                           <div className="w-20 h-20 bg-bvb-black rounded-full flex items-center justify-center text-bvb-yellow font-black text-3xl border-4 border-bvb-yellow">WS</div>
+                           <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />
                        </div>
                        <div className="text-sm font-bold text-gray-400">顽石之光足球俱乐部</div>
                    </div>
@@ -1224,7 +1226,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   onAddPlayerReview,
   onRechargePlayer,
   onBulkRechargePlayers,
-  initialFilter
+  initialFilter,
+  appLogo
 }) => {
   
   const isDirector = currentUser?.role === 'director';
@@ -1914,7 +1917,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                        </div>
                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">家长姓名</label>
-                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="家长姓名" value={newPlayer.parentName || ''} onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})} />
+                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="姓名" value={newPlayer.parentName || ''} onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})} />
                        </div>
                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">联系电话</label>
@@ -2002,71 +2005,63 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             onUpdatePlayer={onUpdatePlayer}
             onDeletePlayer={onDeletePlayer}
             initialFilter={initialFilter}
+            appLogo={appLogo}
         />
       )}
 
       {/* Hidden Export Template for Player List */}
       <div id="player-list-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
-          <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
-             <div className="flex items-center">
-                 <div className="w-16 h-16 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-black text-2xl border-4 border-black mr-4">WS</div>
-                 <div>
-                     <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
-                     <p className="text-xl text-gray-500 font-bold mt-1">{selectedTeam ? selectedTeam.name : '全员'} - 球员大名单</p>
-                 </div>
-             </div>
-             <div className="text-right">
-                 <div className="text-sm font-bold text-gray-400 uppercase">导出日期</div>
-                 <div className="text-2xl font-black">{new Date().toLocaleDateString()}</div>
-             </div>
-          </div>
-
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-100 border-b-2 border-gray-300">
-              <tr>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">姓名</th>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">号码</th>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">位置</th>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">年龄</th>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">入队时间/球龄</th>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">就读学校</th>
-                 <th className="p-3 font-black text-sm uppercase text-gray-600">家长联系方式</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPlayers.map((p, idx) => (
-                 <tr key={p.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                    <td className="p-3 font-bold text-gray-900">{p.name} {p.isCaptain && '(C)'}</td>
-                    <td className="p-3 font-mono font-bold text-gray-700">#{p.number}</td>
-                    <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${getPosColor(p.position)}`}>{p.position}</span></td>
-                    <td className="p-3 text-sm">{p.age} 岁</td>
-                    <td className="p-3 text-sm">
-                        {p.joinDate ? (
-                            <div>
-                                <span>{p.joinDate}</span>
-                                <span className="text-xs text-gray-400 block">{calculateTenure(p.joinDate)}</span>
-                            </div>
-                        ) : '-'}
-                    </td>
-                    <td className="p-3 text-sm">{p.school || '-'}</td>
-                    <td className="p-3 text-sm">
-                        {p.parentName ? (
-                            <div>
-                                <span className="font-bold">{p.parentName}</span>
-                                <span className="block text-xs font-mono">{p.parentPhone}</span>
-                            </div>
-                        ) : '-'}
-                    </td>
-                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400">
-              <span>共 {filteredPlayers.length} 名球员</span>
-              <span>© 顽石之光足球俱乐部 - 内部资料</span>
-          </div>
+            <div className="flex items-center justify-between border-b-4 border-bvb-yellow pb-6 mb-8">
+                <div className="flex items-center">
+                    <img src={appLogo} alt="Club Logo" className="w-24 h-24 object-contain mr-6" />
+                    <div>
+                        <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
+                        <p className="text-xl text-gray-500 font-bold mt-1">
+                             {selectedTeam ? `${selectedTeam.name} - 球员名单` : '全部球员名单'}
+                        </p>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <div className="text-sm font-bold text-gray-400 uppercase">生成日期</div>
+                    <div className="text-2xl font-black">{new Date().toLocaleDateString()}</div>
+                </div>
+            </div>
+            
+            <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-100 border-b-2 border-gray-300">
+                    <tr>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">球员</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">梯队</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">位置</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">年龄</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">入队时间</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">监护人</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600 text-right">联系电话</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {(filteredPlayers || []).map((p, idx) => (
+                        <tr key={p.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                            <td className="p-3 font-bold text-gray-900 flex items-center gap-2">
+                                <span className="text-xs text-gray-400 font-mono w-4">{idx + 1}</span>
+                                {p.name} <span className="text-xs bg-bvb-yellow text-bvb-black px-1 rounded">#{p.number}</span>
+                            </td>
+                            <td className="p-3">{teams.find(t => t.id === p.teamId)?.name || '待分配'}</td>
+                            <td className="p-3">{p.position}</td>
+                            <td className="p-3">{p.age}岁 ({p.birthDate})</td>
+                            <td className="p-3">{p.joinDate || '-'}</td>
+                            <td className="p-3">{p.parentName || '-'}</td>
+                            <td className="p-3 text-right font-mono">{p.parentPhone || '-'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+            
+            <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400">
+                 <span>共 {filteredPlayers.length} 名球员</span>
+                 <span>© 顽石之光足球俱乐部 - 内部资料</span>
+            </div>
       </div>
-      
     </div>
   );
 };

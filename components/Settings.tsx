@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -12,6 +12,8 @@ interface SettingsProps {
   onDeleteUser: (userId: string) => void;
   onResetUserPassword: (userId: string) => void;
   onUpdateUserPassword: (userId: string, newPass: string) => void;
+  appLogo?: string;
+  onUpdateAppLogo?: (newLogo: string) => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
@@ -22,14 +24,16 @@ const Settings: React.FC<SettingsProps> = ({
     onAddUser,
     onDeleteUser,
     onResetUserPassword,
-    onUpdateUserPassword
+    onUpdateUserPassword,
+    appLogo,
+    onUpdateAppLogo
 }) => {
   const isDirector = currentUser?.role === 'director';
 
   const [localConfig, setLocalConfig] = useState<AttributeConfig>(JSON.parse(JSON.stringify(attributeConfig)));
   
   // Tabs: Coaches only see "Account", Directors see everything
-  const [activeTab, setActiveTab] = useState<'attributes' | 'drills' | 'users' | 'account'>('account');
+  const [activeTab, setActiveTab] = useState<'attributes' | 'drills' | 'users' | 'account' | 'branding'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
@@ -141,6 +145,18 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file && onUpdateAppLogo) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              const base64String = reader.result as string;
+              onUpdateAppLogo(base64String);
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
   const handleSaveConfig = () => {
     onUpdateConfig(localConfig);
     alert('配置设置已保存！');
@@ -156,7 +172,7 @@ const Settings: React.FC<SettingsProps> = ({
            </p>
         </div>
         {/* Only show "Save Config" button if NOT in Account tab (Account tab has its own form button) */}
-        {isDirector && activeTab !== 'account' && activeTab !== 'users' && (
+        {isDirector && activeTab !== 'account' && activeTab !== 'users' && activeTab !== 'branding' && (
             <button 
             onClick={handleSaveConfig}
             className="flex items-center px-6 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 transition-colors"
@@ -195,6 +211,12 @@ const Settings: React.FC<SettingsProps> = ({
                     className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
                 >
                     <Book className="w-4 h-4 mr-2" /> 训练内容库
+                </button>
+                <button 
+                    onClick={() => setActiveTab('branding')} 
+                    className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}
+                >
+                    <ImageIcon className="w-4 h-4 mr-2" /> 品牌外观
                 </button>
               </>
           )}
@@ -247,6 +269,47 @@ const Settings: React.FC<SettingsProps> = ({
                             更新密码
                         </button>
                     </form>
+                </div>
+            </div>
+        )}
+
+        {/* === TAB: BRANDING (Director Only) === */}
+        {activeTab === 'branding' && isDirector && (
+            <div className="flex-1 p-6 flex flex-col items-center justify-center">
+                <div className="w-full max-w-lg bg-gray-50 p-8 rounded-xl border border-gray-200 text-center">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center">
+                        <ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" />
+                        应用 Logo 设置
+                    </h3>
+                    
+                    <div className="mb-8 flex flex-col items-center">
+                        <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4">
+                            {appLogo ? (
+                                <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" />
+                            ) : (
+                                <span className="text-gray-300 font-bold">No Logo</span>
+                            )}
+                        </div>
+                        <p className="text-sm text-gray-500">当前显示的 Logo 预览</p>
+                    </div>
+
+                    <div className="relative group w-full">
+                        <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleLogoUpload}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-bvb-yellow hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center">
+                            <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                            <span className="font-bold text-gray-600">点击上传新图片</span>
+                            <span className="text-xs text-gray-400 mt-1">支持 PNG, JPG, GIF 格式</span>
+                        </div>
+                    </div>
+                    
+                    <p className="text-xs text-gray-400 mt-6">
+                        注意：上传后的 Logo 将应用到整个系统，包括登录页、侧边栏以及 PDF 导出报告。建议使用正方形或透明背景的 PNG 图片。
+                    </p>
                 </div>
             </div>
         )}

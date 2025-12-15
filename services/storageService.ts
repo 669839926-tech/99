@@ -6,6 +6,7 @@ export interface AppData {
     trainings: any[];
     attributeConfig: any;
     announcements: any[];
+    appLogo?: string;
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

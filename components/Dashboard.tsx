@@ -1,7 +1,7 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2 } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -16,16 +16,26 @@ interface DashboardProps {
   onAddAnnouncement?: (announcement: Announcement) => void;
   onDeleteAnnouncement?: (id: string) => void;
   onUpdateAnnouncement?: (announcement: Announcement) => void;
+  appLogo?: string;
 }
 
-type TimeRange = 'month' | 'quarter' | 'year';
+type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
 
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
-    announcements = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement
+    announcements = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement, appLogo
 }) => {
+  // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
+  const [customStartDate, setCustomStartDate] = useState<string>(() => {
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      return d.toISOString().split('T')[0];
+  });
+  const [customEndDate, setCustomEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+
   const [attendanceTeamId, setAttendanceTeamId] = useState<string>('all');
+  const [attendancePlayerId, setAttendancePlayerId] = useState<string>('all');
   const [isExporting, setIsExporting] = useState(false);
 
   // Permission check
@@ -34,6 +44,31 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
+
+  // Handle Preset Range Changes
+  const handleRangeChange = (range: TimeRange) => {
+      setAttendanceRange(range);
+      const end = new Date();
+      const start = new Date();
+      
+      if (range === 'month') {
+          start.setMonth(end.getMonth() - 1);
+      } else if (range === 'quarter') {
+          start.setMonth(end.getMonth() - 3);
+      } else if (range === 'year') {
+          start.setFullYear(end.getFullYear() - 1);
+      }
+      // If custom, we don't overwrite dates immediately, keep previous custom or default
+      if (range !== 'custom') {
+          setCustomStartDate(start.toISOString().split('T')[0]);
+          setCustomEndDate(end.toISOString().split('T')[0]);
+      }
+  };
+
+  // Reset player selection when team changes
+  useEffect(() => {
+      setAttendancePlayerId('all');
+  }, [attendanceTeamId]);
 
   // Director Pending Tasks Logic
   const pendingTasks = useMemo(() => {
@@ -104,29 +139,23 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [matches, players]);
 
   // --- Attendance Analytics Logic ---
-  const getStartDate = (range: TimeRange) => {
-    const now = new Date();
-    const startDate = new Date();
-    if (range === 'month') startDate.setMonth(now.getMonth() - 1);
-    else if (range === 'quarter') startDate.setMonth(now.getMonth() - 3);
-    else startDate.setFullYear(now.getFullYear() - 1);
-    return startDate;
-  };
+  const { chartData, averageRate, exportPlayersData, teamPlayersList } = useMemo(() => {
+    // 1. Filtered Sessions
+    const start = new Date(customStartDate);
+    const end = new Date(customEndDate);
+    end.setHours(23, 59, 59, 999);
 
-  const { chartData, averageRate, exportPlayersData } = useMemo(() => {
-    if (!trainings || trainings.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [] };
-
-    const now = new Date();
-    const startDate = getStartDate(attendanceRange);
-
-    const filteredSessions = trainings.filter(s => {
+    const filteredSessions = (trainings || []).filter(s => {
         const d = new Date(s.date);
-        const matchDate = d >= startDate && d <= now;
+        const matchDate = d >= start && d <= end;
         const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId;
         return matchDate && matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [] };
+    // 2. Filtered Players for Dropdown & Chart Context
+    const teamPlayers = players.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
+
+    if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], teamPlayersList: teamPlayers };
 
     const groupedData: Record<string, { totalRate: number; count: number }> = {};
     let grandTotalRate = 0;
@@ -136,16 +165,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         const date = new Date(session.date);
         let key = '';
         
-        if (attendanceRange === 'month') {
-            const weekNum = Math.ceil(date.getDate() / 7);
-            key = `${date.getMonth() + 1}月W${weekNum}`;
+        if (attendanceRange === 'year') {
+             key = `${date.getMonth() + 1}月`;
         } else {
-            key = `${date.getMonth() + 1}月`;
+             const weekNum = Math.ceil(date.getDate() / 7);
+             key = `${date.getMonth() + 1}月W${weekNum}`;
         }
         
-        const teamPlayersCount = players.filter(p => p.teamId === session.teamId).length;
+        const sessionTeamPlayersCount = players.filter(p => p.teamId === session.teamId).length;
         const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
-        const rate = teamPlayersCount > 0 ? (presentCount / teamPlayersCount) * 100 : 0;
+        const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
 
         if (!groupedData[key]) groupedData[key] = { totalRate: 0, count: 0 };
         groupedData[key].totalRate += rate;
@@ -160,8 +189,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         rate: Math.round(groupedData[key].totalRate / groupedData[key].count)
     }));
     
-    const relevantPlayers = players.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
-    const exportList = relevantPlayers.map(p => {
+    // Export Data for Summary Table
+    const exportList = teamPlayers.map(p => {
          const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
          const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
          const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
@@ -173,10 +202,51 @@ const Dashboard: React.FC<DashboardProps> = ({
     return { 
         chartData: data, 
         averageRate: Math.round(grandTotalRate / grandTotalCount),
-        exportPlayersData: exportList
+        exportPlayersData: exportList,
+        teamPlayersList: teamPlayers
     };
 
-  }, [trainings, players, attendanceRange, attendanceTeamId]);
+  }, [trainings, players, attendanceRange, attendanceTeamId, customStartDate, customEndDate]);
+
+  // --- Individual Player Export Data ---
+  const individualReport = useMemo(() => {
+      if (attendancePlayerId === 'all') return null;
+      
+      const player = players.find(p => p.id === attendancePlayerId);
+      if (!player) return null;
+
+      const start = new Date(customStartDate);
+      const end = new Date(customEndDate);
+      end.setHours(23, 59, 59, 999);
+
+      const relevantSessions = trainings.filter(s => {
+          const d = new Date(s.date);
+          return d >= start && d <= end && s.teamId === player.teamId;
+      }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      const sessionRecords = relevantSessions.map(s => {
+          const record = s.attendance?.find(r => r.playerId === player.id);
+          return {
+              id: s.id,
+              date: s.date,
+              title: s.title,
+              focus: s.focus,
+              status: record?.status || 'Absent'
+          };
+      });
+
+      const present = sessionRecords.filter(r => r.status === 'Present').length;
+      const leave = sessionRecords.filter(r => r.status === 'Leave').length;
+      const injury = sessionRecords.filter(r => r.status === 'Injury').length;
+      const absent = sessionRecords.filter(r => r.status === 'Absent').length;
+      const rate = sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0;
+
+      return {
+          player,
+          sessions: sessionRecords,
+          stats: { total: sessionRecords.length, present, leave, injury, absent, rate }
+      };
+  }, [attendancePlayerId, trainings, players, customStartDate, customEndDate]);
 
   const playersStats = useMemo(() => {
       return exportPlayersData.slice(0, 5);
@@ -185,7 +255,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-        await exportToPDF('attendance-report-export', `训练出勤分析报告_${new Date().toISOString().split('T')[0]}`);
+        if (attendancePlayerId !== 'all' && individualReport) {
+             await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}_${customStartDate}`);
+        } else {
+             await exportToPDF('attendance-report-export', `训练出勤分析报告_${customStartDate}_至_${customEndDate}`);
+        }
     } catch (e) {
         alert('导出失败');
     } finally {
@@ -274,6 +348,7 @@ const Dashboard: React.FC<DashboardProps> = ({
            <Trophy className="absolute -right-6 -bottom-6 w-48 h-48 text-white/20 rotate-12 pointer-events-none" />
         </div>
 
+        {/* ... (Pending Tasks Widget and Stats Grid remain unchanged) ... */}
         {/* --- Director's Pending Audit Widget --- */}
         {isDirector && pendingTasks.total > 0 && (
             <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-6 animate-in slide-in-from-top-4">
@@ -370,9 +445,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
         </div>
 
-        {/* --- Notifications & Announcements Area --- */}
+        {/* ... (Notifications & Announcements Area remains unchanged) ... */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
             {/* Left Column: Alerts */}
             <div className="space-y-4">
                 {/* Low Credit Alert */}
@@ -542,7 +616,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         
         {/* Attendance Analytics Section */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="p-6 border-b border-gray-100 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 <div>
                     <h3 className="text-xl font-bold text-gray-800 flex items-center">
                         <Calendar className="w-5 h-5 mr-2 text-bvb-yellow" />
@@ -553,39 +627,73 @@ const Dashboard: React.FC<DashboardProps> = ({
                 
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Filters */}
-                    <div className="flex bg-gray-100 rounded-lg p-1">
-                        {(['month', 'quarter', 'year'] as TimeRange[]).map(r => (
-                            <button
-                                key={r}
-                                onClick={() => setAttendanceRange(r)}
-                                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
-                                    attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                            >
-                                {r === 'month' ? '近30天' : r === 'quarter' ? '本季度' : '本年度'}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-2">
+                        <div className="flex bg-gray-100 rounded-lg p-1">
+                            {(['month', 'quarter', 'year', 'custom'] as TimeRange[]).map(r => (
+                                <button
+                                    key={r}
+                                    onClick={() => handleRangeChange(r)}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                                        attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                    {r === 'month' ? '近30天' : r === 'quarter' ? '本季度' : r === 'year' ? '本年度' : '自定义'}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        {attendanceRange === 'custom' && (
+                            <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                                <input 
+                                    type="date" 
+                                    className="text-xs bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                    value={customStartDate}
+                                    onChange={e => setCustomStartDate(e.target.value)}
+                                />
+                                <span className="text-gray-400 text-xs">-</span>
+                                <input 
+                                    type="date" 
+                                    className="text-xs bg-white border border-gray-300 rounded px-2 py-1 focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                    value={customEndDate}
+                                    onChange={e => setCustomEndDate(e.target.value)}
+                                />
+                            </div>
+                        )}
                     </div>
 
-                    <div className="relative">
-                        <select
-                            value={attendanceTeamId}
-                            onChange={(e) => setAttendanceTeamId(e.target.value)}
-                            className="appearance-none bg-gray-100 pl-3 pr-8 py-2 rounded-lg text-xs font-bold text-gray-600 focus:outline-none focus:bg-white focus:ring-1 focus:ring-bvb-yellow cursor-pointer border border-transparent hover:border-gray-200"
-                        >
-                            <option value="all">所有梯队</option>
-                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                        </select>
-                         <ChevronDown className="w-3 h-3 text-gray-500 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <select
+                                value={attendanceTeamId}
+                                onChange={(e) => setAttendanceTeamId(e.target.value)}
+                                className="appearance-none bg-gray-100 pl-3 pr-8 py-2 rounded-lg text-xs font-bold text-gray-600 focus:outline-none focus:bg-white focus:ring-1 focus:ring-bvb-yellow cursor-pointer border border-transparent hover:border-gray-200"
+                            >
+                                <option value="all">所有梯队</option>
+                                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                            </select>
+                            <ChevronDown className="w-3 h-3 text-gray-500 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+                        </div>
+
+                        <div className="relative">
+                            <select
+                                value={attendancePlayerId}
+                                onChange={(e) => setAttendancePlayerId(e.target.value)}
+                                className="appearance-none bg-gray-100 pl-3 pr-8 py-2 rounded-lg text-xs font-bold text-gray-600 focus:outline-none focus:bg-white focus:ring-1 focus:ring-bvb-yellow cursor-pointer border border-transparent hover:border-gray-200 min-w-[100px]"
+                            >
+                                <option value="all">全体成员 (汇总)</option>
+                                {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                            <UserIcon className="w-3 h-3 text-gray-500 absolute right-2 top-1/2 transform -translate-y-1/2 pointer-events-none" />
+                        </div>
                     </div>
 
                     <button 
                         onClick={handleExportPDF}
                         disabled={isExporting}
-                        className="flex items-center px-3 py-2 bg-gray-800 text-bvb-yellow text-xs font-bold rounded-lg hover:bg-gray-700 transition-colors"
+                        className="flex items-center px-3 py-2 bg-gray-800 text-bvb-yellow text-xs font-bold rounded-lg hover:bg-gray-700 transition-colors whitespace-nowrap"
                     >
                         {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3 mr-1" />}
-                        导出报告
+                        {attendancePlayerId === 'all' ? '导出汇总' : '导出个人'}
                     </button>
                 </div>
             </div>
@@ -593,7 +701,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="p-6 grid lg:grid-cols-3 gap-8">
                 {/* Left: Trend Chart */}
                 <div className="lg:col-span-2 h-64 md:h-80 relative">
-                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-4">出勤率走势 ({attendanceRange === 'month' ? '按周' : '按月'})</h4>
+                     <h4 className="text-xs font-bold text-gray-400 uppercase mb-4">出勤率走势 ({attendanceRange === 'year' ? '按月' : '按周'})</h4>
                      {chartData.length > 0 ? (
                         <ResponsiveContainer width="100%" height="90%">
                             <LineChart data={chartData}>
@@ -668,10 +776,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* --- Hidden Export View (Off-screen) --- */}
+      
+      {/* 1. Summary Report */}
       <div id="attendance-report-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
             <div className="flex items-center justify-between border-b-4 border-bvb-yellow pb-6 mb-8">
                 <div className="flex items-center">
-                    <div className="w-16 h-16 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-black text-2xl border-4 border-black mr-4">WS</div>
+                    <img src={appLogo} alt="Club Logo" className="w-24 h-24 object-contain mr-6" />
                     <div>
                         <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
                         <p className="text-xl text-gray-500 font-bold mt-1">训练出勤分析报告</p>
@@ -685,6 +795,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             
             <div className="mb-8">
                 <h2 className="text-xl font-bold border-b border-gray-200 pb-2 mb-4">综合统计</h2>
+                <div className="mb-4 text-sm font-bold text-gray-600">
+                    统计周期：{customStartDate} 至 {customEndDate}
+                </div>
                 <div className="grid grid-cols-4 gap-6 text-center">
                     <div className="p-4 bg-gray-50 rounded-lg">
                          <span className="block text-sm text-gray-500 font-bold">平均出勤率</span>
@@ -692,7 +805,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div className="p-4 bg-gray-50 rounded-lg">
                          <span className="block text-sm text-gray-500 font-bold">总课程数</span>
-                         <span className="block text-3xl font-black mt-2">{trainings.length}</span>
+                         <span className="block text-3xl font-black mt-2">{trainings.filter(s => s.date >= customStartDate && s.date <= customEndDate && (attendanceTeamId === 'all' || s.teamId === attendanceTeamId)).length}</span>
                     </div>
                 </div>
             </div>
@@ -731,6 +844,94 @@ const Dashboard: React.FC<DashboardProps> = ({
                 © 2023 顽石之光足球俱乐部青训管理系统 - 内部资料，请勿外传
             </div>
       </div>
+
+      {/* 2. Individual Player Report */}
+      {individualReport && (
+          <div id="individual-attendance-export" className="absolute left-[-9999px] top-0 w-[1000px] bg-white text-black p-12 z-[-1000] font-sans">
+              <div className="flex items-center justify-between border-b-4 border-bvb-yellow pb-6 mb-8">
+                  <div className="flex items-center">
+                      <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain mr-6" />
+                      <div>
+                          <h1 className="text-3xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
+                          <p className="text-lg text-gray-500 font-bold mt-1">球员个人出勤档案</p>
+                      </div>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-2xl font-black">{individualReport.player.name}</div>
+                      <div className="text-sm font-bold text-gray-400 uppercase">#{individualReport.player.number} • {individualReport.player.position}</div>
+                  </div>
+              </div>
+
+              <div className="mb-8 p-6 bg-gray-50 rounded-xl border border-gray-100">
+                  <h4 className="text-sm font-bold text-gray-500 uppercase mb-4 border-b border-gray-200 pb-2">统计周期：{customStartDate} 至 {customEndDate}</h4>
+                  <div className="grid grid-cols-5 gap-4 text-center">
+                      <div>
+                          <span className="block text-xs text-gray-400 font-bold uppercase">总课程</span>
+                          <span className="block text-2xl font-black mt-1">{individualReport.stats.total}</span>
+                      </div>
+                      <div>
+                          <span className="block text-xs text-gray-400 font-bold uppercase">实到</span>
+                          <span className="block text-2xl font-black mt-1 text-green-600">{individualReport.stats.present}</span>
+                      </div>
+                      <div>
+                          <span className="block text-xs text-gray-400 font-bold uppercase">请假</span>
+                          <span className="block text-2xl font-black mt-1 text-yellow-600">{individualReport.stats.leave}</span>
+                      </div>
+                      <div>
+                          <span className="block text-xs text-gray-400 font-bold uppercase">伤病</span>
+                          <span className="block text-2xl font-black mt-1 text-red-600">{individualReport.stats.injury}</span>
+                      </div>
+                      <div>
+                          <span className="block text-xs text-gray-400 font-bold uppercase">出勤率</span>
+                          <span className="block text-2xl font-black mt-1">{individualReport.stats.rate}%</span>
+                      </div>
+                  </div>
+              </div>
+
+              <div>
+                  <h4 className="text-lg font-bold mb-4">详细记录</h4>
+                  <table className="w-full text-left border border-gray-200">
+                      <thead className="bg-gray-100">
+                          <tr>
+                              <th className="p-3 border-b font-bold text-sm w-32">日期</th>
+                              <th className="p-3 border-b font-bold text-sm">训练主题</th>
+                              <th className="p-3 border-b font-bold text-sm">重点</th>
+                              <th className="p-3 border-b font-bold text-sm text-right">状态</th>
+                          </tr>
+                      </thead>
+                      <tbody>
+                          {individualReport.sessions.length > 0 ? (
+                              individualReport.sessions.map((s, idx) => (
+                                  <tr key={idx} className="border-b border-gray-100">
+                                      <td className="p-3 font-mono text-sm">{s.date}</td>
+                                      <td className="p-3 font-bold text-sm">{s.title}</td>
+                                      <td className="p-3 text-sm text-gray-600">{s.focus}</td>
+                                      <td className="p-3 text-right">
+                                          <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${
+                                              s.status === 'Present' ? 'bg-green-100 text-green-700' :
+                                              s.status === 'Leave' ? 'bg-yellow-100 text-yellow-700' :
+                                              s.status === 'Injury' ? 'bg-red-100 text-red-700' :
+                                              'bg-gray-200 text-gray-500'
+                                          }`}>
+                                              {s.status === 'Present' ? '正常' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤病' : '缺席'}
+                                          </span>
+                                      </td>
+                                  </tr>
+                              ))
+                          ) : (
+                              <tr>
+                                  <td colSpan={4} className="p-8 text-center text-gray-400 italic">该时间段内无训练记录</td>
+                              </tr>
+                          )}
+                      </tbody>
+                  </table>
+              </div>
+              
+              <div className="mt-12 text-center text-gray-400 text-xs border-t pt-4">
+                  © 2023 顽石之光足球俱乐部 - 内部资料
+              </div>
+          </div>
+      )}
     </div>
   );
 };

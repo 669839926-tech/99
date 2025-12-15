@@ -7,9 +7,10 @@ interface LoginProps {
   users: User[];
   players: Player[];
   onLogin: (user: User) => void;
+  appLogo?: string;
 }
 
-const Login: React.FC<LoginProps> = ({ users, players, onLogin }) => {
+const Login: React.FC<LoginProps> = ({ users, players, onLogin, appLogo }) => {
   const [activePortal, setActivePortal] = useState<'staff' | 'parent'>('staff');
   
   // Staff Login State
@@ -72,7 +73,7 @@ const Login: React.FC<LoginProps> = ({ users, players, onLogin }) => {
         {/* Left: Branding & Info */}
         <div className="w-full md:w-1/2 bg-bvb-black text-white p-8 flex flex-col justify-between relative overflow-hidden">
            <div className="relative z-10">
-               <div className="w-16 h-16 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-black text-2xl border-4 border-white mb-6">WS</div>
+               <img src={appLogo} alt="Club Logo" className="w-24 h-24 object-contain mb-6" />
                <h1 className="text-4xl font-black mb-2 text-bvb-yellow tracking-tighter">顽石之光</h1>
                <p className="text-xl font-bold opacity-80">足球俱乐部青训管理系统</p>
            </div>

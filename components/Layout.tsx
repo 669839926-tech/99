@@ -11,9 +11,10 @@ interface LayoutProps {
   onLogout: () => void;
   isSyncing?: boolean; // New prop for sync status
   hasNewAnnouncements?: boolean; // New prop for notifications
+  appLogo?: string;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, isSyncing = false, hasNewAnnouncements = false }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, isSyncing = false, hasNewAnnouncements = false, appLogo }) => {
   const navItems = [
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
     { id: 'players', label: '球队管理', icon: Shirt },
@@ -31,9 +32,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-bvb-black text-white h-full shadow-xl z-20">
         <div className="p-6 flex items-center justify-center border-b border-gray-800">
-          <div className="w-12 h-12 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-xl border-4 border-white mr-3 shadow-lg">
-            WS
-          </div>
+          <img src={appLogo} alt="Club Logo" className="w-16 h-16 object-contain mr-3" />
           <div>
             <h1 className="text-xl font-bold text-bvb-yellow tracking-tighter">顽石之光</h1>
             <p className="text-xs text-gray-400">青训管理系统</p>
@@ -125,7 +124,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
         {/* Mobile Header (Brand Only) */}
         <header className="md:hidden bg-bvb-black text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0 sticky top-0">
              <div className="flex items-center">
-                <div className="w-8 h-8 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-sm mr-2 border-2 border-white">WS</div>
+                <img src={appLogo} alt="Club Logo" className="w-8 h-8 object-contain mr-2" />
                 <div className="flex flex-col">
                   <span className="font-bold text-bvb-yellow tracking-wider text-sm leading-tight">顽石之光</span>
                   <span className="text-[10px] text-gray-400 leading-tight">青训管理</span>

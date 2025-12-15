@@ -8,7 +8,7 @@ import MatchPlanner from './components/MatchPlanner';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
-import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS } from './constants';
+import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO } from './constants';
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
@@ -25,6 +25,7 @@ function App() {
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES); 
   const [attributeConfig, setAttributeConfig] = useState<AttributeConfig>(DEFAULT_ATTRIBUTE_CONFIG);
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
+  const [appLogo, setAppLogo] = useState<string>(APP_LOGO);
   
   // User Management State (Lifted from Settings/Mock)
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
@@ -45,6 +46,7 @@ function App() {
             setTrainings(cloudData.trainings || MOCK_TRAINING);
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
+            if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
             // In a real app, users would also be loaded from DB. 
             // For this demo, we use initial mock users or could persist them too if schema allows.
         }
@@ -70,7 +72,8 @@ function App() {
                 matches,
                 trainings,
                 attributeConfig,
-                announcements
+                announcements,
+                appLogo
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -80,7 +83,7 @@ function App() {
     }, 2000); // 2 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -324,7 +327,7 @@ function App() {
 
   // 1. Not Logged In -> Show Login
   if (!currentUser) {
-    return <Login users={users} players={players} onLogin={handleLogin} />;
+    return <Login users={users} players={players} onLogin={handleLogin} appLogo={appLogo} />;
   }
 
   // 2. Parent Login -> Show dedicated Parent Portal
@@ -340,6 +343,7 @@ function App() {
             attributeConfig={attributeConfig} 
             trainings={trainings}
             onLogout={handleLogout}
+            appLogo={appLogo}
         />
     );
   }
@@ -359,6 +363,7 @@ function App() {
                   onAddAnnouncement={handleAddAnnouncement}
                   onDeleteAnnouncement={handleDeleteAnnouncement}
                   onUpdateAnnouncement={handleUpdateAnnouncement}
+                  appLogo={appLogo}
                />;
       case 'players':
         return (
@@ -386,6 +391,7 @@ function App() {
             onRechargePlayer={handleRechargePlayer}
             onBulkRechargePlayers={handleBulkRechargePlayers}
             initialFilter={navigationParams.filter}
+            appLogo={appLogo}
           />
         );
       case 'training':
@@ -399,6 +405,7 @@ function App() {
             onAddTraining={handleAddTraining} 
             onUpdateTraining={handleUpdateAttendance}
             initialFilter={navigationParams.filter}
+            appLogo={appLogo}
           />
         );
       case 'matches':
@@ -410,6 +417,7 @@ function App() {
                 onAddMatch={handleAddMatch}
                 onDeleteMatch={handleDeleteMatch}
                 onUpdateMatch={handleUpdateMatch}
+                appLogo={appLogo}
             />
         );
       case 'settings':
@@ -422,6 +430,8 @@ function App() {
                   onDeleteUser={handleDeleteUser}
                   onResetUserPassword={handleResetUserPassword}
                   onUpdateUserPassword={handleUpdateUserPassword}
+                  appLogo={appLogo}
+                  onUpdateAppLogo={setAppLogo}
                />;
       default:
         return <Dashboard 
@@ -430,7 +440,8 @@ function App() {
                   trainings={trainings} 
                   teams={teams} 
                   announcements={announcements}
-                  currentUser={currentUser} 
+                  currentUser={currentUser}
+                  appLogo={appLogo}
                />;
     }
   };
@@ -446,6 +457,7 @@ function App() {
         onLogout={handleLogout}
         isSyncing={isSyncing}
         hasNewAnnouncements={hasNewAnnouncements}
+        appLogo={appLogo}
     >
       {renderContent()}
     </Layout>

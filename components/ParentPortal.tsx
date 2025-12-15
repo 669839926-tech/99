@@ -10,9 +10,10 @@ interface ParentPortalProps {
     attributeConfig: AttributeConfig;
     trainings: TrainingSession[];
     onLogout: () => void;
+    appLogo?: string;
 }
 
-const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConfig, trainings, onLogout }) => {
+const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConfig, trainings, onLogout, appLogo }) => {
     
     // State to toggle between radar views
     const [activeRadar, setActiveRadar] = useState<'overall' | 'technical' | 'tactical' | 'physical' | 'mental'>('overall');
@@ -70,7 +71,7 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
             <header className="bg-bvb-black text-white p-4 sticky top-0 z-20 shadow-md">
                 <div className="max-w-5xl mx-auto flex justify-between items-center">
                     <div className="flex items-center">
-                        <div className="w-10 h-10 bg-bvb-yellow rounded-full flex items-center justify-center text-bvb-black font-bold text-lg border-2 border-white mr-3">WS</div>
+                        <img src={appLogo} alt="Club Logo" className="w-10 h-10 object-contain mr-3" />
                         <div>
                             <h1 className="font-bold text-lg leading-tight">家长端</h1>
                             <p className="text-xs text-gray-400">顽石之光青训系统</p>
