@@ -226,6 +226,34 @@ function App() {
     }));
   };
 
+  const handleBulkRechargePlayers = (playerIds: string[], amount: number, leaveQuota: number) => {
+    const today = new Date();
+    today.setFullYear(today.getFullYear() + 1);
+    const nextYearStr = today.toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    setPlayers(prev => prev.map(p => {
+        if (playerIds.includes(p.id)) {
+            const newRecord: RechargeRecord = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                date: todayStr,
+                amount: amount,
+                quotaAdded: leaveQuota
+            };
+
+            return {
+                ...p,
+                credits: (p.credits || 0) + amount,
+                validUntil: nextYearStr,
+                leaveQuota: leaveQuota,
+                leavesUsed: 0, // Reset leaves on new recharge cycle
+                rechargeHistory: [...(p.rechargeHistory || []), newRecord]
+            };
+        }
+        return p;
+    }));
+  };
+
   const handleAddTraining = (session: TrainingSession) => {
     setTrainings(prev => [...prev, session]);
   };
@@ -356,6 +384,7 @@ function App() {
             onTransferPlayers={handleTransferPlayers}
             onAddPlayerReview={handleAddPlayerReview}
             onRechargePlayer={handleRechargePlayer}
+            onBulkRechargePlayers={handleBulkRechargePlayers}
             initialFilter={navigationParams.filter}
           />
         );

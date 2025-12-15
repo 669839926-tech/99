@@ -22,6 +22,7 @@ interface PlayerManagerProps {
   onTransferPlayers: (playerIds: string[], targetTeamId: string) => void;
   onAddPlayerReview: (playerId: string, review: PlayerReview) => void;
   onRechargePlayer: (playerId: string, amount: number, leaveQuota: number) => void;
+  onBulkRechargePlayers: (playerIds: string[], amount: number, leaveQuota: number) => void;
   initialFilter?: string;
 }
 
@@ -234,6 +235,68 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                         </div>
                         <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
                             确认充值
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface BulkRechargeModalProps {
+    count: number;
+    onClose: () => void;
+    onSubmit: (amount: number, quota: number) => void;
+}
+
+const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, onSubmit }) => {
+    const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSubmit(rechargeData.amount, rechargeData.quota);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
+                    <h3 className="font-bold flex items-center">
+                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
+                        批量课时充值
+                    </h3>
+                    <button onClick={onClose}><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-6">
+                    <div className="mb-4 bg-yellow-50 border border-yellow-200 p-3 rounded text-sm text-yellow-800 font-bold">
+                        正在为 {count} 名球员进行统一充值。
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">统一充值课时数</label>
+                            <input 
+                                type="number"
+                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
+                                value={rechargeData.amount}
+                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
+                                min={1}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">统一允许请假次数</label>
+                            <input 
+                                type="number"
+                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
+                                value={rechargeData.quota}
+                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
+                                min={0}
+                            />
+                            <p className="text-[10px] text-gray-400 mt-1">
+                                所有选定球员的有效期将自动延长至一年后。
+                            </p>
+                        </div>
+                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
+                            确认批量充值
                         </button>
                     </form>
                 </div>
@@ -1160,6 +1223,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   onTransferPlayers,
   onAddPlayerReview,
   onRechargePlayer,
+  onBulkRechargePlayers,
   initialFilter
 }) => {
   
@@ -1235,6 +1299,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [showTransferModal, setShowTransferModal] = useState(false);
   
   const [showRechargeModal, setShowRechargeModal] = useState(false);
+  const [showBulkRechargeModal, setShowBulkRechargeModal] = useState(false);
   const [rechargePlayerId, setRechargePlayerId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -1365,6 +1430,13 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       setSelectedIds(new Set());
       setIsSelectionMode(false);
       setShowTransferModal(false);
+  };
+
+  const handleBulkRechargeConfirm = (amount: number, quota: number) => {
+      onBulkRechargePlayers(Array.from(selectedIds), amount, quota);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      setShowBulkRechargeModal(false);
   };
 
   const handleExportPlayerList = async () => {
@@ -1563,6 +1635,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <div className="flex items-center space-x-3"><button onClick={handleSelectAll} className="text-xs font-bold text-gray-400 hover:text-white">全选</button><span className="text-sm font-bold">已选: {selectedIds.size}</span></div>
                         <div className="flex space-x-2">
                             <button disabled={selectedIds.size === 0} onClick={() => setShowTransferModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><ArrowRightLeft className="w-3 h-3 mr-1" /> 移交</button>
+                            <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><CreditCard className="w-3 h-3 mr-1" /> 充值</button>
                             {isDirector && <button disabled={selectedIds.size === 0} onClick={executeBulkDelete} className="px-3 py-1 bg-red-900 hover:bg-red-800 rounded text-xs font-bold disabled:opacity-50 flex items-center"><Trash2 className="w-3 h-3 mr-1" /> 删除</button>}
                             <button onClick={() => setIsSelectionMode(false)} className="px-2 hover:bg-gray-800 rounded"><X className="w-4 h-4" /></button>
                         </div>
@@ -1766,6 +1839,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         )}
       </div>
 
+      {/* Modals */}
       {showAddPlayerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -1774,7 +1848,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 <button onClick={() => setShowAddPlayerModal(false)}><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleAddPlayerSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              {/* ... Image Input Omitted for Brevity (unchanged) ... */}
               <div className="flex justify-center mb-4">
                 <div className="relative group cursor-pointer w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center overflow-hidden border-2 border-dashed border-gray-300 hover:border-bvb-yellow transition-colors" onClick={() => fileInputRef.current?.click()}>
                    {newPlayer.image ? <img src={newPlayer.image} className="w-full h-full object-cover" /> : <Upload className="w-8 h-8 text-gray-400" />}
@@ -1797,7 +1870,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号 (自动解析生日/性别)</label>
                   <input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none tracking-widest font-mono" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} placeholder="18位身份证号码" />
               </div>
-              {/* ... Gender/Age Display (unchanged) ... */}
               <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
                   <div>
                       <span className="block text-xs font-bold text-gray-400 uppercase">性别</span>
@@ -1829,7 +1901,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   </div>
               </div>
 
-              {/* New Family/Info Section (unchanged) */}
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-4 space-y-3">
                   <h4 className="text-xs font-bold text-gray-500 uppercase">教育与家庭信息</h4>
                   <div className="grid grid-cols-2 gap-4">
@@ -1858,7 +1929,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         </div>
       )}
 
-      {/* ... Other Modals (AddTeam, Import, etc) are identical ... */}
       {showAddTeamModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -1910,6 +1980,14 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             player={players.find(p => p.id === rechargePlayerId)}
             onClose={() => setShowRechargeModal(false)}
             onSubmit={handleRechargeSubmit}
+        />
+      )}
+
+      {showBulkRechargeModal && (
+        <BulkRechargeModal 
+            count={selectedIds.size}
+            onClose={() => setShowBulkRechargeModal(false)}
+            onSubmit={handleBulkRechargeConfirm}
         />
       )}
       
