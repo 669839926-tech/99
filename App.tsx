@@ -167,6 +167,13 @@ function App() {
       setUsers(prev => [...prev, user]);
   };
 
+  const handleUpdateUser = (updatedUser: User) => {
+      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      if (currentUser && currentUser.id === updatedUser.id) {
+          setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
+      }
+  };
+
   const handleDeleteUser = (userId: string) => {
       setUsers(prev => prev.filter(u => u.id !== userId));
   };
@@ -358,7 +365,7 @@ function App() {
             player={childPlayer} 
             team={childTeam} 
             attributeConfig={attributeConfig} 
-            trainings={trainings}
+            trainings={trainings} 
             onLogout={handleLogout}
             appLogo={appLogo}
         />
@@ -445,7 +452,9 @@ function App() {
                   onUpdateConfig={handleUpdateAttributeConfig}
                   currentUser={currentUser}
                   users={users}
+                  teams={teams}
                   onAddUser={handleAddUser}
+                  onUpdateUser={handleUpdateUser}
                   onDeleteUser={handleDeleteUser}
                   onResetUserPassword={handleResetUserPassword}
                   onUpdateUserPassword={handleUpdateUserPassword}

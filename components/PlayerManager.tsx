@@ -1015,7 +1015,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                     <td className={`px-4 py-3 text-right font-bold ${item.amount > 0 ? 'text-green-600' : item.amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>{item.amount > 0 ? `+${item.amount}` : item.amount}</td>
                                     <td className="px-4 py-3 text-right font-mono font-bold text-gray-800">{item.balanceAfter}</td>
                                     <td className="px-4 py-3 text-right">
-                                        {item.type === 'recharge' && (
+                                        {item.type === 'recharge' && isDirector && (
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -1859,7 +1859,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <div className="flex items-center space-x-3"><button onClick={handleSelectAll} className="text-xs font-bold text-gray-400 hover:text-white">全选</button><span className="text-sm font-bold">已选: {selectedIds.size}</span></div>
                         <div className="flex space-x-2">
                             <button disabled={selectedIds.size === 0} onClick={() => setShowTransferModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><ArrowRightLeft className="w-3 h-3 mr-1" /> 移交</button>
-                            <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><CreditCard className="w-3 h-3 mr-1" /> 充值</button>
+                            {isDirector && <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><CreditCard className="w-3 h-3 mr-1" /> 充值</button>}
                             {isDirector && <button disabled={selectedIds.size === 0} onClick={executeBulkDelete} className="px-3 py-1 bg-red-900 hover:bg-red-800 rounded text-xs font-bold disabled:opacity-50 flex items-center"><Trash2 className="w-3 h-3 mr-1" /> 删除</button>}
                             <button onClick={() => setIsSelectionMode(false)} className="px-2 hover:bg-gray-800 rounded"><X className="w-4 h-4" /></button>
                         </div>
@@ -1974,13 +1974,15 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                         </div>
                                     </td>
                                     <td className="p-4 text-right flex justify-end gap-2">
-                                        <button 
-                                            onClick={(e) => openRechargeModal(e, player.id)} 
-                                            className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" 
-                                            title="充值"
-                                        >
-                                            <CreditCard className="w-4 h-4" />
-                                        </button>
+                                        {isDirector && (
+                                            <button 
+                                                onClick={(e) => openRechargeModal(e, player.id)} 
+                                                className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" 
+                                                title="充值"
+                                            >
+                                                <CreditCard className="w-4 h-4" />
+                                            </button>
+                                        )}
                                         {isDirector && (
                                             <button 
                                                 onClick={(e) => {
@@ -2048,7 +2050,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         </div>
                         <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 flex justify-between items-center mt-auto">
                             {birthdayStatus ? <span className={`text-[10px] text-white px-2 py-0.5 rounded-full font-bold flex items-center ${birthdayStatus.color}`}><Cake className="w-3 h-3 mr-1"/> {birthdayStatus.label}</span> : <span className="text-[10px] text-gray-400 flex items-center">{isExpiredValid ? <span className="text-red-400 font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/>已过期</span> : <span>有效期至 {player.validUntil}</span>}</span>}
-                            <button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" title="充值"><CreditCard className="w-3 h-3" /></button>
+                            {isDirector && <button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" title="充值"><CreditCard className="w-3 h-3" /></button>}
                         </div>
                     </div>
                     );
