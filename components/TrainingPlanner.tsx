@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2 } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -14,7 +14,9 @@ interface TrainingPlannerProps {
   currentUser: User | null;
   onAddTraining: (session: TrainingSession) => void;
   onUpdateTraining: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
+  onDeleteTraining: (id: string) => void;
   initialFilter?: string;
+  appLogo?: string;
 }
 
 type TimeScope = 'month' | 'quarter' | 'year';
@@ -27,10 +29,11 @@ interface SessionDetailModalProps {
     currentUser: User | null;
     onUpdate: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
     onDuplicate: (session: TrainingSession) => void;
+    onDelete: (id: string) => void;
     onClose: () => void;
 }
 
-const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onDuplicate, onClose }) => {
+const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -141,6 +144,11 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
         setSaveStatus('saved');
     };
 
+    const handleDelete = () => {
+        onDelete(session.id);
+        onClose();
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
@@ -157,6 +165,11 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                       <button onClick={() => onDuplicate(session)} className="p-1 hover:text-bvb-yellow" title="复制训练计划">
                           <Copy className="w-5 h-5" />
                       </button>
+                      {canEditLog && (
+                          <button onClick={handleDelete} className="p-1 hover:text-red-500" title="删除训练计划">
+                              <Trash2 className="w-5 h-5" />
+                          </button>
+                      )}
                       <button onClick={onClose}><X className="w-6 h-6" /></button>
                     </div>
                 </div>
@@ -367,7 +380,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
 // --- TrainingPlanner Main Component ---
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, currentUser, onAddTraining, onUpdateTraining, initialFilter 
+    trainings, teams, players, drillLibrary, currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter 
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScope, setTimeScope] = useState<TimeScope>('month');
@@ -548,6 +561,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                       <div className="space-y-3">
                           {groups[monthKey].map(s => {
                               const team = teams.find(t => t.id === s.teamId);
+                              const canDelete = (currentUser?.role === 'director') || (currentUser?.role === 'coach' && currentUser.teamId === s.teamId);
                               return (
                                   <div 
                                     key={s.id}
@@ -576,7 +590,18 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                               </div>
                                           </div>
                                       </div>
-                                      <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-bvb-yellow transition-colors" />
+                                      <div className="flex items-center gap-2">
+                                          {canDelete && (
+                                              <button
+                                                  onClick={(e) => { e.stopPropagation(); onDeleteTraining(s.id); }}
+                                                  className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                  title="删除"
+                                              >
+                                                  <Trash2 className="w-4 h-4" />
+                                              </button>
+                                          )}
+                                          <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-bvb-yellow transition-colors" />
+                                      </div>
                                   </div>
                               );
                           })}
@@ -981,6 +1006,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             currentUser={currentUser}
             onUpdate={onUpdateTraining}
             onDuplicate={handleDuplicateSession}
+            onDelete={onDeleteTraining}
             onClose={() => setSelectedSession(null)}
          />
       )}

@@ -261,6 +261,12 @@ function App() {
     setTrainings(prev => [...prev, session]);
   };
 
+  const handleDeleteTraining = (sessionId: string) => {
+      if (confirm('确定要删除这条训练计划吗？\n删除后相关考勤记录也将一并移除。')) {
+          setTrainings(prev => prev.filter(t => t.id !== sessionId));
+      }
+  };
+
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => {
       const oldSession = trainings.find(t => t.id === session.id);
       const oldAttendance = oldSession?.attendance || [];
@@ -397,6 +403,7 @@ function App() {
             currentUser={currentUser}
             onAddTraining={handleAddTraining} 
             onUpdateTraining={handleUpdateAttendance}
+            onDeleteTraining={handleDeleteTraining}
             initialFilter={navigationParams.filter}
             appLogo={appLogo}
           />
