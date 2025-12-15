@@ -350,6 +350,12 @@ function App() {
       setHomeTrainingRecords(prev => [...prev, record]);
   };
 
+  const handleDeleteHomeTrainingRecord = (id: string) => {
+      if(confirm('确定要删除这条打卡记录吗？')) {
+          setHomeTrainingRecords(prev => prev.filter(r => r.id !== id));
+      }
+  };
+
   const handleAddSkillTestRecord = (record: SkillTestRecord) => {
       setSkillTestRecords(prev => [...prev, record]);
   };
@@ -469,6 +475,7 @@ function App() {
                 homeTrainingRecords={homeTrainingRecords}
                 currentUser={currentUser}
                 onAddHomeTraining={handleAddHomeTraining}
+                onDeleteHomeTrainingRecord={handleDeleteHomeTrainingRecord}
                 onAddSkillTestRecord={handleAddSkillTestRecord}
                 onDeleteSkillTestRecord={handleDeleteSkillTestRecord}
                 onAddSkillTest={handleAddSkillTest}
