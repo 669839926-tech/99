@@ -1,5 +1,5 @@
 
-import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User } from './types';
+import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement } from './types';
 
 // Geo Data Structure: Province -> City -> Districts
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
@@ -53,6 +53,11 @@ export const MOCK_USERS: User[] = [
   { id: 'u1', username: 'admin', password: '123', name: '青训总监', role: 'director' },
   { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamId: 't1' },
   { id: 'u3', username: 'coach_u17', password: '123', name: 'U17 主教练', role: 'coach', teamId: 't2' },
+];
+
+export const MOCK_ANNOUNCEMENTS: Announcement[] = [
+    { id: '1', title: '球场维护通知', content: '本周三主球场进行草皮维护，U17 训练场地调整至 2 号人工草训练场，请互相转告。', date: new Date().toISOString().split('T')[0], type: 'info', author: '青训总监' },
+    { id: '2', title: '冬季训练营报名', content: '2023 冬季特训营报名通道已开启，名额有限，请尽快联系管理人员。', date: new Date().toISOString().split('T')[0], type: 'urgent', author: '运营部' }
 ];
 
 export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {

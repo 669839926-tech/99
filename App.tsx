@@ -8,8 +8,8 @@ import MatchPlanner from './components/MatchPlanner';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
-import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match } from './types';
+import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS } from './constants';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -24,6 +24,7 @@ function App() {
   const [trainings, setTrainings] = useState<TrainingSession[]>(MOCK_TRAINING);
   const [matches, setMatches] = useState<Match[]>(MOCK_MATCHES); 
   const [attributeConfig, setAttributeConfig] = useState<AttributeConfig>(DEFAULT_ATTRIBUTE_CONFIG);
+  const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   
   // User Management State (Lifted from Settings/Mock)
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
@@ -43,6 +44,7 @@ function App() {
             setMatches(cloudData.matches || MOCK_MATCHES);
             setTrainings(cloudData.trainings || MOCK_TRAINING);
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
+            setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             // In a real app, users would also be loaded from DB. 
             // For this demo, we use initial mock users or could persist them too if schema allows.
         }
@@ -67,7 +69,8 @@ function App() {
                 teams,
                 matches,
                 trainings,
-                attributeConfig
+                attributeConfig,
+                announcements
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -77,7 +80,7 @@ function App() {
     }, 2000); // 2 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -179,6 +182,19 @@ function App() {
       if (currentUser && currentUser.id === userId) {
           setCurrentUser(prev => prev ? { ...prev, password: newPassword } : null);
       }
+  };
+
+  // --- Announcements Logic ---
+  const handleAddAnnouncement = (announcement: Announcement) => {
+    setAnnouncements(prev => [announcement, ...prev]);
+  };
+
+  const handleDeleteAnnouncement = (id: string) => {
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+  };
+
+  const handleUpdateAnnouncement = (updatedAnnouncement: Announcement) => {
+    setAnnouncements(prev => prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a));
   };
 
   // --- Recharge / Credit Logic ---
@@ -309,8 +325,12 @@ function App() {
                   matches={matches} 
                   trainings={trainings} 
                   teams={teams} 
+                  announcements={announcements}
                   currentUser={currentUser} 
                   onNavigate={handleNavigate}
+                  onAddAnnouncement={handleAddAnnouncement}
+                  onDeleteAnnouncement={handleDeleteAnnouncement}
+                  onUpdateAnnouncement={handleUpdateAnnouncement}
                />;
       case 'players':
         return (
@@ -375,9 +395,19 @@ function App() {
                   onUpdateUserPassword={handleUpdateUserPassword}
                />;
       default:
-        return <Dashboard players={players} matches={matches} trainings={trainings} teams={teams} currentUser={currentUser} />;
+        return <Dashboard 
+                  players={players} 
+                  matches={matches} 
+                  trainings={trainings} 
+                  teams={teams} 
+                  announcements={announcements}
+                  currentUser={currentUser} 
+               />;
     }
   };
+
+  // Determine if there are new announcements today to show a badge in Layout
+  const hasNewAnnouncements = announcements.some(a => a.date === new Date().toISOString().split('T')[0]);
 
   return (
     <Layout 
@@ -386,6 +416,7 @@ function App() {
         currentUser={currentUser} 
         onLogout={handleLogout}
         isSyncing={isSyncing}
+        hasNewAnnouncements={hasNewAnnouncements}
     >
       {renderContent()}
     </Layout>

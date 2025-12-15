@@ -5,6 +5,7 @@ export interface AppData {
     matches: any[];
     trainings: any[];
     attributeConfig: any;
+    announcements: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

@@ -178,6 +178,15 @@ export interface DashboardStats {
   topScorer: string;
 }
 
+export interface Announcement {
+    id: string;
+    title: string;
+    content: string;
+    date: string;
+    type: 'info' | 'urgent';
+    author?: string; // Name of the creator
+}
+
 // --- Auth Types ---
 
 export type UserRole = 'director' | 'coach' | 'parent';

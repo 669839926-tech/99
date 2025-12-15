@@ -1,6 +1,7 @@
+
 import React, { useMemo, useState } from 'react';
-import { Player, Match, TrainingSession, Team, User } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert } from 'lucide-react';
+import { Player, Match, TrainingSession, Team, User, Announcement } from '../types';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -9,21 +10,20 @@ interface DashboardProps {
   matches: Match[];
   trainings: TrainingSession[];
   teams: Team[];
+  announcements?: Announcement[];
   currentUser: User | null;
   onNavigate?: (tab: string, filter?: string) => void;
+  onAddAnnouncement?: (announcement: Announcement) => void;
+  onDeleteAnnouncement?: (id: string) => void;
+  onUpdateAnnouncement?: (announcement: Announcement) => void;
 }
 
 type TimeRange = 'month' | 'quarter' | 'year';
 
-interface Announcement {
-    id: number;
-    title: string;
-    content: string;
-    date: string;
-    type: 'info' | 'urgent';
-}
-
-const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, teams, currentUser, onNavigate }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+    players, matches, trainings, teams, currentUser, onNavigate,
+    announcements = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement
+}) => {
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
   const [attendanceTeamId, setAttendanceTeamId] = useState<string>('all');
   const [isExporting, setIsExporting] = useState(false);
@@ -31,12 +31,8 @@ const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, team
   // Permission check
   const isDirector = currentUser?.role === 'director';
 
-  // Announcement State
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-      { id: 1, title: '球场维护通知', content: '本周三主球场进行草皮维护，U17 训练场地调整至 2 号人工草训练场，请互相转告。', date: new Date().toISOString().split('T')[0], type: 'info' },
-      { id: 2, title: '冬季训练营报名', content: '2023 冬季特训营报名通道已开启，名额有限，请尽快联系管理人员。', date: new Date().toISOString().split('T')[0], type: 'urgent' }
-  ]);
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
 
   // Director Pending Tasks Logic
@@ -197,24 +193,57 @@ const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, team
     }
   };
 
-  const handleAddAnnouncement = (e: React.FormEvent) => {
+  const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newAnnouncement.title && newAnnouncement.content) {
-        setAnnouncements(prev => [{
-            id: Date.now(),
-            title: newAnnouncement.title,
-            content: newAnnouncement.content,
-            date: new Date().toISOString().split('T')[0],
-            type: newAnnouncement.type
-        }, ...prev]);
+        if (editingAnnouncementId && onUpdateAnnouncement) {
+             // Update existing
+             const original = announcements.find(a => a.id === editingAnnouncementId);
+             onUpdateAnnouncement({
+                 id: editingAnnouncementId,
+                 title: newAnnouncement.title,
+                 content: newAnnouncement.content,
+                 type: newAnnouncement.type,
+                 date: original?.date || new Date().toISOString().split('T')[0],
+                 author: original?.author || currentUser?.name || '管理员'
+             });
+             setEditingAnnouncementId(null);
+        } else if (onAddAnnouncement) {
+            // Add new
+            onAddAnnouncement({
+                id: Date.now().toString(),
+                title: newAnnouncement.title,
+                content: newAnnouncement.content,
+                date: new Date().toISOString().split('T')[0],
+                type: newAnnouncement.type,
+                author: currentUser?.name || '管理员'
+            });
+        }
+        
         setNewAnnouncement({ title: '', content: '', type: 'info' });
         setShowAnnounceForm(false);
     }
   };
 
-  const handleDeleteAnnouncement = (id: number) => {
-      if(confirm('确定要删除这条公告吗？')) {
-          setAnnouncements(prev => prev.filter(a => a.id !== id));
+  const handleEditAnnouncementClick = (announcement: Announcement) => {
+      setNewAnnouncement({
+          title: announcement.title,
+          content: announcement.content,
+          type: announcement.type
+      });
+      setEditingAnnouncementId(announcement.id);
+      setShowAnnounceForm(true);
+  };
+
+  const handleCancelEdit = () => {
+      setShowAnnounceForm(false);
+      setEditingAnnouncementId(null);
+      setNewAnnouncement({ title: '', content: '', type: 'info' });
+  };
+
+  const handleDeleteAnnouncementSubmit = (id: string) => {
+      if(confirm('确定要删除这条公告吗？') && onDeleteAnnouncement) {
+          onDeleteAnnouncement(id);
       }
   };
 
@@ -407,11 +436,11 @@ const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, team
                     </h3>
                     {isDirector ? (
                         <button 
-                            onClick={() => setShowAnnounceForm(!showAnnounceForm)}
+                            onClick={showAnnounceForm ? handleCancelEdit : () => setShowAnnounceForm(true)}
                             className="text-xs flex items-center bg-white border border-gray-300 hover:border-bvb-yellow px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm"
                         >
                             {showAnnounceForm ? <X className="w-3 h-3 mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
-                            {showAnnounceForm ? '取消发布' : '发布公告'}
+                            {showAnnounceForm ? (editingAnnouncementId ? '取消编辑' : '取消发布') : '发布公告'}
                         </button>
                     ) : (
                         <span className="text-xs text-gray-400 flex items-center bg-gray-100 px-2 py-1 rounded">
@@ -420,10 +449,10 @@ const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, team
                     )}
                 </div>
                 
-                {/* Add Form (Only if allowed) */}
+                {/* Add/Edit Form (Only if allowed) */}
                 {showAnnounceForm && isDirector && (
                     <div className="p-4 bg-yellow-50 border-b border-yellow-100 animate-in slide-in-from-top-2">
-                        <form onSubmit={handleAddAnnouncement} className="space-y-3">
+                        <form onSubmit={handleAddAnnouncementSubmit} className="space-y-3">
                             <div className="flex gap-3">
                                 <input 
                                     placeholder="公告标题..." 
@@ -449,9 +478,9 @@ const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, team
                                 onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
                                 required
                             />
-                            <div className="flex justify-end">
+                            <div className="flex justify-end gap-2">
                                 <button type="submit" className="px-4 py-1.5 bg-bvb-black text-white text-xs font-bold rounded hover:bg-gray-800 flex items-center">
-                                    <Send className="w-3 h-3 mr-1" /> 发布
+                                    <Send className="w-3 h-3 mr-1" /> {editingAnnouncementId ? '更新公告' : '发布'}
                                 </button>
                             </div>
                         </form>
@@ -461,31 +490,47 @@ const Dashboard: React.FC<DashboardProps> = ({ players, matches, trainings, team
                 {/* List */}
                 <div className="flex-1 overflow-y-auto max-h-[300px] p-4 space-y-3 custom-scrollbar">
                     {announcements.length > 0 ? (
-                        announcements.map(item => (
-                            <div key={item.id} className="relative group border border-gray-100 rounded-lg p-3 hover:shadow-md transition-shadow bg-white">
-                                <div className="flex justify-between items-start mb-1">
-                                    <div className="flex items-center gap-2">
-                                        {item.type === 'urgent' && <Bell className="w-4 h-4 text-red-500 fill-current" />}
-                                        <h4 className={`font-bold text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>
-                                            {item.title}
-                                        </h4>
-                                        {item.type === 'urgent' && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">重要</span>}
+                        announcements.map(item => {
+                            const isNew = item.date === new Date().toISOString().split('T')[0];
+                            return (
+                                <div key={item.id} className={`relative group border border-gray-100 rounded-lg p-3 hover:shadow-md transition-shadow bg-white ${isNew ? 'ring-1 ring-blue-100' : ''}`}>
+                                    <div className="flex justify-between items-start mb-1">
+                                        <div className="flex items-center gap-2">
+                                            {item.type === 'urgent' && <Bell className="w-4 h-4 text-red-500 fill-current" />}
+                                            <h4 className={`font-bold text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>
+                                                {item.title}
+                                            </h4>
+                                            {item.type === 'urgent' && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">重要</span>}
+                                            {isNew && <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold animate-pulse">New</span>}
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <span className="text-[10px] text-gray-400 font-mono">{item.date}</span>
+                                            {item.author && <span className="text-[9px] text-gray-300">By {item.author}</span>}
+                                        </div>
                                     </div>
-                                    <span className="text-xs text-gray-400 font-mono">{item.date}</span>
+                                    <p className="text-sm text-gray-600 leading-relaxed pl-6 md:pl-0">{item.content}</p>
+                                    
+                                    {isDirector && (
+                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => handleEditAnnouncementClick(item)}
+                                                className="p-1.5 text-gray-300 hover:text-bvb-black hover:bg-gray-100 rounded"
+                                                title="编辑"
+                                            >
+                                                <Edit2 className="w-3 h-3" />
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteAnnouncementSubmit(item.id)}
+                                                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded"
+                                                title="删除"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                                <p className="text-sm text-gray-600 leading-relaxed pl-6 md:pl-0">{item.content}</p>
-                                
-                                {isDirector && (
-                                    <button 
-                                        onClick={() => handleDeleteAnnouncement(item.id)}
-                                        className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="删除"
-                                    >
-                                        <Trash2 className="w-3 h-3" />
-                                    </button>
-                                )}
-                            </div>
-                        ))
+                            );
+                        })
                     ) : (
                         <div className="text-center py-10 text-gray-400 text-sm italic">
                             暂无公告信息

@@ -10,9 +10,10 @@ interface LayoutProps {
   currentUser: UserType | null;
   onLogout: () => void;
   isSyncing?: boolean; // New prop for sync status
+  hasNewAnnouncements?: boolean; // New prop for notifications
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, isSyncing = false }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, isSyncing = false, hasNewAnnouncements = false }) => {
   const navItems = [
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
     { id: 'players', label: '球队管理', icon: Shirt },
@@ -77,7 +78,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 ${
+              className={`w-full flex items-center p-3 rounded-lg transition-all duration-200 relative ${
                 activeTab === item.id
                   ? 'bg-bvb-yellow text-bvb-black font-bold shadow-lg transform scale-105'
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
@@ -85,6 +86,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
             >
               <item.icon className="w-5 h-5 mr-3" />
               {item.label}
+              
+              {/* Notification Badge for Dashboard */}
+              {item.id === 'dashboard' && hasNewAnnouncements && (
+                  <span className="absolute right-3 top-3 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse shadow-sm"></span>
+              )}
             </button>
           ))}
         </nav>
@@ -146,11 +152,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95 ${
+                  className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-all duration-200 active:scale-95 relative ${
                     activeTab === item.id ? 'text-bvb-yellow' : 'text-gray-500 hover:text-gray-300'
                   }`}
                 >
-                  <item.icon className={`w-6 h-6 ${activeTab === item.id ? 'fill-current' : ''}`} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                  <div className="relative">
+                      <item.icon className={`w-6 h-6 ${activeTab === item.id ? 'fill-current' : ''}`} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                      {item.id === 'dashboard' && hasNewAnnouncements && (
+                          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-bvb-black"></span>
+                      )}
+                  </div>
                   <span className="text-[10px] font-bold scale-90 origin-center">{getMobileLabel(item.label)}</span>
                 </button>
               ))}
