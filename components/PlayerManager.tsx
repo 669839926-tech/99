@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
 import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon } from 'lucide-react';
@@ -1174,7 +1173,383 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                ))}
             </div>
           </div>
-          {/* Content Area - Same as before... */}
+          {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
              {activeTab === 'overview' && (
-               <div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300
+               <div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300">
+                  <div className="w-full md:w-1/2 flex flex-col items-center justify-center bg-gray-50 rounded-xl p-4 border border-gray-100">
+                      <h4 className="text-sm font-bold text-gray-400 uppercase mb-4">综合能力图谱</h4>
+                      <div className="w-full h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}>
+                                  <PolarGrid stroke="#e5e7eb" />
+                                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 12, fontWeight: 'bold' }} />
+                                  <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
+                                  <Radar name="能力值" dataKey="A" stroke="#000" strokeWidth={2} fill="#FDE100" fillOpacity={0.6} />
+                              </RadarChart>
+                          </ResponsiveContainer>
+                      </div>
+                      <div className="mt-4 text-center">
+                          <div className="text-3xl font-black text-bvb-black">{getOverallRating(editedPlayer)}</div>
+                          <div className="text-xs text-gray-400 font-bold uppercase">综合评分</div>
+                      </div>
+                  </div>
+                  <div className="w-full md:w-1/2 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
+                      {/* Summary stats or quick info could go here */}
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                          <div className="text-xs font-bold text-blue-800 uppercase mb-2">出勤率 (近30天)</div>
+                          <div className="text-2xl font-black text-blue-600">{attendanceRate}%</div>
+                      </div>
+                      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-100">
+                          <div className="text-xs font-bold text-yellow-800 uppercase mb-2">课时余额</div>
+                          <div className="text-2xl font-black text-yellow-600">{editedPlayer.credits} 节</div>
+                      </div>
+                  </div>
+               </div>
+             )}
+             {activeTab === 'technical' && renderCategoryContent('technical')}
+             {activeTab === 'tactical' && renderCategoryContent('tactical')}
+             {activeTab === 'physical' && renderCategoryContent('physical')}
+             {activeTab === 'mental' && renderCategoryContent('mental')}
+             {activeTab === 'reviews' && renderReviews()}
+             {activeTab === 'records' && renderRecords()}
+             {activeTab === 'gallery' && renderGallery()}
+          </div>
+        </div>
+        {/* Hidden Export Container */}
+        <div id="player-profile-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
+            <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
+                 <div className="flex items-center">
+                     <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain mr-6" />
+                     <div>
+                         <h1 className="text-4xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
+                         <p className="text-xl text-gray-500 font-bold mt-1">球员年度评估档案 / Player Profile {exportYear}</p>
+                     </div>
+                 </div>
+                 <div className="text-right">
+                     <div className="text-4xl font-black text-bvb-black">{editedPlayer.name}</div>
+                     <div className="text-lg font-bold text-gray-400 uppercase">#{editedPlayer.number} • {editedPlayer.position}</div>
+                 </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-8 mb-12">
+                 <div className="col-span-1 flex flex-col items-center">
+                      <img src={editedPlayer.image} className="w-48 h-48 rounded-full object-cover border-4 border-gray-100 shadow-lg mb-6" />
+                      <div className="w-full space-y-2">
+                           <div className="flex justify-between border-b border-gray-100 py-2"><span className="font-bold text-gray-500">年龄</span><span className="font-bold">{editedPlayer.age}</span></div>
+                           <div className="flex justify-between border-b border-gray-100 py-2"><span className="font-bold text-gray-500">身高/体重</span><span className="font-bold">{editedPlayer.height}cm / {editedPlayer.weight}kg</span></div>
+                           <div className="flex justify-between border-b border-gray-100 py-2"><span className="font-bold text-gray-500">惯用脚</span><span className="font-bold">右脚</span></div>
+                           <div className="flex justify-between border-b border-gray-100 py-2"><span className="font-bold text-gray-500">入队时长</span><span className="font-bold">{calculateTenure(editedPlayer.joinDate) || '-'}</span></div>
+                      </div>
+                 </div>
+                 <div className="col-span-2">
+                      <h3 className="text-xl font-bold border-l-4 border-bvb-yellow pl-3 mb-6">能力模型评估</h3>
+                      <div className="flex gap-8">
+                           <div className="w-1/2 h-64 border border-gray-100 rounded-lg p-2 bg-gray-50">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}>
+                                        <PolarGrid stroke="#e5e7eb" />
+                                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#374151', fontSize: 10, fontWeight: 'bold' }} />
+                                        <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
+                                        <Radar name="Ability" dataKey="A" stroke="#000" strokeWidth={2} fill="#FDE100" fillOpacity={0.6} />
+                                    </RadarChart>
+                                </ResponsiveContainer>
+                           </div>
+                           <div className="w-1/2 space-y-4">
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                     <div className="text-sm font-bold text-gray-400 uppercase">综合评分</div>
+                                     <div className="text-4xl font-black text-bvb-black mt-1">{getOverallRating(editedPlayer)}</div>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                     <div className="text-sm font-bold text-gray-400 uppercase">年度出勤率</div>
+                                     <div className="text-4xl font-black text-bvb-black mt-1">{annualAttendanceStats.rate}%</div>
+                                     <div className="text-xs text-gray-400 mt-1">
+                                         实到 {annualAttendanceStats.present} / 总计 {annualAttendanceStats.total}
+                                     </div>
+                                </div>
+                           </div>
+                      </div>
+                 </div>
+            </div>
+
+            <div className="mb-12">
+                 <h3 className="text-xl font-bold border-l-4 border-bvb-yellow pl-3 mb-6">年度教练评价</h3>
+                 {editedPlayer.reviews?.filter(r => r.year === exportYear).length > 0 ? (
+                     <div className="grid grid-cols-2 gap-6">
+                         {editedPlayer.reviews.filter(r => r.year === exportYear).map(r => (
+                             <div key={r.id} className="bg-gray-50 p-6 rounded-lg border border-gray-100 break-inside-avoid">
+                                 <div className="flex justify-between items-center mb-4 border-b border-gray-200 pb-2">
+                                     <span className="font-black text-lg">{r.quarter}</span>
+                                     <span className="text-xs text-gray-400">{r.date}</span>
+                                 </div>
+                                 <div className="space-y-3 text-sm text-gray-800 leading-relaxed">
+                                     <p><span className="font-bold text-gray-500">[技战术]</span> {r.technicalTacticalImprovement}</p>
+                                     <p><span className="font-bold text-gray-500">[心理]</span> {r.mentalDevelopment}</p>
+                                     <p className="italic bg-white p-2 rounded border border-gray-100">"{r.summary}"</p>
+                                 </div>
+                             </div>
+                         ))}
+                     </div>
+                 ) : (
+                     <p className="text-gray-400 italic">本年度暂无评价记录</p>
+                 )}
+            </div>
+
+            <div className="text-center text-xs text-gray-400 pt-8 border-t border-gray-200">
+                © {exportYear} 顽石之光足球俱乐部 • 内部绝密资料
+            </div>
+        </div>
+      </div>
+    );
+};
+
+const PlayerManager: React.FC<PlayerManagerProps> = ({
+  teams, players, trainings, attributeConfig, currentUser,
+  onAddPlayer, onBulkAddPlayers, onAddTeam, onDeleteTeam,
+  onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers,
+  onAddPlayerReview, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge,
+  initialFilter, appLogo
+}) => {
+    // State
+    const [selectedTeamId, setSelectedTeamId] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    
+    // Modals
+    const [showImportModal, setShowImportModal] = useState(false);
+    const [showTransferModal, setShowTransferModal] = useState(false);
+    const [showBulkRechargeModal, setShowBulkRechargeModal] = useState(false);
+    const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+    const [rechargePlayer, setRechargePlayer] = useState<Player | undefined>(undefined);
+
+    // Filter Logic
+    const filteredPlayers = useMemo(() => {
+        return players.filter(p => {
+            const matchesTeam = selectedTeamId === 'all' || p.teamId === selectedTeamId;
+            const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                  p.number.toString().includes(searchQuery);
+            return matchesTeam && matchesSearch;
+        });
+    }, [players, selectedTeamId, searchQuery]);
+
+    // Handlers
+    const toggleSelectPlayer = (id: string) => {
+        setSelectedPlayerIds(prev => prev.includes(id) ? prev.filter(pid => pid !== id) : [...prev, id]);
+    };
+
+    return (
+        <div className="space-y-6 h-full flex flex-col">
+            {/* Header Actions */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
+                <div>
+                   <h2 className="text-3xl font-black text-bvb-black uppercase">球队管理</h2>
+                   <p className="text-gray-500">管理球员档案、评估与梯队分配。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                     <button onClick={() => setShowImportModal(true)} className="flex items-center px-4 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-sm">
+                        <FileSpreadsheet className="w-4 h-4 mr-2" /> 导入
+                     </button>
+                     <button onClick={() => {
+                         const newPlayer: Player = {
+                             id: Date.now().toString(),
+                             teamId: teams[0]?.id || '',
+                             name: '新球员',
+                             number: 0,
+                             position: Position.MID,
+                             gender: '男',
+                             idCard: '',
+                             birthDate: '2010-01-01',
+                             age: 10,
+                             height: 140,
+                             weight: 35,
+                             goals: 0,
+                             assists: 0,
+                             appearances: 0,
+                             image: 'https://via.placeholder.com/150',
+                             stats: generateDefaultStats(attributeConfig),
+                             statsStatus: 'Published',
+                             lastPublishedStats: generateDefaultStats(attributeConfig),
+                             reviews: [],
+                             credits: 0,
+                             validUntil: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+                             leaveQuota: 0,
+                             leavesUsed: 0,
+                             rechargeHistory: [],
+                             gallery: []
+                         };
+                         setEditingPlayer(newPlayer);
+                     }} className="flex items-center px-4 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-md text-sm">
+                        <Plus className="w-4 h-4 mr-2 text-bvb-yellow" /> 新增球员
+                     </button>
+                </div>
+            </div>
+
+            {/* Toolbar */}
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-center shrink-0">
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                     <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <select 
+                            value={selectedTeamId} 
+                            onChange={e => setSelectedTeamId(e.target.value)}
+                            className="pl-9 pr-8 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-bvb-yellow appearance-none cursor-pointer"
+                        >
+                            <option value="all">所有梯队</option>
+                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                     </div>
+                     <div className="relative flex-1 md:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input 
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="搜索姓名或号码..."
+                            className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                        />
+                     </div>
+                </div>
+
+                {/* Bulk Actions */}
+                {selectedPlayerIds.length > 0 && (
+                    <div className="flex items-center gap-2 animate-in fade-in slide-in-from-right-2">
+                        <span className="text-xs font-bold text-gray-500 mr-2">已选 {selectedPlayerIds.length} 人</span>
+                        <button onClick={() => setShowBulkRechargeModal(true)} className="p-2 bg-green-50 text-green-600 rounded hover:bg-green-100" title="批量充值"><CreditCard className="w-4 h-4" /></button>
+                        <button onClick={() => setShowTransferModal(true)} className="p-2 bg-blue-50 text-blue-600 rounded hover:bg-blue-100" title="批量移交"><ArrowRightLeft className="w-4 h-4" /></button>
+                        <button onClick={() => { onBulkDeletePlayers(selectedPlayerIds); setSelectedPlayerIds([]); }} className="p-2 bg-red-50 text-red-600 rounded hover:bg-red-100" title="批量删除"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                )}
+            </div>
+
+            {/* Player Grid */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20">
+                    {filteredPlayers.map(player => (
+                        <div key={player.id} className={`bg-white rounded-xl border transition-all hover:shadow-md relative group ${selectedPlayerIds.includes(player.id) ? 'border-bvb-yellow ring-1 ring-bvb-yellow' : 'border-gray-200'}`}>
+                            {/* Selection Checkbox */}
+                            <div className="absolute top-3 left-3 z-10">
+                                <input 
+                                    type="checkbox" 
+                                    checked={selectedPlayerIds.includes(player.id)}
+                                    onChange={() => toggleSelectPlayer(player.id)}
+                                    className="w-4 h-4 rounded border-gray-300 text-bvb-yellow focus:ring-bvb-yellow cursor-pointer"
+                                />
+                            </div>
+
+                            <div className="p-5 flex items-center space-x-4 cursor-pointer" onClick={() => setEditingPlayer(player)}>
+                                <div className="relative">
+                                    <img src={player.image} alt={player.name} className="w-16 h-16 rounded-full object-cover border-2 border-gray-100" />
+                                    <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border border-white ${getPosColor(player.position)}`}>
+                                        {player.position}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-800">{player.name}</h3>
+                                    <div className="flex items-center text-xs text-gray-500 mt-1">
+                                        <span className="font-mono font-bold text-bvb-black mr-2">#{player.number}</span>
+                                        <span>{player.age}岁</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-2">
+                                         {player.credits <= 2 && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                                         <span className={`text-xs font-bold ${player.credits <= 2 ? 'text-red-500' : 'text-gray-400'}`}>余额: {player.credits}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Quick Actions Footer */}
+                            <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 flex justify-between items-center rounded-b-xl">
+                                <div className="flex gap-2">
+                                     <button 
+                                        onClick={(e) => { e.stopPropagation(); setRechargePlayer(player); }}
+                                        className="text-xs font-bold text-gray-500 hover:text-bvb-black flex items-center"
+                                     >
+                                         <CreditCard className="w-3 h-3 mr-1" /> 充值
+                                     </button>
+                                </div>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={(e) => { e.stopPropagation(); setEditingPlayer(player); }} className="p-1.5 hover:bg-white rounded text-gray-400 hover:text-bvb-black"><Edit2 className="w-3 h-3" /></button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                    {filteredPlayers.length === 0 && (
+                        <div className="col-span-full text-center py-12 text-gray-400">
+                            没有找到符合条件的球员
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Modals */}
+            {editingPlayer && (
+                <PlayerDetailModal 
+                    player={editingPlayer}
+                    onClose={() => setEditingPlayer(null)}
+                    teams={teams}
+                    trainings={trainings || []}
+                    attributeConfig={attributeConfig}
+                    currentUser={currentUser}
+                    onUpdatePlayer={(p) => {
+                        if (players.find(existing => existing.id === p.id)) {
+                            onUpdatePlayer(p);
+                        } else {
+                            onAddPlayer(p);
+                        }
+                        setEditingPlayer(null);
+                    }}
+                    onDeletePlayer={onDeletePlayer}
+                    onDeleteRecharge={onDeleteRecharge}
+                    initialFilter={initialFilter}
+                    appLogo={appLogo}
+                />
+            )}
+
+            {rechargePlayer && (
+                <RechargeModal 
+                    player={rechargePlayer}
+                    onClose={() => setRechargePlayer(undefined)}
+                    onSubmit={(amount, quota) => {
+                        onRechargePlayer(rechargePlayer.id, amount, quota);
+                        setRechargePlayer(undefined);
+                    }}
+                />
+            )}
+
+            {showBulkRechargeModal && (
+                <BulkRechargeModal 
+                    count={selectedPlayerIds.length}
+                    onClose={() => setShowBulkRechargeModal(false)}
+                    onSubmit={(amount, quota) => {
+                        onBulkRechargePlayers(selectedPlayerIds, amount, quota);
+                        setShowBulkRechargeModal(false);
+                        setSelectedPlayerIds([]);
+                    }}
+                />
+            )}
+
+            {showTransferModal && (
+                <TransferModal 
+                    teams={teams}
+                    count={selectedPlayerIds.length}
+                    onClose={() => setShowTransferModal(false)}
+                    onConfirm={(targetId) => {
+                        onTransferPlayers(selectedPlayerIds, targetId);
+                        setShowTransferModal(false);
+                        setSelectedPlayerIds([]);
+                    }}
+                />
+            )}
+
+            {showImportModal && (
+                <ImportPlayersModal 
+                    teams={teams}
+                    attributeConfig={attributeConfig}
+                    onImport={onBulkAddPlayers}
+                    onClose={() => setShowImportModal(false)}
+                />
+            )}
+        </div>
+    );
+};
+
+export default PlayerManager;

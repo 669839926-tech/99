@@ -5,11 +5,12 @@ import Dashboard from './components/Dashboard';
 import PlayerManager from './components/PlayerManager';
 import TrainingPlanner from './components/TrainingPlanner';
 import MatchPlanner from './components/MatchPlanner';
+import PlayerTesting from './components/PlayerTesting';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
-import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement } from './types';
+import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_SKILL_TESTS, MOCK_TEST_RECORDS, MOCK_HOME_TRAINING } from './constants';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, SkillTest, SkillTestRecord, HomeTrainingRecord } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -27,6 +28,11 @@ function App() {
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [appLogo, setAppLogo] = useState<string>(APP_LOGO);
   
+  // New State for Testing Module
+  const [skillTests, setSkillTests] = useState<SkillTest[]>(DEFAULT_SKILL_TESTS);
+  const [skillTestRecords, setSkillTestRecords] = useState<SkillTestRecord[]>(MOCK_TEST_RECORDS);
+  const [homeTrainingRecords, setHomeTrainingRecords] = useState<HomeTrainingRecord[]>(MOCK_HOME_TRAINING);
+
   // User Management State (Lifted from Settings/Mock)
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
 
@@ -47,8 +53,11 @@ function App() {
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
-            // In a real app, users would also be loaded from DB. 
-            // For this demo, we use initial mock users or could persist them too if schema allows.
+            
+            // Load new testing data
+            if (cloudData.skillTests) setSkillTests(cloudData.skillTests);
+            if (cloudData.skillTestRecords) setSkillTestRecords(cloudData.skillTestRecords);
+            if (cloudData.homeTrainingRecords) setHomeTrainingRecords(cloudData.homeTrainingRecords);
         }
         setIsInitializing(false);
     };
@@ -73,7 +82,11 @@ function App() {
                 trainings,
                 attributeConfig,
                 announcements,
-                appLogo
+                appLogo,
+                // Save new testing data
+                skillTests,
+                skillTestRecords,
+                homeTrainingRecords
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -83,7 +96,7 @@ function App() {
     }, 2000); // 2 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, skillTests, skillTestRecords, homeTrainingRecords, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -332,6 +345,25 @@ function App() {
     setAttributeConfig(newConfig);
   };
 
+  // --- Testing Module Handlers ---
+  const handleAddHomeTraining = (record: HomeTrainingRecord) => {
+      setHomeTrainingRecords(prev => [...prev, record]);
+  };
+
+  const handleAddSkillTestRecord = (record: SkillTestRecord) => {
+      setSkillTestRecords(prev => [...prev, record]);
+  };
+
+  const handleDeleteSkillTestRecord = (id: string) => {
+      if(confirm('确定要删除这条测试记录吗？')) {
+          setSkillTestRecords(prev => prev.filter(r => r.id !== id));
+      }
+  };
+
+  const handleAddSkillTest = (test: SkillTest) => {
+      setSkillTests(prev => [...prev, test]);
+  };
+
   // Loading Screen
   if (isInitializing) {
       return (
@@ -426,6 +458,21 @@ function App() {
             initialFilter={navigationParams.filter}
             appLogo={appLogo}
           />
+        );
+      case 'testing':
+        return (
+            <PlayerTesting 
+                players={players}
+                teams={teams}
+                skillTests={skillTests}
+                skillTestRecords={skillTestRecords}
+                homeTrainingRecords={homeTrainingRecords}
+                currentUser={currentUser}
+                onAddHomeTraining={handleAddHomeTraining}
+                onAddSkillTestRecord={handleAddSkillTestRecord}
+                onDeleteSkillTestRecord={handleDeleteSkillTestRecord}
+                onAddSkillTest={handleAddSkillTest}
+            />
         );
       case 'matches':
         return (

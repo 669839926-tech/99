@@ -1,5 +1,5 @@
 
-import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement } from './types';
+import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, SkillTest, HomeTrainingRecord, SkillTestRecord } from './types';
 
 // Geo Data Structure: Province -> City -> Districts
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
@@ -104,6 +104,26 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
     '传中射门练习'
   ]
 };
+
+// --- MOCK DATA FOR TESTING FEATURE ---
+export const DEFAULT_SKILL_TESTS: SkillTest[] = [
+    { id: 't-juggle', name: '颠球测试', unit: '个', category: 'technical' },
+    { id: 't-sprint30', name: '30米冲刺', unit: '秒', category: 'physical' },
+    { id: 't-agility505', name: '505敏捷测试', unit: '秒', category: 'physical' },
+    { id: 't-longpass', name: '长传精度', unit: '分', category: 'technical' }
+];
+
+export const MOCK_HOME_TRAINING: HomeTrainingRecord[] = [
+    { id: 'h1', playerId: '1', date: '2023-11-01', count: 1, content: '居家核心力量训练' },
+    { id: 'h2', playerId: '1', date: '2023-11-02', count: 3, content: '球感练习 (3组)' },
+    { id: 'h3', playerId: '1', date: '2023-11-03', count: 1, content: '有氧慢跑' },
+];
+
+export const MOCK_TEST_RECORDS: SkillTestRecord[] = [
+    { id: 'r1', playerId: '1', testId: 't-juggle', date: '2023-10-01', value: 150 },
+    { id: 'r2', playerId: '1', testId: 't-juggle', date: '2023-11-01', value: 185 },
+    { id: 'r3', playerId: '1', testId: 't-sprint30', date: '2023-10-15', value: 4.2 },
+];
 
 // Helper to generate random stats (Scale 1-10)
 const generateStats = (): PlayerStats => {
