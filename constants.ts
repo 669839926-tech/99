@@ -169,6 +169,7 @@ const createMockPlayer = (data: Partial<Player>): Player => {
         stats: stats,
         statsStatus: 'Published',
         lastPublishedStats: JSON.parse(JSON.stringify(stats)), // Clone
+        gallery: [], // Initialize gallery
     } as Player;
 }
 

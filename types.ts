@@ -63,6 +63,13 @@ export interface PlayerReview {
   status?: ApprovalStatus; // Workflow status
 }
 
+export interface PlayerPhoto {
+    id: string;
+    url: string; // Base64 data URL
+    date: string;
+    caption?: string;
+}
+
 export interface Player {
   id: string;
   teamId: string; // Links player to a team
@@ -100,6 +107,9 @@ export interface Player {
   leaveQuota: number; // Total allowed leaves in current cycle
   leavesUsed: number; // Leaves used in current cycle
   rechargeHistory: RechargeRecord[]; // New: Log of recharges
+  
+  // Gallery System
+  gallery?: PlayerPhoto[]; // New: Daily photos
 }
 
 // --- Match Detail Types ---
