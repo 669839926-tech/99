@@ -53,9 +53,8 @@ export const MOCK_TEAMS: Team[] = [
 // Mock Users for Auth
 export const MOCK_USERS: User[] = [
   { id: 'u1', username: 'admin', password: '123', name: '青训总监', role: 'director' },
-  { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamIds: ['t1'] },
-  { id: 'u3', username: 'coach_u17', password: '123', name: 'U17 主教练', role: 'coach', teamIds: ['t2'] },
-  { id: 'u4', username: 'head_coach', password: '123', name: '青训总教练', role: 'coach', teamIds: ['t1', 't2'] }, // Example of multi-team coach
+  { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamId: 't1' },
+  { id: 'u3', username: 'coach_u17', password: '123', name: 'U17 主教练', role: 'coach', teamId: 't2' },
 ];
 
 export const MOCK_ANNOUNCEMENTS: Announcement[] = [

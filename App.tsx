@@ -451,7 +451,6 @@ function App() {
                   onUpdateUserPassword={handleUpdateUserPassword}
                   appLogo={appLogo}
                   onUpdateAppLogo={setAppLogo}
-                  teams={teams} // Pass teams here
                />;
       default:
         return <Dashboard 
