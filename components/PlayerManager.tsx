@@ -180,133 +180,6 @@ const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => 
 
 // --- Extracted Modals ---
 
-interface RechargeModalProps {
-    player: Player | undefined;
-    onClose: () => void;
-    onSubmit: (amount: number, quota: number) => void;
-}
-
-const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit }) => {
-    const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
-    
-    if (!player) return null;
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit(rechargeData.amount, rechargeData.quota);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold flex items-center">
-                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
-                        课时充值
-                    </h3>
-                    <button onClick={onClose}><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6">
-                    <div className="mb-4 flex items-center justify-between bg-gray-50 p-3 rounded">
-                        <span className="font-bold text-gray-700">{player.name}</span>
-                        <span className="text-xs text-gray-500">当前余额: {player.credits || 0}</span>
-                    </div>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.amount}
-                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
-                                min={1}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">周期内允许请假次数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.quota}
-                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
-                                min={0}
-                            />
-                            <p className="text-[10px] text-gray-400 mt-1">
-                                有效期将自动延长至一年后。达到请假次数上限后将正常扣课时。
-                            </p>
-                        </div>
-                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
-                            确认充值
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-interface BulkRechargeModalProps {
-    count: number;
-    onClose: () => void;
-    onSubmit: (amount: number, quota: number) => void;
-}
-
-const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, onSubmit }) => {
-    const [rechargeData, setRechargeData] = useState({ amount: 50, quota: 3 });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSubmit(rechargeData.amount, rechargeData.quota);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
-                    <h3 className="font-bold flex items-center">
-                        <CreditCard className="w-5 h-5 mr-2 text-bvb-yellow" /> 
-                        批量课时充值
-                    </h3>
-                    <button onClick={onClose}><X className="w-5 h-5" /></button>
-                </div>
-                <div className="p-6">
-                    <div className="mb-4 bg-yellow-50 border border-yellow-200 p-3 rounded text-sm text-yellow-800 font-bold">
-                        正在为 {count} 名球员进行统一充值。
-                    </div>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">统一充值课时数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.amount}
-                                onChange={e => setRechargeData({...rechargeData, amount: parseInt(e.target.value)})}
-                                min={1}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">统一允许请假次数</label>
-                            <input 
-                                type="number"
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-lg"
-                                value={rechargeData.quota}
-                                onChange={e => setRechargeData({...rechargeData, quota: parseInt(e.target.value)})}
-                                min={0}
-                            />
-                            <p className="text-[10px] text-gray-400 mt-1">
-                                所有选定球员的有效期将自动延长至一年后。
-                            </p>
-                        </div>
-                        <button type="submit" className="w-full py-3 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 mt-2">
-                            确认批量充值
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 interface TransferModalProps {
     teams: Team[];
     count: number;
@@ -463,8 +336,6 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
             id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
             teamId: selectedTeamId,
             isCaptain: false,
-            height: 0,
-            weight: 0,
             goals: 0,
             assists: 0,
             appearances: 0,
@@ -581,6 +452,110 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                             <Upload className="w-4 h-4 mr-2" /> 确认导入
                         </button>
                     )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface RechargeModalProps {
+    player?: Player;
+    onClose: () => void;
+    onSubmit: (amount: number, quota: number) => void;
+}
+
+const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit }) => {
+    const [amount, setAmount] = useState(10);
+    const [quota, setQuota] = useState(0);
+
+    if (!player) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+                <h3 className="font-bold text-lg mb-2 flex items-center"><CreditCard className="w-5 h-5 mr-2 text-bvb-yellow"/> 课时充值</h3>
+                <p className="text-sm text-gray-500 mb-4">为 <span className="font-bold text-bvb-black">{player.name}</span> 充值课时及请假额度。</p>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            value={amount}
+                            onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">增加请假额度 (次)</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            value={quota}
+                            onChange={(e) => setQuota(parseInt(e.target.value) || 0)}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">取消</button>
+                    <button 
+                        onClick={() => onSubmit(amount, quota)} 
+                        className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800"
+                    >
+                        确认充值
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface BulkRechargeModalProps {
+    count: number;
+    onClose: () => void;
+    onSubmit: (amount: number, quota: number) => void;
+}
+
+const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, onSubmit }) => {
+    const [amount, setAmount] = useState(10);
+    const [quota, setQuota] = useState(0);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+                <h3 className="font-bold text-lg mb-2 flex items-center"><CreditCard className="w-5 h-5 mr-2 text-bvb-yellow"/> 批量充值</h3>
+                <p className="text-sm text-gray-500 mb-4">为选中的 <span className="font-bold text-bvb-black">{count}</span> 名球员进行充值。</p>
+                
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数 (每人)</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            value={amount}
+                            onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">增加请假额度 (每人)</label>
+                        <input 
+                            type="number" 
+                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            value={quota}
+                            onChange={(e) => setQuota(parseInt(e.target.value) || 0)}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">取消</button>
+                    <button 
+                        onClick={() => onSubmit(amount, quota)} 
+                        className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800"
+                    >
+                        确认批量充值
+                    </button>
                 </div>
             </div>
         </div>
@@ -1304,10 +1279,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            <div className="relative z-10 flex-1 flex flex-col justify-center">
                                <h2 className="text-3xl font-black text-gray-900 mb-1">{editedPlayer.name}</h2>
                                <p className="text-sm font-bold text-gray-500 mb-4 uppercase">#{editedPlayer.number} • {editedPlayer.position} • {teams.find(t => t.id === editedPlayer.teamId)?.name}</p>
-                               <div className="grid grid-cols-4 gap-4 text-sm w-full">
+                               <div className="grid grid-cols-2 gap-4 text-sm w-full">
                                    <div><span className="block text-gray-400 text-xs">年龄</span><span className="font-bold">{editedPlayer.age}岁</span></div>
-                                   <div><span className="block text-gray-400 text-xs">身高</span><span className="font-bold">{editedPlayer.height}cm</span></div>
-                                   <div><span className="block text-gray-400 text-xs">体重</span><span className="font-bold">{editedPlayer.weight}kg</span></div>
                                    <div><span className="block text-gray-400 text-xs">综合评分</span><span className="font-black text-bvb-yellow bg-black px-2 rounded">{getOverallRating(editedPlayer)}</span></div>
                                </div>
                            </div>
@@ -1690,7 +1663,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             position: newPlayer.position as Position,
             isCaptain: newPlayer.isCaptain || false,
             age: newPlayer.age || 16,
-            height: 175, weight: 70, goals: 0, assists: 0, appearances: 0,
+            goals: 0, assists: 0, appearances: 0,
             image: newPlayer.image || `https://picsum.photos/200/200?random=${Date.now()}`,
             stats: defaultStats,
             statsStatus: 'Published',
@@ -1879,7 +1852,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             </th>
                             <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">球员信息</th>
                             <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">梯队/位置</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">年龄/身体</th>
+                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">年龄</th>
                             <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">综合评分</th>
                             <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden md:table-cell w-32">出勤率</th>
                             <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">课时余额</th>
@@ -1936,8 +1909,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                     <td className="p-4 hidden sm:table-cell">
                                         <div className="text-xs">
                                             <span className="font-bold">{player.age}岁</span>
-                                            <span className="text-gray-400 mx-1">|</span>
-                                            <span className="text-gray-500">{player.height}cm</span>
                                         </div>
                                     </td>
                                     <td className="p-4">

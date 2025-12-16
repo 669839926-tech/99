@@ -1,11 +1,13 @@
 
+// ... (imports remain the same)
 import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement } from './types';
 
-// Geo Data Structure: Province -> City -> Districts
+// ... (Geo Data, App Logo, Mock Teams remain the same)
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
     "北京市": {
         "北京市": ["东城区", "西城区", "朝阳区", "丰台区", "石景山区", "海淀区", "门头沟区", "房山区", "通州区", "顺义区", "昌平区", "大兴区", "怀柔区", "平谷区", "密云区", "延庆区"]
     },
+    // ... (rest of geo data)
     "上海市": {
         "上海市": ["黄浦区", "徐汇区", "长宁区", "静安区", "普陀区", "虹口区", "杨浦区", "闵行区", "宝山区", "嘉定区", "浦东新区", "金山区", "松江区", "青浦区", "奉贤区", "崇明区"]
     },
@@ -63,6 +65,7 @@ export const MOCK_ANNOUNCEMENTS: Announcement[] = [
 ];
 
 export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
+  // ... (rest of config)
   technical: [
     { key: 'passing', label: '传接球' },
     { key: 'dribbling', label: '盘带' },
@@ -105,11 +108,10 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
   ]
 };
 
-// Helper to generate random stats (Scale 1-10)
+// ... (rest of helper functions)
 const generateStats = (): PlayerStats => {
   const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
   
-  // Dynamically generate based on keys in default config to match structure
   const stats: any = {
     technical: {},
     tactical: {},
@@ -117,19 +119,16 @@ const generateStats = (): PlayerStats => {
     mental: {}
   };
 
-  // Generate realistic stats between 4 and 9 for field players
   DEFAULT_ATTRIBUTE_CONFIG.technical.forEach(attr => stats.technical[attr.key] = rand(4, 9));
   DEFAULT_ATTRIBUTE_CONFIG.tactical.forEach(attr => stats.tactical[attr.key] = rand(4, 9));
   DEFAULT_ATTRIBUTE_CONFIG.physical.forEach(attr => stats.physical[attr.key] = rand(5, 9));
   DEFAULT_ATTRIBUTE_CONFIG.mental.forEach(attr => stats.mental[attr.key] = rand(4, 9));
 
-  // Override goalkeeping for non-GKs to be low usually (1-3)
   if (stats.technical.goalkeeping) stats.technical.goalkeeping = rand(1, 3);
 
   return stats as PlayerStats;
 };
 
-// Helper for mock ID cards
 const mockId = (year: number) => `110101${year}01011234`;
 
 const MOCK_REVIEWS: PlayerReview[] = [
@@ -155,7 +154,6 @@ const MOCK_REVIEWS: PlayerReview[] = [
     }
 ];
 
-// Helper to get next year date
 const getNextYear = () => {
   const d = new Date();
   d.setFullYear(d.getFullYear() + 1);
@@ -174,15 +172,16 @@ const createMockPlayer = (data: Partial<Player>): Player => {
 }
 
 export const MOCK_PLAYERS: Player[] = [
-  createMockPlayer({ id: '1', teamId: 't1', name: '马尔科·罗伊斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 11, position: Position.MID, isCaptain: true, age: 18, height: 175, weight: 65, goals: 12, assists: 8, appearances: 15, image: 'https://picsum.photos/200/200?random=1', reviews: MOCK_REVIEWS, credits: 50, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [] }),
-  createMockPlayer({ id: '2', teamId: 't1', name: '马茨·胡梅尔斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 15, position: Position.DEF, isCaptain: false, age: 18, height: 188, weight: 80, goals: 2, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=2', reviews: [], credits: 45, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 1, rechargeHistory: [] }),
-  createMockPlayer({ id: '3', teamId: 't1', name: '尤利安·布兰特 (Jr)', gender: '男', idCard: mockId(2006), birthDate: '2006-01-01', number: 19, position: Position.MID, isCaptain: false, age: 17, height: 178, weight: 70, goals: 5, assists: 12, appearances: 14, image: 'https://picsum.photos/200/200?random=3', reviews: [], credits: 12, validUntil: '2023-12-31', leaveQuota: 3, leavesUsed: 2, rechargeHistory: [] }),
-  createMockPlayer({ id: '4', teamId: 't1', name: '格雷戈·科贝尔 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 1, position: Position.GK, isCaptain: false, age: 18, height: 190, weight: 85, goals: 0, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=4', reviews: [], credits: 100, validUntil: getNextYear(), leaveQuota: 5, leavesUsed: 0, rechargeHistory: [] }),
-  createMockPlayer({ id: '5', teamId: 't2', name: '卡里姆·阿德耶米 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 27, position: Position.FWD, isCaptain: true, age: 16, height: 172, weight: 68, goals: 15, assists: 4, appearances: 13, image: 'https://picsum.photos/200/200?random=5', reviews: [], credits: 0, validUntil: '2023-01-01', leaveQuota: 2, leavesUsed: 2, rechargeHistory: [] }),
-  createMockPlayer({ id: '6', teamId: 't2', name: '尼科·施洛特贝克 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 4, position: Position.DEF, isCaptain: false, age: 16, height: 185, weight: 78, goals: 3, assists: 0, appearances: 14, image: 'https://picsum.photos/200/200?random=6', reviews: [], credits: 20, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [] }),
-  createMockPlayer({ id: '7', teamId: 't2', name: '埃姆雷·詹 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 23, position: Position.MID, isCaptain: false, age: 16, height: 180, weight: 75, goals: 1, assists: 3, appearances: 12, image: 'https://picsum.photos/200/200?random=7', reviews: [], credits: 30, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [] }),
+  createMockPlayer({ id: '1', teamId: 't1', name: '马尔科·罗伊斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 11, position: Position.MID, isCaptain: true, age: 18, goals: 12, assists: 8, appearances: 15, image: 'https://picsum.photos/200/200?random=1', reviews: MOCK_REVIEWS, credits: 50, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [] }),
+  createMockPlayer({ id: '2', teamId: 't1', name: '马茨·胡梅尔斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 15, position: Position.DEF, isCaptain: false, age: 18, goals: 2, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=2', reviews: [], credits: 45, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 1, rechargeHistory: [] }),
+  createMockPlayer({ id: '3', teamId: 't1', name: '尤利安·布兰特 (Jr)', gender: '男', idCard: mockId(2006), birthDate: '2006-01-01', number: 19, position: Position.MID, isCaptain: false, age: 17, goals: 5, assists: 12, appearances: 14, image: 'https://picsum.photos/200/200?random=3', reviews: [], credits: 12, validUntil: '2023-12-31', leaveQuota: 3, leavesUsed: 2, rechargeHistory: [] }),
+  createMockPlayer({ id: '4', teamId: 't1', name: '格雷戈·科贝尔 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 1, position: Position.GK, isCaptain: false, age: 18, goals: 0, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=4', reviews: [], credits: 100, validUntil: getNextYear(), leaveQuota: 5, leavesUsed: 0, rechargeHistory: [] }),
+  createMockPlayer({ id: '5', teamId: 't2', name: '卡里姆·阿德耶米 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 27, position: Position.FWD, isCaptain: true, age: 16, goals: 15, assists: 4, appearances: 13, image: 'https://picsum.photos/200/200?random=5', reviews: [], credits: 0, validUntil: '2023-01-01', leaveQuota: 2, leavesUsed: 2, rechargeHistory: [] }),
+  createMockPlayer({ id: '6', teamId: 't2', name: '尼科·施洛特贝克 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 4, position: Position.DEF, isCaptain: false, age: 16, goals: 3, assists: 0, appearances: 14, image: 'https://picsum.photos/200/200?random=6', reviews: [], credits: 20, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [] }),
+  createMockPlayer({ id: '7', teamId: 't2', name: '埃姆雷·詹 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 23, position: Position.MID, isCaptain: false, age: 16, goals: 1, assists: 3, appearances: 12, image: 'https://picsum.photos/200/200?random=7', reviews: [], credits: 30, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [] }),
 ];
 
+// ... (rest of constants)
 export const MOCK_MATCHES: Match[] = [
   { id: '1', title: 'U19 青年联赛第5轮', opponent: '沙尔克04 U19', date: '2023-10-01', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', result: '4-1', status: 'Completed', competition: '联赛' },
   { id: '2', title: '国家德比青年版', opponent: '拜仁慕尼黑 U19', date: '2023-10-08', time: '11:00', location: 'Away', province: '广东省', city: '广州市', district: '天河区', result: '2-2', status: 'Completed', competition: '联赛' },

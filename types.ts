@@ -81,8 +81,6 @@ export interface Player {
   position: Position;
   isCaptain?: boolean;
   age: number;
-  height: number; // cm
-  weight: number; // kg
   goals: number;
   assists: number;
   appearances: number;
