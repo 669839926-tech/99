@@ -588,6 +588,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const galleryInputRef = useRef<HTMLInputElement>(null);
+    const profileImageInputRef = useRef<HTMLInputElement>(null);
     
     // NEW: Export Year State
     const [exportYear, setExportYear] = useState<number>(new Date().getFullYear());
@@ -786,6 +787,17 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     ...prev,
                     gallery: [newPhoto, ...(prev.gallery || [])]
                 }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditedPlayer(prev => ({ ...prev, image: reader.result as string }));
             };
             reader.readAsDataURL(file);
         }
@@ -1133,9 +1145,27 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                    {/* Left Col: Photo & Basic Info */}
                    <div className="w-full md:w-1/3 space-y-6">
                       <div className="flex flex-col items-center">
-                          <div className="relative">
+                          <div className="relative group">
                             <img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />
-                             <div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden">
+                             {isEditing && (
+                                <>
+                                    <div 
+                                        onClick={() => profileImageInputRef.current?.click()}
+                                        className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                                    >
+                                        <Upload className="w-6 h-6 text-white mb-1" />
+                                        <span className="text-[10px] text-white font-bold">更换头像</span>
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={profileImageInputRef} 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handleProfileImageChange}
+                                    />
+                                </>
+                             )}
+                             <div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">
                                 {isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}
                             </div>
                           </div>
