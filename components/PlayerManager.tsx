@@ -465,8 +465,8 @@ interface RechargeModalProps {
 }
 
 const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit }) => {
-    const [amount, setAmount] = useState(10);
-    const [quota, setQuota] = useState(0);
+    const [amount, setAmount] = useState<string>('10');
+    const [quota, setQuota] = useState<string>('0');
 
     if (!player) return null;
 
@@ -483,7 +483,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                             type="number" 
                             className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={amount}
-                            onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
+                            onChange={(e) => setAmount(e.target.value)}
                         />
                     </div>
                     <div>
@@ -492,7 +492,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                             type="number" 
                             className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={quota}
-                            onChange={(e) => setQuota(parseInt(e.target.value) || 0)}
+                            onChange={(e) => setQuota(e.target.value)}
                         />
                     </div>
                 </div>
@@ -500,7 +500,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                 <div className="flex justify-end gap-3 mt-6">
                     <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">取消</button>
                     <button 
-                        onClick={() => onSubmit(amount, quota)} 
+                        onClick={() => onSubmit(Number(amount) || 0, Number(quota) || 0)} 
                         className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800"
                     >
                         确认充值
@@ -518,8 +518,8 @@ interface BulkRechargeModalProps {
 }
 
 const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, onSubmit }) => {
-    const [amount, setAmount] = useState(10);
-    const [quota, setQuota] = useState(0);
+    const [amount, setAmount] = useState<string>('10');
+    const [quota, setQuota] = useState<string>('0');
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -534,7 +534,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
                             type="number" 
                             className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={amount}
-                            onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
+                            onChange={(e) => setAmount(e.target.value)}
                         />
                     </div>
                     <div>
@@ -543,7 +543,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
                             type="number" 
                             className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={quota}
-                            onChange={(e) => setQuota(parseInt(e.target.value) || 0)}
+                            onChange={(e) => setQuota(e.target.value)}
                         />
                     </div>
                 </div>
@@ -551,7 +551,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
                 <div className="flex justify-end gap-3 mt-6">
                     <button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">取消</button>
                     <button 
-                        onClick={() => onSubmit(amount, quota)} 
+                        onClick={() => onSubmit(Number(amount) || 0, Number(quota) || 0)} 
                         className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800"
                     >
                         确认批量充值
@@ -1270,7 +1270,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                    </div>
 
                    {/* Main Content Area */}
-                   <div className="flex-1 flex flex-col gap-8">
+                   <div className="flex-1 flex flex-col gap-5">
                        {/* A. Bio Row */}
                        <div className="flex gap-8 bg-gray-50 rounded-lg p-6 border border-gray-100 relative overflow-hidden">
                            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-bvb-yellow shadow-lg bg-white relative z-10 shrink-0">
@@ -1279,13 +1279,34 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            <div className="relative z-10 flex-1 flex flex-col justify-center">
                                <h2 className="text-3xl font-black text-gray-900 mb-1">{editedPlayer.name}</h2>
                                <p className="text-sm font-bold text-gray-500 mb-4 uppercase">#{editedPlayer.number} • {editedPlayer.position} • {teams.find(t => t.id === editedPlayer.teamId)?.name}</p>
-                               <div className="grid grid-cols-2 gap-4 text-sm w-full">
+                               <div className="grid grid-cols-4 gap-4 text-sm w-full">
                                    <div><span className="block text-gray-400 text-xs">年龄</span><span className="font-bold">{editedPlayer.age}岁</span></div>
+                                   <div><span className="block text-gray-400 text-xs">球龄</span><span className="font-bold">{calculateTenure(editedPlayer.joinDate) || '-'}</span></div>
+                                   <div><span className="block text-gray-400 text-xs">入队时间</span><span className="font-bold">{editedPlayer.joinDate || '-'}</span></div>
                                    <div><span className="block text-gray-400 text-xs">综合评分</span><span className="font-black text-bvb-yellow bg-black px-2 rounded">{getOverallRating(editedPlayer)}</span></div>
                                </div>
                            </div>
                            <div className="absolute top-0 right-0 w-64 h-64 bg-bvb-yellow/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
                        </div>
+
+                        {/* NEW: Match Stats Row */}
+                        <div className="grid grid-cols-3 gap-6">
+                            <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-bvb-yellow"></div>
+                                <span className="text-xs font-bold text-gray-400 uppercase mb-1">出场 (Apps)</span>
+                                <span className="text-3xl font-black text-gray-800">{editedPlayer.appearances}</span>
+                            </div>
+                            <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-black"></div>
+                                <span className="text-xs font-bold text-gray-400 uppercase mb-1">进球 (Goals)</span>
+                                <span className="text-3xl font-black text-gray-800">{editedPlayer.goals}</span>
+                            </div>
+                            <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gray-400"></div>
+                                <span className="text-xs font-bold text-gray-400 uppercase mb-1">助攻 (Assists)</span>
+                                <span className="text-3xl font-black text-gray-800">{editedPlayer.assists}</span>
+                            </div>
+                        </div>
 
                        {/* B. 4-Dimension Radar Charts */}
                        <div>
