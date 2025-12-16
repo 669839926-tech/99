@@ -1908,7 +1908,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                     </td>
                                     <td className="p-4 hidden sm:table-cell">
                                         <div className="text-xs">
-                                            <span className="font-bold">{player.age}岁</span>
+                                            <div className="font-bold">{player.age}岁</div>
+                                            <div className="text-[10px] text-gray-400 font-mono mt-0.5">{player.birthDate}</div>
                                         </div>
                                     </td>
                                     <td className="p-4">
@@ -2010,7 +2011,17 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             </div>
                             <div className="flex-1 flex flex-col justify-between py-0.5">
                                 <div className="flex justify-between items-start">
-                                    <div className="pr-2"><h3 className="font-bold text-gray-900 text-lg leading-tight line-clamp-1">{player.name}</h3><div className="flex flex-wrap items-center gap-1 mt-0.5"><span className={`text-[10px] font-bold px-1 rounded ${player.teamId === 'unassigned' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>{teamName}</span><span className="text-[10px] text-gray-400">#{player.number}</span></div></div>
+                                    <div className="pr-2">
+                                        <h3 className="font-bold text-gray-900 text-lg leading-tight line-clamp-1">{player.name}</h3>
+                                        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                                            <span className={`text-[10px] font-bold px-1 rounded ${player.teamId === 'unassigned' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>{teamName}</span>
+                                            <span className="text-[10px] text-gray-400">#{player.number}</span>
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 mt-1 font-mono flex items-center">
+                                            <CalendarIcon className="w-3 h-3 mr-1 opacity-70" />
+                                            {player.birthDate}
+                                        </div>
+                                    </div>
                                     <div className="flex flex-col items-end"><span className={`text-xl font-black ${parseFloat(overallRating) >= 8 ? 'text-green-500' : parseFloat(overallRating) >= 6 ? 'text-yellow-500' : 'text-gray-400'}`}>{overallRating}</span><span className="text-[9px] text-gray-300 uppercase font-bold">Rating</span></div>
                                 </div>
                                 <div className="mt-2 space-y-1">
