@@ -40,6 +40,29 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Permission check
   const isDirector = currentUser?.role === 'director';
+  const isCoach = currentUser?.role === 'coach';
+
+  // --- Filter Data for Coaches ---
+  const managedTeamIds = useMemo(() => {
+      if (isDirector) return teams.map(t => t.id);
+      return currentUser?.teamIds || [];
+  }, [isDirector, currentUser, teams]);
+
+  const displayTeams = useMemo(() => {
+      if (isDirector) return teams;
+      return teams.filter(t => managedTeamIds.includes(t.id));
+  }, [teams, isDirector, managedTeamIds]);
+
+  const displayPlayers = useMemo(() => {
+      if (isDirector) return players;
+      // Coaches only see players in their managed teams
+      return players.filter(p => managedTeamIds.includes(p.teamId));
+  }, [players, isDirector, managedTeamIds]);
+
+  const displayTrainings = useMemo(() => {
+      if (isDirector) return trainings;
+      return trainings.filter(t => managedTeamIds.includes(t.teamId));
+  }, [trainings, isDirector, managedTeamIds]);
 
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
@@ -96,13 +119,14 @@ const Dashboard: React.FC<DashboardProps> = ({
     const losses = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) < parseInt(m.result.split('-')[1])).length;
     const draws = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) === parseInt(m.result.split('-')[1])).length;
     
-    const sortedPlayers = [...players].sort((a, b) => b.goals - a.goals);
+    // Use displayPlayers for ranking
+    const sortedPlayers = [...displayPlayers].sort((a, b) => b.goals - a.goals);
 
-    // Birthday Logic
+    // Birthday Logic (Use displayPlayers)
     const today = new Date();
     today.setHours(0,0,0,0);
     
-    const upcomingBirthdays = players.filter(p => {
+    const upcomingBirthdays = displayPlayers.filter(p => {
         if (!p.birthDate) return false;
         const [y, m, d] = p.birthDate.split('-').map(Number);
         if(!y || !m || !d) return false;
@@ -125,47 +149,50 @@ const Dashboard: React.FC<DashboardProps> = ({
         return { ...p, daysUntil: diffDays };
     }).sort((a,b) => a.daysUntil - b.daysUntil);
 
-    // Low Credit Logic (<= 2 credits)
-    const lowCreditPlayers = players.filter(p => p.credits <= 2).sort((a,b) => a.credits - b.credits);
+    // Low Credit Logic (Use displayPlayers)
+    const lowCreditPlayers = displayPlayers.filter(p => p.credits <= 2).sort((a,b) => a.credits - b.credits);
     
-    // Team Counts Logic
-    const teamCounts = teams.map(t => ({
+    // Team Counts Logic (Use displayTeams and displayPlayers)
+    const teamCounts = displayTeams.map(t => ({
         id: t.id,
         name: t.name,
-        count: players.filter(p => p.teamId === t.id).length
+        count: displayPlayers.filter(p => p.teamId === t.id).length
     }));
-    const unassignedCount = players.filter(p => p.teamId === 'unassigned').length;
-    if (unassignedCount > 0) {
-        teamCounts.push({ id: 'unassigned', name: '待分配', count: unassignedCount });
+    // Only check unassigned if Director (or if coach has unassigned access, which current logic excludes for coaches)
+    if (isDirector) {
+        const unassignedCount = displayPlayers.filter(p => p.teamId === 'unassigned').length;
+        if (unassignedCount > 0) {
+            teamCounts.push({ id: 'unassigned', name: '待分配', count: unassignedCount });
+        }
     }
 
     return {
       wins, losses, draws,
       topScorer: sortedPlayers[0],
       nextMatch: matches.find(m => m.status === 'Upcoming'),
-      totalPlayers: players.length,
+      totalPlayers: displayPlayers.length,
       upcomingBirthdays,
       lowCreditPlayers,
       teamCounts
     };
-  }, [matches, players, teams]);
+  }, [matches, displayPlayers, displayTeams, isDirector]);
 
   // --- Attendance Analytics Logic ---
   const { chartData, averageRate, exportPlayersData, teamPlayersList } = useMemo(() => {
-    // 1. Filtered Sessions
+    // 1. Filtered Sessions (Use displayTrainings)
     const start = new Date(customStartDate);
     const end = new Date(customEndDate);
     end.setHours(23, 59, 59, 999);
 
-    const filteredSessions = (trainings || []).filter(s => {
+    const filteredSessions = (displayTrainings || []).filter(s => {
         const d = new Date(s.date);
         const matchDate = d >= start && d <= end;
         const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId;
         return matchDate && matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // 2. Filtered Players for Dropdown & Chart Context
-    const teamPlayers = players.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
+    // 2. Filtered Players for Dropdown & Chart Context (Use displayPlayers)
+    const teamPlayers = displayPlayers.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
 
     if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], teamPlayersList: teamPlayers };
 
@@ -184,7 +211,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              key = `${date.getMonth() + 1}月W${weekNum}`;
         }
         
-        const sessionTeamPlayersCount = players.filter(p => p.teamId === session.teamId).length;
+        const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
         const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
         const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
 
@@ -218,20 +245,20 @@ const Dashboard: React.FC<DashboardProps> = ({
         teamPlayersList: teamPlayers
     };
 
-  }, [trainings, players, attendanceRange, attendanceTeamId, customStartDate, customEndDate]);
+  }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate]);
 
   // --- Individual Player Export Data ---
   const individualReport = useMemo(() => {
       if (attendancePlayerId === 'all') return null;
       
-      const player = players.find(p => p.id === attendancePlayerId);
+      const player = displayPlayers.find(p => p.id === attendancePlayerId);
       if (!player) return null;
 
       const start = new Date(customStartDate);
       const end = new Date(customEndDate);
       end.setHours(23, 59, 59, 999);
 
-      const relevantSessions = trainings.filter(s => {
+      const relevantSessions = displayTrainings.filter(s => {
           const d = new Date(s.date);
           return d >= start && d <= end && s.teamId === player.teamId;
       }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Recent first
@@ -259,7 +286,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           sessions: sessionRecords,
           stats: { total: sessionRecords.length, present, leave, injury, absent, rate }
       };
-  }, [attendancePlayerId, trainings, players, customStartDate, customEndDate]);
+  }, [attendancePlayerId, displayTrainings, displayPlayers, customStartDate, customEndDate]);
 
   const playersStats = useMemo(() => {
       return exportPlayersData.slice(0, 5);
@@ -344,7 +371,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end bg-bvb-yellow rounded-2xl p-6 shadow-lg relative overflow-hidden">
            <div className="relative z-10">
               <h2 className="text-4xl font-black text-bvb-black uppercase tracking-tighter mb-2">俱乐部概览</h2>
-              <p className="text-bvb-black font-bold opacity-80">欢迎回来，{currentUser?.name || '教练'}。这是本周的球队状态报告。</p>
+              <p className="text-bvb-black font-bold opacity-80">欢迎回来，{currentUser?.name || '教练'}。这是{isCoach ? '您管理球队' : '本周'}的状态报告。</p>
            </div>
            <div className="relative z-10 mt-4 md:mt-0 flex gap-4 text-center">
                 <div className="bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-sm">
@@ -478,32 +505,34 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 </div>
 
-                {/* Low Credit Alert */}
-                <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
-                    <div className="flex justify-between items-center mb-3">
-                         <h3 className="font-bold flex items-center text-gray-800">
-                             <AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} />
-                             课时余额预警
-                         </h3>
-                         <span className={`text-xs font-bold px-2 py-0.5 rounded ${stats.lowCreditPlayers.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                             {stats.lowCreditPlayers.length} 人
-                         </span>
+                {/* Low Credit Alert - Hidden for Coaches */}
+                {isDirector && (
+                    <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="font-bold flex items-center text-gray-800">
+                                <AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} />
+                                课时余额预警
+                            </h3>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${stats.lowCreditPlayers.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                {stats.lowCreditPlayers.length} 人
+                            </span>
+                        </div>
+                        {stats.lowCreditPlayers.length > 0 ? (
+                            <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                                {stats.lowCreditPlayers.map(p => (
+                                    <div key={p.id} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm">
+                                        <span className="font-bold text-gray-700">{p.name}</span>
+                                        <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-4 text-gray-400 text-sm">
+                                目前所有球员课时充足
+                            </div>
+                        )}
                     </div>
-                    {stats.lowCreditPlayers.length > 0 ? (
-                        <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                            {stats.lowCreditPlayers.map(p => (
-                                <div key={p.id} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm">
-                                    <span className="font-bold text-gray-700">{p.name}</span>
-                                    <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-4 text-gray-400 text-sm">
-                            目前所有球员课时充足
-                        </div>
-                    )}
-                </div>
+                )}
 
                 {/* Birthday Alert */}
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-pink-500 p-4">
@@ -672,7 +701,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow"
                     >
                         <option value="all">所有梯队</option>
-                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {displayTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
 
                     <select 
@@ -712,7 +741,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <div><div className="text-xs text-gray-400 font-bold uppercase">出勤率</div><div className="text-2xl font-black text-gray-800">{individualReport.stats.rate}%</div></div>
                             <div><div className="text-xs text-gray-400 font-bold uppercase">训练课</div><div className="text-2xl font-black text-gray-800">{individualReport.stats.total}</div></div>
                             <div><div className="text-xs text-gray-400 font-bold uppercase">实到</div><div className="text-2xl font-black text-green-600">{individualReport.stats.present}</div></div>
-                            <div><div className="text-xs text-gray-400 font-bold uppercase">课时余额</div><div className={`text-2xl font-black ${individualReport.player.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{individualReport.player.credits}</div></div>
+                            {isDirector && (
+                                <div><div className="text-xs text-gray-400 font-bold uppercase">课时余额</div><div className={`text-2xl font-black ${individualReport.player.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{individualReport.player.credits}</div></div>
+                            )}
                         </div>
                     </div>
 
@@ -725,7 +756,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <th className="px-4 py-3">训练主题</th>
                                     <th className="px-4 py-3">重点</th>
                                     <th className="px-4 py-3 text-center">状态</th>
-                                    <th className="px-4 py-3 text-right">课时变动</th>
+                                    {isDirector && <th className="px-4 py-3 text-right">课时变动</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -743,12 +774,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 {s.status === 'Present' ? '实到' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤停' : '缺席'}
                                             </span>
                                         </td>
-                                        <td className={`px-4 py-3 text-right font-mono font-bold ${s.creditChange < 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                                            {s.creditChange}
-                                        </td>
+                                        {isDirector && (
+                                            <td className={`px-4 py-3 text-right font-mono font-bold ${s.creditChange < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                                {s.creditChange}
+                                            </td>
+                                        )}
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={5} className="text-center py-8 text-gray-400">该时段无训练记录</td></tr>
+                                    <tr><td colSpan={isDirector ? 5 : 4} className="text-center py-8 text-gray-400">该时段无训练记录</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -801,7 +834,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <th className="px-4 py-3 text-center">实到</th>
                                     <th className="px-4 py-3 text-center">请假</th>
                                     <th className="px-4 py-3 text-center">伤停</th>
-                                    <th className="px-4 py-3 text-right">课时余额</th>
+                                    {isDirector && <th className="px-4 py-3 text-right">课时余额</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -822,12 +855,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         <td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>
                                         <td className="px-4 py-3 text-center text-yellow-600">{p.leave}</td>
                                         <td className="px-4 py-3 text-center text-red-500">{p.injury}</td>
-                                        <td className={`px-4 py-3 text-right font-black font-mono ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
-                                            {p.credits}
-                                        </td>
+                                        {isDirector && (
+                                            <td className={`px-4 py-3 text-right font-black font-mono ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
+                                                {p.credits}
+                                            </td>
+                                        )}
                                     </tr>
                                 ))}
-                                {exportPlayersData.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400">无数据</td></tr>}
+                                {exportPlayersData.length === 0 && <tr><td colSpan={isDirector ? 6 : 5} className="text-center py-8 text-gray-400">无数据</td></tr>}
                             </tbody>
                         </table>
                     </div>
@@ -857,7 +892,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                  <th className="p-3 font-black text-sm uppercase text-center">出勤率</th>
                  <th className="p-3 font-black text-sm uppercase text-center">实到次数</th>
                  <th className="p-3 font-black text-sm uppercase text-center">请假次数</th>
-                 <th className="p-3 font-black text-sm uppercase text-right">剩余课时</th>
+                 {isDirector && <th className="p-3 font-black text-sm uppercase text-right">剩余课时</th>}
               </tr>
             </thead>
             <tbody>
@@ -870,7 +905,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <td className="p-3 text-center">{p.rate}%</td>
                         <td className="p-3 text-center">{p.present}</td>
                         <td className="p-3 text-center">{p.leave}</td>
-                        <td className="p-3 text-right font-mono font-bold">{p.credits}</td>
+                        {isDirector && <td className="p-3 text-right font-mono font-bold">{p.credits}</td>}
                      </tr>
                  );
               })}
@@ -890,7 +925,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                      <p className="text-xl text-gray-500 font-bold mt-1">个人训练考勤详单</p>
                  </div>
                  <div className="text-right">
-                     <div className="text-2xl font-black">课时余额: {individualReport.player.credits}</div>
+                     {isDirector && <div className="text-2xl font-black">课时余额: {individualReport.player.credits}</div>}
                      <div className="text-sm font-bold text-gray-400 uppercase">{customStartDate} ~ {customEndDate}</div>
                  </div>
               </div>
@@ -906,7 +941,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                      <th className="p-3 font-black text-sm uppercase">日期</th>
                      <th className="p-3 font-black text-sm uppercase">训练内容</th>
                      <th className="p-3 font-black text-sm uppercase text-center">状态</th>
-                     <th className="p-3 font-black text-sm uppercase text-right">课时扣除</th>
+                     {isDirector && <th className="p-3 font-black text-sm uppercase text-right">课时扣除</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -918,7 +953,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <div className="text-xs text-gray-500">{s.focus}</div>
                             </td>
                             <td className="p-3 text-center">{s.status === 'Present' ? '实到' : s.status}</td>
-                            <td className="p-3 text-right font-mono">{s.creditChange}</td>
+                            {isDirector && <td className="p-3 text-right font-mono">{s.creditChange}</td>}
                          </tr>
                   ))}
                 </tbody>
