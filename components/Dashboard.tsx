@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -234,7 +234,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const relevantSessions = trainings.filter(s => {
           const d = new Date(s.date);
           return d >= start && d <= end && s.teamId === player.teamId;
-      }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Recent first
 
       const sessionRecords = relevantSessions.map(s => {
           const record = s.attendance?.find(r => r.playerId === player.id);
@@ -243,7 +243,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               date: s.date,
               title: s.title,
               focus: s.focus,
-              status: record?.status || 'Absent'
+              status: record?.status || 'Absent',
+              creditChange: (record?.status === 'Present') ? -1 : 0
           };
       });
 
@@ -642,10 +643,289 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
         </div>
         
-        {/* Attendance Analytics Section ... (unchanged) */}
-        {/* ... */}
+        {/* Attendance Analysis Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-gray-100 pb-4">
+                <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                    <Activity className="w-6 h-6 mr-2 text-bvb-yellow" />
+                    训练出勤与课时分析
+                </h3>
+                {/* Filters */}
+                <div className="flex flex-wrap gap-2 items-center justify-end">
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button onClick={() => handleRangeChange('month')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'month' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>近1月</button>
+                        <button onClick={() => handleRangeChange('quarter')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'quarter' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>本季度</button>
+                        <button onClick={() => handleRangeChange('custom')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'custom' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>自定义</button>
+                    </div>
+                    
+                    {attendanceRange === 'custom' && (
+                        <div className="flex gap-1 items-center bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                            <input type="date" className="text-xs bg-transparent outline-none font-bold text-gray-600" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} />
+                            <span className="text-gray-400">-</span>
+                            <input type="date" className="text-xs bg-transparent outline-none font-bold text-gray-600" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
+                        </div>
+                    )}
+
+                    <select 
+                        value={attendanceTeamId}
+                        onChange={e => setAttendanceTeamId(e.target.value)}
+                        className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow"
+                    >
+                        <option value="all">所有梯队</option>
+                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+
+                    <select 
+                        value={attendancePlayerId}
+                        onChange={e => setAttendancePlayerId(e.target.value)}
+                        className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[120px]"
+                    >
+                        <option value="all">全体球员</option>
+                        {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+
+                    <button 
+                        onClick={handleExportPDF} 
+                        disabled={isExporting}
+                        className="p-2 bg-gray-800 text-bvb-yellow rounded-lg hover:bg-gray-700 transition-colors"
+                        title="导出报表"
+                    >
+                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
+                    </button>
+                </div>
+            </div>
+
+            {/* Conditional Content: Individual OR Overview */}
+            {attendancePlayerId !== 'all' && individualReport ? (
+                /* --- Individual View --- */
+                <div className="space-y-6 animate-in fade-in">
+                    {/* Header Card */}
+                    <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center border border-gray-100">
+                        <div className="flex items-center gap-4">
+                            <img src={individualReport.player.image} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
+                            <div>
+                                <h3 className="text-lg font-black text-gray-800">{individualReport.player.name}</h3>
+                                <p className="text-xs text-gray-500">#{individualReport.player.number} • {individualReport.player.position}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-4 text-center">
+                            <div><div className="text-xs text-gray-400 font-bold uppercase">出勤率</div><div className="text-2xl font-black text-gray-800">{individualReport.stats.rate}%</div></div>
+                            <div><div className="text-xs text-gray-400 font-bold uppercase">训练课</div><div className="text-2xl font-black text-gray-800">{individualReport.stats.total}</div></div>
+                            <div><div className="text-xs text-gray-400 font-bold uppercase">实到</div><div className="text-2xl font-black text-green-600">{individualReport.stats.present}</div></div>
+                            <div><div className="text-xs text-gray-400 font-bold uppercase">课时余额</div><div className={`text-2xl font-black ${individualReport.player.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{individualReport.player.credits}</div></div>
+                        </div>
+                    </div>
+
+                    {/* Detailed Session Table */}
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase">
+                                <tr>
+                                    <th className="px-4 py-3">日期</th>
+                                    <th className="px-4 py-3">训练主题</th>
+                                    <th className="px-4 py-3">重点</th>
+                                    <th className="px-4 py-3 text-center">状态</th>
+                                    <th className="px-4 py-3 text-right">课时变动</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {individualReport.sessions.length > 0 ? individualReport.sessions.map(s => (
+                                    <tr key={s.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-mono text-xs">{s.date}</td>
+                                        <td className="px-4 py-3 font-bold">{s.title}</td>
+                                        <td className="px-4 py-3 text-xs text-gray-500">{s.focus}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                s.status === 'Present' ? 'bg-green-100 text-green-700' :
+                                                s.status === 'Leave' ? 'bg-yellow-100 text-yellow-700' :
+                                                s.status === 'Injury' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
+                                            }`}>
+                                                {s.status === 'Present' ? '实到' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤停' : '缺席'}
+                                            </span>
+                                        </td>
+                                        <td className={`px-4 py-3 text-right font-mono font-bold ${s.creditChange < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {s.creditChange}
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr><td colSpan={5} className="text-center py-8 text-gray-400">该时段无训练记录</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            ) : (
+                /* --- Overview View --- */
+                <div className="space-y-6">
+                    {/* Chart */}
+                    <div className="h-64 w-full">
+                        {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} unit="%" />
+                                    <Tooltip 
+                                        cursor={{ fill: '#f9fafb' }} 
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} barSize={20} name="出勤率" />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
+                                暂无出勤数据
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Team Stats Summary */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
+                            <span className="text-xs text-gray-400 font-bold uppercase">区间平均出勤率</span>
+                            <div className="text-2xl font-black text-gray-800">{averageRate}%</div>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
+                            <span className="text-xs text-gray-400 font-bold uppercase">统计训练场次</span>
+                            <div className="text-2xl font-black text-gray-800">{chartData.reduce((acc, curr) => acc + (curr as any).rate > 0 ? 1 : 0, 0)} <span className="text-xs font-normal">周/次</span></div>
+                        </div>
+                    </div>
+
+                    {/* Players Table */}
+                    <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-4 py-3">球员</th>
+                                    <th className="px-4 py-3">出勤率</th>
+                                    <th className="px-4 py-3 text-center">实到</th>
+                                    <th className="px-4 py-3 text-center">请假</th>
+                                    <th className="px-4 py-3 text-center">伤停</th>
+                                    <th className="px-4 py-3 text-right">课时余额</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {exportPlayersData.map(p => (
+                                    <tr key={p.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-bold flex items-center">
+                                            <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: p.rate >= 90 ? '#16a34a' : p.rate >= 75 ? '#eab308' : '#ef4444' }}></div>
+                                            {p.name}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div>
+                                                </div>
+                                                <span className="text-xs font-mono">{p.rate}%</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>
+                                        <td className="px-4 py-3 text-center text-yellow-600">{p.leave}</td>
+                                        <td className="px-4 py-3 text-center text-red-500">{p.injury}</td>
+                                        <td className={`px-4 py-3 text-right font-black font-mono ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
+                                            {p.credits}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {exportPlayersData.length === 0 && <tr><td colSpan={6} className="text-center py-8 text-gray-400">无数据</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+        </div>
+
       </div>
-      {/* ... Exports ... */}
+      
+      {/* Hidden Export Templates */}
+      <div id="attendance-report-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
+          <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
+             <div>
+                 <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
+                 <p className="text-xl text-gray-500 font-bold mt-1">训练出勤与课时统计</p>
+             </div>
+             <div className="text-right">
+                 <div className="text-sm font-bold text-gray-400 uppercase">统计周期</div>
+                 <div className="text-xl font-black">{customStartDate} ~ {customEndDate}</div>
+             </div>
+          </div>
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-100 border-b-2 border-gray-300">
+              <tr>
+                 <th className="p-3 font-black text-sm uppercase">球员姓名</th>
+                 <th className="p-3 font-black text-sm uppercase">所属梯队</th>
+                 <th className="p-3 font-black text-sm uppercase text-center">出勤率</th>
+                 <th className="p-3 font-black text-sm uppercase text-center">实到次数</th>
+                 <th className="p-3 font-black text-sm uppercase text-center">请假次数</th>
+                 <th className="p-3 font-black text-sm uppercase text-right">剩余课时</th>
+              </tr>
+            </thead>
+            <tbody>
+              {exportPlayersData.map((p, idx) => {
+                 const teamName = teams.find(t => t.id === p.teamId)?.name || '未知';
+                 return (
+                     <tr key={p.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                        <td className="p-3 font-bold">{p.name}</td>
+                        <td className="p-3 text-gray-600">{teamName}</td>
+                        <td className="p-3 text-center">{p.rate}%</td>
+                        <td className="p-3 text-center">{p.present}</td>
+                        <td className="p-3 text-center">{p.leave}</td>
+                        <td className="p-3 text-right font-mono font-bold">{p.credits}</td>
+                     </tr>
+                 );
+              })}
+            </tbody>
+          </table>
+          <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 flex justify-between">
+              <span>生成日期: {new Date().toLocaleDateString()}</span>
+              <span>CONFIDENTIAL INTERNAL REPORT</span>
+          </div>
+      </div>
+
+      {individualReport && (
+          <div id="individual-attendance-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
+              <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
+                 <div>
+                     <h1 className="text-4xl font-black uppercase tracking-tighter">{individualReport.player.name}</h1>
+                     <p className="text-xl text-gray-500 font-bold mt-1">个人训练考勤详单</p>
+                 </div>
+                 <div className="text-right">
+                     <div className="text-2xl font-black">课时余额: {individualReport.player.credits}</div>
+                     <div className="text-sm font-bold text-gray-400 uppercase">{customStartDate} ~ {customEndDate}</div>
+                 </div>
+              </div>
+              <div className="grid grid-cols-4 gap-4 mb-8 bg-gray-50 p-4 rounded border border-gray-200">
+                  <div className="text-center"><div className="text-sm text-gray-500">总课次</div><div className="text-xl font-black">{individualReport.stats.total}</div></div>
+                  <div className="text-center"><div className="text-sm text-gray-500">实到</div><div className="text-xl font-black">{individualReport.stats.present}</div></div>
+                  <div className="text-center"><div className="text-sm text-gray-500">请假</div><div className="text-xl font-black">{individualReport.stats.leave}</div></div>
+                  <div className="text-center"><div className="text-sm text-gray-500">出勤率</div><div className="text-xl font-black">{individualReport.stats.rate}%</div></div>
+              </div>
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-gray-100 border-b-2 border-gray-300">
+                  <tr>
+                     <th className="p-3 font-black text-sm uppercase">日期</th>
+                     <th className="p-3 font-black text-sm uppercase">训练内容</th>
+                     <th className="p-3 font-black text-sm uppercase text-center">状态</th>
+                     <th className="p-3 font-black text-sm uppercase text-right">课时扣除</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {individualReport.sessions.map((s, idx) => (
+                         <tr key={s.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                            <td className="p-3 font-mono">{s.date}</td>
+                            <td className="p-3">
+                                <div className="font-bold">{s.title}</div>
+                                <div className="text-xs text-gray-500">{s.focus}</div>
+                            </td>
+                            <td className="p-3 text-center">{s.status === 'Present' ? '实到' : s.status}</td>
+                            <td className="p-3 text-right font-mono">{s.creditChange}</td>
+                         </tr>
+                  ))}
+                </tbody>
+              </table>
+          </div>
+      )}
+
     </div>
   );
 };

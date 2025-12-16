@@ -46,7 +46,9 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
     // --- Log / Feedback State ---
     const [coachFeedback, setCoachFeedback] = useState(session.coachFeedback || '');
     const [directorReview, setDirectorReview] = useState(session.directorReview || '');
-    const [logStatus, setLogStatus] = useState(session.submissionStatus || 'Planned');
+    
+    // Fix: Explicitly type the state to allow specific string literals
+    const [logStatus, setLogStatus] = useState<'Planned' | 'Submitted' | 'Reviewed'>(session.submissionStatus || 'Planned');
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
     // Sync logStatus from props if it changes externally (e.g. approved by another user, though rare in this session)
@@ -67,7 +69,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
             setSaveStatus('saving');
             
             // Construct update object
-            const updatedSession = {
+            const updatedSession: TrainingSession = {
                 ...session,
                 attendance: localAttendance,
                 coachFeedback,
@@ -111,15 +113,22 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
 
     // Explicit Save (forces immediate update)
     const handleForceSave = () => {
-        onUpdate({ ...session, attendance: localAttendance, coachFeedback, directorReview, submissionStatus: logStatus }, localAttendance);
+        const updatedSession: TrainingSession = { 
+            ...session, 
+            attendance: localAttendance, 
+            coachFeedback, 
+            directorReview, 
+            submissionStatus: logStatus 
+        };
+        onUpdate(updatedSession, localAttendance);
         setSaveStatus('saved');
     };
 
     const handleSubmitLog = () => {
-        const newStatus = 'Submitted';
+        const newStatus: 'Submitted' = 'Submitted';
         setLogStatus(newStatus);
         // Force immediate update for status change
-        const updatedSession = { 
+        const updatedSession: TrainingSession = { 
             ...session, 
             attendance: localAttendance,
             coachFeedback, 
@@ -131,9 +140,9 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
     };
 
     const handleDirectorApprove = () => {
-        const newStatus = 'Reviewed';
+        const newStatus: 'Reviewed' = 'Reviewed';
         setLogStatus(newStatus);
-        const updatedSession = {
+        const updatedSession: TrainingSession = {
             ...session,
             attendance: localAttendance,
             coachFeedback,

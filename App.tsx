@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import PlayerManager from './components/PlayerManager';
@@ -35,6 +35,28 @@ function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const isFirstRun = useRef(true);
 
+  // Derived Players: Calculate Credits on the fly to ensure consistency
+  // Credits = Sum of all Recharges - Count of 'Present' in Training Sessions
+  const derivedPlayers = useMemo(() => {
+      return players.map(p => {
+          let balance = 0;
+          // Add Recharges
+          if (p.rechargeHistory) {
+              balance += p.rechargeHistory.reduce((sum, r) => sum + r.amount, 0);
+          }
+          
+          // Deduct Attendance (Present only)
+          trainings.forEach(t => {
+              const record = t.attendance?.find(r => r.playerId === p.id);
+              if (record && record.status === 'Present') {
+                  balance -= 1;
+              }
+          });
+          
+          return { ...p, credits: balance };
+      });
+  }, [players, trainings]);
+
   // 1. Load Data on Mount
   useEffect(() => {
     const init = async () => {
@@ -47,8 +69,6 @@ function App() {
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
-            // In a real app, users would also be loaded from DB. 
-            // For this demo, we use initial mock users or could persist them too if schema allows.
         }
         setIsInitializing(false);
     };
@@ -67,7 +87,7 @@ function App() {
         setIsSyncing(true);
         try {
             await saveDataToCloud({
-                players,
+                players, // Save raw players state
                 teams,
                 matches,
                 trainings,
@@ -201,6 +221,7 @@ function App() {
   };
 
   // --- Recharge / Credit Logic ---
+  // No longer manual credit update, just history
   const handleRechargePlayer = (playerId: string, amount: number, leaveQuota: number) => {
     const today = new Date();
     today.setFullYear(today.getFullYear() + 1);
@@ -218,7 +239,7 @@ function App() {
 
             return {
                 ...p,
-                credits: (p.credits || 0) + amount,
+                // credits: removed (calculated)
                 validUntil: nextYearStr,
                 leaveQuota: leaveQuota,
                 leavesUsed: 0, // Reset leaves on new recharge cycle
@@ -246,7 +267,7 @@ function App() {
 
             return {
                 ...p,
-                credits: (p.credits || 0) + amount,
+                // credits: removed (calculated)
                 validUntil: nextYearStr,
                 leaveQuota: leaveQuota,
                 leavesUsed: 0, // Reset leaves on new recharge cycle
@@ -262,12 +283,9 @@ function App() {
 
       setPlayers(prev => prev.map(p => {
           if (p.id === playerId) {
-              const record = p.rechargeHistory?.find(r => r.id === rechargeId);
-              if (!record) return p;
-              
               return {
                   ...p,
-                  credits: (p.credits || 0) - record.amount,
+                  // credits: removed (calculated from filtered history)
                   rechargeHistory: p.rechargeHistory.filter(r => r.id !== rechargeId)
               };
           }
@@ -286,6 +304,10 @@ function App() {
   };
 
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => {
+      // Logic for updating player credits based on attendance is now handled by derivedPlayers calculation.
+      // We only need to update leave counts if we want to track them persistently in state, 
+      // but for simplicity and consistency, let's update leavesUsed only.
+      
       const oldSession = trainings.find(t => t.id === session.id);
       const oldAttendance = oldSession?.attendance || [];
 
@@ -299,26 +321,18 @@ function App() {
               }
           };
 
-          // Revert old effects
+          // Revert old leave usage
           oldAttendance.forEach(record => {
-              if (record.status === 'Present') {
-                  modifyPlayer(record.playerId, p => ({ ...p, credits: p.credits + 1 }));
-              } else if (record.status === 'Leave') {
-                  // Only decrease leave count, do not refund credit (as leave no longer deducts)
+              if (record.status === 'Leave') {
                   modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: Math.max(0, p.leavesUsed - 1) }));
               }
           });
 
-          // Apply new effects
+          // Apply new leave usage
           newAttendance.forEach(record => {
-              if (record.status === 'Present') {
-                  // Present: Deduct 1 credit
-                  modifyPlayer(record.playerId, p => ({ ...p, credits: p.credits - 1 }));
-              } else if (record.status === 'Leave') {
-                  // Leave: No credit deduction, just track count
+              if (record.status === 'Leave') {
                   modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: p.leavesUsed + 1 }));
               }
-              // Injury & Absent: No credit deduction, no leave count change
           });
 
           return updatedPlayers;
@@ -344,12 +358,12 @@ function App() {
 
   // 1. Not Logged In -> Show Login
   if (!currentUser) {
-    return <Login users={users} players={players} onLogin={handleLogin} appLogo={appLogo} />;
+    return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
   }
 
   // 2. Parent Login -> Show dedicated Parent Portal
   if (currentUser.role === 'parent' && currentUser.playerId) {
-    const childPlayer = players.find(p => p.id === currentUser.playerId);
+    const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
     if (!childPlayer) return <div>Error: Player not found</div>;
     const childTeam = teams.find(t => t.id === childPlayer.teamId);
 
@@ -370,7 +384,7 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard 
-                  players={players} 
+                  players={derivedPlayers} 
                   matches={matches} 
                   trainings={trainings} 
                   teams={teams} 
@@ -386,7 +400,7 @@ function App() {
         return (
           <PlayerManager 
             teams={teams}
-            players={players} 
+            players={derivedPlayers} 
             trainings={trainings} 
             attributeConfig={attributeConfig}
             currentUser={currentUser}
@@ -394,7 +408,6 @@ function App() {
             onBulkAddPlayers={handleBulkAddPlayers}
             onAddTeam={handleAddTeam}
             onDeleteTeam={(teamId) => {
-                // Delete Team Logic
                 if (confirm('确定要删除这支球队吗？删除后该队球员将自动转入“待分配”列表，不会被删除。')) {
                     setTeams(prev => prev.filter(t => t.id !== teamId));
                     setPlayers(prev => prev.map(p => p.teamId === teamId ? { ...p, teamId: 'unassigned' } : p));
@@ -416,7 +429,7 @@ function App() {
         return (
           <TrainingPlanner 
             teams={teams}
-            players={players}
+            players={derivedPlayers}
             trainings={trainings} 
             drillLibrary={attributeConfig.drillLibrary}
             currentUser={currentUser}
@@ -431,7 +444,7 @@ function App() {
         return (
             <MatchPlanner 
                 matches={matches} 
-                players={players}
+                players={derivedPlayers}
                 teams={teams}
                 onAddMatch={handleAddMatch}
                 onDeleteMatch={handleDeleteMatch}
@@ -454,7 +467,7 @@ function App() {
                />;
       default:
         return <Dashboard 
-                  players={players} 
+                  players={derivedPlayers} 
                   matches={matches} 
                   trainings={trainings} 
                   teams={teams} 
@@ -465,7 +478,6 @@ function App() {
     }
   };
 
-  // Determine if there are new announcements today to show a badge in Layout
   const hasNewAnnouncements = announcements.some(a => a.date === new Date().toISOString().split('T')[0]);
 
   return (

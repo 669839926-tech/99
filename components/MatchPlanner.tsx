@@ -13,11 +13,12 @@ interface MatchPlannerProps {
   onAddMatch: (match: Match) => void;
   onDeleteMatch: (id: string) => void;
   onUpdateMatch: (match: Match) => void;
+  appLogo?: string;
 }
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
 
-const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, onAddMatch, onDeleteMatch, onUpdateMatch }) => {
+const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, onAddMatch, onDeleteMatch, onUpdateMatch, appLogo }) => {
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
   const [strategy, setStrategy] = useState<string>('');
   const [loading, setLoading] = useState(false);
