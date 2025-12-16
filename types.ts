@@ -205,6 +205,6 @@ export interface User {
   password?: string; // For login
   name: string;
   role: UserRole;
-  teamId?: string; // For coaches, which team they manage
+  teamIds?: string[]; // Updated: Supports multiple teams for coaches
   playerId?: string; // For parents, which player they view
 }

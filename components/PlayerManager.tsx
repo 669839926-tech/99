@@ -1478,7 +1478,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const isCoach = currentUser?.role === 'coach';
   
   const availableTeams = isCoach 
-    ? teams.filter(t => t.id === currentUser?.teamId) 
+    ? teams.filter(t => currentUser?.teamIds?.includes(t.id)) 
     : teams;
 
   const [selectedTeamId, setSelectedTeamId] = useState<string>('');
@@ -1505,11 +1505,13 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
   // Handle Team Selection Logic
   useEffect(() => {
-    // 1. If Coach, force to their team
-    if (isCoach && currentUser?.teamId) {
-        setSelectedTeamId(currentUser.teamId);
+    // 1. If Coach, force to one of their teams if not selected or invalid
+    if (isCoach && currentUser?.teamIds && currentUser.teamIds.length > 0) {
+        if (!selectedTeamId || !currentUser.teamIds.includes(selectedTeamId)) {
+             setSelectedTeamId(currentUser.teamIds[0]);
+        }
         return;
-    } 
+    }
     
     // 2. If Director, and current selection is invalid (deleted team), fallback
     const teamExists = teams.some(t => t.id === selectedTeamId);

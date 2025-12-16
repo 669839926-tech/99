@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { AttributeConfig, AttributeCategory, User } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload } from 'lucide-react';
+import { AttributeConfig, AttributeCategory, User, Team } from '../types';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -14,6 +14,7 @@ interface SettingsProps {
   onUpdateUserPassword: (userId: string, newPass: string) => void;
   appLogo?: string;
   onUpdateAppLogo?: (newLogo: string) => void;
+  teams?: Team[]; // Passed from App for selection
 }
 
 const Settings: React.FC<SettingsProps> = ({ 
@@ -26,7 +27,8 @@ const Settings: React.FC<SettingsProps> = ({
     onResetUserPassword,
     onUpdateUserPassword,
     appLogo,
-    onUpdateAppLogo
+    onUpdateAppLogo,
+    teams = []
 }) => {
   const isDirector = currentUser?.role === 'director';
 
@@ -38,7 +40,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [newItemName, setNewItemName] = useState('');
 
   // User Management State (New User Form)
-  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach' });
+  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [] });
 
   // Change Password State
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
@@ -84,9 +86,20 @@ const Settings: React.FC<SettingsProps> = ({
           } as User;
           
           onAddUser(user);
-          setNewUser({ username: '', name: '', role: 'coach' });
+          setNewUser({ username: '', name: '', role: 'coach', teamIds: [] });
           alert(`用户 ${user.name} 已创建，默认密码为 123`);
       }
+  };
+
+  const toggleTeamSelection = (teamId: string) => {
+      setNewUser(prev => {
+          const currentIds = prev.teamIds || [];
+          if (currentIds.includes(teamId)) {
+              return { ...prev, teamIds: currentIds.filter(id => id !== teamId) };
+          } else {
+              return { ...prev, teamIds: [...currentIds, teamId] };
+          }
+      });
   };
 
   const handleDeleteUserClick = (id: string) => {
@@ -325,57 +338,110 @@ const Settings: React.FC<SettingsProps> = ({
                 {/* Add User Form */}
                 <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
                     <h4 className="font-bold text-sm text-gray-700 mb-3">新增用户</h4>
-                    <form onSubmit={handleCreateUser} className="grid grid-cols-4 gap-3">
-                        <input 
-                            placeholder="用户名" 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.username}
-                            onChange={e => setNewUser({...newUser, username: e.target.value})}
-                        />
-                         <input 
-                            placeholder="显示名称" 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.name}
-                            onChange={e => setNewUser({...newUser, name: e.target.value})}
-                        />
-                         <select 
-                            className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                            value={newUser.role}
-                            onChange={e => setNewUser({...newUser, role: e.target.value as any})}
-                        >
-                            <option value="coach">教练员</option>
-                            <option value="director">青训总监</option>
-                        </select>
-                        <button className="bg-bvb-black text-white font-bold rounded hover:bg-gray-800">
-                            添加
-                        </button>
+                    <form onSubmit={handleCreateUser} className="space-y-4">
+                        <div className="grid grid-cols-3 gap-3">
+                            <input 
+                                placeholder="用户名" 
+                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm"
+                                value={newUser.username}
+                                onChange={e => setNewUser({...newUser, username: e.target.value})}
+                                required
+                            />
+                            <input 
+                                placeholder="显示名称" 
+                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm"
+                                value={newUser.name}
+                                onChange={e => setNewUser({...newUser, name: e.target.value})}
+                                required
+                            />
+                            <select 
+                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm"
+                                value={newUser.role}
+                                onChange={e => setNewUser({...newUser, role: e.target.value as any})}
+                            >
+                                <option value="coach">教练员</option>
+                                <option value="director">青训总监</option>
+                            </select>
+                        </div>
+
+                        {/* Team Selection for Coaches */}
+                        {newUser.role === 'coach' && (
+                            <div className="bg-white p-3 rounded border border-gray-200">
+                                <span className="block text-xs font-bold text-gray-400 uppercase mb-2">负责梯队 (可多选)</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {teams.map(t => {
+                                        const isSelected = newUser.teamIds?.includes(t.id);
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={t.id}
+                                                onClick={() => toggleTeamSelection(t.id)}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center ${
+                                                    isSelected 
+                                                    ? 'bg-bvb-yellow border-bvb-yellow text-bvb-black' 
+                                                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-bvb-yellow'
+                                                }`}
+                                            >
+                                                {isSelected && <CheckCircle className="w-3 h-3 mr-1" />}
+                                                {t.name}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end">
+                            <button className="bg-bvb-black text-white font-bold rounded px-4 py-2 hover:bg-gray-800 text-sm">
+                                添加用户
+                            </button>
+                        </div>
                     </form>
-                    <p className="text-[10px] text-gray-400 mt-2 flex items-center">
+                    <p className="text-[10px] text-gray-400 mt-2 flex items-center border-t pt-2 border-gray-200">
                         * 默认初始密码为 <span className="font-mono bg-gray-200 px-1 rounded ml-1 text-gray-600">123</span>，请提醒用户登录后尽快修改。
                     </p>
                 </div>
 
                 {/* User List */}
                 <div className="space-y-2">
-                    <div className="grid grid-cols-4 text-xs font-bold text-gray-400 uppercase px-4 py-2 bg-gray-50 border border-gray-100 rounded-t-lg">
-                        <div>用户名</div>
-                        <div>姓名</div>
-                        <div>角色</div>
-                        <div className="text-right">操作</div>
+                    <div className="grid grid-cols-5 text-xs font-bold text-gray-400 uppercase px-4 py-2 bg-gray-50 border border-gray-100 rounded-t-lg">
+                        <div className="col-span-1">用户名</div>
+                        <div className="col-span-1">姓名</div>
+                        <div className="col-span-1">角色</div>
+                        <div className="col-span-1">管理梯队</div>
+                        <div className="col-span-1 text-right">操作</div>
                     </div>
                     {users.map(u => (
-                        <div key={u.id} className="grid grid-cols-4 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50">
-                            <div className="font-mono text-sm">{u.username}</div>
-                            <div className="font-bold text-sm text-gray-800 flex items-center">
+                        <div key={u.id} className="grid grid-cols-5 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50">
+                            <div className="col-span-1 font-mono text-sm">{u.username}</div>
+                            <div className="col-span-1 font-bold text-sm text-gray-800 flex items-center">
                                 {u.name}
                                 {u.id === currentUser?.id && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded">Me</span>}
                             </div>
-                            <div>
+                            <div className="col-span-1">
                                 <span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                     {u.role === 'director' ? '总监' : '教练'}
                                 </span>
                             </div>
-                            <div className="text-right flex justify-end gap-2">
+                            <div className="col-span-1 flex flex-wrap gap-1">
+                                {u.role === 'director' ? (
+                                    <span className="text-xs text-gray-400 italic">全部权限</span>
+                                ) : (
+                                    u.teamIds && u.teamIds.length > 0 ? (
+                                        u.teamIds.map(tid => {
+                                            const t = teams.find(team => team.id === tid);
+                                            return t ? (
+                                                <span key={tid} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 rounded border border-gray-200">
+                                                    {t.name}
+                                                </span>
+                                            ) : null;
+                                        })
+                                    ) : (
+                                        <span className="text-xs text-gray-400 italic">未分配</span>
+                                    )
+                                )}
+                            </div>
+                            <div className="col-span-1 text-right flex justify-end gap-2">
                                 {/* Can't delete self */}
                                 {u.id !== currentUser?.id && (
                                     <>
