@@ -437,7 +437,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   // --- Statistics & Filtering Logic ---
   const { filteredSessions, dateLabel, statsData } = useMemo(() => {
-      // ... same logic
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
       
@@ -478,6 +477,23 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       return { filteredSessions: sessions, dateLabel: label, statsData: chartData };
   }, [currentDate, timeScope, trainings]);
 
+  // --- Date Navigation Logic ---
+  const handlePrevPeriod = () => {
+        const d = new Date(currentDate);
+        if (timeScope === 'month') d.setMonth(d.getMonth() - 1);
+        else if (timeScope === 'quarter') d.setMonth(d.getMonth() - 3);
+        else d.setFullYear(d.getFullYear() - 1);
+        setCurrentDate(d);
+  };
+
+  const handleNextPeriod = () => {
+        const d = new Date(currentDate);
+        if (timeScope === 'month') d.setMonth(d.getMonth() + 1);
+        else if (timeScope === 'quarter') d.setMonth(d.getMonth() + 3);
+        else d.setFullYear(d.getFullYear() + 1);
+        setCurrentDate(d);
+  };
+
   // --- Import Design Logic ---
   const handleImportDesign = (design: DrillDesign) => {
       setFormData(prev => ({
@@ -491,17 +507,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       setShowDesignSelectModal(false);
   };
 
-  // --- View Rendering Logic ---
-  const renderCalendar = () => {
-      // ... same implementation as before
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
+  // --- Reusable Month Grid Renderer ---
+  const renderMonthGrid = (year: number, month: number, isCompact: boolean) => {
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const startDay = new Date(year, month, 1).getDay(); // 0 = Sun
       
       const days = [];
       for (let i = 0; i < startDay; i++) {
-          days.push(<div key={`empty-${i}`} className="h-24 md:h-32 bg-gray-50/50 border-r border-b border-gray-200"></div>);
+          days.push(<div key={`empty-${i}`} className={`${isCompact ? 'h-8' : 'h-24 md:h-32'} bg-gray-50/50 border-r border-b border-gray-200`}></div>);
       }
 
       for (let d = 1; d <= daysInMonth; d++) {
@@ -512,55 +525,107 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           const sessionsOnDay = trainings.filter(t => t.date === dateStr);
           const hasPending = sessionsOnDay.some(s => s.submissionStatus === 'Submitted');
 
-          days.push(
-              <div 
-                key={d} 
-                onClick={() => setSelectedDate(dateStr)}
-                className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}
-              >
-                  <div className="flex justify-between items-start">
-                      <div className="flex items-center">
-                          <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>
-                              {d}
-                          </span>
-                          {hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}
+          if (isCompact) {
+              // Compact Cell (Quarter/Year View)
+              days.push(
+                  <div 
+                    key={d} 
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`h-8 border-r border-b border-gray-200 relative cursor-pointer hover:bg-yellow-50 transition-colors flex items-center justify-center ${isSelected ? 'bg-yellow-100' : 'bg-white'}`}
+                  >
+                      {sessionsOnDay.length > 0 ? (
+                          <div className={`w-3 h-3 rounded-full ${
+                              sessionsOnDay[0].intensity === 'High' ? 'bg-red-500' : 
+                              sessionsOnDay[0].intensity === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'
+                          } ${hasPending ? 'ring-2 ring-blue-400' : ''}`} title={`${sessionsOnDay.length} 节训练`}></div>
+                      ) : (
+                          <span className={`text-[10px] ${isToday ? 'font-black text-bvb-black' : 'text-gray-300'}`}>{d}</span>
+                      )}
+                  </div>
+              );
+          } else {
+              // Large Cell (Month View)
+              days.push(
+                  <div 
+                    key={d} 
+                    onClick={() => setSelectedDate(dateStr)}
+                    className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}
+                  >
+                      <div className="flex justify-between items-start">
+                          <div className="flex items-center">
+                              <span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>
+                                  {d}
+                              </span>
+                              {hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}
+                          </div>
+                      </div>
+                      <div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">
+                          {sessionsOnDay.map(s => {
+                              const team = teams.find(t => t.id === s.teamId);
+                              return (
+                                <div 
+                                    key={s.id}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }}
+                                    className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${
+                                        s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' :
+                                        s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' :
+                                        s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' :
+                                        'bg-green-50 border-green-500 text-green-700'
+                                    }`}
+                                >
+                                    <span className="truncate flex-1">{team?.level} - {s.title}</span>
+                                    {s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}
+                                    {s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}
+                                </div>
+                              );
+                          })}
                       </div>
                   </div>
-                  <div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">
-                      {sessionsOnDay.map(s => {
-                          const team = teams.find(t => t.id === s.teamId);
-                          return (
-                            <div 
-                                key={s.id}
-                                onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }}
-                                className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${
-                                    s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' :
-                                    s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' :
-                                    s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' :
-                                    'bg-green-50 border-green-500 text-green-700'
-                                }`}
-                            >
-                                <span className="truncate flex-1">{team?.level} - {s.title}</span>
-                                {s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}
-                                {s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}
-                            </div>
-                          );
-                      })}
-                  </div>
+              );
+          }
+      }
+      
+      const weekDays = isCompact 
+        ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] 
+        : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+      return (
+          <div className={`flex flex-col border-gray-200 overflow-hidden ${isCompact ? 'border rounded-lg' : 'border rounded-lg'}`}>
+              {isCompact && <div className="text-center text-xs font-bold bg-gray-100 py-1 text-gray-600 border-b border-gray-200">{month + 1}月</div>}
+              <div className="grid grid-cols-7 gap-px bg-gray-200">
+                  {weekDays.map((day, i) => (
+                      <div key={i} className={`bg-gray-100 text-center font-bold text-gray-500 uppercase ${isCompact ? 'text-[8px] py-0.5' : 'text-xs p-2'}`}>
+                          {day}
+                      </div>
+                  ))}
+                  {days}
+              </div>
+          </div>
+      );
+  };
+
+  const renderCalendar = () => {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+
+      if (timeScope === 'month') {
+          return renderMonthGrid(year, month, false);
+      } else if (timeScope === 'quarter') {
+          // Calculate start month of the current quarter (0, 3, 6, 9)
+          const startMonth = Math.floor(month / 3) * 3;
+          return (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-y-auto p-1">
+                  {[0, 1, 2].map(offset => renderMonthGrid(year, startMonth + offset, true))}
+              </div>
+          );
+      } else {
+          // Year View
+          return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto p-1">
+                  {Array.from({ length: 12 }).map((_, i) => renderMonthGrid(year, i, true))}
               </div>
           );
       }
-      
-      return (
-          <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
-              {['周日', '周一', '周二', '周三', '周四', '周五', '周六'].map(d => (
-                  <div key={d} className="bg-gray-100 p-2 text-center text-xs font-bold text-gray-500 uppercase">
-                      {d}
-                  </div>
-              ))}
-              {days}
-          </div>
-      );
   };
 
   const renderStats = () => {
@@ -685,9 +750,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             </div>
             <div className="flex items-center gap-3">
                  <div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 shadow-sm">
-                    <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft className="w-5 h-5"/></button>
+                    <button onClick={handlePrevPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft className="w-5 h-5"/></button>
                     <span className="px-3 font-bold text-sm min-w-[100px] text-center">{dateLabel}</span>
-                    <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))} className="p-1 hover:bg-gray-100 rounded"><ChevronRight className="w-5 h-5"/></button>
+                    <button onClick={handleNextPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronRight className="w-5 h-5"/></button>
                  </div>
                  <button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600" title="导出PDF">
                      {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
