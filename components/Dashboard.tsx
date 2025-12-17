@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -20,6 +20,7 @@ interface DashboardProps {
 }
 
 type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
+type AnalysisView = 'player' | 'session';
 
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
@@ -29,13 +30,15 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
       const d = new Date();
-      d.setMonth(d.getMonth() - 1);
+      d.setDate(1); // Modified: Default to 1st day of current month
       return d.toISOString().split('T')[0];
   });
   const [customEndDate, setCustomEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   const [attendanceTeamId, setAttendanceTeamId] = useState<string>('all');
   const [attendancePlayerId, setAttendancePlayerId] = useState<string>('all');
+  const [analysisView, setAnalysisView] = useState<AnalysisView>('player');
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   // Permission check
@@ -75,7 +78,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const start = new Date();
       
       if (range === 'month') {
-          start.setMonth(end.getMonth() - 1);
+          start.setDate(1); // Modified: Set to 1st of current month
       } else if (range === 'quarter') {
           start.setMonth(end.getMonth() - 3);
       } else if (range === 'year') {
@@ -88,10 +91,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
   };
 
-  // Reset player selection when team changes
+  // Reset selections when filter changes
   useEffect(() => {
       setAttendancePlayerId('all');
-  }, [attendanceTeamId]);
+      setSelectedSessionId(null);
+  }, [attendanceTeamId, attendanceRange, customStartDate, customEndDate, analysisView]);
 
   // Director Pending Tasks Logic
   const pendingTasks = useMemo(() => {
@@ -178,7 +182,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [matches, displayPlayers, displayTeams, isDirector]);
 
   // --- Attendance Analytics Logic ---
-  const { chartData, averageRate, exportPlayersData, teamPlayersList } = useMemo(() => {
+  const { chartData, averageRate, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
     // 1. Filtered Sessions (Use displayTrainings)
     const start = new Date(customStartDate);
     const end = new Date(customEndDate);
@@ -194,41 +198,66 @@ const Dashboard: React.FC<DashboardProps> = ({
     // 2. Filtered Players for Dropdown & Chart Context (Use displayPlayers)
     const teamPlayers = displayPlayers.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
 
-    if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], teamPlayersList: teamPlayers };
+    if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], exportSessionsData: [], teamPlayersList: teamPlayers };
 
-    const groupedData: Record<string, { totalRate: number; count: number }> = {};
+    let data: any[] = [];
     let grandTotalRate = 0;
     let grandTotalCount = 0;
 
-    filteredSessions.forEach(session => {
-        const date = new Date(session.date);
-        let key = '';
+    // --- Chart Data Calculation ---
+    if (analysisView === 'session') {
+        // By Session: X-Axis is Date/Session
+        data = filteredSessions.map(s => {
+             const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
+             const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
+             const rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
+             
+             grandTotalRate += rate;
+             grandTotalCount++;
+
+             const d = new Date(s.date);
+             return {
+                 name: `${d.getMonth() + 1}/${d.getDate()}`,
+                 rate,
+                 fullDate: s.date,
+                 title: s.title,
+                 id: s.id // Ensure ID is passed for click handling
+             };
+        });
+    } else {
+        // By Time Grouping (Week/Month)
+        const groupedData: Record<string, { totalRate: number; count: number }> = {};
         
-        if (attendanceRange === 'year') {
-             key = `${date.getMonth() + 1}月`;
-        } else {
-             const weekNum = Math.ceil(date.getDate() / 7);
-             key = `${date.getMonth() + 1}月W${weekNum}`;
-        }
-        
-        const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
-        const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
-        const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
+        filteredSessions.forEach(session => {
+            const date = new Date(session.date);
+            let key = '';
+            
+            if (attendanceRange === 'year') {
+                 key = `${date.getMonth() + 1}月`;
+            } else {
+                 const weekNum = Math.ceil(date.getDate() / 7);
+                 key = `${date.getMonth() + 1}月W${weekNum}`;
+            }
+            
+            const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
+            const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
+            const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
 
-        if (!groupedData[key]) groupedData[key] = { totalRate: 0, count: 0 };
-        groupedData[key].totalRate += rate;
-        groupedData[key].count += 1;
+            if (!groupedData[key]) groupedData[key] = { totalRate: 0, count: 0 };
+            groupedData[key].totalRate += rate;
+            groupedData[key].count += 1;
 
-        grandTotalRate += rate;
-        grandTotalCount++;
-    });
+            grandTotalRate += rate;
+            grandTotalCount++;
+        });
 
-    const data = Object.keys(groupedData).map(key => ({
-        name: key,
-        rate: Math.round(groupedData[key].totalRate / groupedData[key].count)
-    }));
+        data = Object.keys(groupedData).map(key => ({
+            name: key,
+            rate: Math.round(groupedData[key].totalRate / groupedData[key].count)
+        }));
+    }
     
-    // Export Data for Summary Table
+    // Export Data 1: Player Summary
     const exportList = teamPlayers.map(p => {
          const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
          const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
@@ -238,14 +267,144 @@ const Dashboard: React.FC<DashboardProps> = ({
          return { ...p, present: pPresent, leave: pLeave, injury: pInjury, total: pSessions.length, rate };
     }).sort((a,b) => b.rate - a.rate);
 
+    // Export Data 2: Session Summary (New)
+    const exportSessions = filteredSessions.map(s => {
+         const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId);
+         const total = sTeamPlayers.length;
+         const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
+         const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
+         const injury = s.attendance?.filter(r => r.status === 'Injury').length || 0;
+         const absent = s.attendance?.filter(r => r.status === 'Absent').length || 0; // Explicit absent
+         const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+         
+         return {
+             id: s.id,
+             date: s.date,
+             title: s.title,
+             focus: s.focus,
+             teamName: teams.find(t => t.id === s.teamId)?.name || '未知',
+             total,
+             present,
+             leave,
+             injury,
+             absent,
+             rate
+         };
+    });
+
     return { 
         chartData: data, 
-        averageRate: Math.round(grandTotalRate / grandTotalCount),
+        averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0,
         exportPlayersData: exportList,
+        exportSessionsData: exportSessions,
         teamPlayersList: teamPlayers
     };
 
-  }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate]);
+  }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate, analysisView]);
+
+  // --- Session Detail View Renderer ---
+  const renderSessionDetail = () => {
+    if (!selectedSessionId) return null;
+    const session = trainings.find(t => t.id === selectedSessionId);
+    if (!session) return null;
+    
+    const team = teams.find(t => t.id === session.teamId);
+    const sessionPlayers = players.filter(p => p.teamId === session.teamId);
+    
+    // Grouping
+    const groups = {
+        Present: [] as Player[],
+        Leave: [] as Player[],
+        Injury: [] as Player[],
+        Absent: [] as Player[]
+    };
+    
+    sessionPlayers.forEach(p => {
+        const record = session.attendance?.find(r => r.playerId === p.id);
+        const status = record ? record.status : 'Absent';
+        if (groups[status]) groups[status].push(p);
+        else groups['Absent'].push(p);
+    });
+
+    return (
+        <div className="space-y-6 animate-in slide-in-from-right-4">
+            {/* Header */}
+            <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
+                <button onClick={() => setSelectedSessionId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
+                    <ChevronDown className="w-5 h-5 text-gray-500 rotate-90" />
+                </button>
+                <div>
+                    <h3 className="text-lg font-black text-gray-800">{session.title}</h3>
+                    <div className="flex items-center text-xs text-gray-500 gap-2 mt-1">
+                        <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{session.date}</span>
+                        <span>{team?.name}</span>
+                        <span className="bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-100 font-bold">{session.focus}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Lists */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Present */}
+                <div className="bg-green-50 rounded-xl p-4 border border-green-100 flex flex-col">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-bold text-green-800 flex items-center"><CheckCircle className="w-4 h-4 mr-1.5"/> 实到 ({groups.Present.length})</span>
+                    </div>
+                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
+                        {groups.Present.map(p => (
+                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-green-100/50">
+                                <span className="text-xs font-bold text-gray-700">{p.name}</span>
+                            </div>
+                        ))}
+                        {groups.Present.length === 0 && <span className="text-xs text-green-400 italic">无</span>}
+                    </div>
+                </div>
+                {/* Leave */}
+                <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-100 flex flex-col">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-bold text-yellow-800 flex items-center"><Clock className="w-4 h-4 mr-1.5"/> 请假 ({groups.Leave.length})</span>
+                    </div>
+                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
+                        {groups.Leave.map(p => (
+                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-yellow-100/50">
+                                <span className="text-xs font-bold text-gray-700">{p.name}</span>
+                            </div>
+                        ))}
+                        {groups.Leave.length === 0 && <span className="text-xs text-yellow-400 italic">无</span>}
+                    </div>
+                </div>
+                {/* Injury */}
+                <div className="bg-red-50 rounded-xl p-4 border border-red-100 flex flex-col">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-bold text-red-800 flex items-center"><AlertCircle className="w-4 h-4 mr-1.5"/> 伤停 ({groups.Injury.length})</span>
+                    </div>
+                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
+                        {groups.Injury.map(p => (
+                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-red-100/50">
+                                <span className="text-xs font-bold text-gray-700">{p.name}</span>
+                            </div>
+                        ))}
+                        {groups.Injury.length === 0 && <span className="text-xs text-red-400 italic">无</span>}
+                    </div>
+                </div>
+                {/* Absent */}
+                <div className="bg-gray-100 rounded-xl p-4 border border-gray-200 flex flex-col">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-sm font-bold text-gray-600 flex items-center"><Ban className="w-4 h-4 mr-1.5"/> 缺席 ({groups.Absent.length})</span>
+                    </div>
+                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
+                        {groups.Absent.map(p => (
+                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-gray-200/50">
+                                <span className="text-xs font-bold text-gray-400">{p.name}</span>
+                            </div>
+                        ))}
+                        {groups.Absent.length === 0 && <span className="text-xs text-gray-400 italic">无</span>}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+  };
 
   // --- Individual Player Export Data ---
   const individualReport = useMemo(() => {
@@ -287,10 +446,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           stats: { total: sessionRecords.length, present, leave, injury, absent, rate }
       };
   }, [attendancePlayerId, displayTrainings, displayPlayers, customStartDate, customEndDate]);
-
-  const playersStats = useMemo(() => {
-      return exportPlayersData.slice(0, 5);
-  }, [exportPlayersData]);
 
   const handleExportPDF = async () => {
     setIsExporting(true);
@@ -681,8 +836,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </h3>
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2 items-center justify-end">
+                    {/* View Toggle */}
+                    {attendancePlayerId === 'all' && (
+                        <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
+                            <button onClick={() => setAnalysisView('player')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                                <Users className="w-3 h-3 mr-1" /> 按球员
+                            </button>
+                            <button onClick={() => setAnalysisView('session')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                                <LayoutList className="w-3 h-3 mr-1" /> 按课次
+                            </button>
+                        </div>
+                    )}
+
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button onClick={() => handleRangeChange('month')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'month' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>近1月</button>
+                        <button onClick={() => handleRangeChange('month')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'month' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>本月</button>
                         <button onClick={() => handleRangeChange('quarter')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'quarter' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>本季度</button>
                         <button onClick={() => handleRangeChange('custom')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'custom' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>自定义</button>
                     </div>
@@ -724,7 +891,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-            {/* Conditional Content: Individual OR Overview */}
+            {/* Content Logic */}
             {attendancePlayerId !== 'all' && individualReport ? (
                 /* --- Individual View --- */
                 <div className="space-y-6 animate-in fade-in">
@@ -787,8 +954,87 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </table>
                     </div>
                 </div>
+            ) : analysisView === 'session' ? (
+                selectedSessionId ? (
+                    renderSessionDetail()
+                ) : (
+                /* --- Session View Table --- */
+                <div className="space-y-6">
+                    {/* Chart (Optional - Showing Rate trend per session) */}
+                    <div className="h-48 w-full">
+                        {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} unit="%" />
+                                    <Tooltip 
+                                        cursor={{ fill: '#f9fafb' }} 
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar 
+                                        dataKey="rate" 
+                                        fill="#FDE100" 
+                                        radius={[4, 4, 0, 0]} 
+                                        barSize={15} 
+                                        name="出勤率" 
+                                        onClick={(data) => setSelectedSessionId(data.id)} 
+                                        cursor="pointer"
+                                    />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
+                                暂无数据
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="overflow-x-auto rounded-lg border border-gray-200">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase sticky top-0 z-10">
+                                <tr>
+                                    <th className="px-4 py-3">日期</th>
+                                    <th className="px-4 py-3">梯队</th>
+                                    <th className="px-4 py-3">训练主题</th>
+                                    <th className="px-4 py-3 w-32">出勤率</th>
+                                    <th className="px-4 py-3 text-center">实到</th>
+                                    <th className="px-4 py-3 text-center">请假</th>
+                                    <th className="px-4 py-3 text-center">伤停</th>
+                                    <th className="px-4 py-3 text-center">缺席</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {exportSessionsData.map(s => (
+                                    <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50 cursor-pointer transition-colors">
+                                        <td className="px-4 py-3 font-mono text-xs font-bold text-gray-600">{s.date}</td>
+                                        <td className="px-4 py-3 text-xs font-bold text-gray-500">{s.teamName}</td>
+                                        <td className="px-4 py-3 font-bold text-gray-800">
+                                            {s.title}
+                                            <div className="text-[10px] text-gray-400 font-normal">{s.focus}</div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex-1 w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div>
+                                                </div>
+                                                <span className="text-xs font-mono">{s.rate}%</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
+                                        <td className="px-4 py-3 text-center text-yellow-600">{s.leave}</td>
+                                        <td className="px-4 py-3 text-center text-red-500">{s.injury}</td>
+                                        <td className="px-4 py-3 text-center text-gray-400">{s.absent}</td>
+                                    </tr>
+                                ))}
+                                {exportSessionsData.length === 0 && <tr><td colSpan={8} className="text-center py-8 text-gray-400">无训练记录</td></tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                )
             ) : (
-                /* --- Overview View --- */
+                /* --- Overview View (Player List) --- */
                 <div className="space-y-6">
                     {/* Chart */}
                     <div className="h-64 w-full">
@@ -820,7 +1066,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
                             <span className="text-xs text-gray-400 font-bold uppercase">统计训练场次</span>
-                            <div className="text-2xl font-black text-gray-800">{chartData.reduce((acc, curr) => acc + (curr as any).rate > 0 ? 1 : 0, 0)} <span className="text-xs font-normal">周/次</span></div>
+                            <div className="text-2xl font-black text-gray-800">{exportSessionsData.length} <span className="text-xs font-normal">次</span></div>
                         </div>
                     </div>
 
@@ -884,6 +1130,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                  <div className="text-xl font-black">{customStartDate} ~ {customEndDate}</div>
              </div>
           </div>
+          {/* Default to Player List for PDF Export if in session mode, or expand logic to support session export in future */}
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-100 border-b-2 border-gray-300">
               <tr>
