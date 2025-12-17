@@ -4,10 +4,11 @@ export interface AppData {
     teams: any[];
     matches: any[];
     trainings: any[];
+    designs?: any[]; // New: Session Designs
     attributeConfig: any;
     announcements: any[];
     appLogo?: string;
-    users?: any[]; // Added users field for persistence
+    users?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

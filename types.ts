@@ -175,6 +175,8 @@ export interface TrainingSession {
   submissionStatus?: 'Planned' | 'Submitted' | 'Reviewed'; // Workflow status
   coachFeedback?: string; // Filled by Coach: Summary of training effect & team state
   directorReview?: string; // Filled by Director: Audit and comments
+  
+  linkedDesignId?: string; // NEW: Link to a visual design
 }
 
 export interface DashboardStats {
@@ -193,6 +195,57 @@ export interface Announcement {
     date: string;
     type: 'info' | 'urgent';
     author?: string; // Name of the creator
+}
+
+// --- Session Design Types (NEW) ---
+
+export type PitchType = 'Full' | 'Half' | 'Box' | 'Portrait';
+
+// Expanded Element Types based on image
+export type ElementType = 
+  | 'Player' | 'GK' | 'Neutral' | 'Coach' 
+  | 'Ball' 
+  | 'Cone' | 'Marker' | 'Pole' 
+  | 'AgilityRing' | 'Ladder' | 'Hurdle' | 'Mannequin' | 'Rebounder' 
+  | 'Goal' | 'MiniGoal' 
+  | 'Text' | 'Zone';
+
+// Expanded Line Types
+export type LineType = 'Pass' | 'Run' | 'Dribble' | 'Boundary';
+
+export interface DesignElement {
+    id: string;
+    type: ElementType;
+    x: number; // Percentage 0-100
+    y: number; // Percentage 0-100
+    rotation: number; // Degrees
+    scale?: number; // 1 = default
+    color?: string; // Custom color
+    label?: string; // e.g. player number
+}
+
+export interface DesignLine {
+    id: string;
+    type: LineType;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    color: string;
+}
+
+export interface DrillDesign {
+    id: string;
+    title: string;
+    category: 'Drill' | 'Tactic' | 'SetPiece' | 'Other';
+    pitchType: PitchType;
+    elements: DesignElement[];
+    lines: DesignLine[];
+    description: string;
+    keyPoints: string[];
+    createdAt: string;
+    authorId?: string;
+    thumbnail?: string; // Optional base64 preview
 }
 
 // --- Auth Types ---

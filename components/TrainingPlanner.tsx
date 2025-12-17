@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2 } from 'lucide-react';
+import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -11,6 +11,7 @@ interface TrainingPlannerProps {
   teams: Team[];
   players: Player[];
   drillLibrary: string[];
+  designs?: DrillDesign[]; // NEW PROP
   currentUser: User | null;
   onAddTraining: (session: TrainingSession) => void;
   onUpdateTraining: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
@@ -34,6 +35,7 @@ interface SessionDetailModalProps {
 }
 
 const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+    // ... (Existing implementation of SessionDetailModal remains unchanged)
     const [activeTab, setActiveTab] = useState<'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -49,7 +51,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
     const [logStatus, setLogStatus] = useState<'Planned' | 'Submitted' | 'Reviewed'>(session.submissionStatus || 'Planned');
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-    // Sync logStatus from props if it changes externally (e.g. approved by another user, though rare in this session)
+    // Sync logStatus from props if it changes externally
     useEffect(() => {
         if (session.submissionStatus !== logStatus) {
             setLogStatus(session.submissionStatus || 'Planned');
@@ -382,17 +384,17 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
 // --- TrainingPlanner Main Component ---
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter 
+    trainings, teams, players, drillLibrary, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter 
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScope, setTimeScope] = useState<TimeScope>('month');
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
   // Sync selectedSession with trainings prop when it updates (e.g. after auto-save)
-  // This ensures the modal receives the latest data without closing/resetting if we pass it correctly
   useEffect(() => {
     if (selectedSession) {
         const updated = trainings.find(t => t.id === selectedSession.id);
@@ -414,7 +416,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       duration: 90,
       intensity: 'Medium',
       date: new Date().toISOString().split('T')[0],
-      drills: [] as string[]
+      drills: [] as string[],
+      linkedDesignId: undefined as string | undefined
   });
 
   const [drillInput, setDrillInput] = useState('');
@@ -422,21 +425,19 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   // Handle Initial Filter (Jump from Dashboard)
   useEffect(() => {
     if (initialFilter === 'pending_logs') {
-        // Find the first pending log and set view to that month
         const firstPending = trainings.find(t => t.submissionStatus === 'Submitted');
         if (firstPending) {
             const date = new Date(firstPending.date);
             setCurrentDate(date);
             setSelectedDate(firstPending.date);
-            // Optionally auto-open list view or switch to month view
             setTimeScope('month');
         }
     }
   }, [initialFilter, trainings]);
 
   // --- Statistics & Filtering Logic ---
-
   const { filteredSessions, dateLabel, statsData } = useMemo(() => {
+      // ... same logic
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
       
@@ -459,13 +460,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           label = `${year}年度`;
       }
 
-      // Filter Sessions
       const sessions = trainings.filter(t => {
           const d = new Date(t.date);
           return d >= startDate && d <= endDate;
       }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      // Calculate Stats
       const focusCounts: Record<string, number> = {};
       sessions.forEach(s => {
           focusCounts[s.focus] = (focusCounts[s.focus] || 0) + 1;
@@ -479,29 +478,38 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       return { filteredSessions: sessions, dateLabel: label, statsData: chartData };
   }, [currentDate, timeScope, trainings]);
 
-  // --- View Rendering Logic ---
+  // --- Import Design Logic ---
+  const handleImportDesign = (design: DrillDesign) => {
+      setFormData(prev => ({
+          ...prev,
+          title: design.title,
+          focus: 'Custom',
+          focusCustom: design.category === 'Drill' ? '技术训练' : design.category === 'Tactic' ? '战术演练' : '综合训练',
+          drills: design.keyPoints.length > 0 ? design.keyPoints : [design.description.substring(0, 50) + '...'],
+          linkedDesignId: design.id
+      }));
+      setShowDesignSelectModal(false);
+  };
 
+  // --- View Rendering Logic ---
   const renderCalendar = () => {
+      // ... same implementation as before
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
       const daysInMonth = new Date(year, month + 1, 0).getDate();
       const startDay = new Date(year, month, 1).getDay(); // 0 = Sun
       
       const days = [];
-      // Empty slots for start of month
       for (let i = 0; i < startDay; i++) {
           days.push(<div key={`empty-${i}`} className="h-24 md:h-32 bg-gray-50/50 border-r border-b border-gray-200"></div>);
       }
 
-      // Days
       for (let d = 1; d <= daysInMonth; d++) {
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const isToday = dateStr === new Date().toISOString().split('T')[0];
           const isSelected = dateStr === selectedDate;
           
           const sessionsOnDay = trainings.filter(t => t.date === dateStr);
-
-          // Check if any session on this day has pending status
           const hasPending = sessionsOnDay.some(s => s.submissionStatus === 'Submitted');
 
           days.push(
@@ -624,7 +632,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 drills: finalDrills,
                 aiGenerated: isAiMode,
                 attendance: [], // Empty initially
-                submissionStatus: 'Planned'
+                submissionStatus: 'Planned',
+                linkedDesignId: formData.linkedDesignId
             };
             
             onAddTraining(newSession);
@@ -638,7 +647,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 duration: 90,
                 intensity: 'Medium',
                 date: new Date().toISOString().split('T')[0],
-                drills: []
+                drills: [],
+                linkedDesignId: undefined
             });
             setIsAiMode(false);
         } catch (error) {
@@ -717,6 +727,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                          <div className="flex justify-between items-start mb-1">
                                              <span className="text-xs font-bold text-gray-500">{team?.name}</span>
                                              <div className="flex items-center">
+                                                 {s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500 mr-1" />}
                                                  {s.submissionStatus === 'Submitted' && <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>}
                                                  {s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-green-600 mr-1" />}
                                                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${s.intensity === 'High' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{s.intensity}</span>
@@ -757,11 +768,23 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                  <span className="text-sm font-bold text-gray-800">启用 AI 辅助生成</span>
                              </div>
                              <label className="relative inline-flex items-center cursor-pointer">
-                                  <input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => setIsAiMode(e.target.checked)}/>
+                                  <input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => { setIsAiMode(e.target.checked); if(e.target.checked) setFormData(p => ({...p, linkedDesignId: undefined})) }}/>
                                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div>
                               </label>
                         </div>
                         
+                        {/* Import from Design */}
+                        {!isAiMode && (
+                            <button 
+                                type="button"
+                                onClick={() => setShowDesignSelectModal(true)}
+                                className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"
+                            >
+                                <PenTool className="w-4 h-4 mr-2" /> 
+                                {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}
+                            </button>
+                        )}
+
                         <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label>
                              <select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>
@@ -842,6 +865,35 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}
                         </button>
                     </form>
+                </div>
+            </div>
+        )}
+
+        {/* Modal: Design Selection */}
+        {showDesignSelectModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+                    <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                        <h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3>
+                        <button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="p-4 flex-1 overflow-y-auto space-y-3">
+                        {designs.length > 0 ? designs.map(d => (
+                            <button 
+                                key={d.id} 
+                                onClick={() => handleImportDesign(d)}
+                                className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"
+                            >
+                                <div className="flex justify-between items-center">
+                                    <span className="font-bold text-gray-800">{d.title}</span>
+                                    <span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p>
+                            </button>
+                        )) : (
+                            <div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>
+                        )}
+                    </div>
                 </div>
             </div>
         )}

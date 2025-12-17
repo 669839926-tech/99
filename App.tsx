@@ -8,8 +8,9 @@ import MatchPlanner from './components/MatchPlanner';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
+import SessionDesigner from './components/SessionDesigner'; // Import Session Designer
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement } from './types';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -26,9 +27,10 @@ function App() {
   const [attributeConfig, setAttributeConfig] = useState<AttributeConfig>(DEFAULT_ATTRIBUTE_CONFIG);
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [appLogo, setAppLogo] = useState<string>(APP_LOGO);
-  
-  // User Management State (Lifted from Settings/Mock)
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
+  
+  // NEW State for Designs
+  const [designs, setDesigns] = useState<DrillDesign[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -69,11 +71,8 @@ function App() {
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
-            
-            // Important: Load users from cloud if available, otherwise fallback to MOCK_USERS (initial state)
-            if (cloudData.users && Array.isArray(cloudData.users)) {
-                setUsers(cloudData.users);
-            }
+            if (cloudData.users) setUsers(cloudData.users);
+            if (cloudData.designs) setDesigns(cloudData.designs); // Load designs
         }
         setIsInitializing(false);
     };
@@ -99,7 +98,8 @@ function App() {
                 attributeConfig,
                 announcements,
                 appLogo,
-                users // Ensure users are persisted
+                users,
+                designs // Persist designs
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -109,7 +109,7 @@ function App() {
     }, 2000); // 2 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -195,7 +195,6 @@ function App() {
 
   const handleUpdateUser = (updatedUser: User) => {
       setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-      // Also update current user session if it's the same user to reflect changes immediately
       if (currentUser && currentUser.id === updatedUser.id) {
           setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
       }
@@ -215,9 +214,27 @@ function App() {
       setUsers(prev => prev.map(u => 
           u.id === userId ? { ...u, password: newPassword } : u
       ));
-      // Also update current user session if it's the same user to reflect changes immediately in Settings check
       if (currentUser && currentUser.id === userId) {
           setCurrentUser(prev => prev ? { ...prev, password: newPassword } : null);
+      }
+  };
+
+  // --- Design Logic (App Level) ---
+  const handleSaveDesign = (design: DrillDesign) => {
+      setDesigns(prev => {
+          const index = prev.findIndex(d => d.id === design.id);
+          if (index >= 0) {
+              const newDesigns = [...prev];
+              newDesigns[index] = design;
+              return newDesigns;
+          }
+          return [...prev, design];
+      });
+  };
+
+  const handleDeleteDesign = (id: string) => {
+      if(confirm('确定要删除这个教案吗？')) {
+          setDesigns(prev => prev.filter(d => d.id !== id));
       }
   };
 
@@ -235,7 +252,6 @@ function App() {
   };
 
   // --- Recharge / Credit Logic ---
-  // No longer manual credit update, just history
   const handleRechargePlayer = (playerId: string, amount: number, leaveQuota: number) => {
     const today = new Date();
     today.setFullYear(today.getFullYear() + 1);
@@ -253,10 +269,9 @@ function App() {
 
             return {
                 ...p,
-                // credits: removed (calculated)
                 validUntil: nextYearStr,
                 leaveQuota: leaveQuota,
-                leavesUsed: 0, // Reset leaves on new recharge cycle
+                leavesUsed: 0,
                 rechargeHistory: [...(p.rechargeHistory || []), newRecord]
             };
         }
@@ -281,10 +296,9 @@ function App() {
 
             return {
                 ...p,
-                // credits: removed (calculated)
                 validUntil: nextYearStr,
                 leaveQuota: leaveQuota,
-                leavesUsed: 0, // Reset leaves on new recharge cycle
+                leavesUsed: 0,
                 rechargeHistory: [...(p.rechargeHistory || []), newRecord]
             };
         }
@@ -299,7 +313,6 @@ function App() {
           if (p.id === playerId) {
               return {
                   ...p,
-                  // credits: removed (calculated from filtered history)
                   rechargeHistory: p.rechargeHistory.filter(r => r.id !== rechargeId)
               };
           }
@@ -318,10 +331,6 @@ function App() {
   };
 
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => {
-      // Logic for updating player credits based on attendance is now handled by derivedPlayers calculation.
-      // We only need to update leave counts if we want to track them persistently in state, 
-      // but for simplicity and consistency, let's update leavesUsed only.
-      
       const oldSession = trainings.find(t => t.id === session.id);
       const oldAttendance = oldSession?.attendance || [];
 
@@ -335,14 +344,12 @@ function App() {
               }
           };
 
-          // Revert old leave usage
           oldAttendance.forEach(record => {
               if (record.status === 'Leave') {
                   modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: Math.max(0, p.leavesUsed - 1) }));
               }
           });
 
-          // Apply new leave usage
           newAttendance.forEach(record => {
               if (record.status === 'Leave') {
                   modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: p.leavesUsed + 1 }));
@@ -439,6 +446,15 @@ function App() {
             appLogo={appLogo}
           />
         );
+      case 'design': // NEW ROUTE
+        return (
+            <SessionDesigner 
+                designs={designs}
+                onSaveDesign={handleSaveDesign}
+                onDeleteDesign={handleDeleteDesign}
+                currentUser={currentUser}
+            />
+        );
       case 'training':
         return (
           <TrainingPlanner 
@@ -446,6 +462,7 @@ function App() {
             players={derivedPlayers}
             trainings={trainings} 
             drillLibrary={attributeConfig.drillLibrary}
+            designs={designs} // Pass designs for importing
             currentUser={currentUser}
             onAddTraining={handleAddTraining} 
             onUpdateTraining={handleUpdateAttendance}
