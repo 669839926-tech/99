@@ -69,7 +69,11 @@ function App() {
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
-            if (cloudData.users) setUsers(cloudData.users);
+            
+            // Important: Load users from cloud if available, otherwise fallback to MOCK_USERS (initial state)
+            if (cloudData.users && Array.isArray(cloudData.users)) {
+                setUsers(cloudData.users);
+            }
         }
         setIsInitializing(false);
     };
@@ -95,7 +99,7 @@ function App() {
                 attributeConfig,
                 announcements,
                 appLogo,
-                users
+                users // Ensure users are persisted
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -203,7 +207,7 @@ function App() {
       setUsers(prev => prev.map(u => 
           u.id === userId ? { ...u, password: newPassword } : u
       ));
-      // Also update current user session if it's the same user
+      // Also update current user session if it's the same user to reflect changes immediately in Settings check
       if (currentUser && currentUser.id === userId) {
           setCurrentUser(prev => prev ? { ...prev, password: newPassword } : null);
       }

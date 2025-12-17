@@ -7,7 +7,7 @@ export interface AppData {
     attributeConfig: any;
     announcements: any[];
     appLogo?: string;
-    users?: any[];
+    users?: any[]; // Added users field for persistence
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
