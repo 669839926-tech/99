@@ -69,6 +69,7 @@ function App() {
             setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
+            if (cloudData.users) setUsers(cloudData.users);
         }
         setIsInitializing(false);
     };
@@ -93,7 +94,8 @@ function App() {
                 trainings,
                 attributeConfig,
                 announcements,
-                appLogo
+                appLogo,
+                users
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -103,7 +105,7 @@ function App() {
     }, 2000); // 2 second debounce
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, isInitializing]);
 
 
   const handleLogin = (user: User) => {
