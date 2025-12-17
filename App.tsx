@@ -193,6 +193,14 @@ function App() {
       setUsers(prev => [...prev, user]);
   };
 
+  const handleUpdateUser = (updatedUser: User) => {
+      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+      // Also update current user session if it's the same user to reflect changes immediately
+      if (currentUser && currentUser.id === updatedUser.id) {
+          setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
+      }
+  };
+
   const handleDeleteUser = (userId: string) => {
       setUsers(prev => prev.filter(u => u.id !== userId));
   };
@@ -465,6 +473,7 @@ function App() {
                   currentUser={currentUser}
                   users={users}
                   onAddUser={handleAddUser}
+                  onUpdateUser={handleUpdateUser}
                   onDeleteUser={handleDeleteUser}
                   onResetUserPassword={handleResetUserPassword}
                   onUpdateUserPassword={handleUpdateUserPassword}

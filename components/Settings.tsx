@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -9,6 +9,7 @@ interface SettingsProps {
   currentUser: User | null;
   users: User[];
   onAddUser: (user: User) => void;
+  onUpdateUser: (user: User) => void;
   onDeleteUser: (userId: string) => void;
   onResetUserPassword: (userId: string) => void;
   onUpdateUserPassword: (userId: string, newPass: string) => void;
@@ -23,6 +24,7 @@ const Settings: React.FC<SettingsProps> = ({
     currentUser,
     users,
     onAddUser,
+    onUpdateUser,
     onDeleteUser,
     onResetUserPassword,
     onUpdateUserPassword,
@@ -39,8 +41,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
-  // User Management State (New User Form)
+  // User Management State (New/Edit User Form)
   const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [] });
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   // Change Password State
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
@@ -76,18 +79,27 @@ const Settings: React.FC<SettingsProps> = ({
       setNewItemName('');
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleUserFormSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if(newUser.username && newUser.name) {
-          const user: User = { 
-              ...newUser, 
-              id: `u-${Date.now()}`,
-              password: '123' // Enforce default
-          } as User;
-          
-          onAddUser(user);
+          if (editingUserId) {
+             const existingUser = users.find(u => u.id === editingUserId);
+             if (existingUser) {
+                 onUpdateUser({ ...existingUser, ...newUser } as User);
+                 alert('用户信息已更新');
+             }
+          } else {
+              const user: User = { 
+                  ...newUser, 
+                  id: `u-${Date.now()}`,
+                  password: '123' // Enforce default
+              } as User;
+              
+              onAddUser(user);
+              alert(`用户 ${user.name} 已创建，默认密码为 123`);
+          }
           setNewUser({ username: '', name: '', role: 'coach', teamIds: [] });
-          alert(`用户 ${user.name} 已创建，默认密码为 123`);
+          setEditingUserId(null);
       }
   };
 
@@ -102,9 +114,27 @@ const Settings: React.FC<SettingsProps> = ({
       });
   };
 
+  const startEditUser = (user: User) => {
+      setEditingUserId(user.id);
+      setNewUser({
+          username: user.username,
+          name: user.name,
+          role: user.role,
+          teamIds: user.teamIds || []
+      });
+      // Scroll to top or just highlight form
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEditUser = () => {
+      setEditingUserId(null);
+      setNewUser({ username: '', name: '', role: 'coach', teamIds: [] });
+  };
+
   const handleDeleteUserClick = (id: string) => {
       if(confirm('确定要删除该用户吗？')) {
           onDeleteUser(id);
+          if (editingUserId === id) cancelEditUser();
       }
   };
 
@@ -335,27 +365,36 @@ const Settings: React.FC<SettingsProps> = ({
                     用户与角色管理
                 </h3>
                 
-                {/* Add User Form */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-                    <h4 className="font-bold text-sm text-gray-700 mb-3">新增用户</h4>
-                    <form onSubmit={handleCreateUser} className="space-y-4">
+                {/* Add/Edit User Form */}
+                <div className={`p-4 rounded-lg border border-gray-200 mb-6 transition-colors ${editingUserId ? 'bg-yellow-50 border-bvb-yellow' : 'bg-gray-50'}`}>
+                    <div className="flex justify-between items-center mb-3">
+                        <h4 className="font-bold text-sm text-gray-700 flex items-center">
+                            {editingUserId ? <><Edit2 className="w-4 h-4 mr-2" /> 编辑用户</> : '新增用户'}
+                        </h4>
+                        {editingUserId && (
+                            <button onClick={cancelEditUser} className="text-xs text-gray-500 hover:text-red-500 flex items-center">
+                                <X className="w-3 h-3 mr-1" /> 取消
+                            </button>
+                        )}
+                    </div>
+                    <form onSubmit={handleUserFormSubmit} className="space-y-4">
                         <div className="grid grid-cols-3 gap-3">
                             <input 
                                 placeholder="用户名" 
-                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm"
+                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white"
                                 value={newUser.username}
                                 onChange={e => setNewUser({...newUser, username: e.target.value})}
                                 required
                             />
                             <input 
                                 placeholder="显示名称" 
-                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm"
+                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white"
                                 value={newUser.name}
                                 onChange={e => setNewUser({...newUser, name: e.target.value})}
                                 required
                             />
                             <select 
-                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm"
+                                className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white"
                                 value={newUser.role}
                                 onChange={e => setNewUser({...newUser, role: e.target.value as any})}
                             >
@@ -392,14 +431,16 @@ const Settings: React.FC<SettingsProps> = ({
                         )}
 
                         <div className="flex justify-end">
-                            <button className="bg-bvb-black text-white font-bold rounded px-4 py-2 hover:bg-gray-800 text-sm">
-                                添加用户
+                            <button className="bg-bvb-black text-white font-bold rounded px-4 py-2 hover:bg-gray-800 text-sm shadow-md">
+                                {editingUserId ? '保存修改' : '添加用户'}
                             </button>
                         </div>
                     </form>
-                    <p className="text-[10px] text-gray-400 mt-2 flex items-center border-t pt-2 border-gray-200">
-                        * 默认初始密码为 <span className="font-mono bg-gray-200 px-1 rounded ml-1 text-gray-600">123</span>，请提醒用户登录后尽快修改。
-                    </p>
+                    {!editingUserId && (
+                        <p className="text-[10px] text-gray-400 mt-2 flex items-center border-t pt-2 border-gray-200">
+                            * 默认初始密码为 <span className="font-mono bg-gray-200 px-1 rounded ml-1 text-gray-600">123</span>，请提醒用户登录后尽快修改。
+                        </p>
+                    )}
                 </div>
 
                 {/* User List */}
@@ -412,7 +453,7 @@ const Settings: React.FC<SettingsProps> = ({
                         <div className="col-span-1 text-right">操作</div>
                     </div>
                     {users.map(u => (
-                        <div key={u.id} className="grid grid-cols-5 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50">
+                        <div key={u.id} className={`grid grid-cols-5 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50 transition-colors ${editingUserId === u.id ? 'bg-yellow-50/50' : ''}`}>
                             <div className="col-span-1 font-mono text-sm">{u.username}</div>
                             <div className="col-span-1 font-bold text-sm text-gray-800 flex items-center">
                                 {u.name}
@@ -445,6 +486,13 @@ const Settings: React.FC<SettingsProps> = ({
                                 {/* Can't delete self */}
                                 {u.id !== currentUser?.id && (
                                     <>
+                                        <button 
+                                            onClick={() => startEditUser(u)}
+                                            className="text-gray-400 hover:text-bvb-black p-1 rounded hover:bg-gray-100"
+                                            title="编辑用户"
+                                        >
+                                            <Edit2 className="w-4 h-4" />
+                                        </button>
                                         <button 
                                             onClick={() => handleResetPasswordClick(u.id)}
                                             className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50"
