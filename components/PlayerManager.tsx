@@ -30,6 +30,25 @@ interface PlayerManagerProps {
 
 // --- Helper Functions ---
 
+// 定义球员位置排序权重：门将 -> 后卫 -> 中场 -> 前锋
+const POSITION_ORDER: Record<Position, number> = {
+  [Position.GK_ATT]: 10,
+  [Position.GK_DEF]: 11,
+  [Position.CB]: 20,
+  [Position.LB]: 21,
+  [Position.RB]: 22,
+  [Position.LWB]: 23,
+  [Position.RWB]: 24,
+  [Position.CDM]: 30,
+  [Position.CM]: 31,
+  [Position.CAM]: 32,
+  [Position.F9]: 40,
+  [Position.ST]: 41,
+  [Position.LW]: 42,
+  [Position.RW]: 43,
+  [Position.TBD]: 99
+};
+
 const calculateTenure = (dateStr?: string) => {
     if (!dateStr) return null;
     const start = new Date(dateStr);
@@ -1015,7 +1034,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                         <div><label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} /></div>
                         <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
                             <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">{editingReviewId ? '更新草稿' : '保存草稿'}</button>
-                            <button type="button" onClick={() => handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
+                            <button type="button" onClick={handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
                         </div>
                     </form>
                 </div>
@@ -1600,7 +1619,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
-  const [sortField, setSortField] = useState<'default' | 'age' | 'rating' | 'attendance' | 'credits'>('default');
+  const [sortField, setSortField] = useState<'default' | 'age' | 'rating' | 'attendance' | 'credits' | 'position'>('default');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
@@ -1779,6 +1798,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
     if (sortField === 'credits') {
         return sortDirection === 'asc' ? a.credits - b.credits : b.credits - a.credits;
+    }
+    if (sortField === 'position') {
+        const orderA = POSITION_ORDER[a.position] || 999;
+        const orderB = POSITION_ORDER[b.position] || 999;
+        return sortDirection === 'asc' ? orderA - orderB : orderB - orderA;
     }
 
     const statusA = getBirthdayStatus(a.birthDate);
@@ -1982,6 +2006,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             onChange={(e) => setSortField(e.target.value as any)}
                         >
                             <option value="default">默认排序</option>
+                            <option value="position">按场上位置</option>
                             <option value="age">出生年月</option>
                             <option value="rating">综合评分</option>
                             <option value="attendance">出勤率</option>
