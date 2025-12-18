@@ -477,6 +477,7 @@ function App() {
                 matches={matches} 
                 players={derivedPlayers}
                 teams={teams}
+                currentUser={currentUser}
                 onAddMatch={handleAddMatch}
                 onDeleteMatch={handleDeleteMatch}
                 onUpdateMatch={handleUpdateMatch}

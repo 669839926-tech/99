@@ -35,7 +35,6 @@ interface SessionDetailModalProps {
 }
 
 const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
-    // ... (Existing implementation of SessionDetailModal remains unchanged)
     const [activeTab, setActiveTab] = useState<'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -394,6 +393,12 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // --- Filtering Teams for Coaches ---
+  const availableTeams = useMemo(() => {
+      if (currentUser?.role === 'director') return teams;
+      return teams.filter(t => currentUser?.teamIds?.includes(t.id));
+  }, [currentUser, teams]);
+
   // Sync selectedSession with trainings prop when it updates (e.g. after auto-save)
   useEffect(() => {
     if (selectedSession) {
@@ -409,7 +414,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [isAiMode, setIsAiMode] = useState(false);
   
   const [formData, setFormData] = useState({
-      teamId: teams[0]?.id || '',
+      teamId: availableTeams[0]?.id || '',
       title: '',
       focus: '传接球',
       focusCustom: '',
@@ -419,6 +424,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       drills: [] as string[],
       linkedDesignId: undefined as string | undefined
   });
+
+  // Reset form teamId when availableTeams changes (e.g. on login/role switch)
+  useEffect(() => {
+      if (availableTeams.length > 0 && !availableTeams.find(t => t.id === formData.teamId)) {
+          setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
+      }
+  }, [availableTeams]);
 
   const [drillInput, setDrillInput] = useState('');
 
@@ -705,7 +717,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setShowAddModal(false);
             // Reset Form
             setFormData({
-                teamId: teams[0]?.id || '',
+                teamId: availableTeams[0]?.id || '',
                 title: '',
                 focus: '传接球',
                 focusCustom: '',
@@ -853,7 +865,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label>
                              <select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>
-                                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                 {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                              </select>
                         </div>
 

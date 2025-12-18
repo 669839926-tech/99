@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchDetails, MatchEvent, MatchEventType } from '../types';
+import { Match, Player, Team, MatchDetails, MatchEvent, MatchEventType, User } from '../types';
 import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Download, Sun, Cloud, CloudRain, CloudSnow, Wind, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
@@ -10,6 +10,7 @@ interface MatchPlannerProps {
   matches: Match[];
   players: Player[];
   teams: Team[];
+  currentUser: User | null;
   onAddMatch: (match: Match) => void;
   onDeleteMatch: (id: string) => void;
   onUpdateMatch: (match: Match) => void;
@@ -18,12 +19,23 @@ interface MatchPlannerProps {
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
 
-const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, onAddMatch, onDeleteMatch, onUpdateMatch, appLogo }) => {
+const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, currentUser, onAddMatch, onDeleteMatch, onUpdateMatch, appLogo }) => {
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
   const [strategy, setStrategy] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // --- Filtering Teams & Matches for Coaches ---
+  const availableTeams = useMemo(() => {
+      if (currentUser?.role === 'director') return teams;
+      return teams.filter(t => currentUser?.teamIds?.includes(t.id));
+  }, [currentUser, teams]);
+
+  const displayMatches = useMemo(() => {
+      if (currentUser?.role === 'director') return matches;
+      return matches.filter(m => currentUser?.teamIds?.includes(m.teamId));
+  }, [currentUser, matches]);
 
   // Modals State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -54,6 +66,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
   // New Match Form
   const [newMatch, setNewMatch] = useState<Partial<Match>>({
+      teamId: availableTeams[0]?.id || '',
       title: '',
       opponent: '',
       province: '',
@@ -66,8 +79,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
       status: 'Upcoming'
   });
 
-  const upcomingMatches = matches.filter(m => m.status === 'Upcoming').sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  const pastMatches = matches.filter(m => m.status === 'Completed' || m.status === 'Cancelled').sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Reset form teamId when availableTeams changes
+  useEffect(() => {
+      if (availableTeams.length > 0 && !availableTeams.find(t => t.id === newMatch.teamId)) {
+          setNewMatch(prev => ({ ...prev, teamId: availableTeams[0].id }));
+      }
+  }, [availableTeams]);
+
+  const upcomingMatches = displayMatches.filter(m => m.status === 'Upcoming').sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const pastMatches = displayMatches.filter(m => m.status === 'Completed' || m.status === 'Cancelled').sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const handleGenerateStrategy = async (match: Match) => {
     setSelectedMatchForAi(match);
@@ -85,12 +105,13 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
   const handleAddSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if(newMatch.opponent && newMatch.date) {
+      if(newMatch.opponent && newMatch.date && newMatch.teamId) {
           // If Home, we can clear the geo details or set them to default base
           const isHome = newMatch.location === 'Home';
           
           const match: Match = {
               id: Date.now().toString(),
+              teamId: newMatch.teamId,
               title: newMatch.title || `${newMatch.competition} VS ${newMatch.opponent}`,
               opponent: newMatch.opponent,
               date: newMatch.date,
@@ -115,6 +136,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
           onAddMatch(match);
           setShowAddModal(false);
           setNewMatch({ 
+              teamId: availableTeams[0]?.id || '',
               title: '', opponent: '', 
               province: '', city: '', district: '',
               date: new Date().toISOString().split('T')[0], time: '14:00', 
@@ -218,72 +240,76 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
 
   // --- Components ---
 
-  const MatchCard: React.FC<{ match: Match }> = ({ match }) => (
-    <div className={`bg-white rounded-xl shadow-sm border-l-4 p-5 transition-all hover:shadow-md relative group ${match.result ? (
-        match.result.split('-')[0] > match.result.split('-')[1] ? 'border-green-500' : 
-        match.result.split('-')[0] < match.result.split('-')[1] ? 'border-red-500' : 'border-yellow-500'
-    ) : 'border-gray-300'}`}>
-        
-        {/* Actions Top Right */}
-        <div className="absolute top-3 right-3 flex gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-            <button 
-                onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }}
-                className="p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"
-                title="删除比赛"
-            >
-                <Trash2 className="w-4 h-4" />
-            </button>
-            <button 
-                onClick={(e) => { e.stopPropagation(); setEditingMatch(match); setActiveTab('info'); }}
-                className="p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded"
-                title={match.status === 'Completed' ? "编辑日志/比分" : "编辑详情"}
-            >
-                {match.status === 'Completed' ? <FileText className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-            </button>
-        </div>
-
-        <div className="flex justify-between items-center mb-2">
-            <span className="text-xs font-bold uppercase text-gray-400 flex items-center">
-                <Calendar className="w-3 h-3 mr-1" /> {match.date} • {match.time}
-            </span>
-            <div className="flex items-center gap-2 pr-12 md:pr-0">
-                <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-200 text-gray-600'}`}>
-                    {getLocationLabel(match.location)}
-                </span>
+  const MatchCard: React.FC<{ match: Match }> = ({ match }) => {
+    const team = teams.find(t => t.id === match.teamId);
+    return (
+        <div className={`bg-white rounded-xl shadow-sm border-l-4 p-5 transition-all hover:shadow-md relative group ${match.result ? (
+            match.result.split('-')[0] > match.result.split('-')[1] ? 'border-green-500' : 
+            match.result.split('-')[0] < match.result.split('-')[1] ? 'border-red-500' : 'border-yellow-500'
+        ) : 'border-gray-300'}`}>
+            
+            {/* Actions Top Right */}
+            <div className="absolute top-3 right-3 flex gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }}
+                    className="p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"
+                    title="删除比赛"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); setEditingMatch(match); setActiveTab('info'); }}
+                    className="p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded"
+                    title={match.status === 'Completed' ? "编辑日志/比分" : "编辑详情"}
+                >
+                    {match.status === 'Completed' ? <FileText className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
+                </button>
             </div>
-        </div>
-        <div className="flex justify-between items-end">
-            <div>
-                {match.title && <h4 className="text-xs font-bold text-gray-500 mb-0.5">{match.title}</h4>}
-                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                    VS {match.opponent}
-                </h3>
-                <div className="text-sm text-gray-500 mt-1 flex items-center">
-                     <MapPin className="w-3 h-3 mr-1 text-gray-400" />
-                     {getFullAddress(match)}
+
+            <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-bold uppercase text-gray-400 flex items-center">
+                    <Calendar className="w-3 h-3 mr-1" /> {match.date} • {match.time}
+                </span>
+                <div className="flex items-center gap-2 pr-12 md:pr-0">
+                    <span className="text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 rounded border border-gray-200">{team?.name}</span>
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-200 text-gray-600'}`}>
+                        {getLocationLabel(match.location)}
+                    </span>
                 </div>
-                {(match.details?.summary || match.matchLog) && (
-                     <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded max-w-xs truncate flex items-center">
-                         <FileText className="w-3 h-3 mr-1" /> 
-                         已录入赛后日志
-                     </div>
+            </div>
+            <div className="flex justify-between items-end">
+                <div>
+                    {match.title && <h4 className="text-xs font-bold text-gray-500 mb-0.5">{match.title}</h4>}
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                        VS {match.opponent}
+                    </h3>
+                    <div className="text-sm text-gray-500 mt-1 flex items-center">
+                         <MapPin className="w-3 h-3 mr-1 text-gray-400" />
+                         {getFullAddress(match)}
+                    </div>
+                    {(match.details?.summary || match.matchLog) && (
+                         <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded max-w-xs truncate flex items-center">
+                             <FileText className="w-3 h-3 mr-1" /> 
+                             已录入赛后日志
+                         </div>
+                    )}
+                </div>
+                {match.status === 'Completed' ? (
+                    <div className="text-2xl font-black text-bvb-black bg-gray-100 px-3 py-1 rounded">
+                        {match.result || '-:-'}
+                    </div>
+                ) : (
+                    <button 
+                        onClick={() => handleGenerateStrategy(match)}
+                        className="text-xs font-bold flex items-center bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
+                    >
+                        <Bot className="w-3 h-3 mr-1.5 text-bvb-yellow" /> 战术分析
+                    </button>
                 )}
             </div>
-            {match.status === 'Completed' ? (
-                <div className="text-2xl font-black text-bvb-black bg-gray-100 px-3 py-1 rounded">
-                    {match.result || '-:-'}
-                </div>
-            ) : (
-                <button 
-                    onClick={() => handleGenerateStrategy(match)}
-                    className="text-xs font-bold flex items-center bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800"
-                >
-                    <Bot className="w-3 h-3 mr-1.5 text-bvb-yellow" /> 战术分析
-                </button>
-            )}
         </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-8 relative pb-20 md:pb-0">
@@ -340,6 +366,16 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, on
                       <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
                   </div>
                   <form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto pb-24 md:pb-6">
+                      <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label>
+                          <select 
+                              className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold"
+                              value={newMatch.teamId}
+                              onChange={e => setNewMatch({...newMatch, teamId: e.target.value})}
+                          >
+                              {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </select>
+                      </div>
                       <div>
                           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">比赛名称 (标题)</label>
                           <input 

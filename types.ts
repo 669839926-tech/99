@@ -163,6 +163,7 @@ export interface MatchDetails {
 
 export interface Match {
   id: string;
+  teamId: string; // New: Link match to a specific team
   title?: string; // New: Match Title e.g. "U19 League Round 5"
   opponent: string;
   date: string;

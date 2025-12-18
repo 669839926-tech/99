@@ -18,7 +18,7 @@ export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
         "东莞市": ["东莞市"] // Direct-administered
     },
     "浙江省": {
-        "杭州市": ["上城区", "拱墅区", "西湖区", "滨江区", "萧山区", "余杭区", "富阳区", "临安区", "临平区", "钱塘区"],
+        "杭州市": ["上城区", "拱墅区", "西湖区", "滨江区", "萧山区", "余杭区", "福阳区", "临安区", "临平区", "钱塘区"],
         "宁波市": ["海曙区", "江北区", "北仑区", "镇海区", "鄞州区", "奉化区"],
         "温州市": ["鹿城区", "龙湾区", "瓯海区", "洞头区"]
     },
@@ -38,7 +38,7 @@ export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
     },
     "辽宁省": {
         "沈阳市": ["和平区", "沈河区", "大东区", "皇姑区", "铁西区", "顺乐路区", "浑南区", "沈北新区", "于洪区", "辽中区"],
-        "大连市": ["中山区", "西岗区", "沙河口区", "甘井子区", "旅顺口区", "金州区", "普兰店区"]
+        "大连市": ["中山区", "西岗区", "沙口区", "甘井子区", "旅顺口区", "金州区", "普兰店区"]
     },
     "陕西省": {
         "西安市": ["新城区", "碑林区", "莲湖区", "灞桥区", "未央区", "雁塔区", "阎良区", "临潼区", "长安区", "高陵区", "鄠邑区"]
@@ -185,11 +185,11 @@ export const MOCK_PLAYERS: Player[] = [
 ];
 
 export const MOCK_MATCHES: Match[] = [
-  { id: '1', title: 'U19 青年联赛第5轮', opponent: '沙尔克04 U19', date: '2023-10-01', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', result: '4-1', status: 'Completed', competition: '联赛' },
-  { id: '2', title: '国家德比青年版', opponent: '拜仁慕尼黑 U19', date: '2023-10-08', time: '11:00', location: 'Away', province: '广东省', city: '广州市', district: '天河区', result: '2-2', status: 'Completed', competition: '联赛' },
-  { id: '3', title: '地区杯赛半决赛', opponent: '波鸿 U19', date: '2023-10-15', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '海淀区', result: '3-0', status: 'Completed', competition: '杯赛' },
-  { id: '4', title: 'U17 关键战役', opponent: '勒沃库森 U17', date: '2023-11-20', time: '14:00', location: 'Away', province: '上海市', city: '上海市', district: '浦东新区', status: 'Upcoming', competition: '联赛' },
-  { id: '5', title: '主场收官战', opponent: '莱比锡 U17', date: '2023-11-27', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', status: 'Upcoming', competition: '联赛' },
+  { id: '1', teamId: 't1', title: 'U19 青年联赛第5轮', opponent: '沙尔克04 U19', date: '2023-10-01', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', result: '4-1', status: 'Completed', competition: '联赛' },
+  { id: '2', teamId: 't1', title: '国家德比青年版', opponent: '拜仁慕尼黑 U19', date: '2023-10-08', time: '11:00', location: 'Away', province: '广东省', city: '广州市', district: '天河区', result: '2-2', status: 'Completed', competition: '联赛' },
+  { id: '3', teamId: 't1', title: '地区杯赛半决赛', opponent: '波鸿 U19', date: '2023-10-15', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '海淀区', result: '3-0', status: 'Completed', competition: '杯赛' },
+  { id: '4', teamId: 't2', title: 'U17 关键战役', opponent: '勒沃库森 U17', date: '2023-11-20', time: '14:00', location: 'Away', province: '上海市', city: '上海市', district: '浦东新区', status: 'Upcoming', competition: '联赛' },
+  { id: '5', teamId: 't2', title: '主场收官战', opponent: '莱比锡 U17', date: '2023-11-27', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', status: 'Upcoming', competition: '联赛' },
 ];
 
 export const MOCK_TRAINING: TrainingSession[] = [
