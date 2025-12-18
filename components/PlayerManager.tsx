@@ -493,7 +493,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl w-full max-sm p-6 animate-in fade-in zoom-in duration-200">
                 <h3 className="font-bold text-lg mb-2 flex items-center"><CreditCard className="w-5 h-5 mr-2 text-bvb-yellow"/> 课时充值</h3>
                 <p className="text-sm text-gray-500 mb-4">为 <span className="font-bold text-bvb-black">{player.name}</span> 充值课时及请假额度。</p>
                 
@@ -544,7 +544,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl w-full max-sm p-6 animate-in fade-in zoom-in duration-200">
                 <h3 className="font-bold text-lg mb-2 flex items-center"><CreditCard className="w-5 h-5 mr-2 text-bvb-yellow"/> 批量充值</h3>
                 <p className="text-sm text-gray-500 mb-4">为选中的 <span className="font-bold text-bvb-black">{count}</span> 名球员进行充值。</p>
                 
@@ -1034,7 +1034,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                         <div><label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} /></div>
                         <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
                             <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">{editingReviewId ? '更新草稿' : '保存草稿'}</button>
-                            <button type="button" onClick={handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
+                            <button type="button" onClick={() => handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
                         </div>
                     </form>
                 </div>
@@ -1805,12 +1805,14 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         return sortDirection === 'asc' ? orderA - orderB : orderB - orderA;
     }
 
-    const statusA = getBirthdayStatus(a.birthDate);
-    const statusB = getBirthdayStatus(b.birthDate);
-    const isTodayA = statusA?.label === '今天生日';
-    const isTodayB = statusB?.label === '今天生日';
-    if (isTodayA && !isTodayB) return -1;
-    if (!isTodayA && isTodayB) return 1;
+    // Default sorting logic (Now prioritized by joinDate, then jersey number)
+    const joinA = a.joinDate || '9999-99-99';
+    const joinB = b.joinDate || '9999-99-99';
+    if (joinA !== joinB) {
+        return joinA.localeCompare(joinB); // Earlier date first
+    }
+
+    // Fallback logic
     if (a.isCaptain && !b.isCaptain) return -1;
     if (!a.isCaptain && b.isCaptain) return 1;
     return (a.number || 0) - (b.number || 0);
@@ -2005,7 +2007,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             value={sortField}
                             onChange={(e) => setSortField(e.target.value as any)}
                         >
-                            <option value="default">默认排序</option>
+                            <option value="default">默认 (按入队时间)</option>
                             <option value="position">按场上位置</option>
                             <option value="age">出生年月</option>
                             <option value="rating">综合评分</option>
@@ -2162,7 +2164,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                     <td className="p-4 hidden md:table-cell">
                                         <div className="w-full flex items-center gap-2">
                                             <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-bvb-black rounded-full" style={{ width: `${attendanceRate}%` }}></div>
+                                                <div className="h-full bg-bvb-black" style={{ width: `${attendanceRate}%` }}></div>
                                             </div>
                                             <span className="text-xs font-bold text-gray-600 w-8 text-right">{attendanceRate}%</span>
                                         </div>
