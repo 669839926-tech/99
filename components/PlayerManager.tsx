@@ -129,7 +129,7 @@ const getPosColor = (pos: Position) => {
         case Position.DEF: return 'bg-blue-600 text-white border-blue-600';
         case Position.MID: return 'bg-green-600 text-white border-green-600';
         case Position.FWD: return 'bg-red-600 text-white border-red-600';
-        default: return 'bg-gray-500 border-gray-500';
+        default: return 'bg-gray-50 border-gray-500';
     }
 };
 
@@ -579,7 +579,6 @@ interface PlayerDetailModalProps {
 const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
     player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge
 }) => {
-    // Implementation same as previous version (Full code preserved in memory, kept here for completeness)
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('overview');
@@ -590,7 +589,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const profileImageInputRef = useRef<HTMLInputElement>(null);
     
-    // NEW: Export Year State
     const [exportYear, setExportYear] = useState<number>(new Date().getFullYear());
 
     const isCoach = currentUser?.role === 'coach';
@@ -691,7 +689,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const handleDeleteRechargeAction = (rechargeId: string) => {
          onDeleteRecharge(player.id, rechargeId);
-         // Manually update local state to reflect deletion immediately to improve UX
          setEditedPlayer(prev => ({
              ...prev,
              credits: (prev.credits || 0) - (prev.rechargeHistory?.find(r => r.id === rechargeId)?.amount || 0),
@@ -721,6 +718,36 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
           }
         },
       }));
+    };
+
+    // --- ID Card Edit Logic for PlayerDetailModal ---
+    const handleIdCardChangeLocal = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const id = e.target.value;
+      const updates: any = { idCard: id };
+
+      if (id.length === 18) {
+        const year = parseInt(id.substring(6, 10));
+        const month = parseInt(id.substring(10, 12));
+        const day = parseInt(id.substring(12, 14));
+        
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day)) {
+          const birthDateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          updates.birthDate = birthDateStr;
+
+          const today = new Date();
+          let age = today.getFullYear() - year;
+          const m = today.getMonth() + 1 - month;
+          if (m < 0 || (m === 0 && today.getDate() < day)) {
+              age--;
+          }
+          updates.age = age;
+        }
+        const genderDigit = parseInt(id.charAt(16));
+        if (!isNaN(genderDigit)) {
+          updates.gender = genderDigit % 2 === 1 ? '男' : '女';
+        }
+      }
+      setEditedPlayer(prev => ({ ...prev, ...updates }));
     };
 
     const handleGenerateAiReview = async () => {
@@ -812,9 +839,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         }
     };
 
-    // Render Logic for Detail Tabs
     const renderStatSliders = (category: AttributeCategory) => {
-        // ... Same implementation as before ...
         const attributes = attributeConfig[category];
         if (attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
         return (
@@ -964,17 +989,12 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             }
         });
         events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        let balance = 0; let quota = 0; let used = 0;
+        let balance = 0; 
         const historyWithBalance = events.map(e => {
-            if (e.type === 'recharge') { balance += e.amount; quota = e.quotaAdded ?? 0; used = 0; } 
+            if (e.type === 'recharge') { balance += e.amount; } 
             else if (e.type === 'training') {
                 if (e.status === 'Present') { balance -= 1; e.amount = -1; } 
-                else if (e.status === 'Leave') { 
-                    used++; 
-                    e.amount = 0; 
-                    e.desc += ' (消耗额度)'; 
-                } 
-                // Injury and Absent do not affect balance
+                else if (e.status === 'Leave') { e.amount = 0; e.desc += ' (消耗额度)'; } 
             }
             return { ...e, balanceAfter: balance };
         });
@@ -1086,7 +1106,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                  )}
              </div>
              <div className="flex items-center space-x-3">
-                {/* Year Selector for Export */}
                 <div className="hidden md:flex items-center gap-2 bg-gray-800 rounded px-2">
                     <span className="text-xs text-gray-400 font-bold">导出年份:</span>
                     <select 
@@ -1138,7 +1157,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                ))}
             </div>
           </div>
-          {/* Content Area - Same as before... */}
+          {/* Content Area */}
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
              {activeTab === 'overview' && (
                <div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300">
@@ -1217,7 +1236,20 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       
                       {/* Identity Card */}
                       <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm">
-                           <div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span><span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span></div>
+                           <div className="col-span-2 flex items-center justify-between border-b pb-2">
+                               <span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>
+                               {isEditing ? (
+                                   <input 
+                                       className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-transparent focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" 
+                                       value={editedPlayer.idCard} 
+                                       onChange={handleIdCardChangeLocal}
+                                       placeholder="点击修改"
+                                       maxLength={18}
+                                   />
+                               ) : (
+                                   <span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>
+                               )}
+                           </div>
                            <div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span><span className="font-bold">{editedPlayer.gender}</span></div>
                            <div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{editedPlayer.age} 岁</span></div>
                       </div>
@@ -1290,7 +1322,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                   </div>
                </div>
              )}
-             {/* ... Other Tabs render logic is unchanged, just omitted for brevity in XML if possible, but keeping context to be safe */}
              {activeTab === 'technical' && renderCategoryContent('technical')}
              {activeTab === 'tactical' && renderCategoryContent('tactical')}
              {activeTab === 'physical' && renderCategoryContent('physical')}
@@ -1299,11 +1330,9 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
              {activeTab === 'records' && renderRecords()}
              {activeTab === 'gallery' && renderGallery()}
           </div>
-           {/* HIDDEN PDF TEMPLATE (Professional Layout) */}
+           {/* HIDDEN PDF TEMPLATE */}
            <div id="player-profile-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
-               {/* 1. HEADER PAGE */}
                <div className="w-full h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white">
-                   {/* Header Branding */}
                    <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-4 mb-8">
                        <div className="flex items-center gap-4">
                            <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />
@@ -1318,9 +1347,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                        </div>
                    </div>
 
-                   {/* Main Content Area */}
                    <div className="flex-1 flex flex-col gap-5">
-                       {/* A. Bio Row */}
                        <div className="flex gap-8 bg-gray-50 rounded-lg p-6 border border-gray-100 relative overflow-hidden">
                            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-bvb-yellow shadow-lg bg-white relative z-10 shrink-0">
                                <img src={editedPlayer.image} alt={editedPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
@@ -1338,7 +1365,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            <div className="absolute top-0 right-0 w-64 h-64 bg-bvb-yellow/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
                        </div>
 
-                        {/* NEW: Match Stats Row */}
                         <div className="grid grid-cols-3 gap-6">
                             <div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden">
                                 <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-bvb-yellow"></div>
@@ -1357,7 +1383,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             </div>
                         </div>
 
-                       {/* B. 4-Dimension Radar Charts */}
                        <div>
                            <h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-6 uppercase">四维能力深度分析</h3>
                            <div className="grid grid-cols-2 gap-x-8 gap-y-8">
@@ -1380,7 +1405,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            </div>
                        </div>
 
-                       {/* C. Reviews Section */}
                        <div className="flex-1 flex flex-col min-h-0">
                            <h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-4 uppercase">年度考评记录</h3>
                            <div className="grid grid-cols-2 gap-4 flex-1">
@@ -1418,14 +1442,12 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                        </div>
                    </div>
 
-                   {/* Footer */}
                    <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 font-mono">
                        <span>CONFIDENTIAL REPORT</span>
                        <span>GENERATED ON {new Date().toLocaleDateString()}</span>
                    </div>
                </div>
 
-               {/* 2. GALLERY PAGE (Only if photos exist for that year) */}
                {editedPlayer.gallery && editedPlayer.gallery.some(p => p.date.startsWith(String(exportYear))) && (
                    <div className="w-full h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white break-before-page">
                        <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-4 mb-8">
@@ -1441,7 +1463,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                        <div className="grid grid-cols-2 gap-6 auto-rows-max">
                            {editedPlayer.gallery
                                .filter(p => p.date.startsWith(String(exportYear)))
-                               .slice(0, 6) // Max 6 photos per page to fit A4 well
+                               .slice(0, 6) 
                                .map(photo => (
                                    <div key={photo.id} className="break-inside-avoid">
                                        <div className="aspect-[4/3] w-full rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-gray-50">
@@ -1456,7 +1478,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            }
                        </div>
                         
-                       {/* Footer */}
                        <div className="mt-auto pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 font-mono">
                            <span>WSZG CLUB</span>
                            <span>PAGE 2</span>
@@ -1480,7 +1501,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   onAddPlayer, 
   onBulkAddPlayers,
   onAddTeam, 
-  onDeleteTeam, // Destructure new prop
+  onDeleteTeam,
   onUpdatePlayer, 
   onDeletePlayer,
   onBulkDeletePlayers,
@@ -1507,10 +1528,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
   const [isExportingList, setIsExportingList] = useState(false);
   
-  // NEW: View Mode State
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
-  // NEW: Sorting State
   const [sortField, setSortField] = useState<'default' | 'age' | 'rating' | 'attendance' | 'credits'>('default');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -1522,9 +1541,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
   }, [initialFilter]);
 
-  // Handle Team Selection Logic
   useEffect(() => {
-    // 1. If Coach, force to one of their teams if not selected or invalid
     if (isCoach && currentUser?.teamIds && currentUser.teamIds.length > 0) {
         if (!selectedTeamId || !currentUser.teamIds.includes(selectedTeamId)) {
              setSelectedTeamId(currentUser.teamIds[0]);
@@ -1532,12 +1549,10 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         return;
     }
     
-    // 2. If Director, and current selection is invalid (deleted team), fallback
     const teamExists = teams.some(t => t.id === selectedTeamId);
     const isUnassigned = selectedTeamId === 'unassigned';
 
     if (!teamExists && !isUnassigned) {
-        // Current selection is invalid (e.g. deleted)
         if (teams.length > 0) {
             setSelectedTeamId(teams[0].id);
         } else {
@@ -1581,7 +1596,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
 
-  // New Player Form State
   const [newPlayer, setNewPlayer] = useState<Partial<Player>>({
     name: '',
     gender: '男',
@@ -1660,16 +1674,9 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
     return matchesTeam && matchesSearch && matchesPos;
   }).sort((a, b) => {
-    // Custom Sorting Logic
     if (sortField === 'age') {
         const dateA = a.birthDate || '0000-00-00';
         const dateB = b.birthDate || '0000-00-00';
-        // 'Asc' for age usually implies oldest first (smallest date string) to youngest? 
-        // Or literally age number ascending (young to old)?
-        // Let's standard: Date string compare. 
-        // 2000 < 2010. 
-        // If sortDirection is 'asc': 2000 comes first (Older person).
-        // If sortDirection is 'desc': 2010 comes first (Younger person).
         return sortDirection === 'asc' 
             ? dateA.localeCompare(dateB) 
             : dateB.localeCompare(dateA);
@@ -1680,7 +1687,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         return sortDirection === 'asc' ? rateA - rateB : rateB - rateA;
     }
     if (sortField === 'attendance') {
-        // Use 'year' scope for general sorting to be representative
         const attA = calculateAttendanceRate(a, trainings, 'year');
         const attB = calculateAttendanceRate(b, trainings, 'year');
         return sortDirection === 'asc' ? attA - attB : attB - attA;
@@ -1689,7 +1695,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         return sortDirection === 'asc' ? a.credits - b.credits : b.credits - a.credits;
     }
 
-    // Default Sort (Birthday > Captain > Number)
     const statusA = getBirthdayStatus(a.birthDate);
     const statusB = getBirthdayStatus(b.birthDate);
     const isTodayA = statusA?.label === '今天生日';
@@ -1820,11 +1825,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       }
   };
 
-  // --- Render Function ---
-
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-100px)] md:h-auto gap-6 relative">
-      {/* Sidebar */}
       <div className="w-full md:w-64 flex-shrink-0 flex flex-col space-y-4">
         <div className="flex justify-between items-center md:block">
             <h2 className="text-3xl font-black text-bvb-black uppercase hidden md:block mb-4">球队管理</h2>
@@ -1861,7 +1863,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                 </div>
             ))}
             
-            {/* Unassigned Button */}
             <button 
                 onClick={() => setSelectedTeamId('unassigned')} 
                 className={`w-full text-left p-4 rounded-xl transition-all border-l-4 mt-2 ${selectedTeamId === 'unassigned' ? 'bg-white border-gray-400 shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}
@@ -1875,19 +1876,14 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         </div>
       </div>
       
-      {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-0">
-        
-        {/* Toolbar */}
         <div className="bg-white p-4 rounded-xl shadow-sm mb-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-           {/* Search & Filter Group */}
            <div className="flex w-full sm:w-auto items-center gap-3">
                <div className="flex items-center bg-gray-100 px-3 py-2 rounded-lg flex-1 sm:w-64">
                    <Search className="w-5 h-5 text-gray-400 mr-2" />
                    <input placeholder="搜索球员..." className="bg-transparent border-none focus:outline-none text-sm w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/>
                </div>
 
-               {/* Sort Controls */}
                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shrink-0">
                     <div className="relative">
                         <select
@@ -1907,44 +1903,40 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <button 
                             onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
                             className="p-1.5 bg-white shadow-sm rounded-md text-gray-600 hover:text-bvb-black transition-colors"
-                            title={sortDirection === 'asc' ? '升序' : '降序'}
                         >
                             {sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
                         </button>
                     )}
                </div>
 
-               {/* View Toggle */}
                <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                   <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-400 hover:text-gray-600'}`} title="列表视图">
+                   <button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`} title="列表视图">
                        <LayoutList className="w-4 h-4" />
                    </button>
-                   <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-bvb-black' : 'text-gray-400 hover:text-gray-600'}`} title="网格视图">
+                   <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`} title="网格视图">
                        <LayoutGrid className="w-4 h-4" />
                    </button>
                </div>
            </div>
 
-           {/* Filters */}
            <div className="flex w-full sm:w-auto items-center gap-2 overflow-x-auto no-scrollbar">
               <div className="flex gap-1 p-1 bg-gray-100 rounded-lg shrink-0">
-                {['全部', '前锋', '中场', '后卫', '门将'].map(pos => <button key={pos} onClick={() => setFilterPos(pos)} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-colors ${filterPos === pos ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{pos}</button>)}
+                {['全部', '前锋', '中场', '后卫', '门将'].map(pos => <button key={pos} onClick={() => setFilterPos(pos)} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-colors ${filterPos === pos ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-500'}`}>{pos}</button>)}
               </div>
-              <button onClick={() => setShowDraftsOnly(!showDraftsOnly)} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1 shrink-0 ${showDraftsOnly ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}><ClipboardCheck className="w-3 h-3" /> 草稿箱 / 未发布</button>
+              <button onClick={() => setShowDraftsOnly(!showDraftsOnly)} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1 shrink-0 ${showDraftsOnly ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}><ClipboardCheck className="w-3 h-3" /> 草稿箱</button>
            </div>
            
-           {/* Action Buttons */}
            <div className="flex gap-2 w-full sm:w-auto justify-end">
-               <button onClick={() => setIsSelectionMode(!isSelectionMode)} className={`p-2 rounded-lg border ${isSelectionMode ? 'bg-gray-800 text-white border-gray-800' : 'border-gray-300 text-gray-500 hover:bg-gray-50'}`} title="批量管理"><CheckSquare className="w-5 h-5" /></button>
+               <button onClick={() => setIsSelectionMode(!isSelectionMode)} className={`p-2 rounded-lg border ${isSelectionMode ? 'bg-gray-800 text-white' : 'border-gray-300 text-gray-500'}`} title="批量管理"><CheckSquare className="w-5 h-5" /></button>
                {isDirector && (
                    <>
-                        <button onClick={handleExportPlayerList} disabled={isExportingList} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-bvb-black" title="导出球员名单PDF">
+                        <button onClick={handleExportPlayerList} disabled={isExportingList} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="导出名单">
                             {isExportingList ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />}
                         </button>
-                        <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-bvb-black" title="批量导入球员">
+                        <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="批量导入">
                             <FileSpreadsheet className="w-5 h-5" />
                         </button>
-                        <button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg hover:brightness-105 shadow-sm">
+                        <button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-sm hover:brightness-105">
                             <Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员
                         </button>
                    </>
@@ -1952,22 +1944,21 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
            </div>
         </div>
         
-        {/* Banner for Drafts / Selection */}
         {(showDraftsOnly || isSelectionMode) && (
-            <div className={`px-4 py-2 rounded-lg mb-4 text-sm flex items-center justify-between ${showDraftsOnly ? 'bg-blue-50 border border-blue-100 text-blue-700' : 'bg-bvb-black text-white'}`}>
+            <div className={`px-4 py-2 rounded-lg mb-4 text-sm flex items-center justify-between ${showDraftsOnly ? 'bg-blue-50 text-blue-700' : 'bg-bvb-black text-white'}`}>
                 {showDraftsOnly && !isSelectionMode && (
                     <>
-                        <div className="flex items-center font-bold"><ClipboardCheck className="w-4 h-4 mr-2" />{isDirector ? '存在未发布的草稿' : '本队未发布的草稿'} ({filteredPlayers.length})</div>
+                        <div className="flex items-center font-bold"><ClipboardCheck className="w-4 h-4 mr-2" />{isDirector ? '未发布草稿' : '本队草稿'} ({filteredPlayers.length})</div>
                         <button onClick={() => setShowDraftsOnly(false)} className="text-xs hover:underline">清除筛选</button>
                     </>
                 )}
                 {isSelectionMode && (
                     <>
-                        <div className="flex items-center space-x-3"><button onClick={handleSelectAll} className="text-xs font-bold text-gray-400 hover:text-white">全选</button><span className="text-sm font-bold">已选: {selectedIds.size}</span></div>
+                        <div className="flex items-center space-x-3"><button onClick={handleSelectAll} className="text-xs font-bold text-gray-400">全选</button><span className="text-sm font-bold">已选: {selectedIds.size}</span></div>
                         <div className="flex space-x-2">
-                            <button disabled={selectedIds.size === 0} onClick={() => setShowTransferModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><ArrowRightLeft className="w-3 h-3 mr-1" /> 移交</button>
-                            {isDirector && <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs font-bold disabled:opacity-50 flex items-center"><CreditCard className="w-3 h-3 mr-1" /> 充值</button>}
-                            {isDirector && <button disabled={selectedIds.size === 0} onClick={executeBulkDelete} className="px-3 py-1 bg-red-900 hover:bg-red-800 rounded text-xs font-bold disabled:opacity-50 flex items-center"><Trash2 className="w-3 h-3 mr-1" /> 删除</button>}
+                            <button disabled={selectedIds.size === 0} onClick={() => setShowTransferModal(true)} className="px-3 py-1 bg-gray-700 rounded text-xs font-bold disabled:opacity-50">移交</button>
+                            {isDirector && <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 rounded text-xs font-bold disabled:opacity-50">充值</button>}
+                            {isDirector && <button disabled={selectedIds.size === 0} onClick={executeBulkDelete} className="px-3 py-1 bg-red-900 rounded text-xs font-bold disabled:opacity-50">删除</button>}
                             <button onClick={() => setIsSelectionMode(false)} className="px-2 hover:bg-gray-800 rounded"><X className="w-4 h-4" /></button>
                         </div>
                     </>
@@ -1975,23 +1966,22 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </div>
         )}
 
-        {/* --- LIST VIEW (TABLE) --- */}
         {viewMode === 'list' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 overflow-y-auto custom-scrollbar">
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 sticky top-0 z-10">
                         <tr>
-                            <th className="p-4 border-b border-gray-200 w-12 text-center">
+                            <th className="p-4 border-b w-12 text-center">
                                 {isSelectionMode && <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.size > 0 && selectedIds.size === filteredPlayers.length} />}
                             </th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">球员信息</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">梯队/位置</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">年龄</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase">综合评分</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden md:table-cell w-32">出勤率</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">课时余额</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase hidden md:table-cell">状态</th>
-                            <th className="p-4 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase text-right">操作</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase">球员信息</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase">梯队/位置</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">年龄</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase">综合评分</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell w-32">出勤率</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">课时余额</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell">状态</th>
+                            <th className="p-4 border-b text-xs font-bold text-gray-500 uppercase text-right">操作</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -2075,7 +2065,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                     <td className="p-4 hidden md:table-cell">
                                         <div className="flex flex-col gap-1 items-start">
                                             {hasDraftReviews && <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold border border-blue-100">点评草稿</span>}
-                                            {hasDraftStats && <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold border border-purple-100">数据更新中</span>}
+                                            {hasDraftStats && <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded font-bold border border-purple-100">数据更新</span>}
                                             {!hasDraftReviews && !hasDraftStats && <span className="text-[10px] text-gray-400">正常</span>}
                                         </div>
                                     </td>
@@ -2083,7 +2073,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                         {isDirector && (
                                             <button 
                                                 onClick={(e) => openRechargeModal(e, player.id)} 
-                                                className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" 
+                                                className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black transition-colors" 
                                                 title="充值"
                                             >
                                                 <CreditCard className="w-4 h-4" />
@@ -2093,12 +2083,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                             <button 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    if (confirm('确定要删除这名球员吗？此操作不可撤销。')) {
+                                                    if (confirm('确定要删除这名球员吗？')) {
                                                         onDeletePlayer(player.id);
                                                     }
                                                 }}
-                                                className="p-1.5 bg-white border border-gray-200 rounded text-red-400 hover:bg-red-50 hover:border-red-200 transition-colors shadow-sm" 
-                                                title="删除球员"
+                                                className="p-1.5 bg-white border border-gray-200 rounded text-red-400 hover:bg-red-50 transition-colors" 
+                                                title="删除"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -2107,20 +2097,13 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                 </tr>
                             );
                         }) : (
-                            <tr>
-                                <td colSpan={9} className="py-20 text-center text-gray-400">
-                                    <div className="flex justify-center mb-4"><Search className="w-12 h-12 opacity-20" /></div>
-                                    <p className="font-bold">未找到符合条件的球员</p>
-                                    <button onClick={() => { setSearchTerm(''); setFilterPos('全部'); }} className="mt-2 text-sm text-bvb-yellow underline">清除筛选条件</button>
-                                </td>
-                            </tr>
+                            <tr><td colSpan={9} className="py-20 text-center text-gray-400 italic">未找到匹配球员</td></tr>
                         )}
                     </tbody>
                 </table>
             </div>
         )}
 
-        {/* --- GRID VIEW (Original Cards) --- */}
         {viewMode === 'grid' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-20 custom-scrollbar flex-1">
                 {filteredPlayers.length > 0 ? filteredPlayers.map(player => {
@@ -2129,14 +2112,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     const overallRating = getOverallRating(player);
                     const attendanceRate = calculateAttendanceRate(player, trainings, attendanceScope);
                     const isExpiredValid = isExpired(player.validUntil);
-                    const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
-                    const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted';
                     const teamName = teams.find(t => t.id === player.teamId)?.name || (player.teamId === 'unassigned' ? '待分配' : '未知');
                     
                     return (
                     <div key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all cursor-pointer border relative group flex flex-col ${isSelected ? 'border-bvb-yellow ring-2 ring-bvb-yellow/50' : 'border-gray-200 hover:border-bvb-yellow'}`}>
                         {isSelectionMode && <div className={`absolute top-2 left-2 w-6 h-6 rounded border-2 z-30 flex items-center justify-center transition-colors ${isSelected ? 'bg-bvb-yellow border-bvb-yellow' : 'bg-white border-gray-300'}`}>{isSelected && <CheckSquare className="w-4 h-4 text-bvb-black" />}</div>}
-                        {(hasDraftReviews || hasDraftStats) && <div className="absolute top-2 right-2 z-20 flex flex-col gap-1 items-end">{hasDraftReviews && <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-gray-200">点评草稿</span>}{hasDraftStats && <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm border border-gray-200">数据草稿</span>}</div>}
                         <div className="flex p-4 gap-4">
                             <div className="relative flex-shrink-0">
                                 <div className="w-20 h-24 rounded-lg overflow-hidden bg-gray-100 shadow-inner relative"><img src={player.image} alt={player.name} className="w-full h-full object-cover object-top" /></div>
@@ -2151,37 +2131,28 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                                             <span className={`text-[10px] font-bold px-1 rounded ${player.teamId === 'unassigned' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-400'}`}>{teamName}</span>
                                             <span className="text-[10px] text-gray-400">#{player.number}</span>
                                         </div>
-                                        <div className="text-[10px] text-gray-400 mt-1 font-mono flex items-center">
-                                            <CalendarIcon className="w-3 h-3 mr-1 opacity-70" />
-                                            {player.birthDate}
-                                        </div>
                                     </div>
                                     <div className="flex flex-col items-end"><span className={`text-xl font-black ${parseFloat(overallRating) >= 8 ? 'text-green-500' : parseFloat(overallRating) >= 6 ? 'text-yellow-500' : 'text-gray-400'}`}>{overallRating}</span><span className="text-[9px] text-gray-300 uppercase font-bold">Rating</span></div>
                                 </div>
                                 <div className="mt-2 space-y-1">
                                     <div className="flex justify-between items-center text-xs"><span className="text-gray-400">出勤率</span><div className="flex items-center"><div className="w-12 h-1.5 bg-gray-100 rounded-full mr-1 overflow-hidden"><div className="h-full bg-bvb-black rounded-full" style={{ width: `${attendanceRate}%` }}></div></div><span className="font-bold">{attendanceRate}%</span></div></div>
-                                    <div className="flex justify-between items-center text-xs"><span className="text-gray-400">剩余课时</span><span className={`font-bold ${player.credits <= 5 ? 'text-red-500' : 'text-gray-700'}`}>{player.credits}</span></div>
+                                    <div className="flex justify-between items-center text-xs"><span className="text-gray-400">课时</span><span className={`font-bold ${player.credits <= 5 ? 'text-red-500' : 'text-gray-700'}`}>{player.credits}</span></div>
                                 </div>
                             </div>
                         </div>
                         <div className="bg-gray-50 px-4 py-2 border-t border-gray-100 flex justify-between items-center mt-auto">
-                            {birthdayStatus ? <span className={`text-[10px] text-white px-2 py-0.5 rounded-full font-bold flex items-center ${birthdayStatus.color}`}><Cake className="w-3 h-3 mr-1"/> {birthdayStatus.label}</span> : <span className="text-[10px] text-gray-400 flex items-center">{isExpiredValid ? <span className="text-red-400 font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/>已过期</span> : <span>有效期至 {player.validUntil}</span>}</span>}
-                            {isDirector && <button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-colors shadow-sm" title="充值"><CreditCard className="w-3 h-3" /></button>}
+                            {birthdayStatus ? <span className={`text-[10px] text-white px-2 py-0.5 rounded-full font-bold flex items-center ${birthdayStatus.color}`}><Cake className="w-3 h-3 mr-1"/> {birthdayStatus.label}</span> : <span className="text-[10px] text-gray-400 flex items-center">{isExpiredValid ? <span className="text-red-400 font-bold flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/>已过期</span> : <span>至 {player.validUntil}</span>}</span>}
+                            {isDirector && <button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black transition-colors" title="充值"><CreditCard className="w-3 h-3" /></button>}
                         </div>
                     </div>
                     );
                 }) : (
-                    <div className="col-span-full py-20 text-center text-gray-400">
-                        <div className="flex justify-center mb-4"><Search className="w-12 h-12 opacity-20" /></div>
-                        <p className="font-bold">未找到符合条件的球员</p>
-                        <button onClick={() => { setSearchTerm(''); setFilterPos('全部'); }} className="mt-2 text-sm text-bvb-yellow underline">清除筛选条件</button>
-                    </div>
+                    <div className="col-span-full py-20 text-center text-gray-400 italic">未找到匹配球员</div>
                 )}
             </div>
         )}
       </div>
 
-      {/* Modals */}
       {showAddPlayerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -2209,7 +2180,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   </div>
               </div>
               <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号 (自动解析生日/性别)</label>
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号 (自动解析)</label>
                   <input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none tracking-widest font-mono" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} placeholder="18位身份证号码" />
               </div>
               <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
@@ -2244,23 +2215,23 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
               </div>
 
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-4 space-y-3">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase">教育与家庭信息</h4>
+                  <h4 className="text-xs font-bold text-gray-500 uppercase">其他信息</h4>
                   <div className="grid grid-cols-2 gap-4">
                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">入队时间</label>
-                            <input type="date" className="w-full p-2 border rounded text-xs bg-white focus:outline-none" value={newPlayer.joinDate || ''} onChange={e => setNewPlayer({...newPlayer, joinDate: e.target.value})} />
+                            <input type="date" className="w-full p-2 border rounded text-xs bg-white" value={newPlayer.joinDate || ''} onChange={e => setNewPlayer({...newPlayer, joinDate: e.target.value})} />
                        </div>
                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">就读学校</label>
-                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="学校名称" value={newPlayer.school || ''} onChange={e => setNewPlayer({...newPlayer, school: e.target.value})} />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">学校</label>
+                            <input className="w-full p-2 border rounded text-xs bg-white" placeholder="学校名称" value={newPlayer.school || ''} onChange={e => setNewPlayer({...newPlayer, school: e.target.value})} />
                        </div>
                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">家长姓名</label>
-                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="姓名" value={newPlayer.parentName || ''} onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})} />
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">家长</label>
+                            <input className="w-full p-2 border rounded text-xs bg-white" placeholder="姓名" value={newPlayer.parentName || ''} onChange={e => setNewPlayer({...newPlayer, parentName: e.target.value})} />
                        </div>
                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">联系电话</label>
-                            <input className="w-full p-2 border rounded text-xs bg-white focus:outline-none" placeholder="手机号码" value={newPlayer.parentPhone || ''} onChange={e => setNewPlayer({...newPlayer, parentPhone: e.target.value})} />
+                            <input className="w-full p-2 border rounded text-xs bg-white" placeholder="手机" value={newPlayer.parentPhone || ''} onChange={e => setNewPlayer({...newPlayer, parentPhone: e.target.value})} />
                        </div>
                   </div>
               </div>
@@ -2281,7 +2252,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             <form onSubmit={handleAddTeamSubmit} className="p-6 space-y-4">
                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">梯队名称</label>
-                  <input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="例如: 多特蒙德 U15" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} />
+                  <input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="例如: U15 精英队" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} />
                </div>
                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">级别</label>
@@ -2349,7 +2320,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         />
       )}
 
-      {/* Hidden Export Template for Player List */}
       <div id="player-list-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
             <div className="flex items-center justify-between border-b-4 border-bvb-yellow pb-6 mb-8">
                 <div className="flex items-center">
@@ -2375,8 +2345,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <th className="p-3 font-black text-sm uppercase text-gray-600">位置</th>
                         <th className="p-3 font-black text-sm uppercase text-gray-600">年龄</th>
                         <th className="p-3 font-black text-sm uppercase text-gray-600">入队时间</th>
-                        <th className="p-3 font-black text-sm uppercase text-gray-600">监护人</th>
-                        <th className="p-3 font-black text-sm uppercase text-gray-600 text-right">联系电话</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600 text-right">监护人</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2388,10 +2357,9 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             </td>
                             <td className="p-3">{teams.find(t => t.id === p.teamId)?.name || '待分配'}</td>
                             <td className="p-3">{p.position}</td>
-                            <td className="p-3">{p.age}岁 ({p.birthDate})</td>
+                            <td className="p-3">{p.age}岁</td>
                             <td className="p-3">{p.joinDate || '-'}</td>
-                            <td className="p-3">{p.parentName || '-'}</td>
-                            <td className="p-3 text-right font-mono">{p.parentPhone || '-'}</td>
+                            <td className="p-3 text-right">{p.parentName || '-'} {p.parentPhone || ''}</td>
                         </tr>
                     ))}
                 </tbody>
