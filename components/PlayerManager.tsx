@@ -1105,7 +1105,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                   <>
                     <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">退出</button>
                     <button onClick={handleSave} className={`px-3 py-1 font-bold rounded hover:brightness-110 text-sm flex items-center ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-yellow text-bvb-black'}`}>
-                        {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-1" />} 
+                        {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-2" />} 
                         {saveStatus === 'saved' ? '已保存' : '保存'}
                     </button>
                   </>
@@ -1172,16 +1172,35 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                           <div className="text-center mt-4 w-full">
                             {isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}
                             <div className="flex justify-center items-center mt-2 space-x-2">
-                                <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>
                                 {isEditing ? (
-                                    <select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="text-xs bg-gray-100 p-1 rounded border" disabled={isCoach}>
-                                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                        <option value="unassigned">待分配</option>
-                                    </select>
+                                    <div className="flex gap-2 items-center">
+                                        <div className="relative group">
+                                            <select 
+                                                value={editedPlayer.position} 
+                                                onChange={e => setEditedPlayer({...editedPlayer, position: e.target.value as Position})}
+                                                className={`appearance-none px-3 py-1 pr-6 rounded text-xs font-bold uppercase border-none focus:ring-2 focus:ring-offset-1 focus:ring-bvb-yellow cursor-pointer ${getPosColor(editedPlayer.position)}`}
+                                            >
+                                                {Object.values(Position).map(pos => <option key={pos} value={pos} className="text-black bg-white">{pos}</option>)}
+                                            </select>
+                                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white pointer-events-none" />
+                                        </div>
+                                        <select 
+                                            value={editedPlayer.teamId} 
+                                            onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} 
+                                            className="text-xs bg-gray-100 p-1 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                                            disabled={isCoach}
+                                        >
+                                            {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                            <option value="unassigned">待分配</option>
+                                        </select>
+                                    </div>
                                 ) : (
-                                    <span className="text-sm font-bold text-gray-500">
-                                        {teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}
-                                    </span>
+                                    <>
+                                        <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>
+                                        <span className="text-sm font-bold text-gray-500">
+                                            {teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}
+                                        </span>
+                                    </>
                                 )}
                             </div>
                           </div>
@@ -1546,7 +1565,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
+  const [showAddPlayerModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
@@ -1766,7 +1785,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             gallery: []
         };
         onAddPlayer(p);
-        setShowAddPlayerModal(false);
+        setShowAddModal(false);
         setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '' });
     }
   };
@@ -1925,7 +1944,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-bvb-black" title="批量导入球员">
                             <FileSpreadsheet className="w-5 h-5" />
                         </button>
-                        <button onClick={() => setShowAddPlayerModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg hover:brightness-105 shadow-sm">
+                        <button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg hover:brightness-105 shadow-sm">
                             <Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员
                         </button>
                    </>
@@ -2168,7 +2187,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
                 <h3 className="font-bold flex items-center"><Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 录入新球员</h3>
-                <button onClick={() => setShowAddPlayerModal(false)}><X className="w-5 h-5" /></button>
+                <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
             </div>
             <form onSubmit={handleAddPlayerSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-center mb-4">
