@@ -1,9 +1,25 @@
 
 export enum Position {
-  GK = '门将',
-  DEF = '后卫',
-  MID = '中场',
-  FWD = '前锋'
+  // 守门员
+  GK_ATT = '进攻型守门员',
+  GK_DEF = '防守型守门员',
+  // 后卫
+  CB = '中后卫',
+  LB = '左边后卫',
+  RB = '右边后卫',
+  LWB = '左边翼卫',
+  RWB = '右边翼卫',
+  // 中场
+  CAM = '进攻型中场',
+  CM = '组织型中场',
+  CDM = '防守型中场',
+  // 前锋
+  F9 = '伪9号',
+  ST = '中锋',
+  LW = '左边锋',
+  RW = '右边锋',
+  // 待定
+  TBD = '位置待定'
 }
 
 export type AttendanceStatus = 'Present' | 'Leave' | 'Injury' | 'Absent';

@@ -124,23 +124,21 @@ const isExpired = (dateStr?: string) => {
 };
 
 const getPosColor = (pos: Position) => {
-    switch(pos) {
-        case Position.GK: return 'bg-yellow-500 text-white border-yellow-500';
-        case Position.DEF: return 'bg-blue-600 text-white border-blue-600';
-        case Position.MID: return 'bg-green-600 text-white border-green-600';
-        case Position.FWD: return 'bg-red-600 text-white border-red-600';
-        default: return 'bg-gray-50 border-gray-500';
-    }
+    const p = pos.toString();
+    if (p.includes('锋') || p.includes('9')) return 'bg-red-600 text-white border-red-600';
+    if (p.includes('中场')) return 'bg-green-600 text-white border-green-600';
+    if (p.includes('卫') || p.includes('翼卫')) return 'bg-blue-600 text-white border-blue-600';
+    if (p.includes('守门员')) return 'bg-yellow-500 text-white border-yellow-500';
+    return 'bg-gray-500 text-white border-gray-500';
 };
 
 const getPosColorLight = (pos: Position) => {
-    switch(pos) {
-        case Position.GK: return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-        case Position.DEF: return 'bg-blue-50 text-blue-700 border-blue-200';
-        case Position.MID: return 'bg-green-50 text-green-700 border-green-200';
-        case Position.FWD: return 'bg-red-50 text-red-700 border-red-200';
-        default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
+    const p = pos.toString();
+    if (p.includes('锋') || p.includes('9')) return 'bg-red-50 text-red-700 border-red-200';
+    if (p.includes('中场')) return 'bg-green-50 text-green-700 border-green-200';
+    if (p.includes('卫') || p.includes('翼卫')) return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (p.includes('守门员')) return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+    return 'bg-gray-50 text-gray-700 border-gray-200';
 };
 
 const getStatusColor = (status?: ApprovalStatus) => {
@@ -235,7 +233,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
 
     const handleDownloadTemplate = () => {
         const headers = "姓名,球衣号码,场上位置,身份证号,入队时间,就读学校,家长姓名,联系电话,惯用脚(左/右)\n";
-        const example = "张三,10,中场,110101201001011234,2023-01-01,实验小学,张父,13800138000,右\n";
+        const example = "张三,10,中锋,110101201001011234,2023-01-01,实验小学,张父,13800138000,右\n";
         const content = headers + example;
         const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -282,10 +280,11 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                 const parentPhone = cols[7] || '';
                 const foot = cols[8] === '左' ? '左' : '右';
 
-                let position: Position = Position.MID;
-                if (positionStr.includes('门')) position = Position.GK;
-                else if (positionStr.includes('卫')) position = Position.DEF;
-                else if (positionStr.includes('锋')) position = Position.FWD;
+                let position: Position = Position.ST;
+                if (positionStr.includes('守门员')) position = Position.GK_ATT;
+                else if (positionStr.includes('后卫')) position = Position.CB;
+                else if (positionStr.includes('中场')) position = Position.CM;
+                else if (positionStr.includes('锋') || positionStr.includes('9')) position = Position.ST;
 
                 let gender: '男' | '女' = '男';
                 let age = 10;
@@ -561,6 +560,53 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
                     </button>
                 </div>
             </div>
+        </div>
+    );
+};
+
+interface PositionSelectProps {
+    value: Position;
+    onChange: (val: Position) => void;
+    className?: string;
+    disabled?: boolean;
+}
+
+const PositionSelect: React.FC<PositionSelectProps> = ({ value, onChange, className, disabled }) => {
+    return (
+        <div className="relative group">
+            <select 
+                disabled={disabled}
+                value={value} 
+                onChange={e => onChange(e.target.value as Position)}
+                className={`appearance-none w-full p-2 rounded text-sm font-bold border-none focus:ring-2 focus:ring-offset-1 focus:ring-bvb-yellow cursor-pointer ${className || ''}`}
+            >
+                <optgroup label="守门员" className="text-gray-400 font-normal">
+                    <option value={Position.GK_ATT} className="text-black bg-white">{Position.GK_ATT}</option>
+                    <option value={Position.GK_DEF} className="text-black bg-white">{Position.GK_DEF}</option>
+                </optgroup>
+                <optgroup label="后卫" className="text-gray-400 font-normal">
+                    <option value={Position.CB} className="text-black bg-white">{Position.CB}</option>
+                    <option value={Position.LB} className="text-black bg-white">{Position.LB}</option>
+                    <option value={Position.RB} className="text-black bg-white">{Position.RB}</option>
+                    <option value={Position.LWB} className="text-black bg-white">{Position.LWB}</option>
+                    <option value={Position.RWB} className="text-black bg-white">{Position.RWB}</option>
+                </optgroup>
+                <optgroup label="中场" className="text-gray-400 font-normal">
+                    <option value={Position.CAM} className="text-black bg-white">{Position.CAM}</option>
+                    <option value={Position.CM} className="text-black bg-white">{Position.CM}</option>
+                    <option value={Position.CDM} className="text-black bg-white">{Position.CDM}</option>
+                </optgroup>
+                <optgroup label="前锋" className="text-gray-400 font-normal">
+                    <option value={Position.F9} className="text-black bg-white">{Position.F9}</option>
+                    <option value={Position.ST} className="text-black bg-white">{Position.ST}</option>
+                    <option value={Position.LW} className="text-black bg-white">{Position.LW}</option>
+                    <option value={Position.RW} className="text-black bg-white">{Position.RW}</option>
+                </optgroup>
+                <optgroup label="其他" className="text-gray-400 font-normal">
+                    <option value={Position.TBD} className="text-black bg-white">{Position.TBD}</option>
+                </optgroup>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-white pointer-events-none opacity-50" />
         </div>
     );
 };
@@ -1195,21 +1241,18 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             {isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}
                             <div className="flex justify-center items-center mt-2 space-x-2">
                                 {isEditing ? (
-                                    <div className="flex gap-2 items-center">
-                                        <div className="relative group">
-                                            <select 
+                                    <div className="flex gap-2 items-center w-full max-w-[240px]">
+                                        <div className="flex-1">
+                                            <PositionSelect 
                                                 value={editedPlayer.position} 
-                                                onChange={e => setEditedPlayer({...editedPlayer, position: e.target.value as Position})}
-                                                className={`appearance-none px-3 py-1 pr-6 rounded text-xs font-bold uppercase border-none focus:ring-2 focus:ring-offset-1 focus:ring-bvb-yellow cursor-pointer ${getPosColor(editedPlayer.position)}`}
-                                            >
-                                                {Object.values(Position).map(pos => <option key={pos} value={pos} className="text-black bg-white">{pos}</option>)}
-                                            </select>
-                                            <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white pointer-events-none" />
+                                                onChange={val => setEditedPlayer({...editedPlayer, position: val})}
+                                                className={getPosColor(editedPlayer.position)}
+                                            />
                                         </div>
                                         <select 
                                             value={editedPlayer.teamId} 
                                             onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} 
-                                            className="text-xs bg-gray-100 p-1 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                                            className="text-xs bg-gray-100 p-1 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" 
                                             disabled={isCoach}
                                         >
                                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -1628,7 +1671,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     gender: '男',
     idCard: '',
     birthDate: '',
-    position: Position.MID,
+    position: Position.ST,
     number: 0,
     age: 0,
     image: '',
@@ -1695,7 +1738,19 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
 
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesPos = filterPos === '全部' || p.position === filterPos;
+    
+    // Category mapping for filters
+    const posVal = p.position.toString();
+    const isFwd = posVal.includes('锋') || posVal.includes('9');
+    const isMid = posVal.includes('中场');
+    const isDef = posVal.includes('后卫') || posVal.includes('翼卫');
+    const isGk = posVal.includes('守门员');
+
+    const matchesPos = filterPos === '全部' || 
+        (filterPos === '前锋' && isFwd) ||
+        (filterPos === '中场' && isMid) ||
+        (filterPos === '后卫' && isDef) ||
+        (filterPos === '门将' && isGk);
     
     if (showDraftsOnly) {
         const hasDraftReviews = p.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted');
@@ -1826,7 +1881,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         };
         onAddPlayer(p);
         setShowAddModal(false);
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
     }
   };
 
@@ -2222,9 +2277,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
               <div className="grid grid-cols-2 gap-4">
                   <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">场上位置</label>
-                      <select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={newPlayer.position} onChange={e => setNewPlayer({...newPlayer, position: e.target.value as Position})}>
-                          {Object.values(Position).map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
+                      <PositionSelect 
+                        value={newPlayer.position || Position.ST} 
+                        onChange={val => setNewPlayer({...newPlayer, position: val})}
+                        className={getPosColor(newPlayer.position || Position.ST)}
+                      />
                   </div>
                   <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label>
