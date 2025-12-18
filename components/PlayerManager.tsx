@@ -493,7 +493,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-sm p-6 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
                 <h3 className="font-bold text-lg mb-2 flex items-center"><CreditCard className="w-5 h-5 mr-2 text-bvb-yellow"/> 课时充值</h3>
                 <p className="text-sm text-gray-500 mb-4">为 <span className="font-bold text-bvb-black">{player.name}</span> 充值课时及请假额度。</p>
                 
@@ -502,7 +502,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数</label>
                         <input 
                             type="number" 
-                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            className="w-full p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
                         />
@@ -511,7 +511,7 @@ const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">增加请假额度 (次)</label>
                         <input 
                             type="number" 
-                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            className="w-full p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={quota}
                             onChange={(e) => setQuota(e.target.value)}
                         />
@@ -544,7 +544,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-sm p-6 animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
                 <h3 className="font-bold text-lg mb-2 flex items-center"><CreditCard className="w-5 h-5 mr-2 text-bvb-yellow"/> 批量充值</h3>
                 <p className="text-sm text-gray-500 mb-4">为选中的 <span className="font-bold text-bvb-black">{count}</span> 名球员进行充值。</p>
                 
@@ -553,7 +553,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">充值课时数 (每人)</label>
                         <input 
                             type="number" 
-                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            className="w-full p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
                         />
@@ -562,7 +562,7 @@ const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, o
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">增加请假额度 (每人)</label>
                         <input 
                             type="number" 
-                            className="w-full p-2 border rounded-lg text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                            className="w-full p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
                             value={quota}
                             onChange={(e) => setQuota(e.target.value)}
                         />
@@ -1034,7 +1034,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                         <div><label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} /></div>
                         <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
                             <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">{editingReviewId ? '更新草稿' : '保存草稿'}</button>
-                            <button type="button" onClick={() => handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
+                            <button type="button" onClick={handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
                         </div>
                     </form>
                 </div>
