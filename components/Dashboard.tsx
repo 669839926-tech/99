@@ -174,7 +174,11 @@ const Dashboard: React.FC<DashboardProps> = ({
         if(nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
         const diffTime = nextBirthday.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return { ...p, daysUntil: diffDays };
+        
+        // 格式化月日
+        const monthDay = `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        
+        return { ...p, daysUntil: diffDays, monthDay };
     }).sort((a,b) => a.daysUntil - b.daysUntil);
 
     const lowCreditPlayers = displayPlayers.filter(p => p.credits <= 2).sort((a,b) => a.credits - b.credits);
@@ -714,7 +718,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex flex-wrap gap-2">
                             {stats.upcomingBirthdays.map(p => (
                                 <span key={p.id} className="bg-pink-50 text-pink-700 px-2 py-1 rounded text-xs font-bold border border-pink-100 flex items-center">
-                                    {p.name} ({p.daysUntil === 0 ? '今天' : `${p.daysUntil}天后`})
+                                    {p.name} [{p.monthDay}] ({p.daysUntil === 0 ? '今天' : `${p.daysUntil}天后`})
                                 </span>
                             ))}
                         </div>
