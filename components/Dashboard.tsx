@@ -30,7 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
       const d = new Date();
-      d.setDate(1); // Modified: Default to 1st day of current month
+      d.setDate(1); // Default to 1st day of current month
       return d.toISOString().split('T')[0];
   });
   const [customEndDate, setCustomEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -58,7 +58,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const displayPlayers = useMemo(() => {
       if (isDirector) return players;
-      // Coaches only see players in their managed teams
       return players.filter(p => managedTeamIds.includes(p.teamId));
   }, [players, isDirector, managedTeamIds]);
 
@@ -78,24 +77,51 @@ const Dashboard: React.FC<DashboardProps> = ({
       const start = new Date();
       
       if (range === 'month') {
-          start.setDate(1); // Modified: Set to 1st of current month
+          start.setDate(1);
       } else if (range === 'quarter') {
           start.setMonth(end.getMonth() - 3);
       } else if (range === 'year') {
           start.setFullYear(end.getFullYear() - 1);
       }
-      // If custom, we don't overwrite dates immediately, keep previous custom or default
       if (range !== 'custom') {
           setCustomStartDate(start.toISOString().split('T')[0]);
           setCustomEndDate(end.toISOString().split('T')[0]);
       }
   };
 
+  // Quick Action: Jump to individual report from credit alert
+  const handleLowCreditPlayerClick = (player: Player) => {
+      // 1. 设置球员ID
+      setAttendancePlayerId(player.id);
+      // 2. 找到最后一次充值日期作为开始日期
+      const lastRecharge = player.rechargeHistory && player.rechargeHistory.length > 0
+          ? [...player.rechargeHistory].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+          : null;
+      
+      if (lastRecharge) {
+          setCustomStartDate(lastRecharge.date);
+      } else if (player.joinDate) {
+          setCustomStartDate(player.joinDate);
+      } else {
+          const monthAgo = new Date();
+          monthAgo.setMonth(monthAgo.getMonth() - 1);
+          setCustomStartDate(monthAgo.toISOString().split('T')[0]);
+      }
+
+      // 3. 设置结束日期为今天
+      setCustomEndDate(new Date().toISOString().split('T')[0]);
+      // 4. 强制切换为自定义范围以触发
+      setAttendanceRange('custom');
+      
+      // 5. 滚动到分析区域
+      document.getElementById('attendance-analysis-section')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   // Reset selections when filter changes
   useEffect(() => {
       setAttendancePlayerId('all');
       setSelectedSessionId(null);
-  }, [attendanceTeamId, attendanceRange, customStartDate, customEndDate, analysisView]);
+  }, [attendanceTeamId, attendanceRange]);
 
   // Director Pending Tasks Logic
   const pendingTasks = useMemo(() => {
@@ -123,10 +149,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     const losses = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) < parseInt(m.result.split('-')[1])).length;
     const draws = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) === parseInt(m.result.split('-')[1])).length;
     
-    // Use displayPlayers for ranking
     const sortedPlayers = [...displayPlayers].sort((a, b) => b.goals - a.goals);
 
-    // Birthday Logic (Use displayPlayers)
     const today = new Date();
     today.setHours(0,0,0,0);
     
@@ -153,16 +177,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         return { ...p, daysUntil: diffDays };
     }).sort((a,b) => a.daysUntil - b.daysUntil);
 
-    // Low Credit Logic (Use displayPlayers)
     const lowCreditPlayers = displayPlayers.filter(p => p.credits <= 2).sort((a,b) => a.credits - b.credits);
     
-    // Team Counts Logic (Use displayTeams and displayPlayers)
     const teamCounts = displayTeams.map(t => ({
         id: t.id,
         name: t.name,
         count: displayPlayers.filter(p => p.teamId === t.id).length
     }));
-    // Only check unassigned if Director (or if coach has unassigned access, which current logic excludes for coaches)
     if (isDirector) {
         const unassignedCount = displayPlayers.filter(p => p.teamId === 'unassigned').length;
         if (unassignedCount > 0) {
@@ -183,7 +204,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // --- Attendance Analytics Logic ---
   const { chartData, averageRate, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
-    // 1. Filtered Sessions (Use displayTrainings)
     const start = new Date(customStartDate);
     const end = new Date(customEndDate);
     end.setHours(23, 59, 59, 999);
@@ -195,7 +215,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         return matchDate && matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // 2. Filtered Players for Dropdown & Chart Context (Use displayPlayers)
     const teamPlayers = displayPlayers.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
 
     if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], exportSessionsData: [], teamPlayersList: teamPlayers };
@@ -204,9 +223,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     let grandTotalRate = 0;
     let grandTotalCount = 0;
 
-    // --- Chart Data Calculation ---
     if (analysisView === 'session') {
-        // By Session: X-Axis is Date/Session
         data = filteredSessions.map(s => {
              const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
              const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
@@ -221,11 +238,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                  rate,
                  fullDate: s.date,
                  title: s.title,
-                 id: s.id // Ensure ID is passed for click handling
+                 id: s.id
              };
         });
     } else {
-        // By Time Grouping (Week/Month)
         const groupedData: Record<string, { totalRate: number; count: number }> = {};
         
         filteredSessions.forEach(session => {
@@ -257,7 +273,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         }));
     }
     
-    // Export Data 1: Player Summary
     const exportList = teamPlayers.map(p => {
          const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
          const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
@@ -267,14 +282,13 @@ const Dashboard: React.FC<DashboardProps> = ({
          return { ...p, present: pPresent, leave: pLeave, injury: pInjury, total: pSessions.length, rate };
     }).sort((a,b) => b.rate - a.rate);
 
-    // Export Data 2: Session Summary (New)
     const exportSessions = filteredSessions.map(s => {
          const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId);
          const total = sTeamPlayers.length;
          const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
          const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
          const injury = s.attendance?.filter(r => r.status === 'Injury').length || 0;
-         const absent = s.attendance?.filter(r => r.status === 'Absent').length || 0; // Explicit absent
+         const absent = s.attendance?.filter(r => r.status === 'Absent').length || 0;
          const rate = total > 0 ? Math.round((present / total) * 100) : 0;
          
          return {
@@ -311,7 +325,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     const team = teams.find(t => t.id === session.teamId);
     const sessionPlayers = players.filter(p => p.teamId === session.teamId);
     
-    // Grouping
     const groups = {
         Present: [] as Player[],
         Leave: [] as Player[],
@@ -328,7 +341,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return (
         <div className="space-y-6 animate-in slide-in-from-right-4">
-            {/* Header */}
             <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
                 <button onClick={() => setSelectedSessionId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
                     <ChevronDown className="w-5 h-5 text-gray-500 rotate-90" />
@@ -343,9 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-            {/* Lists */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Present */}
                 <div className="bg-green-50 rounded-xl p-4 border border-green-100 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-sm font-bold text-green-800 flex items-center"><CheckCircle className="w-4 h-4 mr-1.5"/> 实到 ({groups.Present.length})</span>
@@ -359,7 +369,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {groups.Present.length === 0 && <span className="text-xs text-green-400 italic">无</span>}
                     </div>
                 </div>
-                {/* Leave */}
                 <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-100 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-sm font-bold text-yellow-800 flex items-center"><Clock className="w-4 h-4 mr-1.5"/> 请假 ({groups.Leave.length})</span>
@@ -373,7 +382,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {groups.Leave.length === 0 && <span className="text-xs text-yellow-400 italic">无</span>}
                     </div>
                 </div>
-                {/* Injury */}
                 <div className="bg-red-50 rounded-xl p-4 border border-red-100 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-sm font-bold text-red-800 flex items-center"><AlertCircle className="w-4 h-4 mr-1.5"/> 伤停 ({groups.Injury.length})</span>
@@ -387,7 +395,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {groups.Injury.length === 0 && <span className="text-xs text-red-400 italic">无</span>}
                     </div>
                 </div>
-                {/* Absent */}
                 <div className="bg-gray-100 rounded-xl p-4 border border-gray-200 flex flex-col">
                     <div className="flex justify-between items-center mb-3">
                         <span className="text-sm font-bold text-gray-600 flex items-center"><Ban className="w-4 h-4 mr-1.5"/> 缺席 ({groups.Absent.length})</span>
@@ -420,7 +427,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const relevantSessions = displayTrainings.filter(s => {
           const d = new Date(s.date);
           return d >= start && d <= end && s.teamId === player.teamId;
-      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()); // Recent first
+      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
       const sessionRecords = relevantSessions.map(s => {
           const record = s.attendance?.find(r => r.playerId === player.id);
@@ -466,7 +473,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     e.preventDefault();
     if (newAnnouncement.title && newAnnouncement.content) {
         if (editingAnnouncementId && onUpdateAnnouncement) {
-             // Update existing
              const original = announcements.find(a => a.id === editingAnnouncementId);
              onUpdateAnnouncement({
                  id: editingAnnouncementId,
@@ -478,7 +484,6 @@ const Dashboard: React.FC<DashboardProps> = ({
              });
              setEditingAnnouncementId(null);
         } else if (onAddAnnouncement) {
-            // Add new
             onAddAnnouncement({
                 id: Date.now().toString(),
                 title: newAnnouncement.title,
@@ -538,12 +543,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="text-sm font-black text-bvb-black max-w-[100px] truncate">{stats.nextMatch ? stats.nextMatch.opponent : '无'}</div>
                 </div>
            </div>
-           {/* Background Decoration */}
            <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/20 to-transparent pointer-events-none"></div>
            <Trophy className="absolute -right-6 -bottom-6 w-48 h-48 text-white/20 rotate-12 pointer-events-none" />
         </div>
 
-        {/* ... (Pending Tasks Widget) ... */}
+        {/* Pending Tasks Widget */}
         {isDirector && pendingTasks.total > 0 && (
             <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-6 animate-in slide-in-from-top-4">
                 <div className="flex justify-between items-center mb-4">
@@ -672,12 +676,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {stats.lowCreditPlayers.length} 人
                             </span>
                         </div>
+                        <p className="text-[10px] text-gray-400 mb-3">* 点击球员直接生成充值后出勤分析</p>
                         {stats.lowCreditPlayers.length > 0 ? (
                             <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
                                 {stats.lowCreditPlayers.map(p => (
-                                    <div key={p.id} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm">
-                                        <span className="font-bold text-gray-700">{p.name}</span>
-                                        <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
+                                    <div 
+                                        key={p.id} 
+                                        onClick={() => handleLowCreditPlayerClick(p)}
+                                        className="flex justify-between items-center bg-red-50 p-2 rounded text-sm cursor-pointer hover:bg-red-100 transition-colors group"
+                                    >
+                                        <span className="font-bold text-gray-700 group-hover:text-red-800">{p.name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
+                                            <ArrowRight className="w-3 h-3 text-red-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -736,7 +748,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                     )}
                 </div>
                 
-                {/* Add/Edit Form (Only if allowed) */}
                 {showAnnounceForm && isDirector && (
                     <div className="p-4 bg-yellow-50 border-b border-yellow-100 animate-in slide-in-from-top-2">
                         <form onSubmit={handleAddAnnouncementSubmit} className="space-y-3">
@@ -774,7 +785,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 )}
 
-                {/* List */}
                 <div className="flex-1 overflow-y-auto max-h-[300px] p-4 space-y-3 custom-scrollbar">
                     {announcements.length > 0 ? (
                         announcements.map(item => {
@@ -828,7 +838,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
         
         {/* Attendance Analysis Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col">
+        <div id="attendance-analysis-section" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col scroll-mt-20">
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-gray-100 pb-4">
                 <h3 className="text-xl font-bold text-gray-800 flex items-center">
                     <Activity className="w-6 h-6 mr-2 text-bvb-yellow" />
@@ -900,7 +910,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="flex items-center gap-4">
                             <img src={individualReport.player.image} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
                             <div>
-                                <h3 className="text-lg font-black text-gray-800">{individualReport.player.name}</h3>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-lg font-black text-gray-800">{individualReport.player.name}</h3>
+                                    <button onClick={() => setAttendancePlayerId('all')} className="text-[10px] text-blue-600 font-bold hover:underline">返回全体列表</button>
+                                </div>
                                 <p className="text-xs text-gray-500">#{individualReport.player.number} • {individualReport.player.position}</p>
                             </div>
                         </div>
@@ -960,7 +973,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                 /* --- Session View Table --- */
                 <div className="space-y-6">
-                    {/* Chart (Optional - Showing Rate trend per session) */}
                     <div className="h-48 w-full">
                         {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
@@ -1036,7 +1048,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             ) : (
                 /* --- Overview View (Player List) --- */
                 <div className="space-y-6">
-                    {/* Chart */}
                     <div className="h-64 w-full">
                         {chartData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
@@ -1058,7 +1069,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )}
                     </div>
 
-                    {/* Team Stats Summary */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
                             <span className="text-xs text-gray-400 font-bold uppercase">区间平均出勤率</span>
@@ -1070,7 +1080,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     </div>
 
-                    {/* Players Table */}
                     <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase sticky top-0 z-10">
@@ -1130,7 +1139,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                  <div className="text-xl font-black">{customStartDate} ~ {customEndDate}</div>
              </div>
           </div>
-          {/* Default to Player List for PDF Export if in session mode, or expand logic to support session export in future */}
           <table className="w-full text-left border-collapse">
             <thead className="bg-gray-100 border-b-2 border-gray-300">
               <tr>
