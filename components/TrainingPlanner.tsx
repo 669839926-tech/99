@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -165,7 +165,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                            {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                       </div>
-                      <button onClick={() => onDuplicate(session)} className="p-1 hover:text-bvb-yellow" title="复制训练计划">
+                      <button onClick={() => onDuplicate(session)} className="p-1 hover:text-bvb-yellow" title="复制并选择日期">
                           <Copy className="w-5 h-5" />
                       </button>
                       {canEditLog && (
@@ -392,6 +392,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Duplication State
+  const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
+  const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   // --- Filtering Teams for Coaches ---
   const availableTeams = useMemo(() => {
@@ -746,6 +750,25 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         }
   };
 
+  const handleDuplicateConfirm = () => {
+      if (!sessionToDuplicate) return;
+      
+      const copy: TrainingSession = {
+          ...sessionToDuplicate,
+          id: Date.now().toString(),
+          title: `${sessionToDuplicate.title} (副本)`,
+          date: duplicateDate,
+          submissionStatus: 'Planned',
+          attendance: [], // Clear attendance for the new copy
+          coachFeedback: '',
+          directorReview: ''
+      };
+      
+      onAddTraining(copy);
+      setSessionToDuplicate(null);
+      alert('已成功复制训练计划到 ' + duplicateDate);
+  };
+
   const addDrill = () => {
       if(drillInput.trim()) {
           setFormData(prev => ({ ...prev, drills: [...prev.drills, drillInput.trim()] }));
@@ -956,6 +979,51 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             </div>
         )}
 
+        {/* Modal: Duplication Date Selection (NEW) */}
+        {sessionToDuplicate && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
+                        <h3 className="font-bold flex items-center"><Copy className="w-4 h-4 mr-2 text-bvb-yellow" /> 复制训练计划</h3>
+                        <button onClick={() => setSessionToDuplicate(null)}><X className="w-5 h-5" /></button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="bg-gray-50 p-3 rounded border border-gray-100">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">正在复制</span>
+                            <div className="font-bold text-gray-800">{sessionToDuplicate.title}</div>
+                        </div>
+                        
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center">
+                                <CalendarDays className="w-3 h-3 mr-1 text-bvb-yellow" /> 选择新计划的日期
+                            </label>
+                            <input 
+                                type="date" 
+                                className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition-colors"
+                                value={duplicateDate}
+                                onChange={e => setDuplicateDate(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="pt-2 flex gap-3">
+                            <button 
+                                onClick={() => setSessionToDuplicate(null)}
+                                className="flex-1 py-2 bg-gray-100 text-gray-600 font-bold rounded hover:bg-gray-200 transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button 
+                                onClick={handleDuplicateConfirm}
+                                className="flex-1 py-2 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 transition-colors shadow-sm"
+                            >
+                                确认复制
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Modal: Design Selection */}
         {showDesignSelectModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -994,9 +1062,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 currentUser={currentUser}
                 onUpdate={(s, att) => { onUpdateTraining(s, att); setSelectedSession(s); }}
                 onDuplicate={(s) => {
-                     const copy = { ...s, id: Date.now().toString(), title: `${s.title} (副本)`, date: new Date().toISOString().split('T')[0], submissionStatus: 'Planned' as any, attendance: [] };
-                     onAddTraining(copy);
-                     alert('已创建副本');
+                     setSessionToDuplicate(s);
+                     setDuplicateDate(new Date().toISOString().split('T')[0]); // Default to today for new copy
                 }}
                 onDelete={(id) => { onDeleteTraining(id); setSelectedSession(null); }}
                 onClose={() => setSelectedSession(null)}
