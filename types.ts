@@ -92,6 +92,12 @@ export interface Player {
   parentName?: string;    // 家长姓名
   parentPhone?: string;   // 联系方式
 
+  // Newly requested fields
+  preferredFoot: '左' | '右'; // 惯用脚 (必填)
+  height?: number;           // 身高 (cm)
+  weight?: number;           // 体重 (kg)
+  nickname?: string;         // 昵称
+
   // Stats System
   stats: PlayerStats; // Current working copy (Draft/Submitted)
   statsStatus?: ApprovalStatus; // Status of the working copy

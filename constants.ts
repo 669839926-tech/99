@@ -163,6 +163,10 @@ const createMockPlayer = (data: Partial<Player>): Player => {
     const stats = generateStats();
     return {
         ...data,
+        preferredFoot: data.preferredFoot || '右',
+        height: data.height || 175,
+        weight: data.weight || 65,
+        nickname: data.nickname || '',
         stats: stats,
         statsStatus: 'Published',
         lastPublishedStats: JSON.parse(JSON.stringify(stats)), // Clone
@@ -178,7 +182,7 @@ const createMockPlayer = (data: Partial<Player>): Player => {
 // P5-P7: Target as is. Attended 0.
 
 export const MOCK_PLAYERS: Player[] = [
-  createMockPlayer({ id: '1', teamId: 't1', name: '马尔科·罗伊斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 11, position: Position.MID, isCaptain: true, age: 18, goals: 12, assists: 8, appearances: 15, image: 'https://picsum.photos/200/200?random=1', reviews: MOCK_REVIEWS, credits: 50, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [{ id: 'init-1', date: '2023-01-01', amount: 52, quotaAdded: 3 }] }),
+  createMockPlayer({ id: '1', teamId: 't1', name: '马尔科·罗伊斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 11, position: Position.MID, isCaptain: true, age: 18, goals: 12, assists: 8, appearances: 15, image: 'https://picsum.photos/200/200?random=1', reviews: MOCK_REVIEWS, credits: 50, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [{ id: 'init-1', date: '2023-01-01', amount: 52, quotaAdded: 3 }], nickname: '小火箭' }),
   createMockPlayer({ id: '2', teamId: 't1', name: '马茨·胡梅尔斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 15, position: Position.DEF, isCaptain: false, age: 18, goals: 2, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=2', reviews: [], credits: 45, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 1, rechargeHistory: [{ id: 'init-2', date: '2023-01-01', amount: 46, quotaAdded: 3 }] }),
   createMockPlayer({ id: '3', teamId: 't1', name: '尤利安·布兰特 (Jr)', gender: '男', idCard: mockId(2006), birthDate: '2006-01-01', number: 19, position: Position.MID, isCaptain: false, age: 17, goals: 5, assists: 12, appearances: 14, image: 'https://picsum.photos/200/200?random=3', reviews: [], credits: 12, validUntil: '2023-12-31', leaveQuota: 3, leavesUsed: 2, rechargeHistory: [{ id: 'init-3', date: '2023-01-01', amount: 12, quotaAdded: 3 }] }),
   createMockPlayer({ id: '4', teamId: 't1', name: '格雷戈·科贝尔 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 1, position: Position.GK, isCaptain: false, age: 18, goals: 0, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=4', reviews: [], credits: 100, validUntil: getNextYear(), leaveQuota: 5, leavesUsed: 0, rechargeHistory: [{ id: 'init-4', date: '2023-01-01', amount: 101, quotaAdded: 5 }] }),

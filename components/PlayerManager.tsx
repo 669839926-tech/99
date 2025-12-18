@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -234,8 +234,8 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleDownloadTemplate = () => {
-        const headers = "姓名,球衣号码,场上位置,身份证号,入队时间,就读学校,家长姓名,联系电话\n";
-        const example = "张三,10,中场,110101201001011234,2023-01-01,实验小学,张父,13800138000\n";
+        const headers = "姓名,球衣号码,场上位置,身份证号,入队时间,就读学校,家长姓名,联系电话,惯用脚(左/右)\n";
+        const example = "张三,10,中场,110101201001011234,2023-01-01,实验小学,张父,13800138000,右\n";
         const content = headers + example;
         const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -280,6 +280,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                 const school = cols[5] || '';
                 const parentName = cols[6] || '';
                 const parentPhone = cols[7] || '';
+                const foot = cols[8] === '左' ? '左' : '右';
 
                 let position: Position = Position.MID;
                 if (positionStr.includes('门')) position = Position.GK;
@@ -313,7 +314,8 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                     joinDate,
                     school,
                     parentName,
-                    parentPhone
+                    parentPhone,
+                    preferredFoot: foot
                 });
             }
         }
@@ -349,7 +351,8 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
             leaveQuota: 0,
             leavesUsed: 0,
             rechargeHistory: [],
-            gallery: []
+            gallery: [],
+            preferredFoot: p.preferredFoot || '右'
         } as Player));
 
         onImport(newPlayers);
@@ -425,7 +428,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                                             <th className="p-2 border-b">号码</th>
                                             <th className="p-2 border-b">位置</th>
                                             <th className="p-2 border-b">年龄</th>
-                                            <th className="p-2 border-b">家长</th>
+                                            <th className="p-2 border-b">惯用脚</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -435,7 +438,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                                                 <td className="p-2">{p.number}</td>
                                                 <td className="p-2">{p.position}</td>
                                                 <td className="p-2">{p.age}</td>
-                                                <td className="p-2">{p.parentName} {p.parentPhone}</td>
+                                                <td className="p-2">{p.preferredFoot}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -1222,6 +1225,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                     </>
                                 )}
                             </div>
+                            {!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}
                           </div>
                       </div>
                       {isEditing && (
@@ -1252,8 +1256,31 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            </div>
                            <div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span><span className="font-bold">{editedPlayer.gender}</span></div>
                            <div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{editedPlayer.age} 岁</span></div>
+                           <div className="flex flex-col"><span className="text-gray-500 text-xs">惯用脚</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.preferredFoot} onChange={e => setEditedPlayer({...editedPlayer, preferredFoot: e.target.value as any})}><option value="右">右脚</option><option value="左">左脚</option></select> : <span className="font-bold">{editedPlayer.preferredFoot}脚</span>}</div>
+                           <div className="flex flex-col"><span className="text-gray-500 text-xs">昵称</span>{isEditing ? <input className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.nickname || ''} onChange={e => setEditedPlayer({...editedPlayer, nickname: e.target.value})} placeholder="选填" /> : <span className="font-bold">{editedPlayer.nickname || '-'}</span>}</div>
                       </div>
                       
+                      {/* Physical Stats Card */}
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                           <h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">体格信息</h4>
+                           <div className="grid grid-cols-2 gap-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Ruler className="w-4 h-4" /></div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-gray-400 uppercase font-bold">身高 (cm)</span>
+                                        {isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.height || ''} onChange={e => setEditedPlayer({...editedPlayer, height: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.height || '-'}</span>}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Weight className="w-4 h-4" /></div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] text-gray-400 uppercase font-bold">体重 (kg)</span>
+                                        {isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.weight || ''} onChange={e => setEditedPlayer({...editedPlayer, weight: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.weight || '-'}</span>}
+                                    </div>
+                                </div>
+                           </div>
+                      </div>
+
                       {/* Extended Info Card */}
                       <div className="bg-gray-50 rounded-xl p-4 space-y-3">
                             <h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">详细资料</h4>
@@ -1358,7 +1385,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                <div className="grid grid-cols-4 gap-4 text-sm w-full">
                                    <div><span className="block text-gray-400 text-xs">年龄</span><span className="font-bold">{editedPlayer.age}岁</span></div>
                                    <div><span className="block text-gray-400 text-xs">球龄</span><span className="font-bold">{calculateTenure(editedPlayer.joinDate) || '-'}</span></div>
-                                   <div><span className="block text-gray-400 text-xs">入队时间</span><span className="font-bold">{editedPlayer.joinDate || '-'}</span></div>
+                                   <div><span className="block text-gray-400 text-xs">惯用脚</span><span className="font-bold">{editedPlayer.preferredFoot}脚</span></div>
                                    <div><span className="block text-gray-400 text-xs">综合评分</span><span className="font-black text-bvb-yellow bg-black px-2 rounded">{getOverallRating(editedPlayer)}</span></div>
                                </div>
                            </div>
@@ -1610,7 +1637,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     joinDate: '',
     school: '',
     parentName: '',
-    parentPhone: ''
+    parentPhone: '',
+    preferredFoot: '右',
+    nickname: '',
+    height: undefined,
+    weight: undefined
   });
 
   const [newTeam, setNewTeam] = useState<Partial<Team>>({
@@ -1787,11 +1818,15 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             school: newPlayer.school,
             parentName: newPlayer.parentName,
             parentPhone: newPlayer.parentPhone,
-            gallery: []
+            gallery: [],
+            preferredFoot: newPlayer.preferredFoot as '左' | '右',
+            height: newPlayer.height,
+            weight: newPlayer.weight,
+            nickname: newPlayer.nickname
         };
         onAddPlayer(p);
         setShowAddModal(false);
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '' });
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.MID, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
     }
   };
 
@@ -2183,21 +2218,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号 (自动解析)</label>
                   <input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none tracking-widest font-mono" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} placeholder="18位身份证号码" />
               </div>
-              <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                  <div>
-                      <span className="block text-xs font-bold text-gray-400 uppercase">性别</span>
-                      <span className="font-bold text-sm">{newPlayer.gender}</span>
-                  </div>
-                  <div>
-                      <span className="block text-xs font-bold text-gray-400 uppercase">年龄</span>
-                      <span className="font-bold text-sm">{newPlayer.age} 岁</span>
-                  </div>
-                  <div>
-                      <span className="block text-xs font-bold text-gray-400 uppercase">生日</span>
-                      <span className="font-bold text-sm">{newPlayer.birthDate || '-'}</span>
-                  </div>
-              </div>
-
+              
               <div className="grid grid-cols-2 gap-4">
                   <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">场上位置</label>
@@ -2214,8 +2235,38 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                   </div>
               </div>
 
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                  <label className="block text-xs font-bold text-yellow-800 uppercase mb-2 flex items-center">
+                    惯用脚 <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <div className="flex gap-4">
+                      <label className="flex items-center cursor-pointer">
+                          <input type="radio" name="foot" className="hidden peer" checked={newPlayer.preferredFoot === '右'} onChange={() => setNewPlayer({...newPlayer, preferredFoot: '右'})} />
+                          <div className="px-4 py-1.5 bg-white border border-gray-300 rounded-md text-sm font-bold peer-checked:bg-bvb-black peer-checked:text-bvb-yellow peer-checked:border-bvb-black transition-all">右脚 (R)</div>
+                      </label>
+                      <label className="flex items-center cursor-pointer">
+                          <input type="radio" name="foot" className="hidden peer" checked={newPlayer.preferredFoot === '左'} onChange={() => setNewPlayer({...newPlayer, preferredFoot: '左'})} />
+                          <div className="px-4 py-1.5 bg-white border border-gray-300 rounded-md text-sm font-bold peer-checked:bg-bvb-black peer-checked:text-bvb-yellow peer-checked:border-bvb-black transition-all">左脚 (L)</div>
+                      </label>
+                  </div>
+              </div>
+
               <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mt-4 space-y-3">
-                  <h4 className="text-xs font-bold text-gray-500 uppercase">其他信息</h4>
+                  <h4 className="text-xs font-bold text-gray-500 uppercase">附加信息 (选填)</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                       <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">身高 (cm)</label>
+                            <input type="number" className="w-full p-2 border rounded text-xs bg-white" value={newPlayer.height || ''} onChange={e => setNewPlayer({...newPlayer, height: parseInt(e.target.value)})} />
+                       </div>
+                       <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">体重 (kg)</label>
+                            <input type="number" className="w-full p-2 border rounded text-xs bg-white" value={newPlayer.weight || ''} onChange={e => setNewPlayer({...newPlayer, weight: parseInt(e.target.value)})} />
+                       </div>
+                       <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">昵称</label>
+                            <input className="w-full p-2 border rounded text-xs bg-white" placeholder="例如: 小魔兽" value={newPlayer.nickname || ''} onChange={e => setNewPlayer({...newPlayer, nickname: e.target.value})} />
+                       </div>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                        <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">入队时间</label>
@@ -2244,7 +2295,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
       {showAddTeamModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl w-full max-sm overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
                 <h3 className="font-bold flex items-center"><Shield className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建梯队</h3>
                 <button onClick={() => setShowAddTeamModal(false)}><X className="w-5 h-5" /></button>
@@ -2344,7 +2395,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <th className="p-3 font-black text-sm uppercase text-gray-600">梯队</th>
                         <th className="p-3 font-black text-sm uppercase text-gray-600">位置</th>
                         <th className="p-3 font-black text-sm uppercase text-gray-600">年龄</th>
-                        <th className="p-3 font-black text-sm uppercase text-gray-600">入队时间</th>
+                        <th className="p-3 font-black text-sm uppercase text-gray-600">惯用脚</th>
                         <th className="p-3 font-black text-sm uppercase text-gray-600 text-right">监护人</th>
                     </tr>
                 </thead>
@@ -2358,7 +2409,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                             <td className="p-3">{teams.find(t => t.id === p.teamId)?.name || '待分配'}</td>
                             <td className="p-3">{p.position}</td>
                             <td className="p-3">{p.age}岁</td>
-                            <td className="p-3">{p.joinDate || '-'}</td>
+                            <td className="p-3">{p.preferredFoot}脚</td>
                             <td className="p-3 text-right">{p.parentName || '-'} {p.parentPhone || ''}</td>
                         </tr>
                     ))}
