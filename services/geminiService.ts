@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { TrainingSession, Player } from '../types';
 
@@ -6,10 +5,12 @@ import { TrainingSession, Player } from '../types';
 // In Vite/Browser environments, process.env might not be directly available at module evaluation time.
 // We initialize this lazily to prevent 'process is not defined' crashes on app startup.
 const getAiClient = () => {
+    // Comment: Initialize with API key from environment variable as per guidelines
     return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
-const TRAINING_MODEL = 'gemini-2.5-flash';
+// Comment: Using gemini-3-flash-preview for basic text tasks like plan generation
+const TRAINING_MODEL = 'gemini-3-flash-preview';
 
 export const generateTrainingPlan = async (focus: string, duration: number, intensity: string): Promise<Partial<TrainingSession>> => {
   try {
@@ -24,6 +25,7 @@ export const generateTrainingPlan = async (focus: string, duration: number, inte
       **IMPORTANT: The content (title and drills) must be in Chinese.**
     `;
 
+    // Comment: Call generateContent with model name and contents directly
     const response = await ai.models.generateContent({
       model: TRAINING_MODEL,
       contents: prompt,
@@ -44,6 +46,7 @@ export const generateTrainingPlan = async (focus: string, duration: number, inte
       }
     });
 
+    // Comment: Access response.text directly (not a function)
     const jsonText = response.text;
     if (!jsonText) throw new Error("No text returned from Gemini");
     
@@ -58,9 +61,9 @@ export const generateTrainingPlan = async (focus: string, duration: number, inte
 export const generateMatchStrategy = async (opponent: string, ourStrengths: string): Promise<string> => {
   try {
     const ai = getAiClient();
-     // Using a simpler text model for strategy text generation
+     // Comment: Using gemini-3-flash-preview for strategy text generation
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3-flash-preview',
       contents: `
         我正在管理一支青少年足球队（多特蒙德风格，高位逼抢）。
         我们的下一个对手是 ${opponent}。
@@ -71,6 +74,7 @@ export const generateMatchStrategy = async (opponent: string, ourStrengths: stri
       `,
     });
 
+    // Comment: Access response.text directly
     return response.text || "无法生成战术策略。";
   } catch (error) {
     console.error("Error generating match strategy:", error);
@@ -102,8 +106,9 @@ export const generatePlayerReview = async (player: Player, quarter: string, year
       Keep it encouraging but professional and specific.
     `;
 
+    // Comment: Using gemini-3-flash-preview for player reviews
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -118,6 +123,7 @@ export const generatePlayerReview = async (player: Player, quarter: string, year
         }
     });
 
+    // Comment: Access response.text directly
     const jsonText = response.text;
     if(!jsonText) throw new Error("No text returned");
     return JSON.parse(jsonText);

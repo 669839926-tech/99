@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
 import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays } from 'lucide-react';
@@ -136,10 +135,11 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
     const handleDirectorApprove = () => {
         const newStatus: 'Reviewed' = 'Reviewed';
         setLogStatus(newStatus);
+        // Comment: Spread existing session data instead of assigning to a non-existent 'session' property
         const updatedSession: TrainingSession = {
             ...session,
             attendance: localAttendance,
-            coachFeedback,
+            coachFeedback, 
             directorReview,
             submissionStatus: newStatus
         };
@@ -163,7 +163,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
-                           {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
+                           {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                       </div>
                       <button onClick={() => onDuplicate(session)} className="p-1 hover:text-bvb-yellow" title="复制并选择日期">
                           <Copy className="w-5 h-5" />
@@ -756,7 +756,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const copy: TrainingSession = {
           ...sessionToDuplicate,
           id: Date.now().toString(),
-          title: `${sessionToDuplicate.title} (副本)`,
+          title: sessionToDuplicate.title,
           date: duplicateDate,
           submissionStatus: 'Planned',
           attendance: [], // Clear attendance for the new copy
