@@ -1057,7 +1057,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     >
                         <Upload className="w-4 h-4 mr-2" /> 上传照片
                     </button>
-                    <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleUploadPhoto} />
+                    <input type="file" galleryInputRef={galleryInputRef} className="hidden" accept="image/*" onChange={handleUploadPhoto} />
                 </div>
                 
                 <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -1166,7 +1166,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       <div className="flex flex-col items-center">
                           <div className="relative group">
                             <img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />
-                             {isEditing && (
+                             {isEditing && !isCoach && (
                                 <>
                                     <div 
                                         onClick={() => profileImageInputRef.current?.click()}
@@ -1185,13 +1185,13 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                 </>
                              )}
                              <div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">
-                                {isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}
+                                {isEditing && !isCoach ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}
                             </div>
                           </div>
                           <div className="text-center mt-4 w-full">
-                            {isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}
+                            {isEditing && !isCoach ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}
                             <div className="flex justify-center items-center mt-2 space-x-2">
-                                {isEditing ? (
+                                {isEditing && !isCoach ? (
                                     <div className="flex gap-2 items-center">
                                         <div className="relative group">
                                             <select 
@@ -1207,7 +1207,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                             value={editedPlayer.teamId} 
                                             onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} 
                                             className="text-xs bg-gray-100 p-1 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none" 
-                                            disabled={isCoach}
                                         >
                                             {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                             <option value="unassigned">待分配</option>
@@ -1224,7 +1223,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             </div>
                           </div>
                       </div>
-                      {isEditing && (
+                      {isEditing && !isCoach && (
                           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between">
                               <span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span>
                               <label className="relative inline-flex items-center cursor-pointer">
@@ -1238,7 +1237,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm">
                            <div className="col-span-2 flex items-center justify-between border-b pb-2">
                                <span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>
-                               {isEditing ? (
+                               {isEditing && !isCoach ? (
                                    <input 
                                        className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-transparent focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" 
                                        value={editedPlayer.idCard} 
@@ -1260,7 +1259,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             <div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
                                 <div className="flex flex-col">
                                     <span className="text-gray-500 text-xs flex items-center"><CalendarDays className="w-3 h-3 mr-1"/> 入队时间</span>
-                                    {isEditing ? 
+                                    {isEditing && !isCoach ? 
                                         <input type="date" className="p-1 border rounded text-xs bg-white" value={editedPlayer.joinDate || ''} onChange={e => setEditedPlayer({...editedPlayer, joinDate: e.target.value})} /> 
                                         : (
                                             <div>
@@ -1276,21 +1275,21 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-gray-500 text-xs flex items-center"><School className="w-3 h-3 mr-1"/> 就读学校</span>
-                                    {isEditing ? 
+                                    {isEditing && !isCoach ? 
                                         <input className="p-1 border rounded text-xs bg-white" placeholder="学校名称" value={editedPlayer.school || ''} onChange={e => setEditedPlayer({...editedPlayer, school: e.target.value})} /> 
                                         : <span className="font-bold truncate">{editedPlayer.school || '-'}</span>
                                     }
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-gray-500 text-xs flex items-center"><UserIcon className="w-3 h-3 mr-1"/> 家长姓名</span>
-                                    {isEditing ? 
+                                    {isEditing && !isCoach ? 
                                         <input className="p-1 border rounded text-xs bg-white" placeholder="姓名" value={editedPlayer.parentName || ''} onChange={e => setEditedPlayer({...editedPlayer, parentName: e.target.value})} /> 
                                         : <span className="font-bold">{editedPlayer.parentName || '-'}</span>
                                     }
                                 </div>
                                 <div className="flex flex-col">
                                     <span className="text-gray-500 text-xs flex items-center"><Phone className="w-3 h-3 mr-1"/> 联系方式</span>
-                                    {isEditing ? 
+                                    {isEditing && !isCoach ? 
                                         <input className="p-1 border rounded text-xs bg-white" placeholder="电话号码" value={editedPlayer.parentPhone || ''} onChange={e => setEditedPlayer({...editedPlayer, parentPhone: e.target.value})} /> 
                                         : <span className="font-bold font-mono">{editedPlayer.parentPhone || '-'}</span>
                                     }
@@ -1928,14 +1927,18 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
            
            <div className="flex gap-2 w-full sm:w-auto justify-end">
                <button onClick={() => setIsSelectionMode(!isSelectionMode)} className={`p-2 rounded-lg border ${isSelectionMode ? 'bg-gray-800 text-white' : 'border-gray-300 text-gray-500'}`} title="批量管理"><CheckSquare className="w-5 h-5" /></button>
-               {isDirector && (
+               {(isDirector || isCoach) && (
                    <>
-                        <button onClick={handleExportPlayerList} disabled={isExportingList} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="导出名单">
-                            {isExportingList ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />}
-                        </button>
-                        <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="批量导入">
-                            <FileSpreadsheet className="w-5 h-5" />
-                        </button>
+                        {isDirector && (
+                            <>
+                                <button onClick={handleExportPlayerList} disabled={isExportingList} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="导出名单">
+                                    {isExportingList ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5" />}
+                                </button>
+                                <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="批量导入">
+                                    <FileSpreadsheet className="w-5 h-5" />
+                                </button>
+                            </>
+                        )}
                         <button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-sm hover:brightness-105">
                             <Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员
                         </button>
