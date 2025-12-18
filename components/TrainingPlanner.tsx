@@ -543,6 +543,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   <div 
                     key={d} 
                     onClick={() => setSelectedDate(dateStr)}
+                    onDoubleClick={() => {
+                        setSelectedDate(dateStr);
+                        setFormData(prev => ({ ...prev, date: dateStr }));
+                        setShowAddModal(true);
+                    }}
                     className={`h-8 border-r border-b border-gray-200 relative cursor-pointer hover:bg-yellow-50 transition-colors flex items-center justify-center ${isSelected ? 'bg-yellow-100' : 'bg-white'}`}
                   >
                       {sessionsOnDay.length > 0 ? (
@@ -561,6 +566,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   <div 
                     key={d} 
                     onClick={() => setSelectedDate(dateStr)}
+                    onDoubleClick={() => {
+                        setSelectedDate(dateStr);
+                        setFormData(prev => ({ ...prev, date: dateStr }));
+                        setShowAddModal(true);
+                    }}
                     className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}
                   >
                       <div className="flex justify-between items-start">
