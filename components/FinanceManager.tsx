@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User } from '../types';
-import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw } from 'lucide-react';
+import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line, PieChart, Pie, Legend } from 'recharts';
 
 interface FinanceManagerProps {
@@ -19,7 +19,6 @@ const COLORS = ['#FDE100', '#000000', '#4A4A4A', '#22C55E', '#EF4444', '#3B82F6'
 // 辅助函数：安全解析年份
 const getSafeYear = (dateStr: string) => {
     if (!dateStr) return 0;
-    // 优先尝试正则匹配 YYYY
     const match = dateStr.match(/^(\d{4})/);
     if (match) return parseInt(match[1]);
     const d = new Date(dateStr);
@@ -67,9 +66,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
 
     const journalWithBalance = useMemo(() => {
         let balance = 0;
-        // 先按日期从小到大排计算结余，再反转展示
         return sortedTransactions.map(t => {
-            balance += (t.income - t.expense);
+            balance += (Number(t.income) - Number(t.expense));
             return { ...t, balance };
         }).reverse(); 
     }, [sortedTransactions]);
@@ -89,10 +87,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             profit: 0
         }));
         transactions.forEach(t => {
-            const d = new Date(t.date);
             const year = getSafeYear(t.date);
             if (year === selectedYear) {
-                // 如果 Date 对象无效，则通过正则尝试获取月份
+                const d = new Date(t.date);
                 let m = isNaN(d.getTime()) ? -1 : d.getMonth();
                 if (m === -1) {
                     const mMatch = t.date.match(/年(\d{1,2})月/) || t.date.match(/-(\d{1,2})-/);
@@ -112,6 +109,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
     const categoryAnalysis = useMemo(() => {
         const incomeMap: Record<string, number> = {};
         const expenseMap: Record<string, number> = {};
+        
         transactions.forEach(t => {
             if (getSafeYear(t.date) === selectedYear) {
                 const cat = financeCategories.find(c => c.id === t.category);
@@ -121,10 +119,21 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 }
             }
         });
-        const incomeData = Object.keys(incomeMap).map(label => ({ name: label, value: incomeMap[label] }));
-        const expenseData = Object.keys(expenseMap).map(label => ({ name: label, value: expenseMap[label] }));
+
+        const incomeData = Object.keys(incomeMap).map(label => ({ 
+            name: label, 
+            value: incomeMap[label],
+            percent: currentStats.income > 0 ? (incomeMap[label] / currentStats.income * 100).toFixed(1) : '0'
+        })).sort((a,b) => b.value - a.value);
+
+        const expenseData = Object.keys(expenseMap).map(label => ({ 
+            name: label, 
+            value: expenseMap[label],
+            percent: currentStats.expense > 0 ? (expenseMap[label] / currentStats.expense * 100).toFixed(1) : '0'
+        })).sort((a,b) => b.value - a.value);
+
         return { incomeData, expenseData };
-    }, [transactions, selectedYear, financeCategories]);
+    }, [transactions, selectedYear, financeCategories, currentStats]);
 
     // Selection Logic
     const toggleSelectAll = () => {
@@ -188,13 +197,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             let batchIncome = 0; let batchExpense = 0;
 
             const cleanAmount = (str: string) => str ? parseFloat(str.replace(/[¥, ]/g, '')) || 0 : 0;
-            
-            // 辅助函数：标准化日期格式为 YYYY-MM-DD
             const normalizeDateStr = (str: string) => {
                 let s = str.trim();
-                // 处理 "2025年8月25日" 格式
                 s = s.replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/, (_, y, m, d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
-                // 处理 "2025/08/25" 格式
                 s = s.replace(/\//g, '-');
                 return s;
             };
@@ -204,17 +209,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 if (!line) continue;
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
                 if (cols.length >= 5) {
-                    const rawDate = cols[0];
-                    const date = normalizeDateStr(rawDate);
+                    const date = normalizeDateStr(cols[0]);
                     const catLabel = cols[1];
                     const details = cols[2];
                     const income = cleanAmount(cols[3]);
                     const expense = cleanAmount(cols[4]);
                     const account = cols[5] || '默认账户';
-                    
                     const catDef = financeCategories.find(c => c.label === catLabel);
                     if (!catDef || (income === 0 && expense === 0)) continue;
-                    
                     batchIncome += income; batchExpense += expense;
                     newTxs.push({ id: `imp-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`, date, details, category: catDef.id, income, expense, account });
                 }
@@ -222,23 +224,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             if (newTxs.length > 0) {
                 setImportSummary({ count: newTxs.length, income: batchIncome, expense: batchExpense, tempTxs: newTxs });
                 setShowImportModal(false);
-            } else alert('未解析到有效数据，请确保分类名称与系统科目完全一致。日期支持 YYYY-MM-DD 或 YYYY年MM月DD日。');
+            } else alert('未解析到有效数据，请确保分类名称与系统科目完全一致。');
         };
         reader.readAsText(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const handleExportJournal = () => {
-        const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n";
-        const rows = journalWithBalance.map(t => {
-            const catLabel = financeCategories.find(c => c.id === t.category)?.label || '未知分类';
-            return `${t.date},${catLabel},"${t.details.replace(/"/g, '""')}",${t.income || ''},${t.expense || ''},${t.account},${t.balance.toFixed(2)}`;
-        }).join('\n');
-        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`;
-        link.click();
     };
 
     if (!isDirector) {
@@ -328,7 +317,18 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                         <h3 className="font-bold text-gray-800 flex items-center"><FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
                         <div className="flex items-center gap-4">
                             <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">共 {transactions.length} 条记录</span>
-                            <button onClick={handleExportJournal} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-sm">
+                            <button onClick={() => {
+                                const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n";
+                                const rows = journalWithBalance.map(t => {
+                                    const catLabel = financeCategories.find(c => c.id === t.category)?.label || '未知分类';
+                                    return `${t.date},${catLabel},"${t.details.replace(/"/g, '""')}",${t.income || ''},${t.expense || ''},${t.account},${t.balance.toFixed(2)}`;
+                                }).join('\n');
+                                const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`;
+                                link.click();
+                            }} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-sm">
                                 <Download className="w-3.5 h-3.5 mr-1.5" /> 导出表格
                             </button>
                         </div>
@@ -348,8 +348,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                     <th className="px-6 py-4">日期</th>
                                     <th className="px-6 py-4">项目分类</th>
                                     <th className="px-6 py-4">明细/摘要</th>
-                                    <th className="px-6 py-4 text-right">收入金额</th>
-                                    <th className="px-6 py-4 text-right">支出金额</th>
+                                    <th className="px-6 py-4 text-right">收入</th>
+                                    <th className="px-6 py-4 text-right">支出</th>
                                     <th className="px-6 py-4 text-right">余额</th>
                                     <th className="px-6 py-4 text-center">操作</th>
                                 </tr>
@@ -375,9 +375,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 font-bold text-gray-800">{t.details}</td>
-                                            <td className="px-6 py-4 text-right font-black text-green-600 tabular-nums">{t.income > 0 ? Number(t.income).toFixed(2) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? Number(t.expense).toFixed(2) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{t.balance.toFixed(2)}</td>
+                                            <td className="px-6 py-4 text-right font-black text-green-600 tabular-nums">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
                                                     <Trash2 className="w-4 h-4" />
@@ -387,9 +387,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                     );
                                 })}
                                 {journalWithBalance.length === 0 && (
-                                    <tr>
-                                        <td colSpan={8} className="py-20 text-center text-gray-400 italic">暂无账务记录，点击上方按钮新增或导入数据。</td>
-                                    </tr>
+                                    <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">暂无账务记录。</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -397,17 +395,20 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 </div>
             ) : (
                 <div className="space-y-8 animate-in slide-in-from-bottom-4">
+                     {/* Year Selector */}
                      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="font-bold text-gray-800 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-bvb-yellow" /> 年度财务趋势与分类统计 ({selectedYear})</h3>
+                        <h3 className="font-bold text-gray-800 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-bvb-yellow" /> 年度财务趋势与统计汇总</h3>
                         <div className="flex items-center gap-2">
                             <button onClick={() => setSelectedYear(v => v - 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400"/></button>
                             <span className="font-black text-lg px-4 border-x border-gray-100">{selectedYear}</span>
                             <button onClick={() => setSelectedYear(v => v + 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400"/></button>
                         </div>
                     </div>
+
+                    {/* Main Charts */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-80">
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">月度收支趋势对比</h4>
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">月度收支趋势对比表</h4>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={monthlySummaryData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
@@ -415,34 +416,168 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
                                     <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
                                     <Legend iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', paddingTop: '10px'}} />
-                                    <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="income" name="总收入" fill="#22C55E" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="expense" name="总支出" fill="#EF4444" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
+                        
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-80 flex flex-col md:flex-row">
                              <div className="flex-1">
-                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">收入构成</h4>
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">收入构成占比</h4>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie data={categoryAnalysis.incomeData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none" paddingAngle={2}>
                                             {categoryAnalysis.incomeData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                                         </Pie>
-                                        <Tooltip />
+                                        <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
                                     </PieChart>
                                 </ResponsiveContainer>
                              </div>
                              <div className="flex-1">
-                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">支出构成</h4>
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">支出构成占比</h4>
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie data={categoryAnalysis.expenseData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none" paddingAngle={2}>
                                             {categoryAnalysis.expenseData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
                                         </Pie>
-                                        <Tooltip />
+                                        <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
                                     </PieChart>
                                 </ResponsiveContainer>
                              </div>
+                        </div>
+                    </div>
+
+                    {/* NEW: Detailed Category Summary Table */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Income Summary Table */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="bg-green-600 p-4 flex justify-between items-center">
+                                <h4 className="text-white font-black text-sm uppercase tracking-widest flex items-center">
+                                    <ArrowUpRight className="w-4 h-4 mr-2" /> 收入项目统计 (年度)
+                                </h4>
+                                <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded">Total: ¥{currentStats.income.toLocaleString()}</span>
+                            </div>
+                            <table className="w-full text-xs">
+                                <thead className="bg-gray-50 border-b">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left">科目名称</th>
+                                        <th className="px-4 py-3 text-right">累计金额</th>
+                                        <th className="px-4 py-3 text-right w-24">所占比重</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {categoryAnalysis.incomeData.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 font-bold text-gray-700">{item.name}</td>
+                                            <td className="px-4 py-3 text-right font-black text-green-600">¥{item.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="font-mono text-gray-400">{item.percent}%</span>
+                                                    <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-green-500" style={{ width: `${item.percent}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {categoryAnalysis.incomeData.length === 0 && (
+                                        <tr><td colSpan={3} className="py-10 text-center text-gray-400 italic">本年度无收入记录</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Expense Summary Table */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="bg-red-600 p-4 flex justify-between items-center">
+                                <h4 className="text-white font-black text-sm uppercase tracking-widest flex items-center">
+                                    <ArrowDownRight className="w-4 h-4 mr-2" /> 支出项目统计 (年度)
+                                </h4>
+                                <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded">Total: ¥{currentStats.expense.toLocaleString()}</span>
+                            </div>
+                            <table className="w-full text-xs">
+                                <thead className="bg-gray-50 border-b">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left">科目名称</th>
+                                        <th className="px-4 py-3 text-right">累计金额</th>
+                                        <th className="px-4 py-3 text-right w-24">所占比重</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {categoryAnalysis.expenseData.map((item, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 font-bold text-gray-700">{item.name}</td>
+                                            <td className="px-4 py-3 text-right font-black text-red-600">¥{item.value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <span className="font-mono text-gray-400">{item.percent}%</span>
+                                                    <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div className="h-full bg-red-500" style={{ width: `${item.percent}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {categoryAnalysis.expenseData.length === 0 && (
+                                        <tr><td colSpan={3} className="py-10 text-center text-gray-400 italic">本年度无支出记录</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* NEW: Monthly Summary Table */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="bg-bvb-black p-4">
+                            <h4 className="text-white font-black text-sm uppercase tracking-widest flex items-center">
+                                <TableProperties className="w-4 h-4 mr-2 text-bvb-yellow" /> 月度盈亏汇总明细表 ({selectedYear}年)
+                            </h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left">
+                                <thead className="bg-gray-50 font-black text-gray-500 border-b">
+                                    <tr>
+                                        <th className="px-6 py-4">月份</th>
+                                        <th className="px-6 py-4 text-right">月度收入</th>
+                                        <th className="px-6 py-4 text-right">月度支出</th>
+                                        <th className="px-6 py-4 text-right">月度盈余 (净利润)</th>
+                                        <th className="px-6 py-4 text-center">状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {monthlySummaryData.map((m, idx) => (
+                                        <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 font-bold text-gray-800">{m.month}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-green-600">¥{m.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-red-500">¥{m.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                            <td className={`px-6 py-4 text-right font-black ${m.profit >= 0 ? 'text-gray-800' : 'text-red-700 bg-red-50/30'}`}>
+                                                ¥{m.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                {m.profit > 0 ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-black uppercase">盈利</span>
+                                                ) : m.profit < 0 ? (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-black uppercase">亏损</span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 text-[10px] font-black uppercase">-</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot className="bg-bvb-yellow/10 font-black border-t-2 border-bvb-yellow">
+                                    <tr>
+                                        <td className="px-6 py-4 text-gray-800">年度合计</td>
+                                        <td className="px-6 py-4 text-right text-green-700">¥{currentStats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        <td className="px-6 py-4 text-right text-red-700">¥{currentStats.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                        <td className={`px-6 py-4 text-right ${currentStats.profit >= 0 ? 'text-gray-900' : 'text-red-800'}`}>
+                                            ¥{currentStats.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
                         </div>
                     </div>
                 </div>
