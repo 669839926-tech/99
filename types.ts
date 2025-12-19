@@ -51,6 +51,7 @@ export interface AttributeConfig {
     physical: AttributeDefinition[];
     mental: AttributeDefinition[];
     drillLibrary: string[];
+    trainingFoci: string[];
 }
 
 export interface PlayerStats {

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight, Zap } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -51,7 +51,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [localPermissions, setLocalPermissions] = useState<RolePermissions>(JSON.parse(JSON.stringify(permissions)));
   const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'finance_cats' | 'attributes' | 'drills' | 'branding'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'finance_cats' | 'attributes' | 'drills' | 'foci' | 'branding'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
@@ -94,6 +94,12 @@ const Settings: React.FC<SettingsProps> = ({
   const handleAddDrill = () => {
       if (!newItemName.trim()) return;
       setLocalConfig(prev => ({ ...prev, drillLibrary: [...(prev.drillLibrary || []), newItemName.trim()] }));
+      setNewItemName('');
+  };
+
+  const handleAddFocus = () => {
+      if (!newItemName.trim()) return;
+      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] }));
       setNewItemName('');
   };
 
@@ -182,6 +188,12 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
+  const handleDeleteFocus = (focus: string) => {
+    if(confirm('确定要删除此训练重点吗？删除后历史训练记录仍会保留该重点名称，但新建计划时不可选。')) {
+        setLocalConfig(prev => ({ ...prev, trainingFoci: (prev.trainingFoci || []).filter(f => f !== focus) }));
+    }
+  };
+
   const handleChangeOwnPassword = (e: React.FormEvent) => {
       e.preventDefault();
       if (passwordForm.new !== passwordForm.confirm) { alert('两次输入的新密码不一致'); return; }
@@ -217,9 +229,9 @@ const Settings: React.FC<SettingsProps> = ({
                {isDirector ? '自定义评价体系、角色权限及系统配置。' : '管理您的个人账户安全。'}
            </p>
         </div>
-        {isDirector && activeTab === 'attributes' && (
+        {isDirector && (activeTab === 'attributes' || activeTab === 'drills' || activeTab === 'foci') && (
             <button onClick={handleSaveConfig} className="flex items-center px-6 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 transition-colors">
-                <Save className="w-5 h-5 mr-2" /> 保存能力配置
+                <Save className="w-5 h-5 mr-2" /> 保存配置更改
             </button>
         )}
         {isDirector && activeTab === 'permissions' && (
@@ -237,6 +249,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <button onClick={() => setActiveTab('permissions')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'permissions' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ShieldAlert className="w-4 h-4 mr-2" /> 角色权限设置</button>
                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Users className="w-4 h-4 mr-2" /> 用户账号管理</button>
                 <button onClick={() => setActiveTab('finance_cats')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'finance_cats' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Wallet className="w-4 h-4 mr-2" /> 财务科目管理</button>
+                <button onClick={() => setActiveTab('foci')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'foci' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Zap className="w-4 h-4 mr-2" /> 训练重点预设</button>
                 <button onClick={() => setActiveTab('attributes')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Target className="w-4 h-4 mr-2" /> 球员能力模型</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
                 <button onClick={() => setActiveTab('branding')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ImageIcon className="w-4 h-4 mr-2" /> 品牌外观</button>
@@ -318,12 +331,6 @@ const Settings: React.FC<SettingsProps> = ({
                         </tbody>
                     </table>
                 </div>
-                <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800 space-y-1">
-                    <p className="font-bold flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 权限说明：</p>
-                    <p>• <b>禁用 (None)</b>：该模块在导航栏中对该角色不可见。</p>
-                    <p>• <b>仅查看 (View)</b>：可以进入该模块，但所有的“新增”、“保存”、“删除”按钮将自动隐藏。</p>
-                    <p>• <b>可编辑 (Edit)</b>：拥有该模块的完整管理和操作权限。</p>
-                </div>
             </div>
         )}
 
@@ -343,89 +350,78 @@ const Settings: React.FC<SettingsProps> = ({
                                 {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                             </select>
                         </div>
-                        {(newUser.role === 'coach' || newUser.role === 'assistant_coach') && (
-                            <div className="bg-white p-3 rounded border border-gray-200">
-                                <span className="block text-xs font-bold text-gray-400 uppercase mb-2">负责梯队 (可多选)</span>
-                                <div className="flex flex-wrap gap-2">{teams.map(t => { const isSelected = newUser.teamIds?.includes(t.id); return ( <button type="button" key={t.id} onClick={() => toggleTeamSelection(t.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center ${isSelected ? 'bg-bvb-yellow border-bvb-yellow text-bvb-black' : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-bvb-yellow'}`}>{isSelected && <CheckCircle className="w-3 h-3 mr-1" />}{t.name}</button> ); })}</div>
-                            </div>
-                        )}
                         <div className="flex justify-end"><button className="bg-bvb-black text-white font-bold rounded px-4 py-2 hover:bg-gray-800 text-sm shadow-md">{editingUserId ? '保存修改' : '添加用户'}</button></div>
                     </form>
                 </div>
                 <div className="space-y-2">
-                    <div className="grid grid-cols-5 text-xs font-bold text-gray-400 uppercase px-4 py-2 bg-gray-50 border border-gray-100 rounded-t-lg"><div className="col-span-1">用户名</div><div className="col-span-1">姓名</div><div className="col-span-1">角色</div><div className="col-span-1">管理梯队</div><div className="col-span-1 text-right">操作</div></div>
                     {users.map(u => (
-                        <div key={u.id} className={`grid grid-cols-5 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50 transition-colors ${editingUserId === u.id ? 'bg-yellow-50/50' : ''}`}>
-                            <div className="col-span-1 font-mono text-sm">{u.username}</div>
-                            <div className="col-span-1 font-bold text-sm text-gray-800 flex items-center">{u.name}{u.id === currentUser?.id && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded">Me</span>}</div>
-                            <div className="col-span-1"><span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : (u.role === 'coach' || u.role === 'assistant_coach') ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{u.role === 'director' ? '总监' : u.role === 'coach' ? '教练' : u.role === 'assistant_coach' ? '助教' : '家长'}</span></div>
-                            <div className="col-span-1 flex flex-wrap gap-1">{u.role === 'director' ? <span className="text-xs text-gray-400 italic">全部权限</span> : u.teamIds && u.teamIds.length > 0 ? u.teamIds.map(tid => { const t = teams.find(team => team.id === tid); return t ? <span key={tid} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 rounded border border-gray-200">{t.name}</span> : null; }) : <span className="text-xs text-gray-400 italic">未分配</span>}</div>
-                            <div className="col-span-1 text-right flex justify-end gap-2">{u.id !== currentUser?.id && (<><button onClick={() => startEditUser(u)} className="text-gray-400 hover:text-bvb-black p-1 rounded hover:bg-gray-100" title="编辑用户"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleResetPasswordClick(u.id)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50" title="重置密码为 123"><RotateCcw className="w-4 h-4" /></button>
-                            {/* Comment: Corrected handleDeleteUserClick(id) to handleDeleteUserClick(u.id) */}
-                            <button onClick={() => handleDeleteUserClick(u.id)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50" title="删除用户"><Trash2 className="w-4 h-4" /></button></>)}</div>
+                        <div key={u.id} className="flex justify-between items-center px-4 py-3 bg-white border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center gap-6">
+                                <div className="font-mono text-sm w-24">{u.username}</div>
+                                <div className="font-bold text-sm text-gray-800 w-32">{u.name}</div>
+                                <div className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => startEditUser(u)} className="text-gray-400 hover:text-bvb-black p-1"><Edit2 className="w-4 h-4" /></button>
+                                <button onClick={() => handleDeleteUserClick(u.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
+                            </div>
                         </div>
                     ))}
                 </div>
              </div>
         )}
 
+        {activeTab === 'foci' && isDirector && (
+            <div className="flex-1 p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练重点预设管理</h3>
+                <p className="text-sm text-gray-500 mb-6">设置训练计划中可选的重点项目（如：传接球、射门等）。</p>
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-sm font-bold text-gray-600 mb-2">添加新重点</label>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder="例如：快速反击" className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddFocus()} />
+                        <button onClick={handleAddFocus} disabled={!newItemName.trim()} className="px-4 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"><Plus className="w-5 h-5" /></button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {localConfig.trainingFoci?.map((focus, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group">
+                            <span className="text-gray-800 font-bold">{focus}</span>
+                            <button onClick={() => handleDeleteFocus(focus)} className="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
         {activeTab === 'finance_cats' && isDirector && (
             <div className="flex-1 p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Wallet className="w-5 h-5 mr-2 text-bvb-yellow" /> 财务科目与分类管理</h3>
-                <p className="text-sm text-gray-500 mb-6">自定义俱乐部收支分类。只有定义好的分类才能在“账务管理”中使用。</p>
-                
                 <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <label className="block text-sm font-bold text-gray-600 mb-2">新增分类科目</label>
                     <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            placeholder="输入科目名称..." 
-                            className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" 
-                            value={newItemName} 
-                            onChange={(e) => setNewItemName(e.target.value)} 
-                        />
-                        <button onClick={() => handleAddFinanceCategory('income')} className="px-4 py-2 bg-green-600 text-white text-xs font-black rounded-lg hover:bg-green-700 transition-colors flex items-center">
-                            <ArrowUpRight className="w-3 h-3 mr-1" /> 设为收入
-                        </button>
-                        <button onClick={() => handleAddFinanceCategory('expense')} className="px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 transition-colors flex items-center">
-                            <ArrowDownRight className="w-3 h-3 mr-1" /> 设为支出
-                        </button>
+                        <input type="text" placeholder="输入科目名称..." className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                        <button onClick={() => handleAddFinanceCategory('income')} className="px-4 py-2 bg-green-600 text-white text-xs font-black rounded-lg">设为收入</button>
+                        <button onClick={() => handleAddFinanceCategory('expense')} className="px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg">设为支出</button>
                     </div>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Income List */}
-                    <div className="space-y-3">
-                        <h4 className="font-black text-xs text-green-600 uppercase tracking-widest flex items-center">
-                            <ArrowUpRight className="w-4 h-4 mr-1" /> 收入类科目
-                        </h4>
-                        <div className="space-y-2">
-                            {localFinanceCategories.filter(c => c.type === 'income').map(cat => (
-                                <div key={cat.id} className="flex justify-between items-center p-3 bg-white border border-green-100 rounded-lg shadow-sm group">
-                                    <span className="font-bold text-gray-700">{cat.label}</span>
-                                    <button onClick={() => handleDeleteFinanceCategory(cat.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-black text-green-600 uppercase">收入科目</h4>
+                        {localFinanceCategories.filter(c => c.type === 'income').map(cat => (
+                            <div key={cat.id} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group">
+                                <span className="font-bold">{cat.label}</span>
+                                <button onClick={() => handleDeleteFinanceCategory(cat.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                        ))}
                     </div>
-
-                    {/* Expense List */}
-                    <div className="space-y-3">
-                        <h4 className="font-black text-xs text-red-600 uppercase tracking-widest flex items-center">
-                            <ArrowDownRight className="w-4 h-4 mr-1" /> 支出类科目
-                        </h4>
-                        <div className="space-y-2">
-                            {localFinanceCategories.filter(c => c.type === 'expense').map(cat => (
-                                <div key={cat.id} className="flex justify-between items-center p-3 bg-white border border-red-100 rounded-lg shadow-sm group">
-                                    <span className="font-bold text-gray-700">{cat.label}</span>
-                                    <button onClick={() => handleDeleteFinanceCategory(cat.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                    <div className="space-y-2">
+                        <h4 className="text-xs font-black text-red-600 uppercase">支出科目</h4>
+                        {localFinanceCategories.filter(c => c.type === 'expense').map(cat => (
+                            <div key={cat.id} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group">
+                                <span className="font-bold">{cat.label}</span>
+                                <button onClick={() => handleDeleteFinanceCategory(cat.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -434,13 +430,12 @@ const Settings: React.FC<SettingsProps> = ({
         {activeTab === 'attributes' && isDirector && (
             <div className="flex flex-col md:flex-row h-full">
                 <div className="md:w-64 bg-gray-50 border-r border-gray-200 p-4 space-y-2">
-                    <h3 className="text-xs font-bold text-gray-400 uppercase mb-4 px-2">评估维度</h3>
                     {(Object.keys(categoryLabels) as AttributeCategory[]).map(cat => (<button key={cat} onClick={() => setActiveCategory(cat)} className={`w-full text-left px-4 py-3 rounded-lg font-bold transition-all ${activeCategory === cat ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-600 hover:bg-white hover:shadow-sm'}`}>{categoryLabels[cat]}</button>))}
                 </div>
                 <div className="flex-1 p-6">
                     <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><SettingsIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 配置: {categoryLabels[activeCategory]}</h3>
                     <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200"><label className="block text-sm font-bold text-gray-600 mb-2">添加新能力项</label><div className="flex gap-2"><input type="text" placeholder="例如：任意球精度" className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddAttribute()} /><button onClick={handleAddAttribute} disabled={!newItemName.trim()} className="px-4 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"><Plus className="w-5 h-5" /></button></div></div>
-                    <div className="space-y-3">{localConfig[activeCategory].length > 0 ? localConfig[activeCategory].map((attr) => ( <div key={attr.key} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-shadow group"><span className="bold text-gray-700 font-bold">{attr.label}</span><div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-xs text-gray-300 font-mono mr-2">{attr.key}</span><button onClick={() => handleDeleteAttribute(activeCategory, attr.key)} className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded" title="删除"><Trash2 className="w-4 h-4" /></button></div></div> )) : <p className="text-gray-400 text-center py-8 italic">此维度暂无评估项目</p>}</div>
+                    <div className="space-y-3">{localConfig[activeCategory].map((attr) => ( <div key={attr.key} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group"><span className="bold text-gray-700 font-bold">{attr.label}</span><button onClick={() => handleDeleteAttribute(activeCategory, attr.key)} className="p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button></div> ))}</div>
                 </div>
             </div>
         )}
@@ -448,7 +443,6 @@ const Settings: React.FC<SettingsProps> = ({
         {activeTab === 'drills' && isDirector && (
             <div className="flex-1 p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Book className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练内容库管理</h3>
-                <p className="text-sm text-gray-500 mb-6">预设常用的训练项目（Drills），在制定训练计划时可以直接从库中选择。</p>
                 <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200"><label className="block text-sm font-bold text-gray-600 mb-2">添加训练项目</label><div className="flex gap-2"><input type="text" placeholder="例如：3v2 快速反击" className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddDrill()} /><button onClick={handleAddDrill} disabled={!newItemName.trim()} className="px-4 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"><Plus className="w-5 h-5" /></button></div></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{localConfig.drillLibrary?.map((drill, idx) => ( <div key={idx} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group"><span className="text-gray-800">{drill}</span><button onClick={() => handleDeleteDrill(drill)} className="p-1.5 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button></div> ))}</div>
             </div>
@@ -458,8 +452,8 @@ const Settings: React.FC<SettingsProps> = ({
             <div className="flex-1 p-6 flex flex-col items-center justify-center">
                 <div className="w-full max-lg bg-gray-50 p-8 rounded-xl border border-gray-200 text-center">
                     <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center"><ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 应用 Logo 设置</h3>
-                    <div className="mb-8 flex flex-col items-center"><div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4">{appLogo ? <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" /> : <span className="text-gray-300 font-bold">No Logo</span>}</div><p className="text-sm text-gray-500">当前显示的 Logo 预览</p></div>
-                    <div className="relative group w-full"><input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-bvb-yellow hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center"><Upload className="w-8 h-8 text-gray-400 mb-2" /><span className="font-bold text-gray-600">点击上传新图片</span><span className="text-xs text-gray-400 mt-1">支持 PNG, JPG, GIF 格式</span></div></div>
+                    <div className="mb-8 flex flex-col items-center"><div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4">{appLogo ? <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" /> : <span className="text-gray-300 font-bold">No Logo</span>}</div></div>
+                    <div className="relative group w-full"><input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-bvb-yellow hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center"><Upload className="w-8 h-8 text-gray-400 mb-2" /><span className="font-bold text-gray-600">点击上传新 Logo 图片</span></div></div>
                 </div>
             </div>
         )}

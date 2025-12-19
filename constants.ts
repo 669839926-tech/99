@@ -1,7 +1,7 @@
 
 import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions, FinanceCategoryDefinition } from './types';
 
-// ... CHINA_GEO_DATA (省略保持原样)
+// ... CHINA_GEO_DATA保持原样
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
     "北京市": {
         "北京市": ["东城区", "西城区", "朝阳区", "丰台区", "石景山区", "海淀区", "门头沟区", "房山区", "通州区", "顺义区", "昌平区", "大兴区", "怀柔区", "平谷区", "密云区", "延庆区"]
@@ -151,6 +151,14 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
     '体能: 12分钟跑',
     '体能: 30米折返跑',
     '传中射门练习'
+  ],
+  trainingFoci: [
+    '传接球',
+    '射门',
+    '防守',
+    '体能',
+    '战术',
+    '对抗'
   ]
 };
 
