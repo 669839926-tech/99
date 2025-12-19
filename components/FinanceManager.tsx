@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User } from '../types';
-import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare } from 'lucide-react';
+import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line, PieChart, Pie, Legend } from 'recharts';
 
 interface FinanceManagerProps {
@@ -15,6 +15,16 @@ interface FinanceManagerProps {
 }
 
 const COLORS = ['#FDE100', '#000000', '#4A4A4A', '#22C55E', '#EF4444', '#3B82F6', '#A855F7', '#F97316'];
+
+// 辅助函数：安全解析年份
+const getSafeYear = (dateStr: string) => {
+    if (!dateStr) return 0;
+    // 优先尝试正则匹配 YYYY
+    const match = dateStr.match(/^(\d{4})/);
+    if (match) return parseInt(match[1]);
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? 0 : d.getFullYear();
+};
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions }) => {
     const [viewMode, setViewMode] = useState<'journal' | 'summary'>('journal');
@@ -57,6 +67,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
 
     const journalWithBalance = useMemo(() => {
         let balance = 0;
+        // 先按日期从小到大排计算结余，再反转展示
         return sortedTransactions.map(t => {
             balance += (t.income - t.expense);
             return { ...t, balance };
@@ -64,9 +75,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
     }, [sortedTransactions]);
 
     const currentStats = useMemo(() => {
-        const yearTransactions = transactions.filter(t => new Date(t.date).getFullYear() === selectedYear);
-        const income = yearTransactions.reduce((sum, t) => sum + (t.income || 0), 0);
-        const expense = yearTransactions.reduce((sum, t) => sum + (t.expense || 0), 0);
+        const yearTransactions = transactions.filter(t => getSafeYear(t.date) === selectedYear);
+        const income = yearTransactions.reduce((sum, t) => sum + (Number(t.income) || 0), 0);
+        const expense = yearTransactions.reduce((sum, t) => sum + (Number(t.expense) || 0), 0);
         return { income, expense, profit: income - expense };
     }, [transactions, selectedYear]);
 
@@ -78,12 +89,21 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             profit: 0
         }));
         transactions.forEach(t => {
-            const date = new Date(t.date);
-            if (date.getFullYear() === selectedYear) {
-                const m = date.getMonth();
-                data[m].income += t.income;
-                data[m].expense += t.expense;
-                data[m].profit = data[m].income - data[m].expense;
+            const d = new Date(t.date);
+            const year = getSafeYear(t.date);
+            if (year === selectedYear) {
+                // 如果 Date 对象无效，则通过正则尝试获取月份
+                let m = isNaN(d.getTime()) ? -1 : d.getMonth();
+                if (m === -1) {
+                    const mMatch = t.date.match(/年(\d{1,2})月/) || t.date.match(/-(\d{1,2})-/);
+                    if (mMatch) m = parseInt(mMatch[1]) - 1;
+                }
+                
+                if (m >= 0 && m < 12) {
+                    data[m].income += (Number(t.income) || 0);
+                    data[m].expense += (Number(t.expense) || 0);
+                    data[m].profit = data[m].income - data[m].expense;
+                }
             }
         });
         return data;
@@ -93,12 +113,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
         const incomeMap: Record<string, number> = {};
         const expenseMap: Record<string, number> = {};
         transactions.forEach(t => {
-            const date = new Date(t.date);
-            if (date.getFullYear() === selectedYear) {
+            if (getSafeYear(t.date) === selectedYear) {
                 const cat = financeCategories.find(c => c.id === t.category);
                 if (cat) {
-                    if (cat.type === 'income') incomeMap[cat.label] = (incomeMap[cat.label] || 0) + t.income;
-                    else expenseMap[cat.label] = (expenseMap[cat.label] || 0) + t.expense;
+                    if (cat.type === 'income') incomeMap[cat.label] = (incomeMap[cat.label] || 0) + (Number(t.income) || 0);
+                    else expenseMap[cat.label] = (expenseMap[cat.label] || 0) + (Number(t.expense) || 0);
                 }
             }
         });
@@ -167,16 +186,35 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             const lines = text.split('\n');
             const newTxs: FinanceTransaction[] = [];
             let batchIncome = 0; let batchExpense = 0;
+
+            const cleanAmount = (str: string) => str ? parseFloat(str.replace(/[¥, ]/g, '')) || 0 : 0;
+            
+            // 辅助函数：标准化日期格式为 YYYY-MM-DD
+            const normalizeDateStr = (str: string) => {
+                let s = str.trim();
+                // 处理 "2025年8月25日" 格式
+                s = s.replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/, (_, y, m, d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+                // 处理 "2025/08/25" 格式
+                s = s.replace(/\//g, '-');
+                return s;
+            };
+
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
                 if (cols.length >= 5) {
-                    const date = cols[0]; const catLabel = cols[1]; const details = cols[2];
-                    const cleanAmount = (str: string) => str ? parseFloat(str.replace(/[¥, ]/g, '')) || 0 : 0;
-                    const income = cleanAmount(cols[3]); const expense = cleanAmount(cols[4]); const account = cols[5] || '默认账户';
+                    const rawDate = cols[0];
+                    const date = normalizeDateStr(rawDate);
+                    const catLabel = cols[1];
+                    const details = cols[2];
+                    const income = cleanAmount(cols[3]);
+                    const expense = cleanAmount(cols[4]);
+                    const account = cols[5] || '默认账户';
+                    
                     const catDef = financeCategories.find(c => c.label === catLabel);
                     if (!catDef || (income === 0 && expense === 0)) continue;
+                    
                     batchIncome += income; batchExpense += expense;
                     newTxs.push({ id: `imp-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`, date, details, category: catDef.id, income, expense, account });
                 }
@@ -184,7 +222,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             if (newTxs.length > 0) {
                 setImportSummary({ count: newTxs.length, income: batchIncome, expense: batchExpense, tempTxs: newTxs });
                 setShowImportModal(false);
-            } else alert('未解析到有效数据，请确保分类名称与系统科目完全一致。');
+            } else alert('未解析到有效数据，请确保分类名称与系统科目完全一致。日期支持 YYYY-MM-DD 或 YYYY年MM月DD日。');
         };
         reader.readAsText(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
@@ -337,8 +375,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 font-bold text-gray-800">{t.details}</td>
-                                            <td className="px-6 py-4 text-right font-black text-green-600 tabular-nums">{t.income > 0 ? t.income.toFixed(2) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? t.expense.toFixed(2) : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-black text-green-600 tabular-nums">{t.income > 0 ? Number(t.income).toFixed(2) : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? Number(t.expense).toFixed(2) : '-'}</td>
                                             <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{t.balance.toFixed(2)}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">

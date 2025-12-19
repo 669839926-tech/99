@@ -178,15 +178,29 @@ const Dashboard: React.FC<DashboardProps> = ({
         count: displayPlayers.filter(p => p.teamId === t.id).length
     }));
 
-    // Financial Stats for Current Month
+    // --- Financial Stats for Current Month (Enhanced Resiliency) ---
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
+    
     const monthlyTransactions = transactions.filter(t => {
         const d = new Date(t.date);
-        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        let year = isNaN(d.getTime()) ? -1 : d.getFullYear();
+        let month = isNaN(d.getTime()) ? -1 : d.getMonth();
+
+        // 容错：如果解析失败，尝试正则提取
+        if (year === -1) {
+            const yMatch = t.date.match(/^(\d{4})/);
+            if (yMatch) year = parseInt(yMatch[1]);
+        }
+        if (month === -1) {
+            const mMatch = t.date.match(/年(\d{1,2})月/) || t.date.match(/-(\d{1,2})-/);
+            if (mMatch) month = parseInt(mMatch[1]) - 1;
+        }
+
+        return month === currentMonth && year === currentYear;
     });
-    const monthlyIncome = monthlyTransactions.reduce((s, t) => s + t.income, 0);
-    const monthlyExpense = monthlyTransactions.reduce((s, t) => s + t.expense, 0);
+    const monthlyIncome = monthlyTransactions.reduce((s, t) => s + (Number(t.income) || 0), 0);
+    const monthlyExpense = monthlyTransactions.reduce((s, t) => s + (Number(t.expense) || 0), 0);
 
     return {
       wins, losses, draws,
