@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
@@ -18,7 +18,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
   const navItems = [
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
     { id: 'players', label: '球队管理', icon: Shirt },
-    { id: 'design', label: '教案设计', icon: PenTool }, // New Item
+    { id: 'finance', label: '账务管理', icon: Wallet }, // New Item
+    { id: 'design', label: '教案设计', icon: PenTool },
     { id: 'training', label: '训练计划', icon: Calendar },
     { id: 'matches', label: '比赛日程', icon: Trophy },
   ];
@@ -26,6 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
   const getMobileLabel = (label: string) => {
     if (label === '俱乐部概览') return '概览';
     if (label === '教案设计') return '教案';
+    if (label === '账务管理') return '账务';
     return label.substring(0, 2);
   };
 
@@ -74,7 +76,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
              </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
           {navItems.map((item) => (
             <button
               key={item.id}

@@ -9,6 +9,8 @@ export interface AppData {
     announcements: any[];
     appLogo?: string;
     users?: any[];
+    // Comment: Added transactions to fix property access errors in App.tsx
+    transactions?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

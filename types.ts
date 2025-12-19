@@ -172,8 +172,20 @@ export interface TrainingSession {
   linkedDesignId?: string;
 }
 
-// --- Session Design Types (Optimized) ---
+// --- Finance Types ---
+export type FinanceCategory = 'Tuition' | 'PitchBooking' | 'Competition' | 'Salary' | 'Rent' | 'Admin' | 'Other';
 
+export interface FinanceTransaction {
+    id: string;
+    date: string;
+    details: string;
+    category: FinanceCategory;
+    income: number;
+    expense: number;
+    account: string;
+}
+
+// Comment: Fixed PitchType definition by changing 'interface' to 'type' as it is a union type assignment
 export type PitchType = 'Full' | 'Half' | 'Box' | 'Portrait' | 'Midfield' | 'DefensiveThird' | 'AttackingThird';
 export type PitchTheme = 'Grass' | 'Blue' | 'Grey' | 'White' | 'Black';
 

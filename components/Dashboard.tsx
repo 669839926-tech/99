@@ -657,10 +657,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div className="space-y-2">
                         {stats.teamCounts.map(t => (
-                            <div key={t.id} className="flex justify-between items-center bg-indigo-50 p-2 rounded text-sm group">
-                                <span className={`font-bold ${t.id === 'unassigned' ? 'text-red-500' : 'text-gray-700'}`}>
-                                    {t.name}
-                                </span>
+                            <div 
+                                key={t.id} 
+                                onClick={() => onNavigate?.('players', t.id)}
+                                className="flex justify-between items-center bg-indigo-50 p-2 rounded text-sm group cursor-pointer hover:bg-indigo-100 transition-all"
+                            >
+                                <div className="flex items-center">
+                                    <span className={`font-bold ${t.id === 'unassigned' ? 'text-red-500' : 'text-gray-700'} group-hover:text-indigo-800`}>
+                                        {t.name}
+                                    </span>
+                                    <ArrowRight className="w-3 h-3 ml-2 text-indigo-300 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
+                                </div>
                                 <span className="font-mono font-black text-indigo-600">{t.count} 人</span>
                             </div>
                         ))}

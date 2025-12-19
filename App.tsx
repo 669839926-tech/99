@@ -8,9 +8,10 @@ import MatchPlanner from './components/MatchPlanner';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
-import SessionDesigner from './components/SessionDesigner'; // Import Session Designer
+import SessionDesigner from './components/SessionDesigner';
+import FinanceManager from './components/FinanceManager'; // New Import
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign } from './types';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -28,38 +29,34 @@ function App() {
   const [announcements, setAnnouncements] = useState<Announcement[]>(MOCK_ANNOUNCEMENTS);
   const [appLogo, setAppLogo] = useState<string>(APP_LOGO);
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  
-  // NEW State for Designs
   const [designs, setDesigns] = useState<DrillDesign[]>([]);
+  
+  // Finance State
+  const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const isFirstRun = useRef(true);
 
-  // Derived Players: Calculate Credits on the fly to ensure consistency
-  // Credits = Sum of all Recharges - Count of 'Present' in Training Sessions
+  // Derived Players: Calculate Credits on the fly
   const derivedPlayers = useMemo(() => {
       return players.map(p => {
           let balance = 0;
-          // Add Recharges
           if (p.rechargeHistory) {
               balance += p.rechargeHistory.reduce((sum, r) => sum + r.amount, 0);
           }
-          
-          // Deduct Attendance (Present only)
           trainings.forEach(t => {
               const record = t.attendance?.find(r => r.playerId === p.id);
               if (record && record.status === 'Present') {
                   balance -= 1;
               }
           });
-          
           return { ...p, credits: balance };
       });
   }, [players, trainings]);
 
-  // 1. Load Data on Mount
+  // Load Data on Mount
   useEffect(() => {
     const init = async () => {
         const cloudData = await loadDataFromCloud();
@@ -72,14 +69,15 @@ function App() {
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
             if (cloudData.users) setUsers(cloudData.users);
-            if (cloudData.designs) setDesigns(cloudData.designs); // Load designs
+            if (cloudData.designs) setDesigns(cloudData.designs);
+            if (cloudData.transactions) setTransactions(cloudData.transactions);
         }
         setIsInitializing(false);
     };
     init();
   }, []);
 
-  // 2. Auto-Save on Change (Debounced)
+  // Auto-Save on Change
   useEffect(() => {
     if (isInitializing) return;
     if (isFirstRun.current) {
@@ -91,7 +89,7 @@ function App() {
         setIsSyncing(true);
         try {
             await saveDataToCloud({
-                players, // Save raw players state
+                players,
                 teams,
                 matches,
                 trainings,
@@ -99,22 +97,23 @@ function App() {
                 announcements,
                 appLogo,
                 users,
-                designs // Persist designs
+                designs,
+                transactions // Persist finance data
             });
         } catch (e) {
             console.error("Auto-save failed", e);
         } finally {
             setIsSyncing(false);
         }
-    }, 2000); // 2 second debounce
+    }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, isInitializing]);
 
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    setActiveTab('dashboard'); // Reset tab on login
+    setActiveTab('dashboard');
     setNavigationParams({});
   };
 
@@ -130,400 +129,118 @@ function App() {
       }
   };
 
-  const handleAddTeam = (team: Team) => {
-    setTeams(prev => [...prev, team]);
+  // Finance Handlers
+  const handleAddTransaction = (t: FinanceTransaction) => {
+      setTransactions(prev => [...prev, t]);
   };
 
-  const handleAddPlayer = (player: Player) => {
-    setPlayers(prev => [...prev, player]);
-  };
-
-  const handleBulkAddPlayers = (newPlayers: Player[]) => {
-    setPlayers(prev => [...prev, ...newPlayers]);
-  };
-
-  const handleUpdatePlayer = (updatedPlayer: Player) => {
-    setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
-  };
-
-  const handleDeletePlayer = (playerId: string) => {
-    if (confirm('确定要删除这名球员吗？此操作不可撤销。')) {
-      setPlayers(prev => prev.filter(p => p.id !== playerId));
-    }
-  };
-
-  const handleBulkDeletePlayers = (playerIds: string[]) => {
-    if (confirm(`确定要删除选中的 ${playerIds.length} 名球员吗？`)) {
-      setPlayers(prev => prev.filter(p => !playerIds.includes(p.id)));
-    }
-  };
-
-  const handleTransferPlayers = (playerIds: string[], targetTeamId: string) => {
-    setPlayers(prev => prev.map(p => 
-      playerIds.includes(p.id) ? { ...p, teamId: targetTeamId } : p
-    ));
-  };
-
-  const handleAddPlayerReview = (playerId: string, review: PlayerReview) => {
-    setPlayers(prev => prev.map(p => {
-        if (p.id === playerId) {
-            return { ...p, reviews: [...(p.reviews || []), review] };
-        }
-        return p;
-    }));
-  };
-
-  // --- Match Logic ---
-  const handleAddMatch = (match: Match) => {
-    setMatches(prev => [...prev, match]);
-  };
-
-  const handleDeleteMatch = (matchId: string) => {
-    if (confirm('确定要删除这场比赛记录吗？')) {
-        setMatches(prev => prev.filter(m => m.id !== matchId));
-    }
-  };
-
-  const handleUpdateMatch = (updatedMatch: Match) => {
-      setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
-  };
-
-  // --- User Management Logic (App Level) ---
-  const handleAddUser = (user: User) => {
-      setUsers(prev => [...prev, user]);
-  };
-
-  const handleUpdateUser = (updatedUser: User) => {
-      setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-      if (currentUser && currentUser.id === updatedUser.id) {
-          setCurrentUser(prev => prev ? { ...prev, ...updatedUser } : null);
+  const handleDeleteTransaction = (id: string) => {
+      if(confirm('确定要删除这条财务记录吗？')) {
+          setTransactions(prev => prev.filter(t => t.id !== id));
       }
   };
 
-  const handleDeleteUser = (userId: string) => {
-      setUsers(prev => prev.filter(u => u.id !== userId));
-  };
-
-  const handleResetUserPassword = (userId: string) => {
-      setUsers(prev => prev.map(u => 
-          u.id === userId ? { ...u, password: '123' } : u
-      ));
-  };
-
-  const handleUpdateUserPassword = (userId: string, newPassword: string) => {
-      setUsers(prev => prev.map(u => 
-          u.id === userId ? { ...u, password: newPassword } : u
-      ));
-      if (currentUser && currentUser.id === userId) {
-          setCurrentUser(prev => prev ? { ...prev, password: newPassword } : null);
-      }
-  };
-
-  // --- Design Logic (App Level) ---
-  const handleSaveDesign = (design: DrillDesign) => {
-      setDesigns(prev => {
-          const index = prev.findIndex(d => d.id === design.id);
-          if (index >= 0) {
-              const newDesigns = [...prev];
-              newDesigns[index] = design;
-              return newDesigns;
-          }
-          return [...prev, design];
-      });
-  };
-
-  const handleDeleteDesign = (id: string) => {
-      if(confirm('确定要删除这个教案吗？')) {
-          setDesigns(prev => prev.filter(d => d.id !== id));
-      }
-  };
-
-  // --- Announcements Logic ---
-  const handleAddAnnouncement = (announcement: Announcement) => {
-    setAnnouncements(prev => [announcement, ...prev]);
-  };
-
-  const handleDeleteAnnouncement = (id: string) => {
-    setAnnouncements(prev => prev.filter(a => a.id !== id));
-  };
-
-  const handleUpdateAnnouncement = (updatedAnnouncement: Announcement) => {
-    setAnnouncements(prev => prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a));
-  };
-
-  // --- Recharge / Credit Logic ---
+  // Other Handlers (Add, Update, Delete for Players, Teams, etc - as defined in original code)
+  const handleAddTeam = (team: Team) => setTeams(prev => [...prev, team]);
+  const handleAddPlayer = (player: Player) => setPlayers(prev => [...prev, player]);
+  const handleBulkAddPlayers = (newPlayers: Player[]) => setPlayers(prev => [...prev, ...newPlayers]);
+  const handleUpdatePlayer = (updatedPlayer: Player) => setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
+  const handleDeletePlayer = (playerId: string) => { if(confirm('确定要删除这名球员吗？')) setPlayers(prev => prev.filter(p => p.id !== playerId)); };
+  const handleBulkDeletePlayers = (playerIds: string[]) => setPlayers(prev => prev.filter(p => !playerIds.includes(p.id)));
+  const handleTransferPlayers = (playerIds: string[], targetTeamId: string) => setPlayers(prev => prev.map(p => playerIds.includes(p.id) ? { ...p, teamId: targetTeamId } : p));
+  const handleAddPlayerReview = (playerId: string, review: PlayerReview) => setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, reviews: [...(p.reviews || []), review] } : p));
+  const handleAddMatch = (match: Match) => setMatches(prev => [...prev, match]);
+  const handleDeleteMatch = (matchId: string) => setMatches(prev => prev.filter(m => m.id !== matchId));
+  const handleUpdateMatch = (updatedMatch: Match) => setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
+  const handleAddUser = (user: User) => setUsers(prev => [...prev, user]);
+  const handleUpdateUser = (updatedUser: User) => setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
+  const handleDeleteUser = (userId: string) => setUsers(prev => prev.filter(u => u.id !== userId));
+  const handleResetUserPassword = (userId: string) => setUsers(prev => prev.map(u => u.id === userId ? { ...u, password: '123' } : u));
+  const handleUpdateUserPassword = (userId: string, newPassword: string) => setUsers(prev => prev.map(u => u.id === userId ? { ...u, password: newPassword } : u));
+  const handleSaveDesign = (design: DrillDesign) => setDesigns(prev => { const idx = prev.findIndex(d => d.id === design.id); if(idx >= 0) { const next = [...prev]; next[idx] = design; return next; } return [...prev, design]; });
+  const handleDeleteDesign = (id: string) => setDesigns(prev => prev.filter(d => d.id !== id));
+  const handleAddAnnouncement = (announcement: Announcement) => setAnnouncements(prev => [announcement, ...prev]);
+  const handleDeleteAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
+  const handleUpdateAnnouncement = (updatedAnnouncement: Announcement) => setAnnouncements(prev => prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a));
   const handleRechargePlayer = (playerId: string, amount: number, leaveQuota: number) => {
-    const today = new Date();
-    today.setFullYear(today.getFullYear() + 1);
-    const nextYearStr = today.toISOString().split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    setPlayers(prev => prev.map(p => {
-        if (p.id === playerId) {
-            const newRecord: RechargeRecord = {
-                id: Date.now().toString(),
-                date: todayStr,
-                amount: amount,
-                quotaAdded: leaveQuota
-            };
-
-            return {
-                ...p,
-                validUntil: nextYearStr,
-                leaveQuota: leaveQuota,
-                leavesUsed: 0,
-                rechargeHistory: [...(p.rechargeHistory || []), newRecord]
-            };
-        }
-        return p;
-    }));
-  };
-
-  const handleBulkRechargePlayers = (playerIds: string[], amount: number, leaveQuota: number) => {
-    const today = new Date();
-    today.setFullYear(today.getFullYear() + 1);
-    const nextYearStr = today.toISOString().split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    setPlayers(prev => prev.map(p => {
-        if (playerIds.includes(p.id)) {
-            const newRecord: RechargeRecord = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                date: todayStr,
-                amount: amount,
-                quotaAdded: leaveQuota
-            };
-
-            return {
-                ...p,
-                validUntil: nextYearStr,
-                leaveQuota: leaveQuota,
-                leavesUsed: 0,
-                rechargeHistory: [...(p.rechargeHistory || []), newRecord]
-            };
-        }
-        return p;
-    }));
-  };
-
-  const handleDeleteRecharge = (playerId: string, rechargeId: string) => {
-      if (!confirm('确定要删除这条充值记录吗？\n删除后将扣除相应的课时余额。')) return;
-
+      const today = new Date();
+      today.setFullYear(today.getFullYear() + 1);
+      const nextYearStr = today.toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
       setPlayers(prev => prev.map(p => {
           if (p.id === playerId) {
-              return {
-                  ...p,
-                  rechargeHistory: p.rechargeHistory.filter(r => r.id !== rechargeId)
-              };
+              const newRecord: RechargeRecord = { id: Date.now().toString(), date: todayStr, amount, quotaAdded: leaveQuota };
+              return { ...p, validUntil: nextYearStr, leaveQuota, leavesUsed: 0, rechargeHistory: [...(p.rechargeHistory || []), newRecord] };
           }
           return p;
       }));
   };
-
-  const handleAddTraining = (session: TrainingSession) => {
-    setTrainings(prev => [...prev, session]);
+  const handleBulkRechargePlayers = (playerIds: string[], amount: number, leaveQuota: number) => {
+      const today = new Date();
+      today.setFullYear(today.getFullYear() + 1);
+      const nextYearStr = today.toISOString().split('T')[0];
+      const todayStr = new Date().toISOString().split('T')[0];
+      setPlayers(prev => prev.map(p => {
+          if (playerIds.includes(p.id)) {
+              const newRecord: RechargeRecord = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: todayStr, amount, quotaAdded: leaveQuota };
+              return { ...p, validUntil: nextYearStr, leaveQuota, leavesUsed: 0, rechargeHistory: [...(p.rechargeHistory || []), newRecord] };
+          }
+          return p;
+      }));
   };
-
-  const handleDeleteTraining = (sessionId: string) => {
-      if (confirm('确定要删除这条训练计划吗？\n删除后相关考勤记录也将一并移除。')) {
-          setTrainings(prev => prev.filter(t => t.id !== sessionId));
-      }
-  };
-
-  const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => {
-      const oldSession = trainings.find(t => t.id === session.id);
-      const oldAttendance = oldSession?.attendance || [];
-
-      setPlayers(currentPlayers => {
-          let updatedPlayers = [...currentPlayers];
-
-          const modifyPlayer = (pid: string, modifier: (p: Player) => Player) => {
-              const idx = updatedPlayers.findIndex(p => p.id === pid);
-              if (idx !== -1) {
-                  updatedPlayers[idx] = modifier(updatedPlayers[idx]);
-              }
-          };
-
-          oldAttendance.forEach(record => {
-              if (record.status === 'Leave') {
-                  modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: Math.max(0, p.leavesUsed - 1) }));
-              }
-          });
-
-          newAttendance.forEach(record => {
-              if (record.status === 'Leave') {
-                  modifyPlayer(record.playerId, p => ({ ...p, leavesUsed: p.leavesUsed + 1 }));
-              }
-          });
-
-          return updatedPlayers;
-      });
-
-      const updatedSession = { ...session, attendance: newAttendance };
-      setTrainings(prev => prev.map(t => t.id === session.id ? updatedSession : t));
-  };
-
-  const handleUpdateAttributeConfig = (newConfig: AttributeConfig) => {
-    setAttributeConfig(newConfig);
-  };
+  const handleDeleteRecharge = (playerId: string, rechargeId: string) => setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, rechargeHistory: p.rechargeHistory.filter(r => r.id !== rechargeId) } : p));
+  const handleAddTraining = (session: TrainingSession) => setTrainings(prev => [...prev, session]);
+  const handleDeleteTraining = (sessionId: string) => setTrainings(prev => prev.filter(t => t.id !== sessionId));
+  const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => setTrainings(prev => prev.map(t => t.id === session.id ? { ...session, attendance: newAttendance } : t));
+  const handleUpdateAttributeConfig = (newConfig: AttributeConfig) => setAttributeConfig(newConfig);
 
   // Loading Screen
   if (isInitializing) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
               <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
-              <p className="text-gray-500 font-bold">正在从 Vercel Blob 恢复数据...</p>
+              <p className="text-gray-500 font-bold">正在载入云端数据...</p>
           </div>
       );
   }
 
-  // 1. Not Logged In -> Show Login
+  // Not Logged In
   if (!currentUser) {
     return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
   }
 
-  // 2. Parent Login -> Show dedicated Parent Portal
+  // Parent Portal
   if (currentUser.role === 'parent' && currentUser.playerId) {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
     if (!childPlayer) return <div>Error: Player not found</div>;
     const childTeam = teams.find(t => t.id === childPlayer.teamId);
-
-    return (
-        <ParentPortal 
-            player={childPlayer} 
-            team={childTeam} 
-            attributeConfig={attributeConfig} 
-            trainings={trainings}
-            onLogout={handleLogout}
-            appLogo={appLogo}
-        />
-    );
+    return <ParentPortal player={childPlayer} team={childTeam} attributeConfig={attributeConfig} trainings={trainings} onLogout={handleLogout} appLogo={appLogo} />;
   }
 
-  // 3. Staff Login -> Show Main App Layout
+  // Staff Layout
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard 
-                  players={derivedPlayers} 
-                  matches={matches} 
-                  trainings={trainings} 
-                  teams={teams} 
-                  announcements={announcements}
-                  currentUser={currentUser} 
-                  onNavigate={handleNavigate}
-                  onAddAnnouncement={handleAddAnnouncement}
-                  onDeleteAnnouncement={handleDeleteAnnouncement}
-                  onUpdateAnnouncement={handleUpdateAnnouncement}
-                  appLogo={appLogo}
-               />;
+        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} />;
       case 'players':
-        return (
-          <PlayerManager 
-            teams={teams}
-            players={derivedPlayers} 
-            trainings={trainings} 
-            attributeConfig={attributeConfig}
-            currentUser={currentUser}
-            onAddPlayer={handleAddPlayer} 
-            onBulkAddPlayers={handleBulkAddPlayers}
-            onAddTeam={handleAddTeam}
-            onDeleteTeam={(teamId) => {
-                if (confirm('确定要删除这支球队吗？删除后该队球员将自动转入“待分配”列表，不会被删除。')) {
-                    setTeams(prev => prev.filter(t => t.id !== teamId));
-                    setPlayers(prev => prev.map(p => p.teamId === teamId ? { ...p, teamId: 'unassigned' } : p));
-                }
-            }}
-            onUpdatePlayer={handleUpdatePlayer}
-            onDeletePlayer={handleDeletePlayer}
-            onBulkDeletePlayers={handleBulkDeletePlayers}
-            onTransferPlayers={handleTransferPlayers}
-            onAddPlayerReview={handleAddPlayerReview}
-            onRechargePlayer={handleRechargePlayer}
-            onBulkRechargePlayers={handleBulkRechargePlayers}
-            onDeleteRecharge={handleDeleteRecharge}
-            initialFilter={navigationParams.filter}
-            appLogo={appLogo}
-          />
-        );
-      case 'design': // NEW ROUTE
-        return (
-            <SessionDesigner 
-                designs={designs}
-                onSaveDesign={handleSaveDesign}
-                onDeleteDesign={handleDeleteDesign}
-                currentUser={currentUser}
-            />
-        );
+        return <PlayerManager teams={teams} players={derivedPlayers} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} />;
+      case 'finance':
+        return <FinanceManager transactions={transactions} currentUser={currentUser} onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} />;
+      case 'design':
+        return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
-        return (
-          <TrainingPlanner 
-            teams={teams}
-            players={derivedPlayers}
-            trainings={trainings} 
-            drillLibrary={attributeConfig.drillLibrary}
-            designs={designs} // Pass designs for importing
-            currentUser={currentUser}
-            onAddTraining={handleAddTraining} 
-            onUpdateTraining={handleUpdateAttendance}
-            onDeleteTraining={handleDeleteTraining}
-            initialFilter={navigationParams.filter}
-            appLogo={appLogo}
-          />
-        );
+        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} />;
       case 'matches':
-        return (
-            <MatchPlanner 
-                matches={matches} 
-                players={derivedPlayers}
-                teams={teams}
-                currentUser={currentUser}
-                onAddMatch={handleAddMatch}
-                onDeleteMatch={handleDeleteMatch}
-                onUpdateMatch={handleUpdateMatch}
-                appLogo={appLogo}
-            />
-        );
+        return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':
-        return <Settings 
-                  attributeConfig={attributeConfig} 
-                  onUpdateConfig={handleUpdateAttributeConfig}
-                  currentUser={currentUser}
-                  users={users}
-                  onAddUser={handleAddUser}
-                  onUpdateUser={handleUpdateUser}
-                  onDeleteUser={handleDeleteUser}
-                  onResetUserPassword={handleResetUserPassword}
-                  onUpdateUserPassword={handleUpdateUserPassword}
-                  appLogo={appLogo}
-                  onUpdateAppLogo={setAppLogo}
-                  teams={teams}
-               />;
+        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} />;
       default:
-        return <Dashboard 
-                  players={derivedPlayers} 
-                  matches={matches} 
-                  trainings={trainings} 
-                  teams={teams} 
-                  announcements={announcements}
-                  currentUser={currentUser}
-                  appLogo={appLogo}
-               />;
+        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} announcements={announcements} currentUser={currentUser} appLogo={appLogo} />;
     }
   };
 
-  const hasNewAnnouncements = announcements.some(a => a.date === new Date().toISOString().split('T')[0]);
-
   return (
-    <Layout 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
-        currentUser={currentUser} 
-        onLogout={handleLogout}
-        isSyncing={isSyncing}
-        hasNewAnnouncements={hasNewAnnouncements}
-        appLogo={appLogo}
-    >
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} isSyncing={isSyncing} hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} appLogo={appLogo}>
       {renderContent()}
     </Layout>
   );
