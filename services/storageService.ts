@@ -4,13 +4,13 @@ export interface AppData {
     teams: any[];
     matches: any[];
     trainings: any[];
-    designs?: any[]; // New: Session Designs
+    designs?: any[];
     attributeConfig: any;
     announcements: any[];
     appLogo?: string;
     users?: any[];
-    // Comment: Added transactions to fix property access errors in App.tsx
     transactions?: any[];
+    permissions?: any; // New: RBAC Config
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
@@ -35,9 +35,7 @@ export const saveDataToCloud = async (data: AppData) => {
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
         });
-        if (!res.ok) {
-            throw new Error('Save failed');
-        }
+        if (!res.ok) throw new Error('Save failed');
         return await res.json();
     } catch (error) {
         console.error('Failed to save data to cloud:', error);

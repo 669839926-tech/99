@@ -9,9 +9,9 @@ import Settings from './components/Settings';
 import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
 import SessionDesigner from './components/SessionDesigner';
-import FinanceManager from './components/FinanceManager'; // New Import
-import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction } from './types';
+import FinanceManager from './components/FinanceManager';
+import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS } from './constants';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -30,9 +30,8 @@ function App() {
   const [appLogo, setAppLogo] = useState<string>(APP_LOGO);
   const [users, setUsers] = useState<User[]>(MOCK_USERS);
   const [designs, setDesigns] = useState<DrillDesign[]>([]);
-  
-  // Finance State
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
+  const [permissions, setPermissions] = useState<RolePermissions>(DEFAULT_PERMISSIONS);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -43,14 +42,10 @@ function App() {
   const derivedPlayers = useMemo(() => {
       return players.map(p => {
           let balance = 0;
-          if (p.rechargeHistory) {
-              balance += p.rechargeHistory.reduce((sum, r) => sum + r.amount, 0);
-          }
+          if (p.rechargeHistory) balance += p.rechargeHistory.reduce((sum, r) => sum + r.amount, 0);
           trainings.forEach(t => {
               const record = t.attendance?.find(r => r.playerId === p.id);
-              if (record && record.status === 'Present') {
-                  balance -= 1;
-              }
+              if (record && record.status === 'Present') balance -= 1;
           });
           return { ...p, credits: balance };
       });
@@ -71,6 +66,7 @@ function App() {
             if (cloudData.users) setUsers(cloudData.users);
             if (cloudData.designs) setDesigns(cloudData.designs);
             if (cloudData.transactions) setTransactions(cloudData.transactions);
+            if (cloudData.permissions) setPermissions(cloudData.permissions);
         }
         setIsInitializing(false);
     };
@@ -98,7 +94,8 @@ function App() {
                 appLogo,
                 users,
                 designs,
-                transactions // Persist finance data
+                transactions,
+                permissions
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -108,7 +105,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -124,23 +121,13 @@ function App() {
 
   const handleNavigate = (tab: string, filter?: string) => {
       setActiveTab(tab);
-      if (filter) {
-          setNavigationParams({ filter });
-      }
+      if (filter) setNavigationParams({ filter });
   };
 
   // Finance Handlers
-  const handleAddTransaction = (t: FinanceTransaction) => {
-      setTransactions(prev => [...prev, t]);
-  };
+  const handleAddTransaction = (t: FinanceTransaction) => setTransactions(prev => [...prev, t]);
+  const handleDeleteTransaction = (id: string) => { if(confirm('确定要删除这条财务记录吗？')) setTransactions(prev => prev.filter(t => t.id !== id)); };
 
-  const handleDeleteTransaction = (id: string) => {
-      if(confirm('确定要删除这条财务记录吗？')) {
-          setTransactions(prev => prev.filter(t => t.id !== id));
-      }
-  };
-
-  // Other Handlers (Add, Update, Delete for Players, Teams, etc - as defined in original code)
   const handleAddTeam = (team: Team) => setTeams(prev => [...prev, team]);
   const handleAddPlayer = (player: Player) => setPlayers(prev => [...prev, player]);
   const handleBulkAddPlayers = (newPlayers: Player[]) => setPlayers(prev => [...prev, ...newPlayers]);
@@ -194,7 +181,6 @@ function App() {
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => setTrainings(prev => prev.map(t => t.id === session.id ? { ...session, attendance: newAttendance } : t));
   const handleUpdateAttributeConfig = (newConfig: AttributeConfig) => setAttributeConfig(newConfig);
 
-  // Loading Screen
   if (isInitializing) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -204,12 +190,8 @@ function App() {
       );
   }
 
-  // Not Logged In
-  if (!currentUser) {
-    return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
-  }
+  if (!currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
 
-  // Parent Portal
   if (currentUser.role === 'parent' && currentUser.playerId) {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
     if (!childPlayer) return <div>Error: Player not found</div>;
@@ -217,7 +199,6 @@ function App() {
     return <ParentPortal player={childPlayer} team={childTeam} attributeConfig={attributeConfig} trainings={trainings} onLogout={handleLogout} appLogo={appLogo} />;
   }
 
-  // Staff Layout
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -233,14 +214,14 @@ function App() {
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':
-        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} />;
+        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} />;
       default:
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} announcements={announcements} currentUser={currentUser} appLogo={appLogo} />;
     }
   };
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} isSyncing={isSyncing} hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} appLogo={appLogo}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} isSyncing={isSyncing} hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} appLogo={appLogo} permissions={permissions}>
       {renderContent()}
     </Layout>
   );

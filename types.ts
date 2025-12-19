@@ -172,7 +172,6 @@ export interface TrainingSession {
   linkedDesignId?: string;
 }
 
-// --- Finance Types ---
 export type FinanceCategory = 'Tuition' | 'PitchBooking' | 'Competition' | 'Salary' | 'Rent' | 'Admin' | 'Other';
 
 export interface FinanceTransaction {
@@ -185,7 +184,6 @@ export interface FinanceTransaction {
     account: string;
 }
 
-// Comment: Fixed PitchType definition by changing 'interface' to 'type' as it is a union type assignment
 export type PitchType = 'Full' | 'Half' | 'Box' | 'Portrait' | 'Midfield' | 'DefensiveThird' | 'AttackingThird';
 export type PitchTheme = 'Grass' | 'Blue' | 'Grey' | 'White' | 'Black';
 
@@ -244,6 +242,12 @@ export interface Announcement {
 }
 
 export type UserRole = 'director' | 'coach' | 'parent';
+
+// --- RBAC Types ---
+export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'settings';
+export type PermissionLevel = 'none' | 'view' | 'edit';
+
+export type RolePermissions = Record<UserRole, Record<ModuleId, PermissionLevel>>;
 
 export interface User {
   id: string;

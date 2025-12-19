@@ -1,13 +1,11 @@
 
-// ... (imports remain the same)
-import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement } from './types';
+import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions } from './types';
 
-// ... (Geo Data remains the same)
+// ... CHINA_GEO_DATA (省略保持原样)
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
     "北京市": {
         "北京市": ["东城区", "西城区", "朝阳区", "丰台区", "石景山区", "海淀区", "门头沟区", "房山区", "通州区", "顺义区", "昌平区", "大兴区", "怀柔区", "平谷区", "密云区", "延庆区"]
     },
-    // ... (rest of geo data)
     "上海市": {
         "上海市": ["黄浦区", "徐汇区", "长宁区", "静安区", "普陀区", "虹口区", "杨浦区", "闵行区", "宝山区", "嘉定区", "浦东新区", "金山区", "松江区", "青浦区", "奉贤区", "崇明区"]
     },
@@ -15,7 +13,7 @@ export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
         "广州市": ["荔湾区", "越秀区", "海珠区", "天河区", "白云区", "黄埔区", "番禺区", "花都区", "南沙区", "从化区", "增城区"],
         "深圳市": ["罗湖区", "福田区", "南山区", "宝安区", "龙岗区", "盐田区", "龙华区", "坪山区", "光明区"],
         "珠海市": ["香洲区", "斗门区", "金湾区"],
-        "东莞市": ["东莞市"] // Direct-administered
+        "东莞市": ["东莞市"]
     },
     "浙江省": {
         "杭州市": ["上城区", "拱墅区", "西湖区", "滨江区", "萧山区", "余杭区", "福阳区", "临安区", "临平区", "钱塘区"],
@@ -47,12 +45,41 @@ export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
 
 export const APP_LOGO = "https://upload.wikimedia.org/wikipedia/commons/6/67/Borussia_Dortmund_logo.svg";
 
+export const DEFAULT_PERMISSIONS: RolePermissions = {
+    director: {
+        dashboard: 'edit',
+        players: 'edit',
+        finance: 'edit',
+        design: 'edit',
+        training: 'edit',
+        matches: 'edit',
+        settings: 'edit'
+    },
+    coach: {
+        dashboard: 'view',
+        players: 'edit',
+        finance: 'none',
+        design: 'edit',
+        training: 'edit',
+        matches: 'view',
+        settings: 'view'
+    },
+    parent: {
+        dashboard: 'view',
+        players: 'view',
+        finance: 'none',
+        design: 'none',
+        training: 'view',
+        matches: 'view',
+        settings: 'view'
+    }
+};
+
 export const MOCK_TEAMS: Team[] = [
   { id: 't1', name: '多特蒙德 U19', level: 'U19', description: '主要青年梯队，备战青年欧冠' },
   { id: 't2', name: '多特蒙德 U17', level: 'U17', description: '专注于基础战术素养培养' },
 ];
 
-// Mock Users for Auth
 export const MOCK_USERS: User[] = [
   { id: 'u1', username: 'admin', password: '123', name: '青训总监', role: 'director' },
   { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamIds: ['t1'] },
@@ -110,47 +137,20 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
 
 const generateStats = (): PlayerStats => {
   const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-  
-  const stats: any = {
-    technical: {},
-    tactical: {},
-    physical: {},
-    mental: {}
-  };
-
+  const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
   DEFAULT_ATTRIBUTE_CONFIG.technical.forEach(attr => stats.technical[attr.key] = rand(4, 9));
   DEFAULT_ATTRIBUTE_CONFIG.tactical.forEach(attr => stats.tactical[attr.key] = rand(4, 9));
   DEFAULT_ATTRIBUTE_CONFIG.physical.forEach(attr => stats.physical[attr.key] = rand(5, 9));
   DEFAULT_ATTRIBUTE_CONFIG.mental.forEach(attr => stats.mental[attr.key] = rand(4, 9));
-
   if (stats.technical.goalkeeping) stats.technical.goalkeeping = rand(1, 3);
-
   return stats as PlayerStats;
 };
 
 const mockId = (year: number) => `110101${year}01011234`;
 
 const MOCK_REVIEWS: PlayerReview[] = [
-    {
-        id: 'r1',
-        date: '2023-04-01',
-        year: 2023,
-        quarter: 'Q1',
-        technicalTacticalImprovement: '在高强度压迫下的出球能力有显著提升，能够更冷静地寻找队友。但是非惯用脚的传球精准度仍需加强。',
-        mentalDevelopment: '自信心增强，但在比赛落后时容易急躁，需要学会控制情绪。',
-        summary: '总体表现出色，已经成为中场的节拍器。下个季度重点提升左脚能力和情绪管理。',
-        status: 'Published'
-    },
-    {
-        id: 'r2',
-        date: '2023-07-01',
-        year: 2023,
-        quarter: 'Q2',
-        technicalTacticalImprovement: '无球跑动更加聪明，经常能出现在对手防线的真空地带。射门转化率有所下降，需要加强门前终结能力训练。',
-        mentalDevelopment: '作为队长展现了很好的领导力，能够鼓励队友。抗压能力在关键比赛中得到了验证。',
-        summary: '战术执行力满分，是球队的核心。需要在休赛期加强力量训练，以适应更高强度的对抗。',
-        status: 'Published'
-    }
+    { id: 'r1', date: '2023-04-01', year: 2023, quarter: 'Q1', technicalTacticalImprovement: '在高强度压迫下的出球能力有显著提升，能够更冷静地寻找队友。但是非惯用脚的传球精准度仍需加强。', mentalDevelopment: '自信心增强，但在比赛落后时容易急躁，需要学会控制情绪。', summary: '总体表现出色，已经成为中场的节拍器。下个季度重点提升左脚能力和情绪管理。', status: 'Published' },
+    { id: 'r2', date: '2023-07-01', year: 2023, quarter: 'Q2', technicalTacticalImprovement: '无球跑动更加聪明，经常能出现在对手防线的真空地带。射门转化率有所下降，需要加强门前终结能力训练。', mentalDevelopment: '作为队长展现了很好的领导力，能够鼓励队友。抗压能力在关键比赛中得到了验证。', summary: '战术执行力满分，是球队的核心。需要在休赛期加强力量训练，以适应更高强度的对抗。', status: 'Published' }
 ];
 
 const getNextYear = () => {
@@ -169,8 +169,8 @@ const createMockPlayer = (data: Partial<Player>): Player => {
         nickname: data.nickname || '',
         stats: stats,
         statsStatus: 'Published',
-        lastPublishedStats: JSON.parse(JSON.stringify(stats)), // Clone
-        gallery: [], // Initialize gallery
+        lastPublishedStats: JSON.parse(JSON.stringify(stats)),
+        gallery: [],
     } as Player;
 }
 
@@ -193,34 +193,6 @@ export const MOCK_MATCHES: Match[] = [
 ];
 
 export const MOCK_TRAINING: TrainingSession[] = [
-  {
-    id: '1',
-    teamId: 't1',
-    title: '高位逼抢恢复',
-    date: '2023-11-14',
-    focus: '防守',
-    duration: 90,
-    intensity: 'High',
-    drills: ['5v2 抢圈 (Rondo)', '3v3 攻守转换', '高位防线布置', '8v8 限制触球次数'],
-    attendance: [
-        { playerId: '1', status: 'Present' },
-        { playerId: '2', status: 'Present' },
-        { playerId: '3', status: 'Leave' }
-    ]
-  },
-  {
-    id: '2',
-    teamId: 't1',
-    title: '防守阵型保持',
-    date: '2023-11-16',
-    focus: '防守',
-    duration: 75,
-    intensity: 'Medium',
-    drills: ['动态拉伸', '影子防守练习', '整体阵型移动', '放松整理'],
-    attendance: [
-        { playerId: '1', status: 'Present' },
-        { playerId: '2', status: 'Injury' },
-        { playerId: '4', status: 'Present' }
-    ]
-  }
+  { id: '1', teamId: 't1', title: '高位逼抢恢复', date: '2023-11-14', focus: '防守', duration: 90, intensity: 'High', drills: ['5v2 抢圈 (Rondo)', '3v3 攻守转换', '高位防线布置', '8v8 限制触球次数'], attendance: [ { playerId: '1', status: 'Present' }, { playerId: '2', status: 'Present' }, { playerId: '3', status: 'Leave' } ] },
+  { id: '2', teamId: 't1', title: '防守阵型保持', date: '2023-11-16', focus: '防守', duration: 75, intensity: 'Medium', drills: ['动态拉伸', '影子防守练习', '整体阵型移动', '放松整理'], attendance: [ { playerId: '1', status: 'Present' }, { playerId: '2', status: 'Injury' }, { playerId: '4', status: 'Present' } ] }
 ];
