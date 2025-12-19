@@ -33,6 +33,7 @@ const MODULES: { id: ModuleId; label: string }[] = [
 const ROLES: { id: UserRole; label: string }[] = [
     { id: 'director', label: '青训总监 (Director)' },
     { id: 'coach', label: '教练员 (Coach)' },
+    { id: 'assistant_coach', label: '助教 (Assistant Coach)' },
     { id: 'parent', label: '家长 (Parent)' },
 ];
 
@@ -316,7 +317,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                             </select>
                         </div>
-                        {newUser.role === 'coach' && (
+                        {(newUser.role === 'coach' || newUser.role === 'assistant_coach') && (
                             <div className="bg-white p-3 rounded border border-gray-200">
                                 <span className="block text-xs font-bold text-gray-400 uppercase mb-2">负责梯队 (可多选)</span>
                                 <div className="flex flex-wrap gap-2">{teams.map(t => { const isSelected = newUser.teamIds?.includes(t.id); return ( <button type="button" key={t.id} onClick={() => toggleTeamSelection(t.id)} className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all flex items-center ${isSelected ? 'bg-bvb-yellow border-bvb-yellow text-bvb-black' : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-bvb-yellow'}`}>{isSelected && <CheckCircle className="w-3 h-3 mr-1" />}{t.name}</button> ); })}</div>
@@ -331,7 +332,7 @@ const Settings: React.FC<SettingsProps> = ({
                         <div key={u.id} className={`grid grid-cols-5 items-center px-4 py-3 bg-white border border-gray-100 first:border-t-0 last:rounded-b-lg hover:bg-gray-50 transition-colors ${editingUserId === u.id ? 'bg-yellow-50/50' : ''}`}>
                             <div className="col-span-1 font-mono text-sm">{u.username}</div>
                             <div className="col-span-1 font-bold text-sm text-gray-800 flex items-center">{u.name}{u.id === currentUser?.id && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded">Me</span>}</div>
-                            <div className="col-span-1"><span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : u.role === 'coach' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{u.role === 'director' ? '总监' : u.role === 'coach' ? '教练' : '家长'}</span></div>
+                            <div className="col-span-1"><span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : (u.role === 'coach' || u.role === 'assistant_coach') ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{u.role === 'director' ? '总监' : u.role === 'coach' ? '教练' : u.role === 'assistant_coach' ? '助教' : '家长'}</span></div>
                             <div className="col-span-1 flex flex-wrap gap-1">{u.role === 'director' ? <span className="text-xs text-gray-400 italic">全部权限</span> : u.teamIds && u.teamIds.length > 0 ? u.teamIds.map(tid => { const t = teams.find(team => team.id === tid); return t ? <span key={tid} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 rounded border border-gray-200">{t.name}</span> : null; }) : <span className="text-xs text-gray-400 italic">未分配</span>}</div>
                             <div className="col-span-1 text-right flex justify-end gap-2">{u.id !== currentUser?.id && (<><button onClick={() => startEditUser(u)} className="text-gray-400 hover:text-bvb-black p-1 rounded hover:bg-gray-100" title="编辑用户"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleResetPasswordClick(u.id)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50" title="重置密码为 123"><RotateCcw className="w-4 h-4" /></button><button onClick={() => handleDeleteUserClick(u.id)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50" title="删除用户"><Trash2 className="w-4 h-4" /></button></>)}</div>
                         </div>

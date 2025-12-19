@@ -64,6 +64,15 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         matches: 'view',
         settings: 'view'
     },
+    assistant_coach: {
+        dashboard: 'view',
+        players: 'view',
+        finance: 'none',
+        design: 'view',
+        training: 'view',
+        matches: 'view',
+        settings: 'view'
+    },
     parent: {
         dashboard: 'view',
         players: 'view',

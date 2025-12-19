@@ -241,7 +241,7 @@ export interface Announcement {
     author: string;
 }
 
-export type UserRole = 'director' | 'coach' | 'parent';
+export type UserRole = 'director' | 'coach' | 'assistant_coach' | 'parent';
 
 // --- RBAC Types ---
 export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'settings';

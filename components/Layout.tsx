@@ -59,7 +59,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                  <div>
                      <p className="text-sm font-bold text-white truncate max-w-[120px]">{currentUser.name}</p>
                      <p className="text-[10px] text-gray-400 uppercase font-bold">
-                         {currentUser.role === 'director' ? '青训总监' : currentUser.role === 'coach' ? '教练员' : '家长'}
+                         {currentUser.role === 'director' ? '青训总监' : currentUser.role === 'coach' ? '教练员' : currentUser.role === 'assistant_coach' ? '助教' : '家长'}
                      </p>
                  </div>
             </div>
