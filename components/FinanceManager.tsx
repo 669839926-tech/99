@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User } from '../types';
-import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye } from 'lucide-react';
+import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line, PieChart, Pie, Legend } from 'recharts';
 
 interface FinanceManagerProps {
@@ -20,8 +20,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
     const [showAddModal, setShowAddModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
     
+    // Import Statistics State
+    const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
+
     // Form State
     const [activeType, setActiveType] = useState<'income' | 'expense'>('income');
     const [formData, setFormData] = useState({
@@ -35,7 +37,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Reset category when switching type or when categories change
     useEffect(() => {
         const categoriesForType = financeCategories.filter(c => c.type === activeType);
         if (categoriesForType.length > 0) {
@@ -57,16 +58,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
         return sortedTransactions.map(t => {
             balance += (t.income - t.expense);
             return { ...t, balance };
-        }).reverse(); // Latest first
+        }).reverse(); 
     }, [sortedTransactions]);
 
     const currentStats = useMemo(() => {
-        const income = transactions.filter(t => new Date(t.date).getFullYear() === selectedYear).reduce((sum, t) => sum + t.income, 0);
-        const expense = transactions.filter(t => new Date(t.date).getFullYear() === selectedYear).reduce((sum, t) => sum + t.expense, 0);
+        const yearTransactions = transactions.filter(t => new Date(t.date).getFullYear() === selectedYear);
+        const income = yearTransactions.reduce((sum, t) => sum + (t.income || 0), 0);
+        const expense = yearTransactions.reduce((sum, t) => sum + (t.expense || 0), 0);
         return { income, expense, profit: income - expense };
     }, [transactions, selectedYear]);
 
-    // Monthly Aggregation
     const monthlySummaryData = useMemo(() => {
         const data = Array.from({ length: 12 }, (_, i) => ({
             month: `${i + 1}月`,
@@ -74,7 +75,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             expense: 0,
             profit: 0
         }));
-
         transactions.forEach(t => {
             const date = new Date(t.date);
             if (date.getFullYear() === selectedYear) {
@@ -84,49 +84,56 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 data[m].profit = data[m].income - data[m].expense;
             }
         });
-
         return data;
     }, [transactions, selectedYear]);
 
-    // Category Breakdown Analysis
+    // Comment: Added missing categoryAnalysis to fix "Cannot find name 'categoryAnalysis'" error
     const categoryAnalysis = useMemo(() => {
         const incomeMap: Record<string, number> = {};
         const expenseMap: Record<string, number> = {};
 
         transactions.forEach(t => {
-            if (new Date(t.date).getFullYear() === selectedYear) {
-                if (t.income > 0) {
-                    incomeMap[t.category] = (incomeMap[t.category] || 0) + t.income;
-                }
-                if (t.expense > 0) {
-                    expenseMap[t.category] = (expenseMap[t.category] || 0) + t.expense;
+            const date = new Date(t.date);
+            if (date.getFullYear() === selectedYear) {
+                const cat = financeCategories.find(c => c.id === t.category);
+                if (cat) {
+                    if (cat.type === 'income') {
+                        incomeMap[cat.label] = (incomeMap[cat.label] || 0) + t.income;
+                    } else {
+                        expenseMap[cat.label] = (expenseMap[cat.label] || 0) + t.expense;
+                    }
                 }
             }
         });
 
-        const incomeData = Object.keys(incomeMap).map(catId => {
-            const cat = financeCategories.find(c => c.id === catId);
-            return { name: cat?.label || '未知收入', value: incomeMap[catId] };
-        }).sort((a, b) => b.value - a.value);
+        const incomeData = Object.keys(incomeMap).map(label => ({
+            name: label,
+            value: incomeMap[label]
+        }));
 
-        const expenseData = Object.keys(expenseMap).map(catId => {
-            const cat = financeCategories.find(c => c.id === catId);
-            return { name: cat?.label || '未知支出', value: expenseMap[catId] };
-        }).sort((a, b) => b.value - a.value);
+        const expenseData = Object.keys(expenseMap).map(label => ({
+            name: label,
+            value: expenseMap[label]
+        }));
 
         return { incomeData, expenseData };
     }, [transactions, selectedYear, financeCategories]);
 
-    // Handle Form Submit
+    const handleDownloadTemplate = () => {
+        const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户\n";
+        const example = `${new Date().toISOString().split('T')[0]},课时续费,张三充值,1000,0,黔农云\n`;
+        const content = headers + example;
+        const blob = new Blob(["\ufeff" + content], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = "财务导入模版.csv";
+        link.click();
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const amountNum = parseFloat(formData.amount) || 0;
-        
-        if (!formData.category) {
-            alert('请选择一个项目分类');
-            return;
-        }
-
+        if (!formData.category) { alert('请选择一个项目分类'); return; }
         const newTx: FinanceTransaction = {
             id: Date.now().toString(),
             date: formData.date,
@@ -137,34 +144,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             account: formData.account,
             attachment: formData.attachment
         };
-
         onAddTransaction(newTx);
         setShowAddModal(false);
         setFormData({ ...formData, details: '', amount: '', attachment: '' });
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, attachment: reader.result as string }));
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    // --- Bulk Import Logic ---
-    const handleDownloadTemplate = () => {
-        const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户\n";
-        const examples = `2024-01-01,课时续费,张三秋季学费,2400,,黔农云\n2024-01-02,租金支出,1月球场租金,,5000,现金`;
-        const content = headers + examples;
-        const blob = new Blob(["\ufeff" + content], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = '财务导入模版.csv';
-        link.click();
     };
 
     const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,56 +158,74 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             const text = evt.target?.result as string;
             const lines = text.split('\n');
             const newTxs: FinanceTransaction[] = [];
+            let batchIncome = 0;
+            let batchExpense = 0;
             
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
-                const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                
+                const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
                 if (cols.length >= 5) {
                     const date = cols[0];
                     const catLabel = cols[1];
                     const details = cols[2];
-                    const income = parseFloat(cols[3]) || 0;
-                    const expense = parseFloat(cols[4]) || 0;
+                    
+                    const cleanAmount = (str: string) => {
+                        if (!str) return 0;
+                        return parseFloat(str.replace(/[¥, ]/g, '')) || 0;
+                    };
+                    
+                    const income = cleanAmount(cols[3]);
+                    const expense = cleanAmount(cols[4]);
                     const account = cols[5] || '默认账户';
 
                     const catDef = financeCategories.find(c => c.label === catLabel);
                     if (!catDef) continue;
                     if (income === 0 && expense === 0) continue;
 
+                    batchIncome += income;
+                    batchExpense += expense;
+
                     newTxs.push({
-                        id: `imp-${Date.now()}-${i}`,
+                        id: `imp-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
                         date, details, category: catDef.id, income, expense, account
                     });
                 }
             }
 
             if (newTxs.length > 0) {
-                onBulkAddTransactions(newTxs);
-                alert(`成功导入 ${newTxs.length} 条账务记录。提示：附件图片需手动在列表中上传（如需此功能，可联系维护人员）。`);
+                setImportSummary({
+                    count: newTxs.length,
+                    income: batchIncome,
+                    expense: batchExpense,
+                    tempTxs: newTxs
+                });
                 setShowImportModal(false);
             } else {
-                alert('未解析到有效数据，请检查文件格式是否与导出模版一致。');
+                alert('未解析到有效数据，请确保分类名称与系统科目完全一致。');
             }
         };
         reader.readAsText(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const confirmBulkImport = () => {
+        if (importSummary) {
+            onBulkAddTransactions(importSummary.tempTxs);
+            setImportSummary(null);
+        }
     };
 
     const handleExportJournal = () => {
         const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n";
         const rows = journalWithBalance.map(t => {
             const catLabel = financeCategories.find(c => c.id === t.category)?.label || '未知分类';
-            const escapedDetails = `"${t.details.replace(/"/g, '""')}"`;
-            const escapedCat = `"${catLabel.replace(/"/g, '""')}"`;
-            const escapedAccount = `"${t.account.replace(/"/g, '""')}"`;
-            return `${t.date},${escapedCat},${escapedDetails},${t.income || ''},${t.expense || ''},${escapedAccount},${t.balance.toFixed(2)}`;
+            return `${t.date},${catLabel},"${t.details.replace(/"/g, '""')}",${t.income || ''},${t.expense || ''},${t.account},${t.balance.toFixed(2)}`;
         }).join('\n');
-        
-        const content = headers + rows;
-        const blob = new Blob(["\ufeff" + content], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
+        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
-        link.href = url;
+        link.href = URL.createObjectURL(blob);
         link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
     };
@@ -249,67 +249,67 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                     <p className="text-gray-500">记录日常收支，分析俱乐部经营状况。</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <div className="flex bg-white p-1 rounded-lg border border-gray-200">
-                        <button onClick={() => setViewMode('journal')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-500'}`}>日记账流水</button>
-                        <button onClick={() => setViewMode('summary')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-500'}`}>统计汇总表</button>
+                    <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                        <button onClick={() => setViewMode('journal')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-500 hover:text-gray-800'}`}>日记账流水</button>
+                        <button onClick={() => setViewMode('summary')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-500 hover:text-gray-800'}`}>统计汇总表</button>
                     </div>
-                    <button onClick={() => setShowImportModal(true)} className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-lg shadow-sm hover:bg-gray-50">
-                        <FileSpreadsheet className="w-5 h-5 mr-2" /> 批量导入
+                    <button onClick={() => setShowImportModal(true)} className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
+                        <FileSpreadsheet className="w-5 h-5 mr-2 text-green-600" /> 批量导入
                     </button>
-                    <button onClick={() => { setActiveType('income'); setShowAddModal(true); }} className="flex items-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105">
+                    <button onClick={() => { setActiveType('income'); setShowAddModal(true); }} className="flex items-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 active:scale-95 transition-all">
                         <Plus className="w-5 h-5 mr-2" /> 记一笔
                     </button>
                 </div>
             </div>
 
-            {/* Quick Stats */}
+            {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-green-500">
-                    <div className="flex justify-between items-center">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[6px] border-green-500 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">{selectedYear}年度总收入</p>
-                            <h3 className="text-3xl font-black text-gray-800">¥{currentStats.income.toLocaleString()}</h3>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{selectedYear}年度总收入</p>
+                            <h3 className="text-3xl font-black text-gray-800 tabular-nums">¥{currentStats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
-                        <div className="p-3 bg-green-50 rounded-xl text-green-600"><ArrowUpRight className="w-6 h-6" /></div>
+                        <div className="p-3 bg-green-50 rounded-2xl text-green-600 shadow-inner"><ArrowUpRight className="w-7 h-7" /></div>
                     </div>
                 </div>
-                <div className="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-red-500">
-                    <div className="flex justify-between items-center">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[6px] border-red-500 hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">{selectedYear}年度总支出</p>
-                            <h3 className="text-3xl font-black text-gray-800">¥{currentStats.expense.toLocaleString()}</h3>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{selectedYear}年度总支出</p>
+                            <h3 className="text-3xl font-black text-gray-800 tabular-nums">¥{currentStats.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
                         </div>
-                        <div className="p-3 bg-red-50 rounded-xl text-red-600"><ArrowDownRight className="w-6 h-6" /></div>
+                        <div className="p-3 bg-red-50 rounded-2xl text-red-600 shadow-inner"><ArrowDownRight className="w-7 h-7" /></div>
                     </div>
                 </div>
-                <div className="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-bvb-yellow">
-                    <div className="flex justify-between items-center">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[6px] border-bvb-yellow hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">{selectedYear}年度净利润</p>
-                            <h3 className={`text-3xl font-black ${currentStats.profit >= 0 ? 'text-gray-800' : 'text-red-500'}`}>
-                                ¥{currentStats.profit.toLocaleString()}
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{selectedYear}年度净利润</p>
+                            <h3 className={`text-3xl font-black tabular-nums ${currentStats.profit >= 0 ? 'text-gray-800' : 'text-red-600'}`}>
+                                ¥{currentStats.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </h3>
                         </div>
-                        <div className="p-3 bg-yellow-50 rounded-xl text-yellow-600"><Calculator className="w-6 h-6" /></div>
+                        <div className="p-3 bg-yellow-50 rounded-2xl text-yellow-600 shadow-inner"><Calculator className="w-7 h-7" /></div>
                     </div>
                 </div>
             </div>
 
             {viewMode === 'journal' ? (
-                /* --- Daily Journal View --- */
+                /* --- Journal View --- */
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h3 className="font-bold text-gray-800 flex items-center"><FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
                         <div className="flex items-center gap-4">
-                            <span className="text-xs text-gray-400 font-bold">共 {transactions.length} 条记录</span>
-                            <button onClick={handleExportJournal} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1 rounded-lg font-bold hover:bg-gray-50">
-                                <Download className="w-3 h-3 mr-1" /> 导出表格
+                            <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">共 {transactions.length} 条记录</span>
+                            <button onClick={handleExportJournal} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-sm">
+                                <Download className="w-3.5 h-3.5 mr-1.5" /> 导出表格
                             </button>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[10px] tracking-widest">
+                            <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[10px] tracking-widest sticky top-0 z-10 border-b border-gray-200">
                                 <tr>
                                     <th className="px-6 py-4">日期</th>
                                     <th className="px-6 py-4">项目分类</th>
@@ -317,8 +317,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                     <th className="px-6 py-4 text-right">收入金额</th>
                                     <th className="px-6 py-4 text-right">支出金额</th>
                                     <th className="px-6 py-4 text-right">余额</th>
-                                    <th className="px-6 py-4">账户</th>
-                                    <th className="px-6 py-4 text-center">附件</th>
                                     <th className="px-6 py-4 text-center">操作</th>
                                 </tr>
                             </thead>
@@ -327,384 +325,239 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                     const cat = financeCategories.find(c => c.id === t.category);
                                     return (
                                         <tr key={t.id} className="hover:bg-yellow-50/30 transition-colors group">
-                                            <td className="px-6 py-4 font-mono text-xs whitespace-nowrap">{t.date}</td>
-                                            <td className="px-6 py-4">
-                                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${cat?.type === 'income' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                                            <td className="px-6 py-4 font-mono text-xs whitespace-nowrap text-gray-500">{t.date}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`text-[10px] px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
                                                     {cat?.label || '未知分类'}
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 font-bold text-gray-800">{t.details}</td>
-                                            <td className="px-6 py-4 text-right font-black text-green-600">{t.income > 0 ? t.income.toFixed(2) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-black text-red-500">{t.expense > 0 ? t.expense.toFixed(2) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30">{t.balance.toFixed(2)}</td>
-                                            <td className="px-6 py-4 text-gray-500 font-bold">{t.account}</td>
+                                            <td className="px-6 py-4 text-right font-black text-green-600 tabular-nums">{t.income > 0 ? t.income.toFixed(2) : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? t.expense.toFixed(2) : '-'}</td>
+                                            <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{t.balance.toFixed(2)}</td>
                                             <td className="px-6 py-4 text-center">
-                                                {t.attachment ? (
-                                                    <button onClick={() => setPreviewImage(t.attachment!)} className="p-1.5 bg-yellow-50 text-bvb-black border border-bvb-yellow rounded-lg hover:bg-bvb-yellow transition-all" title="查看附件">
-                                                        <Paperclip className="w-4 h-4" />
-                                                    </button>
-                                                ) : (
-                                                    <span className="text-gray-200">-</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <button onClick={() => onDeleteTransaction(t.id)} className="p-1 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                                <button onClick={() => onDeleteTransaction(t.id)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </td>
                                         </tr>
                                     );
                                 })}
-                                {transactions.length === 0 && (
-                                    <tr><td colSpan={9} className="py-20 text-center text-gray-400 italic">暂无账务流水记录</td></tr>
+                                {journalWithBalance.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} className="py-20 text-center text-gray-400 italic">暂无账务记录，点击上方按钮新增或导入数据。</td>
+                                    </tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             ) : (
-                /* --- Summary Analysis View --- */
-                <div className="space-y-8 animate-in fade-in duration-500">
-                    <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                        <h3 className="font-bold text-gray-800 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-bvb-yellow" /> 俱乐部年度经营深度分析 ({selectedYear})</h3>
+                /* --- Summary View --- */
+                <div className="space-y-8 animate-in slide-in-from-bottom-4">
+                     <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="font-bold text-gray-800 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-bvb-yellow" /> 年度财务趋势与分类统计 ({selectedYear})</h3>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => setSelectedYear(v => v - 1)} className="p-2 hover:bg-gray-100 rounded transition-colors"><ChevronLeft className="w-4 h-4"/></button>
-                            <span className="font-black text-lg px-4">{selectedYear}</span>
-                            <button onClick={() => setSelectedYear(v => v + 1)} className="p-2 hover:bg-gray-100 rounded transition-colors"><ChevronRight className="w-4 h-4"/></button>
+                            <button onClick={() => setSelectedYear(v => v - 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400"/></button>
+                            <span className="font-black text-lg px-4 border-x border-gray-100">{selectedYear}</span>
+                            <button onClick={() => setSelectedYear(v => v + 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400"/></button>
                         </div>
                     </div>
-
-                    {/* Chart Row 1: Monthly Trends */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                            <h4 className="font-bold text-gray-800 mb-6 text-sm uppercase flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400"/> 月度收支趋势对比</h4>
-                            <div className="h-64">
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-80">
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">月度收支趋势对比</h4>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={monthlySummaryData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} />
+                                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                    <Legend iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', paddingTop: '10px'}} />
+                                    <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-80 flex flex-col md:flex-row">
+                             <div className="flex-1">
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">收入构成</h4>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={monthlySummaryData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis dataKey="month" axisLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
-                                        <YAxis axisLine={false} tick={{ fontSize: 10 }} />
-                                        <Tooltip cursor={{ fill: '#FDE10010' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                                        <Legend iconType="circle" />
-                                        <Bar dataKey="income" name="总收入" fill="#22C55E" radius={[4, 4, 0, 0]} />
-                                        <Bar dataKey="expense" name="总支出" fill="#EF4444" radius={[4, 4, 0, 0]} />
-                                    </BarChart>
+                                    <PieChart>
+                                        <Pie data={categoryAnalysis.incomeData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none" paddingAngle={2}>
+                                            {categoryAnalysis.incomeData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
                                 </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                            <h4 className="font-bold text-gray-800 mb-6 text-sm uppercase flex items-center gap-2"><TrendingUp className="w-4 h-4 text-gray-400"/> 月度净利润波动趋势</h4>
-                            <div className="h-64">
+                             </div>
+                             <div className="flex-1">
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 text-center">支出构成</h4>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={monthlySummaryData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis dataKey="month" axisLine={false} tick={{ fontSize: 10, fontWeight: 'bold' }} />
-                                        <YAxis axisLine={false} tick={{ fontSize: 10 }} />
-                                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                                        <Line type="monotone" dataKey="profit" name="净利润" stroke="#FDE100" strokeWidth={4} dot={{ r: 4, fill: '#000', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
-                                    </LineChart>
+                                    <PieChart>
+                                        <Pie data={categoryAnalysis.expenseData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" stroke="none" paddingAngle={2}>
+                                            {categoryAnalysis.expenseData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
                                 </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Chart Row 2: Category Analysis */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
-                            <h4 className="font-bold text-gray-800 mb-2 text-sm uppercase flex items-center gap-2"><PieChartIcon className="w-4 h-4 text-green-500"/> 项目收入分类占比</h4>
-                            <p className="text-[10px] text-gray-400 mb-6 uppercase tracking-widest font-bold">年度收入结构分析</p>
-                            <div className="h-64 flex-1">
-                                {categoryAnalysis.incomeData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie 
-                                                data={categoryAnalysis.incomeData} 
-                                                cx="50%" cy="50%" 
-                                                innerRadius={60} 
-                                                outerRadius={80} 
-                                                paddingAngle={5} 
-                                                dataKey="value"
-                                                stroke="none"
-                                            >
-                                                {categoryAnalysis.incomeData.map((_, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                            <Legend verticalAlign="bottom" align="center" iconType="circle" />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-gray-400 italic text-sm">暂无收入数据</div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col">
-                            <h4 className="font-bold text-gray-800 mb-2 text-sm uppercase flex items-center gap-2"><PieChartIcon className="w-4 h-4 text-red-500"/> 项目支出分类占比</h4>
-                            <p className="text-[10px] text-gray-400 mb-6 uppercase tracking-widest font-bold">年度支出成本分析</p>
-                            <div className="h-64 flex-1">
-                                {categoryAnalysis.expenseData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie 
-                                                data={categoryAnalysis.expenseData} 
-                                                cx="50%" cy="50%" 
-                                                innerRadius={60} 
-                                                outerRadius={80} 
-                                                paddingAngle={5} 
-                                                dataKey="value"
-                                                stroke="none"
-                                            >
-                                                {categoryAnalysis.expenseData.map((_, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                            <Legend verticalAlign="bottom" align="center" iconType="circle" />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-gray-400 italic text-sm">暂无支出数据</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Table Row: Category Details */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
-                            <h4 className="font-black text-xs uppercase tracking-widest text-gray-500 flex items-center gap-2">
-                                <Target className="w-4 h-4" /> 项目分类明细汇总表 ({selectedYear})
-                            </h4>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-white text-gray-400 font-bold border-b text-[10px] uppercase">
-                                    <tr>
-                                        <th className="px-6 py-4">科目分类</th>
-                                        <th className="px-6 py-4">类型</th>
-                                        <th className="px-6 py-4 text-right">年度汇总金额</th>
-                                        <th className="px-6 py-4 text-right">占比</th>
-                                        <th className="px-6 py-4 text-right">记录笔数</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {financeCategories.map(cat => {
-                                        const total = transactions
-                                            .filter(t => t.category === cat.id && new Date(t.date).getFullYear() === selectedYear)
-                                            .reduce((sum, t) => sum + (cat.type === 'income' ? t.income : t.expense), 0);
-                                        
-                                        const count = transactions
-                                            .filter(t => t.category === cat.id && new Date(t.date).getFullYear() === selectedYear)
-                                            .length;
-
-                                        const percentage = cat.type === 'income' 
-                                            ? (currentStats.income > 0 ? (total / currentStats.income) * 100 : 0)
-                                            : (currentStats.expense > 0 ? (total / currentStats.expense) * 100 : 0);
-
-                                        if (total === 0) return null;
-
-                                        return (
-                                            <tr key={cat.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4 font-bold text-gray-800">{cat.label}</td>
-                                                <td className="px-6 py-4">
-                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded ${cat.type === 'income' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                        {cat.type === 'income' ? '收入类' : '支出类'}
-                                                    </span>
-                                                </td>
-                                                <td className={`px-6 py-4 text-right font-mono font-bold ${cat.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                                    ¥{total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <div className="w-16 h-1 bg-gray-100 rounded-full overflow-hidden">
-                                                            <div 
-                                                                className={`h-full ${cat.type === 'income' ? 'bg-green-500' : 'bg-red-500'}`} 
-                                                                style={{ width: `${percentage}%` }}
-                                                            ></div>
-                                                        </div>
-                                                        <span className="text-[10px] font-bold text-gray-500">{percentage.toFixed(1)}%</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right text-gray-400 font-mono text-xs">{count} 笔</td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                                <tfoot className="bg-bvb-black text-white font-black">
-                                    <tr>
-                                        <td colSpan={2} className="px-6 py-4 uppercase tracking-wider">年度收支总计</td>
-                                        <td className="px-6 py-4 text-right text-bvb-yellow">¥{currentStats.income.toLocaleString()} (收) / ¥{currentStats.expense.toLocaleString()} (支)</td>
-                                        <td colSpan={2} className="px-6 py-4 text-right text-lg">利润: ¥{currentStats.profit.toLocaleString()}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
+                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Import Transactions Modal */}
+            {/* --- Modals --- */}
+
+            {/* Import Statistics Summary Report Modal */}
+            {importSummary && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+                        <div className="bg-bvb-black p-8 flex justify-between items-center text-white">
+                            <div>
+                                <h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic">
+                                    <Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 
+                                    导入数据统计报告
+                                </h3>
+                                <p className="text-gray-400 text-xs font-bold mt-1 uppercase tracking-widest">Financial Import Batch Analysis</p>
+                            </div>
+                            <button onClick={() => setImportSummary(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-10 space-y-8 bg-gray-50/50">
+                            {/* Record Count */}
+                            <div className="flex items-center gap-5 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                                <div className="p-4 bg-bvb-yellow/10 rounded-2xl text-bvb-black"><FileText className="w-8 h-8" /></div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">解析到有效记录</p>
+                                    <h4 className="text-3xl font-black text-gray-800">{importSummary.count} <span className="text-sm font-normal text-gray-400 ml-1">Entries</span></h4>
+                                </div>
+                            </div>
+
+                            {/* Summary Detail */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
+                                    <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2 flex items-center"><ArrowUpRight className="w-3 h-3 mr-1" /> 收入总额</p>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-sm font-black text-green-700">¥</span>
+                                        <h4 className="text-2xl font-black text-green-800 tabular-nums">{importSummary.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-100">
+                                    <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-2 flex items-center"><ArrowDownRight className="w-3 h-3 mr-1" /> 支出总额</p>
+                                    <div className="flex items-baseline gap-1">
+                                        <span className="text-sm font-black text-red-700">¥</span>
+                                        <h4 className="text-2xl font-black text-red-800 tabular-nums">{importSummary.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Impact Analysis */}
+                            <div className="bg-bvb-black p-8 rounded-[24px] text-white relative overflow-hidden shadow-xl shadow-bvb-black/20">
+                                <div className="relative z-10">
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2 flex items-center">
+                                        <TrendingUp className="w-3 h-3 mr-1 text-bvb-yellow" />
+                                        本次入账利润贡献
+                                    </p>
+                                    <h4 className={`text-4xl font-black tabular-nums ${(importSummary.income - importSummary.expense) >= 0 ? 'text-bvb-yellow' : 'text-red-400'}`}>
+                                        ¥{(importSummary.income - importSummary.expense).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </h4>
+                                </div>
+                                <div className="absolute top-0 right-0 h-full w-1/3 bg-bvb-yellow/5 skew-x-12 transform translate-x-12 pointer-events-none"></div>
+                                <Target className="absolute -right-6 -bottom-6 w-32 h-32 text-white/5 rotate-12" />
+                            </div>
+
+                            <div className="flex gap-4 pt-4">
+                                <button onClick={() => setImportSummary(null)} className="flex-1 py-4 bg-gray-200 text-gray-600 font-black rounded-2xl hover:bg-gray-300 transition-all uppercase tracking-widest text-xs">放弃导入</button>
+                                <button onClick={confirmBulkImport} className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl hover:brightness-105 shadow-lg flex items-center justify-center uppercase tracking-widest text-xs">
+                                    <CheckCircle className="w-5 h-5 mr-3" /> 确认入账并保存
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Standard Import Guidance Modal */}
             {showImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                            <h3 className="font-bold text-xl flex items-center"><FileSpreadsheet className="w-5 h-5 mr-2 text-bvb-yellow" /> 批量导入账务</h3>
-                            <button onClick={() => setShowImportModal(false)}><X className="w-6 h-6" /></button>
+                            <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase">
+                                <FileSpreadsheet className="w-6 h-6 mr-3 text-bvb-yellow" /> 
+                                财务导入向导
+                            </h3>
+                            <button onClick={() => setShowImportModal(false)} className="hover:bg-white/10 rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
                         </div>
-                        <div className="p-8 space-y-6">
-                            <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 flex flex-col items-center text-center">
-                                <FileDown className="w-12 h-12 text-gray-400 mb-4" />
-                                <h4 className="font-bold text-gray-700 mb-2">第一步：下载模版</h4>
-                                <p className="text-xs text-gray-500 mb-4">请使用我们提供的标准格式进行数据整理，确保列名及分类与系统一致。</p>
-                                <button onClick={handleDownloadTemplate} className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors shadow-sm">
-                                    <Download className="w-4 h-4 mr-2" /> 下载 CSV 模版
+                        <div className="p-8 space-y-6 bg-gray-50/50">
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col items-center text-center shadow-sm hover:border-bvb-yellow transition-colors group">
+                                <FileDown className="w-12 h-12 text-gray-300 mb-4 group-hover:text-bvb-yellow transition-colors" />
+                                <h4 className="font-black text-gray-700 mb-2 uppercase text-sm">1. 获取标准表格模板</h4>
+                                <button onClick={handleDownloadTemplate} className="flex items-center px-6 py-2.5 bg-bvb-black text-white rounded-xl text-xs font-black hover:bg-gray-800 shadow-md transition-all active:scale-95">
+                                    <Download className="w-4 h-4 mr-2 text-bvb-yellow" /> 下载 CSV 模板
                                 </button>
                             </div>
-                            
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-6 flex flex-col items-center text-center relative group">
+                            <div className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl p-8 flex flex-col items-center text-center relative group hover:bg-blue-100/50 transition-colors">
                                 <Upload className="w-12 h-12 text-blue-400 mb-4 group-hover:scale-110 transition-transform" />
-                                <h4 className="font-bold text-blue-900 mb-2">第二步：上传数据</h4>
-                                <p className="text-xs text-blue-600 mb-4">选择填写好的 CSV 文件，我们将自动解析收入与支出金额。</p>
-                                <input 
-                                    type="file" 
-                                    accept=".csv" 
-                                    onChange={handleImportCSV} 
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                                />
-                                <button className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md pointer-events-none">
-                                    点击选择文件
-                                </button>
+                                <h4 className="font-black text-blue-900 mb-2 uppercase text-sm">2. 上传数据进行统计</h4>
+                                <p className="text-[10px] text-blue-600/70 font-bold mb-4">支持 .CSV 格式文件</p>
+                                <input type="file" ref={fileInputRef} accept=".csv" onChange={handleImportCSV} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                                <button className="flex items-center px-8 py-3 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/20 group-hover:brightness-110">选择文件并分析</button>
                             </div>
-
-                            <p className="text-[10px] text-gray-400 text-center italic">
-                                * 提示：导入后请在日记账流水中核对结余数据。
-                            </p>
+                            <div className="flex items-start gap-3 text-[10px] text-gray-400 italic bg-white p-3 rounded-lg border border-gray-100">
+                                <AlertCircle className="w-4 h-4 shrink-0 text-bvb-yellow" />
+                                <span>系统将基于“项目分类”自动匹配会计科目。请确保表格中的分类名称与“系统设置”中的科目完全一致。</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Add Transaction Modal */}
+            {/* Manual Add Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                            <h3 className="font-bold text-xl flex items-center"><Calculator className="w-5 h-5 mr-2 text-bvb-yellow" /> 新增账务记录</h3>
-                            <button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button>
+                            <h3 className="font-black text-xl flex items-center tracking-tighter uppercase">
+                                <Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 
+                                手动入账
+                            </h3>
+                            <button onClick={() => setShowAddModal(false)} className="hover:bg-white/10 rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
                         </div>
-                        
-                        {/* Type Toggle Buttons */}
-                        <div className="flex p-4 gap-2 bg-gray-50 border-b border-gray-100">
-                            <button 
-                                onClick={() => setActiveType('income')}
-                                className={`flex-1 py-3 rounded-xl font-black text-sm flex items-center justify-center transition-all ${activeType === 'income' ? 'bg-green-600 text-white shadow-lg shadow-green-200 scale-[1.02]' : 'bg-white text-gray-400 border border-gray-200'}`}
-                            >
-                                <ArrowUpRight className="w-4 h-4 mr-2" /> 收入录入
+                        <div className="flex p-2 gap-2 bg-gray-100/50 mx-6 mt-6 rounded-2xl border border-gray-200">
+                            <button onClick={() => setActiveType('income')} className={`flex-1 py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all ${activeType === 'income' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}>
+                                <ArrowUpRight className="w-4 h-4 mr-2" /> 收入入账
                             </button>
-                            <button 
-                                onClick={() => setActiveType('expense')}
-                                className={`flex-1 py-3 rounded-xl font-black text-sm flex items-center justify-center transition-all ${activeType === 'expense' ? 'bg-red-600 text-white shadow-lg shadow-red-200 scale-[1.02]' : 'bg-white text-gray-400 border border-gray-200'}`}
-                            >
-                                <ArrowDownRight className="w-4 h-4 mr-2" /> 支出录入
+                            <button onClick={() => setActiveType('expense')} className={`flex-1 py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all ${activeType === 'expense' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}>
+                                <ArrowDownRight className="w-4 h-4 mr-2" /> 支出入账
                             </button>
                         </div>
-
                         <form onSubmit={handleSubmit} className="p-8 space-y-5">
-                            <div>
-                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">业务日期</label>
-                                <input type="date" required className="w-full p-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                            </div>
-                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">项目分类</label>
-                                    <select 
-                                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-bvb-yellow outline-none font-bold ${activeType === 'income' ? 'bg-green-50/30' : 'bg-red-50/30'}`} 
-                                        value={formData.category} 
-                                        onChange={e => setFormData({...formData, category: e.target.value})}
-                                    >
-                                        <option value="" disabled>选择分类...</option>
-                                        {financeCategories.filter(c => c.type === activeType).map(c => (
-                                            <option key={c.id} value={c.id}>{c.label}</option>
-                                        ))}
-                                    </select>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">业务日期</label>
+                                    <input type="date" required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">金额 (¥)</label>
-                                    <input 
-                                        type="number" 
-                                        step="0.01" 
-                                        required 
-                                        className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-bvb-yellow outline-none font-black text-lg ${activeType === 'income' ? 'bg-green-50/30 text-green-700' : 'bg-red-50/30 text-red-700'}`} 
-                                        placeholder="0.00" 
-                                        value={formData.amount} 
-                                        onChange={e => setFormData({...formData, amount: e.target.value})} 
-                                    />
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">收支金额 (¥)</label>
+                                    <input type="number" step="0.01" required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-black text-lg text-gray-800 focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0.00" />
                                 </div>
                             </div>
-
                             <div>
-                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">摘要备注</label>
-                                <input required className="w-full p-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder={activeType === 'income' ? "例如：2024秋季班学费" : "例如：主球场10月租金"} value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} />
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">会计科目</label>
+                                <select required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-bvb-yellow transition-all appearance-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                                    <option value="" disabled>请选择所属分类...</option>
+                                    {financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                                </select>
                             </div>
-
                             <div>
-                                <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">结算账户</label>
-                                <input className="w-full p-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={formData.account} onChange={e => setFormData({...formData, account: e.target.value})} />
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">明细备注 / 摘要</label>
+                                <textarea required rows={2} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-bvb-yellow transition-all resize-none" value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} placeholder="例如：学员张三续缴课时费..." />
                             </div>
-
-                            {/* Attachment Section */}
-                            <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-4 flex flex-col items-center">
-                                <p className="text-[10px] font-black text-gray-400 uppercase mb-2">凭证附件 (选填)</p>
-                                {formData.attachment ? (
-                                    <div className="relative group w-20 h-20 mb-2">
-                                        <img src={formData.attachment} className="w-full h-full object-cover rounded-lg border border-gray-200" />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => setFormData(prev => ({...prev, attachment: ''}))} 
-                                            className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md"
-                                        >
-                                            <X className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <button 
-                                        type="button" 
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-full py-4 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center hover:bg-gray-100 hover:border-bvb-yellow transition-all"
-                                    >
-                                        <ImageIcon className="w-6 h-6 text-gray-300 mb-1" />
-                                        <span className="text-xs text-gray-400 font-bold">点击上传图片</span>
-                                    </button>
-                                )}
-                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                            </div>
-
-                            <button 
-                                type="submit" 
-                                className={`w-full py-4 text-white font-black rounded-2xl hover:brightness-110 shadow-xl flex items-center justify-center transition-all active:scale-[0.98] mt-4 ${activeType === 'income' ? 'bg-green-600 shadow-green-100' : 'bg-red-600 shadow-red-100'}`}
-                            >
-                                <CheckCircle className="w-5 h-5 mr-2 text-white" /> 确认入账
+                            <button type="submit" className={`w-full py-4 text-white font-black rounded-2xl shadow-xl mt-4 uppercase tracking-widest transition-all active:scale-95 ${activeType === 'income' ? 'bg-green-600 shadow-green-600/20' : 'bg-red-600 shadow-red-600/20'}`}>
+                                <CheckCircle className="w-5 h-5 inline-block mr-2" /> 确认提交入账
                             </button>
                         </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Image Preview Modal */}
-            {previewImage && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200" onClick={() => setPreviewImage(null)}>
-                    <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl flex flex-col items-center bg-white p-2">
-                        <img src={previewImage} className="max-w-full max-h-[80vh] object-contain rounded-lg" />
-                        <div className="p-4 flex gap-4 w-full justify-between items-center bg-white border-t border-gray-100 mt-2">
-                            <p className="text-xs text-gray-500 font-bold">附件凭证预览</p>
-                            <button onClick={() => setPreviewImage(null)} className="flex items-center px-6 py-2 bg-bvb-black text-white rounded-lg text-sm font-bold shadow-md">
-                                <X className="w-4 h-4 mr-2" /> 关闭
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
