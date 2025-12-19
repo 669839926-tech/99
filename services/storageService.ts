@@ -10,7 +10,8 @@ export interface AppData {
     appLogo?: string;
     users?: any[];
     transactions?: any[];
-    permissions?: any; // New: RBAC Config
+    permissions?: any;
+    financeCategories?: any[]; // New: Finance Categories
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

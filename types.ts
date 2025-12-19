@@ -172,16 +172,21 @@ export interface TrainingSession {
   linkedDesignId?: string;
 }
 
-export type FinanceCategory = 'Tuition' | 'PitchBooking' | 'Competition' | 'Salary' | 'Rent' | 'Admin' | 'Other';
+export interface FinanceCategoryDefinition {
+    id: string;
+    label: string;
+    type: 'income' | 'expense';
+}
 
 export interface FinanceTransaction {
     id: string;
     date: string;
     details: string;
-    category: FinanceCategory;
+    category: string; // Dynamic ID from FinanceCategoryDefinition
     income: number;
     expense: number;
     account: string;
+    attachment?: string; // Base64 Image
 }
 
 export type PitchType = 'Full' | 'Half' | 'Box' | 'Portrait' | 'Midfield' | 'DefensiveThird' | 'AttackingThird';

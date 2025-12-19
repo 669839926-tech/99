@@ -1,5 +1,5 @@
 
-import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions } from './types';
+import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions, FinanceCategoryDefinition } from './types';
 
 // ... CHINA_GEO_DATA (省略保持原样)
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
@@ -83,6 +83,16 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         settings: 'view'
     }
 };
+
+export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [
+    { id: 'cat-1', label: '课时续费', type: 'income' },
+    { id: 'cat-2', label: '球场包场', type: 'income' },
+    { id: 'cat-3', label: '参赛费/杂费', type: 'income' },
+    { id: 'cat-4', label: '工资支出', type: 'expense' },
+    { id: 'cat-5', label: '租金支出', type: 'expense' },
+    { id: 'cat-6', label: '行政/杂项', type: 'expense' },
+    { id: 'cat-7', label: '其他支出', type: 'expense' },
+];
 
 export const MOCK_TEAMS: Team[] = [
   { id: 't1', name: '多特蒙德 U19', level: 'U19', description: '主要青年梯队，备战青年欧冠' },

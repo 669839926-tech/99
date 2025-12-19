@@ -10,8 +10,8 @@ import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
 import SessionDesigner from './components/SessionDesigner';
 import FinanceManager from './components/FinanceManager';
-import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions } from './types';
+import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES } from './constants';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -32,6 +32,7 @@ function App() {
   const [designs, setDesigns] = useState<DrillDesign[]>([]);
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [permissions, setPermissions] = useState<RolePermissions>(DEFAULT_PERMISSIONS);
+  const [financeCategories, setFinanceCategories] = useState<FinanceCategoryDefinition[]>(DEFAULT_FINANCE_CATEGORIES);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -67,6 +68,7 @@ function App() {
             if (cloudData.designs) setDesigns(cloudData.designs);
             if (cloudData.transactions) setTransactions(cloudData.transactions);
             if (cloudData.permissions) setPermissions(cloudData.permissions);
+            if (cloudData.financeCategories) setFinanceCategories(cloudData.financeCategories);
         }
         setIsInitializing(false);
     };
@@ -95,7 +97,8 @@ function App() {
                 users,
                 designs,
                 transactions,
-                permissions
+                permissions,
+                financeCategories
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -105,7 +108,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -126,6 +129,7 @@ function App() {
 
   // Finance Handlers
   const handleAddTransaction = (t: FinanceTransaction) => setTransactions(prev => [...prev, t]);
+  const handleBulkAddTransactions = (newTransactions: FinanceTransaction[]) => setTransactions(prev => [...prev, ...newTransactions]);
   const handleDeleteTransaction = (id: string) => { if(confirm('确定要删除这条财务记录吗？')) setTransactions(prev => prev.filter(t => t.id !== id)); };
 
   const handleAddTeam = (team: Team) => setTeams(prev => [...prev, team]);
@@ -206,7 +210,7 @@ function App() {
       case 'players':
         return <PlayerManager teams={teams} players={derivedPlayers} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} />;
       case 'finance':
-        return <FinanceManager transactions={transactions} currentUser={currentUser} onAddTransaction={handleAddTransaction} onDeleteTransaction={handleDeleteTransaction} />;
+        return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} />;
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
@@ -214,7 +218,7 @@ function App() {
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':
-        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} />;
+        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} />;
       default:
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} announcements={announcements} currentUser={currentUser} appLogo={appLogo} />;
     }

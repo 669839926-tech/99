@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition } from '../types';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -18,6 +18,8 @@ interface SettingsProps {
   teams?: Team[];
   permissions: RolePermissions;
   onUpdatePermissions: (perms: RolePermissions) => void;
+  financeCategories: FinanceCategoryDefinition[];
+  onUpdateFinanceCategories: (cats: FinanceCategoryDefinition[]) => void;
 }
 
 const MODULES: { id: ModuleId; label: string }[] = [
@@ -40,14 +42,16 @@ const ROLES: { id: UserRole; label: string }[] = [
 const Settings: React.FC<SettingsProps> = ({ 
     attributeConfig, onUpdateConfig, currentUser, users,
     onAddUser, onUpdateUser, onDeleteUser, onResetUserPassword, onUpdateUserPassword,
-    appLogo, onUpdateAppLogo, teams = [], permissions, onUpdatePermissions
+    appLogo, onUpdateAppLogo, teams = [], permissions, onUpdatePermissions,
+    financeCategories, onUpdateFinanceCategories
 }) => {
   const isDirector = currentUser?.role === 'director';
 
   const [localConfig, setLocalConfig] = useState<AttributeConfig>(JSON.parse(JSON.stringify(attributeConfig)));
   const [localPermissions, setLocalPermissions] = useState<RolePermissions>(JSON.parse(JSON.stringify(permissions)));
+  const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'attributes' | 'drills' | 'branding'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'finance_cats' | 'attributes' | 'drills' | 'branding'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
@@ -91,6 +95,27 @@ const Settings: React.FC<SettingsProps> = ({
       if (!newItemName.trim()) return;
       setLocalConfig(prev => ({ ...prev, drillLibrary: [...(prev.drillLibrary || []), newItemName.trim()] }));
       setNewItemName('');
+  };
+
+  const handleAddFinanceCategory = (type: 'income' | 'expense') => {
+      if (!newItemName.trim()) return;
+      const newCat: FinanceCategoryDefinition = {
+          id: `cat-${Date.now()}`,
+          label: newItemName.trim(),
+          type
+      };
+      const updated = [...localFinanceCategories, newCat];
+      setLocalFinanceCategories(updated);
+      onUpdateFinanceCategories(updated);
+      setNewItemName('');
+  };
+
+  const handleDeleteFinanceCategory = (id: string) => {
+      if (confirm('确定要删除这个财务分类吗？删除后已录入的历史账目将显示为“未知分类”。')) {
+          const updated = localFinanceCategories.filter(c => c.id !== id);
+          setLocalFinanceCategories(updated);
+          onUpdateFinanceCategories(updated);
+      }
   };
 
   const handleUserFormSubmit = (e: React.FormEvent) => {
@@ -211,6 +236,7 @@ const Settings: React.FC<SettingsProps> = ({
               <>
                 <button onClick={() => setActiveTab('permissions')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'permissions' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ShieldAlert className="w-4 h-4 mr-2" /> 角色权限设置</button>
                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Users className="w-4 h-4 mr-2" /> 用户账号管理</button>
+                <button onClick={() => setActiveTab('finance_cats')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'finance_cats' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Wallet className="w-4 h-4 mr-2" /> 财务科目管理</button>
                 <button onClick={() => setActiveTab('attributes')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Target className="w-4 h-4 mr-2" /> 球员能力模型</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
                 <button onClick={() => setActiveTab('branding')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ImageIcon className="w-4 h-4 mr-2" /> 品牌外观</button>
@@ -334,11 +360,75 @@ const Settings: React.FC<SettingsProps> = ({
                             <div className="col-span-1 font-bold text-sm text-gray-800 flex items-center">{u.name}{u.id === currentUser?.id && <span className="ml-2 text-[10px] bg-green-100 text-green-700 px-1.5 rounded">Me</span>}</div>
                             <div className="col-span-1"><span className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : (u.role === 'coach' || u.role === 'assistant_coach') ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>{u.role === 'director' ? '总监' : u.role === 'coach' ? '教练' : u.role === 'assistant_coach' ? '助教' : '家长'}</span></div>
                             <div className="col-span-1 flex flex-wrap gap-1">{u.role === 'director' ? <span className="text-xs text-gray-400 italic">全部权限</span> : u.teamIds && u.teamIds.length > 0 ? u.teamIds.map(tid => { const t = teams.find(team => team.id === tid); return t ? <span key={tid} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 rounded border border-gray-200">{t.name}</span> : null; }) : <span className="text-xs text-gray-400 italic">未分配</span>}</div>
-                            <div className="col-span-1 text-right flex justify-end gap-2">{u.id !== currentUser?.id && (<><button onClick={() => startEditUser(u)} className="text-gray-400 hover:text-bvb-black p-1 rounded hover:bg-gray-100" title="编辑用户"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleResetPasswordClick(u.id)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50" title="重置密码为 123"><RotateCcw className="w-4 h-4" /></button><button onClick={() => handleDeleteUserClick(u.id)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50" title="删除用户"><Trash2 className="w-4 h-4" /></button></>)}</div>
+                            <div className="col-span-1 text-right flex justify-end gap-2">{u.id !== currentUser?.id && (<><button onClick={() => startEditUser(u)} className="text-gray-400 hover:text-bvb-black p-1 rounded hover:bg-gray-100" title="编辑用户"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleResetPasswordClick(u.id)} className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50" title="重置密码为 123"><RotateCcw className="w-4 h-4" /></button>
+                            {/* Comment: Corrected handleDeleteUserClick(id) to handleDeleteUserClick(u.id) */}
+                            <button onClick={() => handleDeleteUserClick(u.id)} className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50" title="删除用户"><Trash2 className="w-4 h-4" /></button></>)}</div>
                         </div>
                     ))}
                 </div>
              </div>
+        )}
+
+        {activeTab === 'finance_cats' && isDirector && (
+            <div className="flex-1 p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Wallet className="w-5 h-5 mr-2 text-bvb-yellow" /> 财务科目与分类管理</h3>
+                <p className="text-sm text-gray-500 mb-6">自定义俱乐部收支分类。只有定义好的分类才能在“账务管理”中使用。</p>
+                
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-sm font-bold text-gray-600 mb-2">新增分类科目</label>
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="输入科目名称..." 
+                            className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" 
+                            value={newItemName} 
+                            onChange={(e) => setNewItemName(e.target.value)} 
+                        />
+                        <button onClick={() => handleAddFinanceCategory('income')} className="px-4 py-2 bg-green-600 text-white text-xs font-black rounded-lg hover:bg-green-700 transition-colors flex items-center">
+                            <ArrowUpRight className="w-3 h-3 mr-1" /> 设为收入
+                        </button>
+                        <button onClick={() => handleAddFinanceCategory('expense')} className="px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 transition-colors flex items-center">
+                            <ArrowDownRight className="w-3 h-3 mr-1" /> 设为支出
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Income List */}
+                    <div className="space-y-3">
+                        <h4 className="font-black text-xs text-green-600 uppercase tracking-widest flex items-center">
+                            <ArrowUpRight className="w-4 h-4 mr-1" /> 收入类科目
+                        </h4>
+                        <div className="space-y-2">
+                            {localFinanceCategories.filter(c => c.type === 'income').map(cat => (
+                                <div key={cat.id} className="flex justify-between items-center p-3 bg-white border border-green-100 rounded-lg shadow-sm group">
+                                    <span className="font-bold text-gray-700">{cat.label}</span>
+                                    <button onClick={() => handleDeleteFinanceCategory(cat.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Expense List */}
+                    <div className="space-y-3">
+                        <h4 className="font-black text-xs text-red-600 uppercase tracking-widest flex items-center">
+                            <ArrowDownRight className="w-4 h-4 mr-1" /> 支出类科目
+                        </h4>
+                        <div className="space-y-2">
+                            {localFinanceCategories.filter(c => c.type === 'expense').map(cat => (
+                                <div key={cat.id} className="flex justify-between items-center p-3 bg-white border border-red-100 rounded-lg shadow-sm group">
+                                    <span className="font-bold text-gray-700">{cat.label}</span>
+                                    <button onClick={() => handleDeleteFinanceCategory(cat.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
         )}
 
         {activeTab === 'attributes' && isDirector && (
@@ -366,7 +456,7 @@ const Settings: React.FC<SettingsProps> = ({
 
         {activeTab === 'branding' && isDirector && (
             <div className="flex-1 p-6 flex flex-col items-center justify-center">
-                <div className="w-full max-w-lg bg-gray-50 p-8 rounded-xl border border-gray-200 text-center">
+                <div className="w-full max-lg bg-gray-50 p-8 rounded-xl border border-gray-200 text-center">
                     <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center"><ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 应用 Logo 设置</h3>
                     <div className="mb-8 flex flex-col items-center"><div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4">{appLogo ? <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" /> : <span className="text-gray-300 font-bold">No Logo</span>}</div><p className="text-sm text-gray-500">当前显示的 Logo 预览</p></div>
                     <div className="relative group w-full"><input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-bvb-yellow hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center"><Upload className="w-8 h-8 text-gray-400 mb-2" /><span className="font-bold text-gray-600">点击上传新图片</span><span className="text-xs text-gray-400 mt-1">支持 PNG, JPG, GIF 格式</span></div></div>
