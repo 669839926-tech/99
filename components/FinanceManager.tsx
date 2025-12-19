@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User } from '../types';
-import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info } from 'lucide-react';
+import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line, PieChart, Pie, Legend } from 'recharts';
 
 interface FinanceManagerProps {
@@ -11,15 +11,17 @@ interface FinanceManagerProps {
     onAddTransaction: (t: FinanceTransaction) => void;
     onBulkAddTransactions: (t: FinanceTransaction[]) => void;
     onDeleteTransaction: (id: string) => void;
+    onBulkDeleteTransactions: (ids: string[]) => void;
 }
 
 const COLORS = ['#FDE100', '#000000', '#4A4A4A', '#22C55E', '#EF4444', '#3B82F6', '#A855F7', '#F97316'];
 
-const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction }) => {
+const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions }) => {
     const [viewMode, setViewMode] = useState<'journal' | 'summary'>('journal');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
     // Import Statistics State
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
@@ -87,37 +89,44 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
         return data;
     }, [transactions, selectedYear]);
 
-    // Comment: Added missing categoryAnalysis to fix "Cannot find name 'categoryAnalysis'" error
     const categoryAnalysis = useMemo(() => {
         const incomeMap: Record<string, number> = {};
         const expenseMap: Record<string, number> = {};
-
         transactions.forEach(t => {
             const date = new Date(t.date);
             if (date.getFullYear() === selectedYear) {
                 const cat = financeCategories.find(c => c.id === t.category);
                 if (cat) {
-                    if (cat.type === 'income') {
-                        incomeMap[cat.label] = (incomeMap[cat.label] || 0) + t.income;
-                    } else {
-                        expenseMap[cat.label] = (expenseMap[cat.label] || 0) + t.expense;
-                    }
+                    if (cat.type === 'income') incomeMap[cat.label] = (incomeMap[cat.label] || 0) + t.income;
+                    else expenseMap[cat.label] = (expenseMap[cat.label] || 0) + t.expense;
                 }
             }
         });
-
-        const incomeData = Object.keys(incomeMap).map(label => ({
-            name: label,
-            value: incomeMap[label]
-        }));
-
-        const expenseData = Object.keys(expenseMap).map(label => ({
-            name: label,
-            value: expenseMap[label]
-        }));
-
+        const incomeData = Object.keys(incomeMap).map(label => ({ name: label, value: incomeMap[label] }));
+        const expenseData = Object.keys(expenseMap).map(label => ({ name: label, value: expenseMap[label] }));
         return { incomeData, expenseData };
     }, [transactions, selectedYear, financeCategories]);
+
+    // Selection Logic
+    const toggleSelectAll = () => {
+        if (selectedIds.size === journalWithBalance.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(journalWithBalance.map(t => t.id)));
+        }
+    };
+
+    const toggleSelectId = (id: string) => {
+        const newSet = new Set(selectedIds);
+        if (newSet.has(id)) newSet.delete(id);
+        else newSet.add(id);
+        setSelectedIds(newSet);
+    };
+
+    const handleBulkDelete = () => {
+        onBulkDeleteTransactions(Array.from(selectedIds));
+        setSelectedIds(new Set());
+    };
 
     const handleDownloadTemplate = () => {
         const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户\n";
@@ -152,69 +161,33 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
     const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (evt) => {
             const text = evt.target?.result as string;
             const lines = text.split('\n');
             const newTxs: FinanceTransaction[] = [];
-            let batchIncome = 0;
-            let batchExpense = 0;
-            
+            let batchIncome = 0; let batchExpense = 0;
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
-                
                 const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
                 if (cols.length >= 5) {
-                    const date = cols[0];
-                    const catLabel = cols[1];
-                    const details = cols[2];
-                    
-                    const cleanAmount = (str: string) => {
-                        if (!str) return 0;
-                        return parseFloat(str.replace(/[¥, ]/g, '')) || 0;
-                    };
-                    
-                    const income = cleanAmount(cols[3]);
-                    const expense = cleanAmount(cols[4]);
-                    const account = cols[5] || '默认账户';
-
+                    const date = cols[0]; const catLabel = cols[1]; const details = cols[2];
+                    const cleanAmount = (str: string) => str ? parseFloat(str.replace(/[¥, ]/g, '')) || 0 : 0;
+                    const income = cleanAmount(cols[3]); const expense = cleanAmount(cols[4]); const account = cols[5] || '默认账户';
                     const catDef = financeCategories.find(c => c.label === catLabel);
-                    if (!catDef) continue;
-                    if (income === 0 && expense === 0) continue;
-
-                    batchIncome += income;
-                    batchExpense += expense;
-
-                    newTxs.push({
-                        id: `imp-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
-                        date, details, category: catDef.id, income, expense, account
-                    });
+                    if (!catDef || (income === 0 && expense === 0)) continue;
+                    batchIncome += income; batchExpense += expense;
+                    newTxs.push({ id: `imp-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`, date, details, category: catDef.id, income, expense, account });
                 }
             }
-
             if (newTxs.length > 0) {
-                setImportSummary({
-                    count: newTxs.length,
-                    income: batchIncome,
-                    expense: batchExpense,
-                    tempTxs: newTxs
-                });
+                setImportSummary({ count: newTxs.length, income: batchIncome, expense: batchExpense, tempTxs: newTxs });
                 setShowImportModal(false);
-            } else {
-                alert('未解析到有效数据，请确保分类名称与系统科目完全一致。');
-            }
+            } else alert('未解析到有效数据，请确保分类名称与系统科目完全一致。');
         };
         reader.readAsText(file);
         if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    const confirmBulkImport = () => {
-        if (importSummary) {
-            onBulkAddTransactions(importSummary.tempTxs);
-            setImportSummary(null);
-        }
     };
 
     const handleExportJournal = () => {
@@ -262,6 +235,22 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 </div>
             </div>
 
+            {/* Selection Toolbar (Floating) */}
+            {selectedIds.size > 0 && viewMode === 'journal' && (
+                <div className="sticky top-0 z-20 bg-bvb-black text-white p-4 rounded-xl shadow-2xl flex justify-between items-center animate-in slide-in-from-top-4">
+                    <div className="flex items-center gap-4">
+                        <CheckSquare className="w-6 h-6 text-bvb-yellow" />
+                        <span className="font-bold">已选择 {selectedIds.size} 条记录</span>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setSelectedIds(new Set())} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-bold transition-colors">取消选择</button>
+                        <button onClick={handleBulkDelete} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold flex items-center transition-colors">
+                            <Trash2 className="w-4 h-4 mr-2" /> 批量删除勾选项
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[6px] border-green-500 hover:shadow-md transition-shadow">
@@ -296,7 +285,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             </div>
 
             {viewMode === 'journal' ? (
-                /* --- Journal View --- */
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h3 className="font-bold text-gray-800 flex items-center"><FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
@@ -311,6 +299,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                         <table className="w-full text-sm text-left">
                             <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[10px] tracking-widest sticky top-0 z-10 border-b border-gray-200">
                                 <tr>
+                                    <th className="px-6 py-4 w-10">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow"
+                                            checked={selectedIds.size > 0 && selectedIds.size === journalWithBalance.length}
+                                            onChange={toggleSelectAll}
+                                        />
+                                    </th>
                                     <th className="px-6 py-4">日期</th>
                                     <th className="px-6 py-4">项目分类</th>
                                     <th className="px-6 py-4">明细/摘要</th>
@@ -323,8 +319,17 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                             <tbody className="divide-y divide-gray-100">
                                 {journalWithBalance.map((t) => {
                                     const cat = financeCategories.find(c => c.id === t.category);
+                                    const isSelected = selectedIds.has(t.id);
                                     return (
-                                        <tr key={t.id} className="hover:bg-yellow-50/30 transition-colors group">
+                                        <tr key={t.id} className={`hover:bg-yellow-50/30 transition-colors group ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
+                                            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleSelectId(t.id)}
+                                                />
+                                            </td>
                                             <td className="px-6 py-4 font-mono text-xs whitespace-nowrap text-gray-500">{t.date}</td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`text-[10px] px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
@@ -336,7 +341,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                             <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? t.expense.toFixed(2) : '-'}</td>
                                             <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{t.balance.toFixed(2)}</td>
                                             <td className="px-6 py-4 text-center">
-                                                <button onClick={() => onDeleteTransaction(t.id)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
+                                                <button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110">
                                                     <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </td>
@@ -345,7 +350,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                 })}
                                 {journalWithBalance.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="py-20 text-center text-gray-400 italic">暂无账务记录，点击上方按钮新增或导入数据。</td>
+                                        <td colSpan={8} className="py-20 text-center text-gray-400 italic">暂无账务记录，点击上方按钮新增或导入数据。</td>
                                     </tr>
                                 )}
                             </tbody>
@@ -353,7 +358,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                     </div>
                 </div>
             ) : (
-                /* --- Summary View --- */
                 <div className="space-y-8 animate-in slide-in-from-bottom-4">
                      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <h3 className="font-bold text-gray-800 flex items-center"><BarChart3 className="w-5 h-5 mr-2 text-bvb-yellow" /> 年度财务趋势与分类统计 ({selectedYear})</h3>
@@ -407,156 +411,79 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
             )}
 
             {/* --- Modals --- */}
-
-            {/* Import Statistics Summary Report Modal */}
             {importSummary && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
                         <div className="bg-bvb-black p-8 flex justify-between items-center text-white">
                             <div>
-                                <h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic">
-                                    <Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 
-                                    导入数据统计报告
-                                </h3>
-                                <p className="text-gray-400 text-xs font-bold mt-1 uppercase tracking-widest">Financial Import Batch Analysis</p>
+                                <h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入统计报告</h3>
                             </div>
-                            <button onClick={() => setImportSummary(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X className="w-6 h-6" />
-                            </button>
+                            <button onClick={() => setImportSummary(null)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="p-10 space-y-8 bg-gray-50/50">
-                            {/* Record Count */}
-                            <div className="flex items-center gap-5 bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
-                                <div className="p-4 bg-bvb-yellow/10 rounded-2xl text-bvb-black"><FileText className="w-8 h-8" /></div>
-                                <div>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">解析到有效记录</p>
-                                    <h4 className="text-3xl font-black text-gray-800">{importSummary.count} <span className="text-sm font-normal text-gray-400 ml-1">Entries</span></h4>
-                                </div>
-                            </div>
-
-                            {/* Summary Detail */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
-                                    <p className="text-[10px] font-black text-green-600 uppercase tracking-widest mb-2 flex items-center"><ArrowUpRight className="w-3 h-3 mr-1" /> 收入总额</p>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-sm font-black text-green-700">¥</span>
-                                        <h4 className="text-2xl font-black text-green-800 tabular-nums">{importSummary.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
-                                    </div>
+                                    <p className="text-[10px] font-black text-green-600 uppercase mb-2">收入总额</p>
+                                    <h4 className="text-2xl font-black text-green-800">¥{importSummary.income.toLocaleString()}</h4>
                                 </div>
                                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-100">
-                                    <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-2 flex items-center"><ArrowDownRight className="w-3 h-3 mr-1" /> 支出总额</p>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-sm font-black text-red-700">¥</span>
-                                        <h4 className="text-2xl font-black text-red-800 tabular-nums">{importSummary.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h4>
-                                    </div>
+                                    <p className="text-[10px] font-black text-red-600 uppercase mb-2">支出总额</p>
+                                    <h4 className="text-2xl font-black text-red-800">¥{importSummary.expense.toLocaleString()}</h4>
                                 </div>
                             </div>
-
-                            {/* Impact Analysis */}
-                            <div className="bg-bvb-black p-8 rounded-[24px] text-white relative overflow-hidden shadow-xl shadow-bvb-black/20">
-                                <div className="relative z-10">
-                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] mb-2 flex items-center">
-                                        <TrendingUp className="w-3 h-3 mr-1 text-bvb-yellow" />
-                                        本次入账利润贡献
-                                    </p>
-                                    <h4 className={`text-4xl font-black tabular-nums ${(importSummary.income - importSummary.expense) >= 0 ? 'text-bvb-yellow' : 'text-red-400'}`}>
-                                        ¥{(importSummary.income - importSummary.expense).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                    </h4>
-                                </div>
-                                <div className="absolute top-0 right-0 h-full w-1/3 bg-bvb-yellow/5 skew-x-12 transform translate-x-12 pointer-events-none"></div>
-                                <Target className="absolute -right-6 -bottom-6 w-32 h-32 text-white/5 rotate-12" />
-                            </div>
-
                             <div className="flex gap-4 pt-4">
-                                <button onClick={() => setImportSummary(null)} className="flex-1 py-4 bg-gray-200 text-gray-600 font-black rounded-2xl hover:bg-gray-300 transition-all uppercase tracking-widest text-xs">放弃导入</button>
-                                <button onClick={confirmBulkImport} className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl hover:brightness-105 shadow-lg flex items-center justify-center uppercase tracking-widest text-xs">
-                                    <CheckCircle className="w-5 h-5 mr-3" /> 确认入账并保存
-                                </button>
+                                <button onClick={() => setImportSummary(null)} className="flex-1 py-4 bg-gray-200 text-gray-600 font-black rounded-2xl">放弃</button>
+                                <button onClick={() => { onBulkAddTransactions(importSummary.tempTxs); setImportSummary(null); }} className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl">确认入账</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Standard Import Guidance Modal */}
             {showImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                            <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase">
-                                <FileSpreadsheet className="w-6 h-6 mr-3 text-bvb-yellow" /> 
-                                财务导入向导
-                            </h3>
-                            <button onClick={() => setShowImportModal(false)} className="hover:bg-white/10 rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
+                            <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase"><FileSpreadsheet className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入向导</h3>
+                            <button onClick={() => setShowImportModal(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="p-8 space-y-6 bg-gray-50/50">
-                            <div className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col items-center text-center shadow-sm hover:border-bvb-yellow transition-colors group">
-                                <FileDown className="w-12 h-12 text-gray-300 mb-4 group-hover:text-bvb-yellow transition-colors" />
-                                <h4 className="font-black text-gray-700 mb-2 uppercase text-sm">1. 获取标准表格模板</h4>
-                                <button onClick={handleDownloadTemplate} className="flex items-center px-6 py-2.5 bg-bvb-black text-white rounded-xl text-xs font-black hover:bg-gray-800 shadow-md transition-all active:scale-95">
-                                    <Download className="w-4 h-4 mr-2 text-bvb-yellow" /> 下载 CSV 模板
-                                </button>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 flex flex-col items-center text-center">
+                                <FileDown className="w-12 h-12 text-gray-300 mb-4" />
+                                <button onClick={handleDownloadTemplate} className="flex items-center px-6 py-2.5 bg-bvb-black text-white rounded-xl text-xs font-black">下载模板</button>
                             </div>
-                            <div className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl p-8 flex flex-col items-center text-center relative group hover:bg-blue-100/50 transition-colors">
-                                <Upload className="w-12 h-12 text-blue-400 mb-4 group-hover:scale-110 transition-transform" />
-                                <h4 className="font-black text-blue-900 mb-2 uppercase text-sm">2. 上传数据进行统计</h4>
-                                <p className="text-[10px] text-blue-600/70 font-bold mb-4">支持 .CSV 格式文件</p>
-                                <input type="file" ref={fileInputRef} accept=".csv" onChange={handleImportCSV} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                                <button className="flex items-center px-8 py-3 bg-blue-600 text-white rounded-xl text-xs font-black shadow-lg shadow-blue-600/20 group-hover:brightness-110">选择文件并分析</button>
-                            </div>
-                            <div className="flex items-start gap-3 text-[10px] text-gray-400 italic bg-white p-3 rounded-lg border border-gray-100">
-                                <AlertCircle className="w-4 h-4 shrink-0 text-bvb-yellow" />
-                                <span>系统将基于“项目分类”自动匹配会计科目。请确保表格中的分类名称与“系统设置”中的科目完全一致。</span>
+                            <div className="bg-blue-50 border-2 border-dashed border-blue-200 rounded-2xl p-8 flex flex-col items-center text-center relative">
+                                <Upload className="w-12 h-12 text-blue-400 mb-4" />
+                                <input type="file" ref={fileInputRef} accept=".csv" onChange={handleImportCSV} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                                <button className="px-8 py-3 bg-blue-600 text-white rounded-xl text-xs font-black">上传文件并分析</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Manual Add Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                            <h3 className="font-black text-xl flex items-center tracking-tighter uppercase">
-                                <Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 
-                                手动入账
-                            </h3>
-                            <button onClick={() => setShowAddModal(false)} className="hover:bg-white/10 rounded-full p-1 transition-colors"><X className="w-6 h-6" /></button>
+                        <div className="bg-bvb-black p-6 flex justify-between items-center text-white">
+                            <h3 className="font-black text-xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 手动入账</h3>
+                            <button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="flex p-2 gap-2 bg-gray-100/50 mx-6 mt-6 rounded-2xl border border-gray-200">
-                            <button onClick={() => setActiveType('income')} className={`flex-1 py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all ${activeType === 'income' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}>
-                                <ArrowUpRight className="w-4 h-4 mr-2" /> 收入入账
-                            </button>
-                            <button onClick={() => setActiveType('expense')} className={`flex-1 py-3 rounded-xl font-black text-xs flex items-center justify-center transition-all ${activeType === 'expense' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}`}>
-                                <ArrowDownRight className="w-4 h-4 mr-2" /> 支出入账
-                            </button>
+                            <button onClick={() => setActiveType('income')} className={`flex-1 py-3 rounded-xl font-black text-xs ${activeType === 'income' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-400'}`}>收入</button>
+                            <button onClick={() => setActiveType('expense')} className={`flex-1 py-3 rounded-xl font-black text-xs ${activeType === 'expense' ? 'bg-red-600 text-white shadow-lg' : 'text-gray-400'}`}>支出</button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-8 space-y-5">
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">业务日期</label>
-                                    <input type="date" required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">收支金额 (¥)</label>
-                                    <input type="number" step="0.01" required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-black text-lg text-gray-800 focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="0.00" />
-                                </div>
+                                <input type="date" required className="w-full p-3 bg-gray-50 border rounded-xl" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                                <input type="number" step="0.01" required className="w-full p-3 bg-gray-50 border rounded-xl" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} placeholder="金额 ¥" />
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">会计科目</label>
-                                <select required className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-bvb-yellow transition-all appearance-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
-                                    <option value="" disabled>请选择所属分类...</option>
-                                    {financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">明细备注 / 摘要</label>
-                                <textarea required rows={2} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none font-bold text-sm focus:ring-2 focus:ring-bvb-yellow transition-all resize-none" value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} placeholder="例如：学员张三续缴课时费..." />
-                            </div>
-                            <button type="submit" className={`w-full py-4 text-white font-black rounded-2xl shadow-xl mt-4 uppercase tracking-widest transition-all active:scale-95 ${activeType === 'income' ? 'bg-green-600 shadow-green-600/20' : 'bg-red-600 shadow-red-600/20'}`}>
-                                <CheckCircle className="w-5 h-5 inline-block mr-2" /> 确认提交入账
-                            </button>
+                            <select required className="w-full p-3 bg-gray-50 border rounded-xl" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>
+                                <option value="" disabled>选择科目...</option>
+                                {financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                            </select>
+                            <textarea required rows={2} className="w-full p-3 bg-gray-50 border rounded-xl resize-none" value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} placeholder="详情摘要..." />
+                            <button type="submit" className={`w-full py-4 text-white font-black rounded-2xl shadow-xl mt-4 ${activeType === 'income' ? 'bg-green-600' : 'bg-red-600'}`}>确认提交入账</button>
                         </form>
                     </div>
                 </div>

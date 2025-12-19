@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { Player, Match, TrainingSession, Team, User, Announcement } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban } from 'lucide-react';
+import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -10,6 +10,7 @@ interface DashboardProps {
   matches: Match[];
   trainings: TrainingSession[];
   teams: Team[];
+  transactions?: FinanceTransaction[];
   announcements?: Announcement[];
   currentUser: User | null;
   onNavigate?: (tab: string, filter?: string) => void;
@@ -24,7 +25,7 @@ type AnalysisView = 'player' | 'session';
 
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
-    announcements = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement, appLogo
+    announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement, appLogo
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
@@ -91,9 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Quick Action: Jump to individual report from credit alert
   const handleLowCreditPlayerClick = (player: Player) => {
-      // 1. 设置球员ID
       setAttendancePlayerId(player.id);
-      // 2. 找到最后一次充值日期作为开始日期
       const lastRecharge = player.rechargeHistory && player.rechargeHistory.length > 0
           ? [...player.rechargeHistory].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
           : null;
@@ -107,13 +106,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           monthAgo.setMonth(monthAgo.getMonth() - 1);
           setCustomStartDate(monthAgo.toISOString().split('T')[0]);
       }
-
-      // 3. 设置结束日期为今天
       setCustomEndDate(new Date().toISOString().split('T')[0]);
-      // 4. 强制切换为自定义范围以触发
       setAttendanceRange('custom');
-      
-      // 5. 滚动到分析区域
       document.getElementById('attendance-analysis-section')?.scrollIntoView({ behavior: 'smooth' });
   };
 
@@ -132,7 +126,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       }, 0);
 
       const pendingStats = players.filter(p => p.statsStatus === 'Submitted').length;
-      
       const pendingLogs = trainings.filter(t => t.submissionStatus === 'Submitted').length;
 
       return {
@@ -166,7 +159,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         
         const diffTime = nextBirthday.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
         return diffDays >= 0 && diffDays <= 7;
     }).map(p => {
         const [y, m, d] = p.birthDate.split('-').map(Number);
@@ -174,10 +166,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         if(nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
         const diffTime = nextBirthday.getTime() - today.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        // 格式化月日
         const monthDay = `${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        
         return { ...p, daysUntil: diffDays, monthDay };
     }).sort((a,b) => a.daysUntil - b.daysUntil);
 
@@ -188,12 +177,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         name: t.name,
         count: displayPlayers.filter(p => p.teamId === t.id).length
     }));
-    if (isDirector) {
-        const unassignedCount = displayPlayers.filter(p => p.teamId === 'unassigned').length;
-        if (unassignedCount > 0) {
-            teamCounts.push({ id: 'unassigned', name: '待分配', count: unassignedCount });
-        }
-    }
+
+    // Financial Stats for Current Month
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
+    const monthlyTransactions = transactions.filter(t => {
+        const d = new Date(t.date);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+    const monthlyIncome = monthlyTransactions.reduce((s, t) => s + t.income, 0);
+    const monthlyExpense = monthlyTransactions.reduce((s, t) => s + t.expense, 0);
 
     return {
       wins, losses, draws,
@@ -202,11 +195,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       totalPlayers: displayPlayers.length,
       upcomingBirthdays,
       lowCreditPlayers,
-      teamCounts
+      teamCounts,
+      finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense }
     };
-  }, [matches, displayPlayers, displayTeams, isDirector]);
+  }, [matches, displayPlayers, displayTeams, transactions, isDirector]);
 
-  // --- Attendance Analytics Logic ---
+  // Attendance Analytics Logic
   const { chartData, averageRate, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
     const start = new Date(customStartDate);
     const end = new Date(customEndDate);
@@ -232,82 +226,40 @@ const Dashboard: React.FC<DashboardProps> = ({
              const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
              const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
              const rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
-             
              grandTotalRate += rate;
              grandTotalCount++;
-
              const d = new Date(s.date);
-             return {
-                 name: `${d.getMonth() + 1}/${d.getDate()}`,
-                 rate,
-                 fullDate: s.date,
-                 title: s.title,
-                 id: s.id
-             };
+             return { name: `${d.getMonth() + 1}/${d.getDate()}`, rate, fullDate: s.date, title: s.title, id: s.id };
         });
     } else {
         const groupedData: Record<string, { totalRate: number; count: number }> = {};
-        
         filteredSessions.forEach(session => {
             const date = new Date(session.date);
-            let key = '';
-            
-            if (attendanceRange === 'year') {
-                 key = `${date.getMonth() + 1}月`;
-            } else {
-                 const weekNum = Math.ceil(date.getDate() / 7);
-                 key = `${date.getMonth() + 1}月W${weekNum}`;
-            }
-            
+            let key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
             const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
             const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
             const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
-
             if (!groupedData[key]) groupedData[key] = { totalRate: 0, count: 0 };
             groupedData[key].totalRate += rate;
             groupedData[key].count += 1;
-
             grandTotalRate += rate;
             grandTotalCount++;
         });
-
-        data = Object.keys(groupedData).map(key => ({
-            name: key,
-            rate: Math.round(groupedData[key].totalRate / groupedData[key].count)
-        }));
+        data = Object.keys(groupedData).map(key => ({ name: key, rate: Math.round(groupedData[key].totalRate / groupedData[key].count) }));
     }
     
     const exportList = teamPlayers.map(p => {
          const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
          const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
-         const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
-         const pInjury = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Injury')).length;
          const rate = pSessions.length > 0 ? Math.round((pPresent / pSessions.length) * 100) : 0;
-         return { ...p, present: pPresent, leave: pLeave, injury: pInjury, total: pSessions.length, rate };
+         return { ...p, present: pPresent, total: pSessions.length, rate };
     }).sort((a,b) => b.rate - a.rate);
 
     const exportSessions = filteredSessions.map(s => {
          const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId);
          const total = sTeamPlayers.length;
          const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
-         const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
-         const injury = s.attendance?.filter(r => r.status === 'Injury').length || 0;
-         const absent = s.attendance?.filter(r => r.status === 'Absent').length || 0;
-         const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-         
-         return {
-             id: s.id,
-             date: s.date,
-             title: s.title,
-             focus: s.focus,
-             teamName: teams.find(t => t.id === s.teamId)?.name || '未知',
-             total,
-             present,
-             leave,
-             injury,
-             absent,
-             rate
-         };
+         return { id: s.id, date: s.date, title: s.title, focus: s.focus, teamName: teams.find(t => t.id === s.teamId)?.name || '未知', total, present, rate: total > 0 ? Math.round((present / total) * 100) : 0 };
     });
 
     return { 
@@ -317,38 +269,25 @@ const Dashboard: React.FC<DashboardProps> = ({
         exportSessionsData: exportSessions,
         teamPlayersList: teamPlayers
     };
-
   }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate, analysisView]);
 
-  // --- Session Detail View Renderer ---
   const renderSessionDetail = () => {
     if (!selectedSessionId) return null;
     const session = trainings.find(t => t.id === selectedSessionId);
     if (!session) return null;
-    
     const team = teams.find(t => t.id === session.teamId);
     const sessionPlayers = players.filter(p => p.teamId === session.teamId);
-    
-    const groups = {
-        Present: [] as Player[],
-        Leave: [] as Player[],
-        Injury: [] as Player[],
-        Absent: [] as Player[]
-    };
-    
+    const groups = { Present: [] as Player[], Leave: [] as Player[], Injury: [] as Player[], Absent: [] as Player[] };
     sessionPlayers.forEach(p => {
         const record = session.attendance?.find(r => r.playerId === p.id);
         const status = record ? record.status : 'Absent';
         if (groups[status]) groups[status].push(p);
         else groups['Absent'].push(p);
     });
-
     return (
         <div className="space-y-6 animate-in slide-in-from-right-4">
             <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
-                <button onClick={() => setSelectedSessionId(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center">
-                    <ChevronDown className="w-5 h-5 text-gray-500 rotate-90" />
-                </button>
+                <button onClick={() => setSelectedSessionId(null)} className="p-2 hover:bg-gray-100 rounded-full flex items-center justify-center"><ChevronDown className="w-5 h-5 text-gray-500 rotate-90" /></button>
                 <div>
                     <h3 className="text-lg font-black text-gray-800">{session.title}</h3>
                     <div className="flex items-center text-xs text-gray-500 gap-2 mt-1">
@@ -358,119 +297,47 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-green-50 rounded-xl p-4 border border-green-100 flex flex-col">
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-bold text-green-800 flex items-center"><CheckCircle className="w-4 h-4 mr-1.5"/> 实到 ({groups.Present.length})</span>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {Object.entries(groups).map(([status, members]) => (
+                    <div key={status} className="bg-white rounded-xl p-4 border border-gray-100 flex flex-col">
+                        <span className="text-sm font-bold text-gray-800 flex items-center mb-3">
+                             {status === 'Present' ? <CheckCircle className="w-4 h-4 mr-1.5 text-green-500"/> : status === 'Leave' ? <Clock className="w-4 h-4 mr-1.5 text-yellow-500"/> : status === 'Injury' ? <AlertTriangle className="w-4 h-4 mr-1.5 text-red-500"/> : <Ban className="w-4 h-4 mr-1.5 text-gray-400"/>}
+                             {status === 'Present' ? '实到' : status === 'Leave' ? '请假' : status === 'Injury' ? '伤停' : '缺席'} ({members.length})
+                        </span>
+                        <div className="space-y-2 flex-1 overflow-y-auto max-h-[200px] custom-scrollbar">
+                            {members.map(p => <div key={p.id} className="text-xs font-bold text-gray-600 bg-gray-50 p-2 rounded">{p.name}</div>)}
+                        </div>
                     </div>
-                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
-                        {groups.Present.map(p => (
-                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-green-100/50">
-                                <span className="text-xs font-bold text-gray-700">{p.name}</span>
-                            </div>
-                        ))}
-                        {groups.Present.length === 0 && <span className="text-xs text-green-400 italic">无</span>}
-                    </div>
-                </div>
-                <div className="bg-yellow-50 rounded-xl p-4 border border-yellow-100 flex flex-col">
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-bold text-yellow-800 flex items-center"><Clock className="w-4 h-4 mr-1.5"/> 请假 ({groups.Leave.length})</span>
-                    </div>
-                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
-                        {groups.Leave.map(p => (
-                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-yellow-100/50">
-                                <span className="text-xs font-bold text-gray-700">{p.name}</span>
-                            </div>
-                        ))}
-                        {groups.Leave.length === 0 && <span className="text-xs text-yellow-400 italic">无</span>}
-                    </div>
-                </div>
-                <div className="bg-red-50 rounded-xl p-4 border border-red-100 flex flex-col">
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-bold text-red-800 flex items-center"><AlertCircle className="w-4 h-4 mr-1.5"/> 伤停 ({groups.Injury.length})</span>
-                    </div>
-                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
-                        {groups.Injury.map(p => (
-                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-red-100/50">
-                                <span className="text-xs font-bold text-gray-700">{p.name}</span>
-                            </div>
-                        ))}
-                        {groups.Injury.length === 0 && <span className="text-xs text-red-400 italic">无</span>}
-                    </div>
-                </div>
-                <div className="bg-gray-100 rounded-xl p-4 border border-gray-200 flex flex-col">
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-bold text-gray-600 flex items-center"><Ban className="w-4 h-4 mr-1.5"/> 缺席 ({groups.Absent.length})</span>
-                    </div>
-                    <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
-                        {groups.Absent.map(p => (
-                            <div key={p.id} className="flex items-center bg-white p-2 rounded shadow-sm border border-gray-200/50">
-                                <span className="text-xs font-bold text-gray-400">{p.name}</span>
-                            </div>
-                        ))}
-                        {groups.Absent.length === 0 && <span className="text-xs text-gray-400 italic">无</span>}
-                    </div>
-                </div>
+                ))}
             </div>
         </div>
     );
   };
 
-  // --- Individual Player Export Data ---
   const individualReport = useMemo(() => {
       if (attendancePlayerId === 'all') return null;
-      
       const player = displayPlayers.find(p => p.id === attendancePlayerId);
       if (!player) return null;
-
       const start = new Date(customStartDate);
       const end = new Date(customEndDate);
       end.setHours(23, 59, 59, 999);
-
-      const relevantSessions = displayTrainings.filter(s => {
+      const sessionRecords = displayTrainings.filter(s => {
           const d = new Date(s.date);
           return d >= start && d <= end && s.teamId === player.teamId;
-      }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      const sessionRecords = relevantSessions.map(s => {
+      }).map(s => {
           const record = s.attendance?.find(r => r.playerId === player.id);
-          return {
-              id: s.id,
-              date: s.date,
-              title: s.title,
-              focus: s.focus,
-              status: record?.status || 'Absent',
-              creditChange: (record?.status === 'Present') ? -1 : 0
-          };
+          return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', creditChange: (record?.status === 'Present') ? -1 : 0 };
       });
-
       const present = sessionRecords.filter(r => r.status === 'Present').length;
-      const leave = sessionRecords.filter(r => r.status === 'Leave').length;
-      const injury = sessionRecords.filter(r => r.status === 'Injury').length;
-      const absent = sessionRecords.filter(r => r.status === 'Absent').length;
-      const rate = sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0;
-
-      return {
-          player,
-          sessions: sessionRecords,
-          stats: { total: sessionRecords.length, present, leave, injury, absent, rate }
-      };
+      return { player, sessions: sessionRecords, stats: { total: sessionRecords.length, present, rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 } };
   }, [attendancePlayerId, displayTrainings, displayPlayers, customStartDate, customEndDate]);
 
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-        if (attendancePlayerId !== 'all' && individualReport) {
-             await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}_${customStartDate}`);
-        } else {
-             await exportToPDF('attendance-report-export', `训练出勤分析报告_${customStartDate}_至_${customEndDate}`);
-        }
-    } catch (e) {
-        alert('导出失败');
-    } finally {
-        setIsExporting(false);
-    }
+        if (attendancePlayerId !== 'all' && individualReport) await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}`);
+        else await exportToPDF('attendance-report-export', `训练出勤分析报告`);
+    } catch (e) { alert('导出失败'); } finally { setIsExporting(false); }
   };
 
   const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
@@ -478,57 +345,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (newAnnouncement.title && newAnnouncement.content) {
         if (editingAnnouncementId && onUpdateAnnouncement) {
              const original = announcements.find(a => a.id === editingAnnouncementId);
-             onUpdateAnnouncement({
-                 id: editingAnnouncementId,
-                 title: newAnnouncement.title,
-                 content: newAnnouncement.content,
-                 type: newAnnouncement.type,
-                 date: original?.date || new Date().toISOString().split('T')[0],
-                 author: original?.author || currentUser?.name || '管理员'
-             });
+             onUpdateAnnouncement({ id: editingAnnouncementId, title: newAnnouncement.title, content: newAnnouncement.content, type: newAnnouncement.type, date: original?.date || new Date().toISOString().split('T')[0], author: original?.author || currentUser?.name || '管理员' });
              setEditingAnnouncementId(null);
         } else if (onAddAnnouncement) {
-            onAddAnnouncement({
-                id: Date.now().toString(),
-                title: newAnnouncement.title,
-                content: newAnnouncement.content,
-                date: new Date().toISOString().split('T')[0],
-                type: newAnnouncement.type,
-                author: currentUser?.name || '管理员'
-            });
+            onAddAnnouncement({ id: Date.now().toString(), title: newAnnouncement.title, content: newAnnouncement.content, date: new Date().toISOString().split('T')[0], type: newAnnouncement.type, author: currentUser?.name || '管理员' });
         }
-        
         setNewAnnouncement({ title: '', content: '', type: 'info' });
         setShowAnnounceForm(false);
     }
   };
 
-  const handleEditAnnouncementClick = (announcement: Announcement) => {
-      setNewAnnouncement({
-          title: announcement.title,
-          content: announcement.content,
-          type: announcement.type
-      });
-      setEditingAnnouncementId(announcement.id);
-      setShowAnnounceForm(true);
-  };
-
-  const handleCancelEdit = () => {
-      setShowAnnounceForm(false);
-      setEditingAnnouncementId(null);
-      setNewAnnouncement({ title: '', content: '', type: 'info' });
-  };
-
-  const handleDeleteAnnouncementSubmit = (id: string) => {
-      if(confirm('确定要删除这条公告吗？') && onDeleteAnnouncement) {
-          onDeleteAnnouncement(id);
-      }
-  };
-
   return (
     <div className="space-y-6">
-      
-      {/* --- Main Dashboard Content --- */}
       <div id="dashboard-content" className="space-y-8">
         
         {/* Header Section */}
@@ -551,95 +379,96 @@ const Dashboard: React.FC<DashboardProps> = ({
            <Trophy className="absolute -right-6 -bottom-6 w-48 h-48 text-white/20 rotate-12 pointer-events-none" />
         </div>
 
-        {/* Pending Tasks Widget */}
-        {isDirector && pendingTasks.total > 0 && (
-            <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-6 animate-in slide-in-from-top-4">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-lg text-gray-800 flex items-center">
-                        <ClipboardCheck className="w-6 h-6 mr-2 text-bvb-yellow" />
-                        待办审核事项
-                    </h3>
-                    <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">
-                        {pendingTasks.total} 个待处理
-                    </span>
+        {/* Club Status Summary: Finance & Tasks */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Financial Quick Card */}
+            {isDirector && (
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-green-500 p-6 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate?.('finance')}>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                            <Wallet className="w-6 h-6 mr-2 text-green-500" />
+                            本月财务快报
+                        </h3>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().getMonth() + 1}月实时流水</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-green-50 p-3 rounded-lg border border-green-100">
+                             <div className="text-[10px] text-green-600 font-black uppercase">本月收入</div>
+                             <div className="text-lg font-black text-green-700">¥{stats.finance.income.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-red-50 p-3 rounded-lg border border-red-100">
+                             <div className="text-[10px] text-red-600 font-black uppercase">本月支出</div>
+                             <div className="text-lg font-black text-red-700">¥{stats.finance.expense.toLocaleString()}</div>
+                        </div>
+                        <div className="bg-bvb-yellow/10 p-3 rounded-lg border border-bvb-yellow/20">
+                             <div className="text-[10px] text-bvb-black font-black uppercase">本月盈余</div>
+                             <div className={`text-lg font-black ${stats.finance.profit >= 0 ? 'text-gray-800' : 'text-red-600'}`}>¥{stats.finance.profit.toLocaleString()}</div>
+                        </div>
+                    </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                     <div 
-                        onClick={() => onNavigate?.('players', 'pending_reviews')}
-                        className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group"
-                     >
-                         <span className="text-xs font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">球员季度评价</span>
-                         <span className={`text-2xl font-black ${pendingTasks.reviews > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                             {pendingTasks.reviews}
-                         </span>
-                     </div>
-                     <div 
-                        onClick={() => onNavigate?.('players', 'pending_stats')}
-                        className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group"
-                     >
-                         <span className="text-xs font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">能力数据更新</span>
-                         <span className={`text-2xl font-black ${pendingTasks.stats > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                             {pendingTasks.stats}
-                         </span>
-                     </div>
-                     <div 
-                        onClick={() => onNavigate?.('training', 'pending_logs')}
-                        className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group"
-                     >
-                         <span className="text-xs font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志审核</span>
-                         <span className={`text-2xl font-black ${pendingTasks.logs > 0 ? 'text-blue-600' : 'text-gray-400'}`}>
-                             {pendingTasks.logs}
-                         </span>
-                     </div>
+            )}
+
+            {/* Pending Tasks Widget */}
+            {isDirector && pendingTasks.total > 0 ? (
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-bold text-lg text-gray-800 flex items-center">
+                            <ClipboardCheck className="w-6 h-6 mr-2 text-bvb-yellow" />
+                            待办审核事项
+                        </h3>
+                        <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                            {pendingTasks.total} 个待处理
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <div onClick={() => onNavigate?.('players', 'pending_reviews')} className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">球员点评</span>
+                            <span className="text-2xl font-black text-blue-600">{pendingTasks.reviews}</span>
+                        </div>
+                        <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">数据更新</span>
+                            <span className="text-2xl font-black text-blue-600">{pendingTasks.stats}</span>
+                        </div>
+                        <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志</span>
+                            <span className="text-2xl font-black text-blue-600">{pendingTasks.logs}</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
-        )}
+            ) : isDirector ? (
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-gray-200 p-6 flex items-center justify-center">
+                    <div className="text-center">
+                        <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">所有审核事项已处理完毕</p>
+                    </div>
+                </div>
+            ) : null}
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500">
                 <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">胜场 (Wins)</p>
-                        <h3 className="text-3xl font-black text-gray-800">{stats.wins}</h3>
-                    </div>
-                    <div className="p-2 bg-green-50 rounded-lg text-green-600">
-                        <TrendingUp className="w-5 h-5" />
-                    </div>
+                    <div><p className="text-xs font-bold text-gray-400 uppercase">胜场</p><h3 className="text-3xl font-black text-gray-800">{stats.wins}</h3></div>
+                    <div className="p-2 bg-green-50 rounded-lg text-green-600"><TrendingUp className="w-5 h-5" /></div>
                 </div>
             </div>
             <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-gray-400">
                  <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">平局 (Draws)</p>
-                        <h3 className="text-3xl font-black text-gray-800">{stats.draws}</h3>
-                    </div>
-                    <div className="p-2 bg-gray-100 rounded-lg text-gray-600">
-                        <Activity className="w-5 h-5" />
-                    </div>
+                    <div><p className="text-xs font-bold text-gray-400 uppercase">平局</p><h3 className="text-3xl font-black text-gray-800">{stats.draws}</h3></div>
+                    <div className="p-2 bg-gray-100 rounded-lg text-gray-600"><Activity className="w-5 h-5" /></div>
                 </div>
             </div>
             <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500">
                  <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">负场 (Losses)</p>
-                        <h3 className="text-3xl font-black text-gray-800">{stats.losses}</h3>
-                    </div>
-                    <div className="p-2 bg-red-50 rounded-lg text-red-600">
-                        <AlertCircle className="w-5 h-5" />
-                    </div>
+                    <div><p className="text-xs font-bold text-gray-400 uppercase">负场</p><h3 className="text-3xl font-black text-gray-800">{stats.losses}</h3></div>
+                    <div className="p-2 bg-red-50 rounded-lg text-red-600"><AlertCircle className="w-5 h-5" /></div>
                 </div>
             </div>
             <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-bvb-yellow">
                  <div className="flex justify-between items-start">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">头号射手</p>
-                        <h3 className="text-xl font-black text-gray-800 truncate max-w-[120px]" title={stats.topScorer?.name || '-'}>{stats.topScorer?.name || '-'}</h3>
-                        <p className="text-xs text-bvb-yellow font-bold bg-black inline-block px-1 rounded mt-1">{stats.topScorer?.goals || 0} 球</p>
-                    </div>
-                    <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600">
-                        <Trophy className="w-5 h-5" />
-                    </div>
+                    <div><p className="text-xs font-bold text-gray-400 uppercase">头号射手</p><h3 className="text-xl font-black text-gray-800 truncate max-w-[120px]">{stats.topScorer?.name || '-'}</h3><p className="text-xs text-bvb-yellow font-bold bg-black inline-block px-1 rounded mt-1">{stats.topScorer?.goals || 0} 球</p></div>
+                    <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600"><Trophy className="w-5 h-5" /></div>
                 </div>
             </div>
         </div>
@@ -647,203 +476,83 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column: Alerts & Info */}
             <div className="space-y-4">
-                {/* Team Counts Card */}
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
-                    <div className="flex justify-between items-center mb-3">
-                         <h3 className="font-bold flex items-center text-gray-800">
-                             <Shirt className="w-5 h-5 mr-2 text-indigo-500" />
-                             梯队人数统计
-                         </h3>
-                    </div>
+                    <h3 className="font-bold flex items-center text-gray-800 mb-3"><Shirt className="w-5 h-5 mr-2 text-indigo-500" /> 梯队人数统计</h3>
                     <div className="space-y-2">
                         {stats.teamCounts.map(t => (
-                            <div 
-                                key={t.id} 
-                                onClick={() => onNavigate?.('players', t.id)}
-                                className="flex justify-between items-center bg-indigo-50 p-2 rounded text-sm group cursor-pointer hover:bg-indigo-100 transition-all"
-                            >
-                                <div className="flex items-center">
-                                    <span className={`font-bold ${t.id === 'unassigned' ? 'text-red-500' : 'text-gray-700'} group-hover:text-indigo-800`}>
-                                        {t.name}
-                                    </span>
-                                    <ArrowRight className="w-3 h-3 ml-2 text-indigo-300 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-1" />
-                                </div>
+                            <div key={t.id} onClick={() => onNavigate?.('players', t.id)} className="flex justify-between items-center bg-indigo-50 p-2 rounded text-sm group cursor-pointer hover:bg-indigo-100 transition-all">
+                                <span className="font-bold text-gray-700 group-hover:text-indigo-800">{t.name}</span>
                                 <span className="font-mono font-black text-indigo-600">{t.count} 人</span>
                             </div>
                         ))}
-                        {stats.teamCounts.length === 0 && <p className="text-xs text-gray-400 text-center py-2">暂无梯队数据</p>}
                     </div>
                 </div>
-
-                {/* Low Credit Alert - Hidden for Coaches */}
                 {isDirector && (
                     <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-bold flex items-center text-gray-800">
-                                <AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} />
-                                课时余额预警
-                            </h3>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${stats.lowCreditPlayers.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                                {stats.lowCreditPlayers.length} 人
-                            </span>
+                        <h3 className="font-bold flex items-center text-gray-800 mb-3"><AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 课时余额预警</h3>
+                        <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
+                            {stats.lowCreditPlayers.map(p => (
+                                <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm cursor-pointer hover:bg-red-100 transition-colors group">
+                                    <span className="font-bold text-gray-700">{p.name}</span>
+                                    <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
+                                </div>
+                            ))}
                         </div>
-                        <p className="text-[10px] text-gray-400 mb-3">* 点击球员直接生成充值后出勤分析</p>
-                        {stats.lowCreditPlayers.length > 0 ? (
-                            <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                                {stats.lowCreditPlayers.map(p => (
-                                    <div 
-                                        key={p.id} 
-                                        onClick={() => handleLowCreditPlayerClick(p)}
-                                        className="flex justify-between items-center bg-red-50 p-2 rounded text-sm cursor-pointer hover:bg-red-100 transition-colors group"
-                                    >
-                                        <span className="font-bold text-gray-700 group-hover:text-red-800">{p.name}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
-                                            <ArrowRight className="w-3 h-3 text-red-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-center py-4 text-gray-400 text-sm">
-                                目前所有球员课时充足
-                            </div>
-                        )}
                     </div>
                 )}
-
-                {/* Birthday Alert */}
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-pink-500 p-4">
-                     <div className="flex justify-between items-center mb-3">
-                         <h3 className="font-bold flex items-center text-gray-800">
-                             <Cake className="w-5 h-5 mr-2 text-pink-500" />
-                             近期生日
-                         </h3>
-                         <span className="text-xs font-bold bg-pink-100 text-pink-700 px-2 py-0.5 rounded">{stats.upcomingBirthdays.length} 人</span>
-                    </div>
+                     <h3 className="font-bold flex items-center text-gray-800 mb-3"><Cake className="w-5 h-5 mr-2 text-pink-500" /> 近期生日</h3>
                     {stats.upcomingBirthdays.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                             {stats.upcomingBirthdays.map(p => (
-                                <span key={p.id} className="bg-pink-50 text-pink-700 px-2 py-1 rounded text-xs font-bold border border-pink-100 flex items-center">
+                                <span key={p.id} className="bg-pink-50 text-pink-700 px-2 py-1 rounded text-xs font-bold border border-pink-100">
                                     {p.name} [{p.monthDay}] ({p.daysUntil === 0 ? '今天' : `${p.daysUntil}天后`})
                                 </span>
                             ))}
                         </div>
-                    ) : (
-                        <div className="text-center py-4 text-gray-400 text-sm">
-                            近期（7天内）无球员生日
-                        </div>
-                    )}
+                    ) : <p className="text-xs text-gray-400 text-center py-4">近期无生日</p>}
                 </div>
             </div>
 
             {/* Right Column: Announcements Board */}
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-gray-800 flex items-center">
-                        <Megaphone className="w-5 h-5 mr-2 text-bvb-yellow" />
-                        俱乐部公告栏
-                    </h3>
-                    {isDirector ? (
-                        <button 
-                            onClick={showAnnounceForm ? handleCancelEdit : () => setShowAnnounceForm(true)}
-                            className="text-xs flex items-center bg-white border border-gray-300 hover:border-bvb-yellow px-3 py-1.5 rounded-lg font-bold transition-all shadow-sm"
-                        >
+                    <h3 className="font-bold text-gray-800 flex items-center"><Megaphone className="w-5 h-5 mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
+                    {isDirector && (
+                        <button onClick={showAnnounceForm ? () => setShowAnnounceForm(false) : () => setShowAnnounceForm(true)} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold">
                             {showAnnounceForm ? <X className="w-3 h-3 mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
-                            {showAnnounceForm ? (editingAnnouncementId ? '取消编辑' : '取消发布') : '发布公告'}
+                            {showAnnounceForm ? '取消' : '发布公告'}
                         </button>
-                    ) : (
-                        <span className="text-xs text-gray-400 flex items-center bg-gray-100 px-2 py-1 rounded">
-                             <Lock className="w-3 h-3 mr-1" /> 仅总监可发布
-                        </span>
                     )}
                 </div>
-                
-                {showAnnounceForm && isDirector && (
+                {showAnnounceForm && (
                     <div className="p-4 bg-yellow-50 border-b border-yellow-100 animate-in slide-in-from-top-2">
                         <form onSubmit={handleAddAnnouncementSubmit} className="space-y-3">
                             <div className="flex gap-3">
-                                <input 
-                                    placeholder="公告标题..." 
-                                    className="flex-1 p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                                    value={newAnnouncement.title}
-                                    onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
-                                    required
-                                />
-                                <select 
-                                    className="p-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                                    value={newAnnouncement.type}
-                                    onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as any})}
-                                >
-                                    <option value="info">普通通知</option>
-                                    <option value="urgent">紧急/重要</option>
+                                <input placeholder="标题..." className="flex-1 p-2 border rounded-lg text-sm" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} required />
+                                <select className="p-2 border rounded-lg text-sm" value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as any})}>
+                                    <option value="info">通知</option>
+                                    <option value="urgent">紧急</option>
                                 </select>
                             </div>
-                            <textarea 
-                                placeholder="公告详情内容..." 
-                                rows={2}
-                                className="w-full p-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                                value={newAnnouncement.content}
-                                onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
-                                required
-                            />
-                            <div className="flex justify-end gap-2">
-                                <button type="submit" className="px-4 py-1.5 bg-bvb-black text-white text-xs font-bold rounded hover:bg-gray-800 flex items-center">
-                                    <Send className="w-3 h-3 mr-1" /> {editingAnnouncementId ? '更新公告' : '发布'}
-                                </button>
-                            </div>
+                            <textarea placeholder="内容..." rows={2} className="w-full p-2 border rounded-lg text-sm" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} required />
+                            <div className="flex justify-end"><button type="submit" className="px-4 py-1.5 bg-bvb-black text-white text-xs font-bold rounded">发布</button></div>
                         </form>
                     </div>
                 )}
-
                 <div className="flex-1 overflow-y-auto max-h-[300px] p-4 space-y-3 custom-scrollbar">
-                    {announcements.length > 0 ? (
-                        announcements.map(item => {
-                            const isNew = item.date === new Date().toISOString().split('T')[0];
-                            return (
-                                <div key={item.id} className={`relative group border border-gray-100 rounded-lg p-3 hover:shadow-md transition-shadow bg-white ${isNew ? 'ring-1 ring-blue-100' : ''}`}>
-                                    <div className="flex justify-between items-start mb-1">
-                                        <div className="flex items-center gap-2">
-                                            {item.type === 'urgent' && <Bell className="w-4 h-4 text-red-500 fill-current" />}
-                                            <h4 className={`font-bold text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>
-                                                {item.title}
-                                            </h4>
-                                            {item.type === 'urgent' && <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold">重要</span>}
-                                            {isNew && <span className="text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold animate-pulse">New</span>}
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-[10px] text-gray-400 font-mono">{item.date}</span>
-                                            {item.author && <span className="text-[9px] text-gray-300">By {item.author}</span>}
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-gray-600 leading-relaxed pl-6 md:pl-0">{item.content}</p>
-                                    
-                                    {isDirector && (
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                                onClick={() => handleEditAnnouncementClick(item)}
-                                                className="p-1.5 text-gray-300 hover:text-bvb-black hover:bg-gray-100 rounded"
-                                                title="编辑"
-                                            >
-                                                <Edit2 className="w-3 h-3" />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteAnnouncementSubmit(item.id)}
-                                                className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded"
-                                                title="删除"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })
-                    ) : (
-                        <div className="text-center py-10 text-gray-400 text-sm italic">
-                            暂无公告信息
+                    {announcements.length > 0 ? announcements.map(item => (
+                        <div key={item.id} className="relative group border border-gray-100 rounded-lg p-3 bg-white">
+                            <div className="flex justify-between items-start mb-1">
+                                <h4 className={`font-bold text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>{item.title}</h4>
+                                <span className="text-[10px] text-gray-400 font-mono">{item.date}</span>
+                            </div>
+                            <p className="text-sm text-gray-600">{item.content}</p>
+                            {isDirector && (
+                                <button onClick={() => onDeleteAnnouncement?.(item.id)} className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                            )}
                         </div>
-                    )}
+                    )) : <div className="text-center py-10 text-gray-400 text-sm italic">暂无公告</div>}
                 </div>
             </div>
         </div>
@@ -851,382 +560,103 @@ const Dashboard: React.FC<DashboardProps> = ({
         {/* Attendance Analysis Section */}
         <div id="attendance-analysis-section" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col scroll-mt-20">
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-bold text-gray-800 flex items-center">
-                    <Activity className="w-6 h-6 mr-2 text-bvb-yellow" />
-                    训练出勤与课时分析
-                </h3>
-                {/* Filters */}
+                <h3 className="text-xl font-bold text-gray-800 flex items-center"><Activity className="w-6 h-6 mr-2 text-bvb-yellow" /> 训练出勤与分析</h3>
                 <div className="flex flex-wrap gap-2 items-center justify-end">
-                    {/* View Toggle */}
                     {attendancePlayerId === 'all' && (
                         <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
-                            <button onClick={() => setAnalysisView('player')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
-                                <Users className="w-3 h-3 mr-1" /> 按球员
-                            </button>
-                            <button onClick={() => setAnalysisView('session')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
-                                <LayoutList className="w-3 h-3 mr-1" /> 按课次
-                            </button>
+                            <button onClick={() => setAnalysisView('player')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><Users className="w-3 h-3 mr-1" /> 按球员</button>
+                            <button onClick={() => setAnalysisView('session')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><LayoutList className="w-3 h-3 mr-1" /> 按课次</button>
                         </div>
                     )}
-
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button onClick={() => handleRangeChange('month')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'month' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>本月</button>
-                        <button onClick={() => handleRangeChange('quarter')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'quarter' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>本季度</button>
-                        <button onClick={() => handleRangeChange('custom')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === 'custom' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>自定义</button>
+                        {['month', 'quarter', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : '自定义'}</button>)}
                     </div>
-                    
                     {attendanceRange === 'custom' && (
                         <div className="flex gap-1 items-center bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                            <input type="date" className="text-xs bg-transparent outline-none font-bold text-gray-600" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} />
+                            <input type="date" className="text-xs bg-transparent" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} />
                             <span className="text-gray-400">-</span>
-                            <input type="date" className="text-xs bg-transparent outline-none font-bold text-gray-600" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
+                            <input type="date" className="text-xs bg-transparent" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
                         </div>
                     )}
-
-                    <select 
-                        value={attendanceTeamId}
-                        onChange={e => setAttendanceTeamId(e.target.value)}
-                        className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow"
-                    >
+                    <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow">
                         <option value="all">所有梯队</option>
                         {displayTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-
-                    <select 
-                        value={attendancePlayerId}
-                        onChange={e => setAttendancePlayerId(e.target.value)}
-                        className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[120px]"
-                    >
+                    <select value={attendancePlayerId} onChange={e => setAttendancePlayerId(e.target.value)} className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[120px]">
                         <option value="all">全体球员</option>
                         {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
-
-                    <button 
-                        onClick={handleExportPDF} 
-                        disabled={isExporting}
-                        className="p-2 bg-gray-800 text-bvb-yellow rounded-lg hover:bg-gray-700 transition-colors"
-                        title="导出报表"
-                    >
-                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}
-                    </button>
+                    <button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-gray-800 text-bvb-yellow rounded-lg">{isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}</button>
                 </div>
             </div>
 
-            {/* Content Logic */}
             {attendancePlayerId !== 'all' && individualReport ? (
-                /* --- Individual View --- */
                 <div className="space-y-6 animate-in fade-in">
-                    {/* Header Card */}
                     <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center border border-gray-100">
                         <div className="flex items-center gap-4">
                             <img src={individualReport.player.image} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-black text-gray-800">{individualReport.player.name}</h3>
-                                    <button onClick={() => setAttendancePlayerId('all')} className="text-[10px] text-blue-600 font-bold hover:underline">返回全体列表</button>
-                                </div>
-                                <p className="text-xs text-gray-500">#{individualReport.player.number} • {individualReport.player.position}</p>
-                            </div>
+                            <div><h3 className="text-lg font-black text-gray-800">{individualReport.player.name}</h3><p className="text-xs text-gray-500">#{individualReport.player.number} • {individualReport.player.position}</p></div>
                         </div>
                         <div className="flex gap-4 text-center">
-                            <div><div className="text-xs text-gray-400 font-bold uppercase">出勤率</div><div className="text-2xl font-black text-gray-800">{individualReport.stats.rate}%</div></div>
-                            <div><div className="text-xs text-gray-400 font-bold uppercase">训练课</div><div className="text-2xl font-black text-gray-800">{individualReport.stats.total}</div></div>
-                            <div><div className="text-xs text-gray-400 font-bold uppercase">实到</div><div className="text-2xl font-black text-green-600">{individualReport.stats.present}</div></div>
-                            {isDirector && (
-                                <div><div className="text-xs text-gray-400 font-bold uppercase">课时余额</div><div className={`text-2xl font-black ${individualReport.player.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{individualReport.player.credits}</div></div>
-                            )}
+                            <div><div className="text-xs text-gray-400 font-bold">出勤率</div><div className="text-2xl font-black">{individualReport.stats.rate}%</div></div>
+                            <div><div className="text-xs text-gray-400 font-bold">已参训</div><div className="text-2xl font-black text-green-600">{individualReport.stats.present}</div></div>
                         </div>
                     </div>
-
-                    {/* Detailed Session Table */}
                     <div className="overflow-x-auto rounded-lg border border-gray-200">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase">
-                                <tr>
-                                    <th className="px-4 py-3">日期</th>
-                                    <th className="px-4 py-3">训练主题</th>
-                                    <th className="px-4 py-3">重点</th>
-                                    <th className="px-4 py-3 text-center">状态</th>
-                                    {isDirector && <th className="px-4 py-3 text-right">课时变动</th>}
-                                </tr>
-                            </thead>
+                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">主题</th><th className="px-4 py-3 text-center">状态</th></tr></thead>
                             <tbody className="divide-y divide-gray-100">
-                                {individualReport.sessions.length > 0 ? individualReport.sessions.map(s => (
+                                {individualReport.sessions.map(s => (
                                     <tr key={s.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-mono text-xs">{s.date}</td>
-                                        <td className="px-4 py-3 font-bold">{s.title}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500">{s.focus}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                                s.status === 'Present' ? 'bg-green-100 text-green-700' :
-                                                s.status === 'Leave' ? 'bg-yellow-100 text-yellow-700' :
-                                                s.status === 'Injury' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'
-                                            }`}>
-                                                {s.status === 'Present' ? '实到' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤停' : '缺席'}
-                                            </span>
-                                        </td>
-                                        {isDirector && (
-                                            <td className={`px-4 py-3 text-right font-mono font-bold ${s.creditChange < 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                                                {s.creditChange}
-                                            </td>
-                                        )}
+                                        <td className="px-4 py-3 font-mono text-xs">{s.date}</td><td className="px-4 py-3 font-bold">{s.title}</td>
+                                        <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${s.status === 'Present' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{s.status === 'Present' ? '实到' : s.status}</span></td>
                                     </tr>
-                                )) : (
-                                    <tr><td colSpan={isDirector ? 5 : 4} className="text-center py-8 text-gray-400">该时段无训练记录</td></tr>
-                                )}
+                                ))}
                             </tbody>
                         </table>
                     </div>
                 </div>
             ) : analysisView === 'session' ? (
-                selectedSessionId ? (
-                    renderSessionDetail()
-                ) : (
-                /* --- Session View Table --- */
+                selectedSessionId ? renderSessionDetail() : (
                 <div className="space-y-6">
                     <div className="h-48 w-full">
-                        {chartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} unit="%" />
-                                    <Tooltip 
-                                        cursor={{ fill: '#f9fafb' }} 
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Bar 
-                                        dataKey="rate" 
-                                        fill="#FDE100" 
-                                        radius={[4, 4, 0, 0]} 
-                                        barSize={15} 
-                                        name="出勤率" 
-                                        onClick={(data) => setSelectedSessionId(data.id)} 
-                                        cursor="pointer"
-                                    />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
-                                暂无数据
-                            </div>
-                        )}
+                        <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
                     </div>
-
                     <div className="overflow-x-auto rounded-lg border border-gray-200">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase sticky top-0 z-10">
-                                <tr>
-                                    <th className="px-4 py-3">日期</th>
-                                    <th className="px-4 py-3">梯队</th>
-                                    <th className="px-4 py-3">训练主题</th>
-                                    <th className="px-4 py-3 w-32">出勤率</th>
-                                    <th className="px-4 py-3 text-center">实到</th>
-                                    <th className="px-4 py-3 text-center">请假</th>
-                                    <th className="px-4 py-3 text-center">伤停</th>
-                                    <th className="px-4 py-3 text-center">缺席</th>
-                                </tr>
-                            </thead>
+                            <thead className="bg-gray-100 font-bold text-xs uppercase"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">梯队</th><th className="px-4 py-3">主题</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th></tr></thead>
                             <tbody className="divide-y divide-gray-100">
                                 {exportSessionsData.map(s => (
                                     <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50 cursor-pointer transition-colors">
-                                        <td className="px-4 py-3 font-mono text-xs font-bold text-gray-600">{s.date}</td>
-                                        <td className="px-4 py-3 text-xs font-bold text-gray-500">{s.teamName}</td>
-                                        <td className="px-4 py-3 font-bold text-gray-800">
-                                            {s.title}
-                                            <div className="text-[10px] text-gray-400 font-normal">{s.focus}</div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div>
-                                                </div>
-                                                <span className="text-xs font-mono">{s.rate}%</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
-                                        <td className="px-4 py-3 text-center text-yellow-600">{s.leave}</td>
-                                        <td className="px-4 py-3 text-center text-red-500">{s.injury}</td>
-                                        <td className="px-4 py-3 text-center text-gray-400">{s.absent}</td>
+                                        <td className="px-4 py-3 font-mono text-xs">{s.date}</td><td className="px-4 py-3 text-xs font-bold">{s.teamName}</td><td className="px-4 py-3 font-bold text-gray-800">{s.title}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div></div><span className="text-xs">{s.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
                                     </tr>
                                 ))}
-                                {exportSessionsData.length === 0 && <tr><td colSpan={8} className="text-center py-8 text-gray-400">无训练记录</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 </div>
                 )
             ) : (
-                /* --- Overview View (Player List) --- */
                 <div className="space-y-6">
                     <div className="h-64 w-full">
-                        {chartData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} unit="%" />
-                                    <Tooltip 
-                                        cursor={{ fill: '#f9fafb' }} 
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} barSize={20} name="出勤率" />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
-                                暂无出勤数据
-                            </div>
-                        )}
+                        <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
                     </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
-                            <span className="text-xs text-gray-400 font-bold uppercase">区间平均出勤率</span>
-                            <div className="text-2xl font-black text-gray-800">{averageRate}%</div>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-center">
-                            <span className="text-xs text-gray-400 font-bold uppercase">统计训练场次</span>
-                            <div className="text-2xl font-black text-gray-800">{exportSessionsData.length} <span className="text-xs font-normal">次</span></div>
-                        </div>
-                    </div>
-
                     <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 font-bold text-gray-600 text-xs uppercase sticky top-0 z-10">
-                                <tr>
-                                    <th className="px-4 py-3">球员</th>
-                                    <th className="px-4 py-3">出勤率</th>
-                                    <th className="px-4 py-3 text-center">实到</th>
-                                    <th className="px-4 py-3 text-center">请假</th>
-                                    <th className="px-4 py-3 text-center">伤停</th>
-                                    {isDirector && <th className="px-4 py-3 text-right">课时余额</th>}
-                                </tr>
-                            </thead>
+                            <thead className="bg-gray-100 font-bold text-xs sticky top-0 z-10"><tr><th className="px-4 py-3">球员</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th>{isDirector && <th className="px-4 py-3 text-right">课时余额</th>}</tr></thead>
                             <tbody className="divide-y divide-gray-100">
                                 {exportPlayersData.map(p => (
                                     <tr key={p.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-bold flex items-center">
-                                            <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: p.rate >= 90 ? '#16a34a' : p.rate >= 75 ? '#eab308' : '#ef4444' }}></div>
-                                            {p.name}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex-1 w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div>
-                                                </div>
-                                                <span className="text-xs font-mono">{p.rate}%</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>
-                                        <td className="px-4 py-3 text-center text-yellow-600">{p.leave}</td>
-                                        <td className="px-4 py-3 text-center text-red-500">{p.injury}</td>
-                                        {isDirector && (
-                                            <td className={`px-4 py-3 text-right font-black font-mono ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
-                                                {p.credits}
-                                            </td>
-                                        )}
+                                        <td className="px-4 py-3 font-bold">{p.name}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="flex-1 w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div></div><span className="text-xs">{p.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>{isDirector && <td className={`px-4 py-3 text-right font-black ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{p.credits}</td>}
                                     </tr>
                                 ))}
-                                {exportPlayersData.length === 0 && <tr><td colSpan={isDirector ? 6 : 5} className="text-center py-8 text-gray-400">无数据</td></tr>}
                             </tbody>
                         </table>
                     </div>
                 </div>
             )}
         </div>
-
       </div>
-      
-      {/* Hidden Export Templates */}
-      <div id="attendance-report-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
-          <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
-             <div>
-                 <h1 className="text-4xl font-black uppercase tracking-tighter">顽石之光足球俱乐部</h1>
-                 <p className="text-xl text-gray-500 font-bold mt-1">训练出勤与课时统计</p>
-             </div>
-             <div className="text-right">
-                 <div className="text-sm font-bold text-gray-400 uppercase">统计周期</div>
-                 <div className="text-xl font-black">{customStartDate} ~ {customEndDate}</div>
-             </div>
-          </div>
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-gray-100 border-b-2 border-gray-300">
-              <tr>
-                 <th className="p-3 font-black text-sm uppercase">球员姓名</th>
-                 <th className="p-3 font-black text-sm uppercase">所属梯队</th>
-                 <th className="p-3 font-black text-sm uppercase text-center">出勤率</th>
-                 <th className="p-3 font-black text-sm uppercase text-center">实到次数</th>
-                 <th className="p-3 font-black text-sm uppercase text-center">请假次数</th>
-                 {isDirector && <th className="p-3 font-black text-sm uppercase text-right">剩余课时</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {exportPlayersData.map((p, idx) => {
-                 const teamName = teams.find(t => t.id === p.teamId)?.name || '未知';
-                 return (
-                     <tr key={p.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                        <td className="p-3 font-bold">{p.name}</td>
-                        <td className="p-3 text-gray-600">{teamName}</td>
-                        <td className="p-3 text-center">{p.rate}%</td>
-                        <td className="p-3 text-center">{p.present}</td>
-                        <td className="p-3 text-center">{p.leave}</td>
-                        {isDirector && <td className="p-3 text-right font-mono font-bold">{p.credits}</td>}
-                     </tr>
-                 );
-              })}
-            </tbody>
-          </table>
-          <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 flex justify-between">
-              <span>生成日期: {new Date().toLocaleDateString()}</span>
-              <span>CONFIDENTIAL INTERNAL REPORT</span>
-          </div>
-      </div>
-
-      {individualReport && (
-          <div id="individual-attendance-export" className="absolute left-[-9999px] top-0 w-[1100px] bg-white text-black p-12 z-[-1000] font-sans">
-              <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-6 mb-8">
-                 <div>
-                     <h1 className="text-4xl font-black uppercase tracking-tighter">{individualReport.player.name}</h1>
-                     <p className="text-xl text-gray-500 font-bold mt-1">个人训练考勤详单</p>
-                 </div>
-                 <div className="text-right">
-                     {isDirector && <div className="text-2xl font-black">课时余额: {individualReport.player.credits}</div>}
-                     <div className="text-sm font-bold text-gray-400 uppercase">{customStartDate} ~ {customEndDate}</div>
-                 </div>
-              </div>
-              <div className="grid grid-cols-4 gap-4 mb-8 bg-gray-50 p-4 rounded border border-gray-200">
-                  <div className="text-center"><div className="text-sm text-gray-500">总课次</div><div className="text-xl font-black">{individualReport.stats.total}</div></div>
-                  <div className="text-center"><div className="text-sm text-gray-500">实到</div><div className="text-xl font-black">{individualReport.stats.present}</div></div>
-                  <div className="text-center"><div className="text-sm text-gray-500">请假</div><div className="text-xl font-black">{individualReport.stats.leave}</div></div>
-                  <div className="text-center"><div className="text-sm text-gray-500">出勤率</div><div className="text-xl font-black">{individualReport.stats.rate}%</div></div>
-              </div>
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-gray-100 border-b-2 border-gray-300">
-                  <tr>
-                     <th className="p-3 font-black text-sm uppercase">日期</th>
-                     <th className="p-3 font-black text-sm uppercase">训练内容</th>
-                     <th className="p-3 font-black text-sm uppercase text-center">状态</th>
-                     {isDirector && <th className="p-3 font-black text-sm uppercase text-right">课时扣除</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {individualReport.sessions.map((s, idx) => (
-                         <tr key={s.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                            <td className="p-3 font-mono">{s.date}</td>
-                            <td className="p-3">
-                                <div className="font-bold">{s.title}</div>
-                                <div className="text-xs text-gray-500">{s.focus}</div>
-                            </td>
-                            <td className="p-3 text-center">{s.status === 'Present' ? '实到' : s.status}</td>
-                            {isDirector && <td className="p-3 text-right font-mono">{s.creditChange}</td>}
-                         </tr>
-                  ))}
-                </tbody>
-              </table>
-          </div>
-      )}
-
     </div>
   );
 };
