@@ -82,7 +82,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       } else if (range === 'quarter') {
           start.setMonth(end.getMonth() - 3);
       } else if (range === 'year') {
-          start.setFullYear(end.getFullYear() - 1);
+          // 年度分析通常指本年度 1月1日至今
+          start.setMonth(0);
+          start.setDate(1);
       }
       if (range !== 'custom') {
           setCustomStartDate(start.toISOString().split('T')[0]);
@@ -249,7 +251,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         const groupedData: Record<string, { totalRate: number; count: number }> = {};
         filteredSessions.forEach(session => {
             const date = new Date(session.date);
+            // 年度视图按月聚合，月/季度视图按周聚合
             let key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
+            
             const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
             const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
             const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
@@ -591,7 +595,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     )}
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                        {['month', 'quarter', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : '自定义'}</button>)}
+                        {['month', 'quarter', 'year', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自定义'}</button>)}
                     </div>
                     {attendanceRange === 'custom' && (
                         <div className="flex gap-1 items-center bg-gray-50 px-2 py-1 rounded border border-gray-200">
@@ -643,8 +647,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {analysisView === 'session' ? (
                         selectedSessionId ? renderSessionDetail() : (
                         <div className="space-y-6">
-                            <div className="h-48 w-full">
-                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
+                            <div className="h-32 w-full">
+                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
                             </div>
                             <div className="overflow-x-auto rounded-lg border border-gray-200">
                                 <table className="w-full text-sm text-left">
@@ -662,8 +666,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )
                     ) : (
                         <div className="space-y-6">
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+                            <div className="h-44 w-full">
+                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={40} /></BarChart></ResponsiveContainer>
                             </div>
                             <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
                                 <table className="w-full text-sm text-left">
