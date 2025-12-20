@@ -16,7 +16,7 @@ export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
         "东莞市": ["东莞市"]
     },
     "浙江省": {
-        "杭州市": ["上城区", "拱墅区", "西湖区", "滨江区", "萧山区", "余杭区", "福阳区", "临安区", "临平区", "钱塘区"],
+        "杭州市": ["上城区", "拱曙区", "西湖区", "滨江区", "萧山区", "余杭区", "福阳区", "临安区", "临平区", "钱塘区"],
         "宁波市": ["海曙区", "江北区", "北仑区", "镇海区", "鄞州区", "奉化区"],
         "温州市": ["鹿城区", "龙湾区", "瓯海区", "洞头区"]
     },
@@ -53,6 +53,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'edit',
         training: 'edit',
         matches: 'edit',
+        // Comment: Added missing growth module permission
+        growth: 'edit',
         settings: 'edit'
     },
     coach: {
@@ -62,6 +64,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'edit',
         training: 'edit',
         matches: 'view',
+        // Comment: Added missing growth module permission
+        growth: 'edit',
         settings: 'view'
     },
     assistant_coach: {
@@ -71,6 +75,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'view',
         training: 'view',
         matches: 'view',
+        // Comment: Added missing growth module permission
+        growth: 'view',
         settings: 'view'
     },
     parent: {
@@ -80,6 +86,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'none',
         training: 'view',
         matches: 'view',
+        // Comment: Added missing growth module permission
+        growth: 'view',
         settings: 'view'
     }
 };

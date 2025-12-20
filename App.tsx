@@ -10,8 +10,9 @@ import Login from './components/Login';
 import ParentPortal from './components/ParentPortal';
 import SessionDesigner from './components/SessionDesigner';
 import FinanceManager from './components/FinanceManager';
+import TechnicalGrowth from './components/TechnicalGrowth';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition } from './types';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -33,6 +34,7 @@ function App() {
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([]);
   const [permissions, setPermissions] = useState<RolePermissions>(DEFAULT_PERMISSIONS);
   const [financeCategories, setFinanceCategories] = useState<FinanceCategoryDefinition[]>(DEFAULT_FINANCE_CATEGORIES);
+  const [techTests, setTechTests] = useState<TechTestDefinition[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -69,6 +71,7 @@ function App() {
             if (cloudData.transactions) setTransactions(cloudData.transactions);
             if (cloudData.permissions) setPermissions(cloudData.permissions);
             if (cloudData.financeCategories) setFinanceCategories(cloudData.financeCategories);
+            if (cloudData.techTests) setTechTests(cloudData.techTests);
         }
         setIsInitializing(false);
     };
@@ -98,7 +101,8 @@ function App() {
                 designs,
                 transactions,
                 permissions,
-                financeCategories
+                financeCategories,
+                techTests
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -108,7 +112,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -205,7 +209,7 @@ function App() {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
     if (!childPlayer) return <div>Error: Player not found</div>;
     const childTeam = teams.find(t => t.id === childPlayer.teamId);
-    return <ParentPortal player={childPlayer} team={childTeam} attributeConfig={attributeConfig} trainings={trainings} onLogout={handleLogout} appLogo={appLogo} />;
+    return <ParentPortal player={childPlayer} team={childTeam} attributeConfig={attributeConfig} trainings={trainings} onLogout={handleLogout} appLogo={appLogo} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} />;
   }
 
   const renderContent = () => {
@@ -214,6 +218,8 @@ function App() {
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} />;
       case 'players':
         return <PlayerManager teams={teams} players={derivedPlayers} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} />;
+      case 'growth':
+        return <TechnicalGrowth players={derivedPlayers} teams={teams} currentUser={currentUser} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} onUpdateTechTests={setTechTests} />;
       case 'finance':
         return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} onBulkDeleteTransactions={handleBulkDeleteTransactions} />;
       case 'design':

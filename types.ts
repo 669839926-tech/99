@@ -81,6 +81,39 @@ export interface PlayerPhoto {
     caption?: string;
 }
 
+// --- Technical Growth Types ---
+export interface HomeTrainingLog {
+    id: string;
+    playerId: string;
+    date: string;
+    title: string;
+    duration: number; // minutes
+    notes?: string;
+}
+
+export interface JugglingRecord {
+    id: string;
+    playerId: string;
+    date: string;
+    count: number;
+}
+
+export interface TechTestDefinition {
+    id: string;
+    name: string;
+    unit: string; // e.g., '秒', '个', '次'
+    description: string;
+}
+
+export interface TechTestResult {
+    id: string;
+    testId: string;
+    playerId: string;
+    date: string;
+    value: number;
+    coachId?: string;
+}
+
 export interface Player {
   id: string;
   teamId: string;
@@ -114,6 +147,10 @@ export interface Player {
   leavesUsed: number;
   rechargeHistory: RechargeRecord[];
   gallery?: PlayerPhoto[];
+  // Growth Data
+  homeTrainingLogs?: HomeTrainingLog[];
+  jugglingHistory?: JugglingRecord[];
+  testResults?: TechTestResult[];
 }
 
 export type MatchEventType = 'Goal' | 'Assist' | 'YellowCard' | 'RedCard' | 'Sub' | 'OwnGoal';
@@ -250,7 +287,7 @@ export interface Announcement {
 export type UserRole = 'director' | 'coach' | 'assistant_coach' | 'parent';
 
 // --- RBAC Types ---
-export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'settings';
+export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings';
 export type PermissionLevel = 'none' | 'view' | 'edit';
 
 export type RolePermissions = Record<UserRole, Record<ModuleId, PermissionLevel>>;
