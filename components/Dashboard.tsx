@@ -349,9 +349,17 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleExportPDF = async () => {
     setIsExporting(true);
     try {
-        if (attendancePlayerId !== 'all' && individualReport) await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}`);
-        else await exportToPDF('attendance-report-export', `训练出勤分析报告`);
-    } catch (e) { alert('导出失败'); } finally { setIsExporting(false); }
+        if (attendancePlayerId !== 'all' && individualReport) {
+            await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}`);
+        } else {
+            await exportToPDF('attendance-report-export', `训练出勤分析报告`);
+        }
+    } catch (e) { 
+        console.error("Export Error:", e);
+        alert('导出失败，请重试'); 
+    } finally { 
+        setIsExporting(false); 
+    }
   };
 
   const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
@@ -605,7 +613,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {attendancePlayerId !== 'all' && individualReport ? (
-                <div className="space-y-6 animate-in fade-in">
+                <div id="individual-attendance-export" className="space-y-6 animate-in fade-in bg-white p-4 rounded-xl">
                     <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center border border-gray-100">
                         <div className="flex items-center gap-4">
                             <img src={individualReport.player.image} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
@@ -630,43 +638,47 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </table>
                     </div>
                 </div>
-            ) : analysisView === 'session' ? (
-                selectedSessionId ? renderSessionDetail() : (
-                <div className="space-y-6">
-                    <div className="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
-                    </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 font-bold text-xs uppercase"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">梯队</th><th className="px-4 py-3">主题</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th></tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {exportSessionsData.map(s => (
-                                    <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50 cursor-pointer transition-colors">
-                                        <td className="px-4 py-3 font-mono text-xs">{s.date}</td><td className="px-4 py-3 text-xs font-bold">{s.teamName}</td><td className="px-4 py-3 font-bold text-gray-800">{s.title}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div></div><span className="text-xs">{s.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                )
             ) : (
-                <div className="space-y-6">
-                    <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
-                    </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 font-bold text-xs sticky top-0 z-10"><tr><th className="px-4 py-3">球员</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th>{isDirector && <th className="px-4 py-3 text-right">课时余额</th>}</tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {exportPlayersData.map(p => (
-                                    <tr key={p.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-bold">{p.name}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="flex-1 w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div></div><span className="text-xs">{p.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>{isDirector && <td className={`px-4 py-3 text-right font-black ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{p.credits}</td>}
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                <div id="attendance-report-export" className="space-y-6 bg-white p-4 rounded-xl">
+                    {analysisView === 'session' ? (
+                        selectedSessionId ? renderSessionDetail() : (
+                        <div className="space-y-6">
+                            <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-100 font-bold text-xs uppercase"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">梯队</th><th className="px-4 py-3">主题</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {exportSessionsData.map(s => (
+                                            <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50 cursor-pointer transition-colors">
+                                                <td className="px-4 py-3 font-mono text-xs">{s.date}</td><td className="px-4 py-3 text-xs font-bold">{s.teamName}</td><td className="px-4 py-3 font-bold text-gray-800">{s.title}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div></div><span className="text-xs">{s.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        )
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="h-64 w-full">
+                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer>
+                            </div>
+                            <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-100 font-bold text-xs sticky top-0 z-10"><tr><th className="px-4 py-3">球员</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th>{isDirector && <th className="px-4 py-3 text-right">课时余额</th>}</tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {exportPlayersData.map(p => (
+                                            <tr key={p.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-3 font-bold">{p.name}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="flex-1 w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div></div><span className="text-xs">{p.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>{isDirector && <td className={`px-4 py-3 text-right font-black ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{p.credits}</td>}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>
