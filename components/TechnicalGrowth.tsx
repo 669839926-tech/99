@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, User } from '../types';
-import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown } from 'lucide-react';
+import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -26,23 +25,46 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [jugglingDate, setJugglingDate] = useState(new Date().toISOString().split('T')[0]);
     const [jugglingCount, setJugglingCount] = useState<string>('');
     const [jugglingSearch, setJugglingSearch] = useState('');
-
-    // 居家训练状态
-    const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
-    const [homeDate, setHomeDate] = useState(new Date().toISOString().split('T')[0]);
-    const [homeTitle, setHomeTitle] = useState('自主基础练习');
-    const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
+    const [isExporting, setIsExporting] = useState(false);
 
     // 统计视图状态
     const [statPeriod, setStatPeriod] = useState<'month' | 'quarter' | 'year'>('month');
     const [viewYear, setViewYear] = useState(new Date().getFullYear());
     const [viewMonth, setViewMonth] = useState(new Date().getMonth());
 
-    const isDirector = currentUser?.role === 'director';
+    // Comment: Added missing state variables for Home Training features to fix errors
+    const [homeDate, setHomeDate] = useState(new Date().toISOString().split('T')[0]);
+    const [homeTitle, setHomeTitle] = useState('居家练习');
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
+    const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
 
     const displayPlayers = useMemo(() => {
         return players.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
     }, [players, selectedTeamId]);
+
+    const focusedPlayer = useMemo(() => {
+        return players.find(p => p.id === jugglingPlayerId) || null;
+    }, [players, jugglingPlayerId]);
+
+    // --- 荣耀等级助手函数 ---
+    const getHonorBadge = (max: number) => {
+        if (max >= 100) return { label: '五星传奇', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
+        if (max >= 50) return { label: '四星大师', color: 'bg-purple-100 text-purple-700 border-purple-200' };
+        if (max >= 20) return { label: '三星高手', color: 'bg-red-100 text-red-700 border-red-200' };
+        if (max >= 10) return { label: '二星达人', color: 'bg-blue-100 text-blue-700 border-blue-200' };
+        if (max >= 5) return { label: '一星小将', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' };
+        if (max >= 3) return { label: '入门学徒', color: 'bg-green-100 text-green-700 border-green-200' };
+        return { label: '待挑战', color: 'bg-gray-50 text-gray-400 border-gray-100' };
+    };
+
+    // Comment: Added missing getHomeStats helper function to calculate training frequencies for the UI
+    const getHomeStats = (player: Player) => {
+        const history = player.homeTrainingLogs || [];
+        const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
+        const monthCount = history.filter(h => h.date.startsWith(mKey)).length;
+        const yearCount = history.filter(h => h.date.startsWith(String(viewYear))).length;
+        return { monthCount, yearCount };
+    };
 
     // --- 颠球挑战逻辑 ---
     const handleAddJuggling = () => {
@@ -63,6 +85,18 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             });
             setJugglingCount('');
             alert(`${player.name} 的成绩已保存！`);
+        }
+    };
+
+    const handleExportReport = async () => {
+        if (!focusedPlayer) return;
+        setIsExporting(true);
+        try {
+            await exportToPDF('juggling-report-pdf', `颠球挑战档案_${focusedPlayer.name}`);
+        } catch (e) {
+            alert('导出失败');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -88,7 +122,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         return {
             max: counts.length ? Math.max(...counts) : 0,
             avg: counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : 0,
-            count: filtered.length
+            count: filtered.length,
+            records: filtered.sort((a, b) => b.date.localeCompare(a.date))
         };
     };
 
@@ -100,59 +135,15 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     }, [displayPlayers, statPeriod, viewYear, viewMonth]);
 
     const jugglingTrendData = useMemo(() => {
-        const player = players.find(p => p.id === jugglingPlayerId);
-        if (!player || !player.jugglingHistory) return [];
-        return [...player.jugglingHistory]
+        if (!focusedPlayer || !focusedPlayer.jugglingHistory) return [];
+        return [...focusedPlayer.jugglingHistory]
             .sort((a, b) => a.date.localeCompare(b.date))
-            .slice(-10)
             .map(h => ({
-                date: h.date.substring(5),
+                date: h.date,
+                displayDate: h.date.substring(5),
                 count: h.count
             }));
-    }, [players, jugglingPlayerId]);
-
-    // --- 居家训练统计逻辑 ---
-    const getHomeStats = (player: Player) => {
-        const logs = player.homeTrainingLogs || [];
-        const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
-        const monthCount = logs.filter(l => l.date.startsWith(mKey)).length;
-        const yearCount = logs.filter(l => l.date.startsWith(String(viewYear))).length;
-        return { monthCount, yearCount };
-    };
-
-    // Comment: Implemented missing toggle function for player selection in batch check-in
-    const togglePlayerSelection = (playerId: string) => {
-        const next = new Set(selectedPlayerIds);
-        if (next.has(playerId)) {
-            next.delete(playerId);
-        } else {
-            next.add(playerId);
-        }
-        setSelectedPlayerIds(next);
-    };
-
-    // Comment: Implemented missing batch check-in handler for home training logs
-    const handleBatchCheckIn = () => {
-        selectedPlayerIds.forEach(id => {
-            const player = players.find(p => p.id === id);
-            if (player) {
-                const newLog: HomeTrainingLog = {
-                    id: `home-${Date.now()}-${id}`,
-                    playerId: id,
-                    date: homeDate,
-                    title: homeTitle,
-                    duration: 0
-                };
-                onUpdatePlayer({
-                    ...player,
-                    homeTrainingLogs: [...(player.homeTrainingLogs || []), newLog]
-                });
-            }
-        });
-        const count = selectedPlayerIds.size;
-        setSelectedPlayerIds(new Set());
-        alert(`成功为 ${count} 名球员完成打卡！`);
-    };
+    }, [focusedPlayer]);
 
     return (
         <div className="space-y-6 pb-20">
@@ -242,29 +233,92 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             </div>
                         </div>
 
-                        {/* Selected Player Progress Chart */}
-                        {jugglingPlayerId && (
-                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 animate-in fade-in duration-500">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h3 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-sm"><History className="w-4 h-4 mr-2 text-bvb-yellow" /> 近期成绩趋势</h3>
-                                    <span className="text-[10px] font-black text-gray-400 uppercase">最后10次</span>
+                        {/* Selected Player Dashboard (PDF Target) */}
+                        {focusedPlayer && (
+                            <div id="juggling-report-pdf" className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 animate-in fade-in duration-500 space-y-6 overflow-hidden relative">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-3">
+                                        <img src={focusedPlayer.image} className="w-12 h-12 rounded-full object-cover border-2 border-bvb-yellow" />
+                                        <div>
+                                            <h3 className="font-black text-gray-800 text-lg leading-tight">{focusedPlayer.name}</h3>
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{focusedPlayer.number} • 技术成长档案</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={handleExportReport}
+                                        disabled={isExporting}
+                                        className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-bvb-black hover:text-bvb-yellow transition-all"
+                                        title="导出 PDF 报表"
+                                    >
+                                        {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                                    </button>
                                 </div>
-                                <div className="h-40 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={jugglingTrendData}>
-                                            <defs>
-                                                <linearGradient id="colorJug" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#FDE100" stopOpacity={0.3}/>
-                                                    <stop offset="95%" stopColor="#FDE100" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold' }} />
-                                            <YAxis hide />
-                                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                            <Area type="monotone" dataKey="count" stroke="#FDE100" strokeWidth={3} fillOpacity={1} fill="url(#colorJug)" />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">本周最高</p>
+                                        <p className="text-2xl font-black text-bvb-black">{getJugglingStats(focusedPlayer).max}</p>
+                                    </div>
+                                    <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">荣誉等级</p>
+                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${getHonorBadge(getJugglingStats(focusedPlayer).max).color}`}>
+                                            {getHonorBadge(getJugglingStats(focusedPlayer).max).label}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <h4 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-xs"><TrendingUp className="w-4 h-4 mr-2 text-bvb-yellow" /> 进步曲线</h4>
+                                        <span className="text-[9px] font-black text-gray-400 uppercase">历史挑战趋势</span>
+                                    </div>
+                                    <div className="h-40 w-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={jugglingTrendData}>
+                                                <defs>
+                                                    <linearGradient id="colorJugReport" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#FDE100" stopOpacity={0.4}/>
+                                                        <stop offset="95%" stopColor="#FDE100" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                                <XAxis dataKey="displayDate" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold' }} />
+                                                <YAxis hide />
+                                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                                <Area type="monotone" dataKey="count" stroke="#FDE100" strokeWidth={3} fillOpacity={1} fill="url(#colorJugReport)" />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-4 border-t border-gray-100">
+                                    <h4 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-xs"><LayoutList className="w-4 h-4 mr-2 text-bvb-yellow" /> 详细挑战清单</h4>
+                                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                                        <table className="w-full text-left text-[11px]">
+                                            <thead className="bg-gray-50 text-gray-400 font-black uppercase sticky top-0">
+                                                <tr>
+                                                    <th className="p-2 border-b">日期</th>
+                                                    <th className="p-2 border-b text-right">成绩</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50">
+                                                {(focusedPlayer.jugglingHistory || []).sort((a,b) => b.date.localeCompare(a.date)).map(h => (
+                                                    <tr key={h.id} className="hover:bg-gray-50 transition-colors">
+                                                        <td className="p-2 font-mono text-gray-500">{h.date}</td>
+                                                        <td className="p-2 text-right font-black text-bvb-black">{h.count} 个</td>
+                                                    </tr>
+                                                ))}
+                                                {(focusedPlayer.jugglingHistory || []).length === 0 && (
+                                                    <tr><td colSpan={2} className="p-4 text-center text-gray-400 italic">暂无历史记录</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <div className="hidden pdf-only flex justify-between items-center mt-6 pt-4 border-t-2 border-bvb-yellow">
+                                    <img src={appLogo} className="w-10 h-10 object-contain" />
+                                    <span className="text-[10px] font-black text-gray-300">BORUSSIA DORTMUND ACADEMY - PERFORMANCE REPORT</span>
                                 </div>
                             </div>
                         )}
@@ -292,53 +346,51 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     <thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[10px] tracking-widest border-b">
                                         <tr>
                                             <th className="px-6 py-4">排名</th>
-                                            <th className="px-6 py-4">球员信息</th>
+                                            <th className="px-6 py-4">球员姓名</th>
                                             <th className="px-6 py-4 text-center">最高纪录</th>
                                             <th className="px-6 py-4 text-center">平均成绩</th>
-                                            <th className="px-6 py-4 text-center">记录数</th>
-                                            <th className="px-6 py-4 text-right">荣誉等级</th>
+                                            <th className="px-6 py-4 text-center">挑战次数</th>
+                                            <th className="px-6 py-4 text-right">荣耀等级</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {jugglingLeaderboard.map((p, idx) => (
-                                            <tr key={p.id} className={`hover:bg-yellow-50/30 transition-colors group ${jugglingPlayerId === p.id ? 'bg-yellow-50/50' : ''}`} onClick={() => setJugglingPlayerId(p.id)}>
-                                                <td className="px-6 py-4">
-                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>
-                                                        {idx + 1}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                        <div>
-                                                            <p className="font-black text-gray-800 text-sm">{p.name}</p>
-                                                            <p className="text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p>
+                                        {jugglingLeaderboard.map((p, idx) => {
+                                            const badge = getHonorBadge(p.stats.max);
+                                            return (
+                                                <tr key={p.id} className={`hover:bg-yellow-50/30 transition-colors cursor-pointer group ${jugglingPlayerId === p.id ? 'bg-yellow-50/50' : ''}`} onClick={() => setJugglingPlayerId(p.id)}>
+                                                    <td className="px-6 py-4">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>
+                                                            {idx + 1}
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <span className="text-xl font-black text-bvb-black">{p.stats.max}</span>
-                                                    <span className="text-[10px] text-gray-400 ml-1 font-bold">个</span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center font-bold text-gray-500 tabular-nums">
-                                                    {p.stats.avg}
-                                                </td>
-                                                <td className="px-6 py-4 text-center font-bold text-gray-400">
-                                                    {p.stats.count}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {p.stats.max >= 100 ? (
-                                                        <span className="bg-purple-100 text-purple-700 text-[10px] font-black px-2 py-1 rounded-full border border-purple-200 uppercase">达人</span>
-                                                    ) : p.stats.max >= 50 ? (
-                                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-1 rounded-full border border-blue-200 uppercase">精英</span>
-                                                    ) : p.stats.max > 0 ? (
-                                                        <span className="bg-green-50 text-green-700 text-[10px] font-black px-2 py-1 rounded-full border border-green-100 uppercase">入门</span>
-                                                    ) : (
-                                                        <span className="text-gray-300 text-[10px] font-black uppercase">待挑战</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm transition-transform group-hover:scale-110" />
+                                                            <div>
+                                                                <p className="font-black text-gray-800 text-sm group-hover:text-bvb-black group-hover:underline decoration-bvb-yellow decoration-2 underline-offset-4 transition-all">{p.name}</p>
+                                                                <p className="text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <span className="text-xl font-black text-bvb-black">{p.stats.max}</span>
+                                                        <span className="text-[10px] text-gray-400 ml-1 font-bold">个</span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-bold text-gray-500 tabular-nums">
+                                                        {p.stats.avg}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center font-bold text-gray-400">
+                                                        {p.stats.count}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border shadow-sm flex items-center justify-center gap-1 min-w-[80px] transition-all uppercase ${badge.color}`}>
+                                                            {p.stats.max >= 100 && <Star className="w-2.5 h-2.5 fill-current" />}
+                                                            {badge.label}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -370,13 +422,25 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             </p>
                             <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar mb-6">
                                 {displayPlayers.map(p => (
-                                    <button key={p.id} onClick={() => togglePlayerSelection(p.id)} className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all ${selectedPlayerIds.has(p.id) ? 'bg-bvb-yellow/10 border-bvb-yellow' : 'bg-white border-gray-100'}`}>
+                                    <button key={p.id} onClick={() => {
+                                        const next = new Set(selectedPlayerIds);
+                                        if (next.has(p.id)) next.delete(p.id);
+                                        else next.add(p.id);
+                                        setSelectedPlayerIds(next);
+                                    }} className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all ${selectedPlayerIds.has(p.id) ? 'bg-bvb-yellow/10 border-bvb-yellow' : 'bg-white border-gray-100'}`}>
                                         <div className={`w-4 h-4 rounded border flex items-center justify-center ${selectedPlayerIds.has(p.id) ? 'bg-bvb-yellow border-bvb-black' : 'border-gray-300'}`}>{selectedPlayerIds.has(p.id) && <CheckCircle className="w-3 h-3 text-bvb-black" />}</div>
                                         <span className="text-xs font-bold text-gray-700 truncate">{p.name}</span>
                                     </button>
                                 ))}
                             </div>
-                            <button onClick={handleBatchCheckIn} disabled={selectedPlayerIds.size === 0} className="w-full py-4 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl disabled:opacity-30 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all"><Plus className="w-5 h-5" /> 确认 {selectedPlayerIds.size} 人打卡</button>
+                            <button onClick={() => {
+                                selectedPlayerIds.forEach(id => {
+                                    const p = players.find(p => p.id === id);
+                                    if (p) onUpdatePlayer({ ...p, homeTrainingLogs: [...(p.homeTrainingLogs || []), { id: `home-${Date.now()}-${id}`, playerId: id, date: homeDate, title: homeTitle, duration: 0 }] });
+                                });
+                                setSelectedPlayerIds(new Set());
+                                alert('批量打卡成功！');
+                            }} disabled={selectedPlayerIds.size === 0} className="w-full py-4 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl disabled:opacity-30 flex items-center justify-center gap-2 hover:brightness-110 active:scale-95 transition-all"><Plus className="w-5 h-5" /> 确认 {selectedPlayerIds.size} 人打卡</button>
                         </div>
                     </div>
 
@@ -424,6 +488,34 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Comment: Added Detail Modal for Home Training logs when a player is selected from the leaderboard */}
+            {detailPlayerId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
+                            <div>
+                                <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase">打卡记录详情</h3>
+                                <p className="text-xs text-gray-400 mt-1">{players.find(p => p.id === detailPlayerId)?.name}</p>
+                            </div>
+                            <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-white/10 rounded-full transition-colors">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3">
+                            {players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.sort((a, b) => b.date.localeCompare(a.date)).map(log => (
+                                <div key={log.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                                    <div>
+                                        <p className="font-black text-gray-800 text-sm">{log.title}</p>
+                                        <p className="text-[10px] text-gray-400 font-mono">{log.date}</p>
+                                    </div>
+                                    <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">计次 +1</div>
+                                </div>
+                            )) || <p className="text-center py-10 text-gray-400 italic text-sm">暂无记录</p>}
                         </div>
                     </div>
                 </div>
