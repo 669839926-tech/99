@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -178,6 +178,21 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const lowCreditPlayers = displayPlayers.filter(p => p.credits <= 2).sort((a,b) => a.credits - b.credits);
     const teamCounts = displayTeams.map(t => ({ id: t.id, name: t.name, count: displayPlayers.filter(p => p.teamId === t.id).length }));
+    
+    // Technical Leaderboards
+    const jugglingLeaders = displayPlayers.map(p => {
+        const history = p.jugglingHistory || [];
+        const max = history.length > 0 ? Math.max(...history.map(h => h.count)) : 0;
+        return { ...p, maxJuggling: max };
+    }).sort((a, b) => b.maxJuggling - a.maxJuggling).slice(0, 3);
+
+    const currentMonthStr = today.toISOString().substring(0, 7);
+    const effortLeaders = displayPlayers.map(p => {
+        const history = p.homeTrainingLogs || [];
+        const count = history.filter(h => h.date.startsWith(currentMonthStr)).length;
+        return { ...p, monthEffort: count };
+    }).sort((a, b) => b.monthEffort - a.monthEffort).slice(0, 3);
+
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     const monthlyTransactions = transactions.filter(t => {
@@ -197,7 +212,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const monthlyIncome = monthlyTransactions.reduce((s, t) => s + (Number(t.income) || 0), 0);
     const monthlyExpense = monthlyTransactions.reduce((s, t) => s + (Number(t.expense) || 0), 0);
 
-    return { wins, losses, draws, topScorer: sortedPlayers[0], nextMatch: matches.find(m => m.status === 'Upcoming'), totalPlayers: displayPlayers.length, upcomingBirthdays, lowCreditPlayers, teamCounts, finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense } };
+    return { wins, losses, draws, topScorer: sortedPlayers[0], nextMatch: matches.find(m => m.status === 'Upcoming'), totalPlayers: displayPlayers.length, upcomingBirthdays, lowCreditPlayers, teamCounts, jugglingLeaders, effortLeaders, finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense } };
   }, [matches, displayPlayers, displayTeams, transactions, isDirector]);
 
   const { chartData, averageRate, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
@@ -377,6 +392,63 @@ const Dashboard: React.FC<DashboardProps> = ({
            </div>
            <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/20 to-transparent pointer-events-none"></div>
            <Trophy className="absolute -right-6 -bottom-6 w-48 h-48 text-white/20 rotate-12 pointer-events-none" />
+        </div>
+
+        {/* Technical Honor Wall - New Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Juggling King Board */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => onNavigate?.('growth')}>
+                <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-800 flex items-center">
+                        <Medal className="w-5 h-5 mr-2 text-yellow-500" /> 颠球挑战光荣榜 (历史最高)
+                    </h3>
+                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-bvb-black transition-colors" />
+                </div>
+                <div className="p-5 space-y-4">
+                    {stats.jugglingLeaders.length > 0 ? stats.jugglingLeaders.map((p, idx) => (
+                        <div key={p.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${idx === 0 ? 'bg-yellow-400 text-white' : idx === 1 ? 'bg-gray-300 text-white' : 'bg-amber-600 text-white'}`}>
+                                    {idx + 1}
+                                </div>
+                                <img src={p.image} className="w-8 h-8 rounded-full object-cover border" />
+                                <span className="font-bold text-sm text-gray-700">{p.name}</span>
+                            </div>
+                            <div className="flex items-baseline gap-1">
+                                <span className="font-black text-lg text-bvb-black">{p.maxJuggling}</span>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase">个</span>
+                            </div>
+                        </div>
+                    )) : <p className="text-center text-gray-400 py-4 text-sm italic">暂无纪录</p>}
+                </div>
+            </div>
+
+            {/* Home Effort Board */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => onNavigate?.('growth')}>
+                <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
+                    <h3 className="font-bold text-gray-800 flex items-center">
+                        <Flame className="w-5 h-5 mr-2 text-orange-500" /> 居家勤奋标兵 (本月)
+                    </h3>
+                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-bvb-black transition-colors" />
+                </div>
+                <div className="p-5 space-y-4">
+                    {stats.effortLeaders.length > 0 ? stats.effortLeaders.map((p, idx) => (
+                        <div key={p.id} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${idx === 0 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                    {idx + 1}
+                                </div>
+                                <img src={p.image} className="w-8 h-8 rounded-full object-cover border" />
+                                <span className="font-bold text-sm text-gray-700">{p.name}</span>
+                            </div>
+                            <div className="flex items-baseline gap-1">
+                                <span className="font-black text-lg text-orange-600">{p.monthEffort}</span>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase">次</span>
+                            </div>
+                        </div>
+                    )) : <p className="text-center text-gray-400 py-4 text-sm italic">暂无打卡数据</p>}
+                </div>
+            </div>
         </div>
 
         {/* Club Status Summary */}

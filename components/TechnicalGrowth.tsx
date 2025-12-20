@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
@@ -17,8 +18,30 @@ interface TechnicalGrowthProps {
 const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({ 
     players, teams, currentUser, techTests = [], onUpdatePlayer, onUpdateTechTests, appLogo 
 }) => {
+    // 权限判断
+    const isDirector = currentUser?.role === 'director';
+    const isCoach = currentUser?.role === 'coach';
+    
+    // 计算当前用户可管理的梯队
+    const managedTeams = useMemo(() => {
+        if (isDirector) return teams;
+        return teams.filter(t => currentUser?.teamIds?.includes(t.id));
+    }, [teams, currentUser, isDirector]);
+
     const [activeTab, setActiveTab] = useState<'juggling' | 'home' | 'tests'>('juggling');
-    const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id || 'all');
+    
+    // 初始化选中的梯队：如果是教练，默认为其管理的第一个梯队
+    const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
+        if (isCoach && managedTeams.length > 0) return managedTeams[0].id;
+        return 'all';
+    });
+
+    // 当用户管理的梯队发生变化时（虽然通常不会），确保选中的 ID 有效
+    useEffect(() => {
+        if (selectedTeamId !== 'all' && !managedTeams.some(t => t.id === selectedTeamId)) {
+            setSelectedTeamId(managedTeams.length > 0 ? managedTeams[0].id : 'all');
+        }
+    }, [managedTeams, selectedTeamId]);
     
     // 状态
     const [isExporting, setIsExporting] = useState(false);
@@ -54,20 +77,27 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [isImportingResults, setIsImportingResults] = useState(false);
     const resultsFileInputRef = useRef<HTMLInputElement>(null);
 
-    // 辅助逻辑：判断是否是“数值越小越好”的单位（如秒、分等时间单位）
+    // 辅助逻辑：判断是否是“数值越小越好”的单位
     const isLowerBetter = (unit?: string) => {
         if (!unit) return false;
         const u = unit.toLowerCase();
         return u.includes('秒') || u.includes('s') || u.includes('分') || u.includes('min');
     };
 
+    // 核心数据隔离：计算当前视图下可见的球员列表
     const displayPlayers = useMemo(() => {
-        return players.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
-    }, [players, selectedTeamId]);
+        // 第一层过滤：基于用户权限的球员基数
+        const basePlayers = isDirector 
+            ? players 
+            : players.filter(p => currentUser?.teamIds?.includes(p.teamId));
+
+        // 第二层过滤：基于页面顶部选中的梯队筛选器
+        return basePlayers.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
+    }, [players, selectedTeamId, currentUser, isDirector]);
 
     const focusedPlayer = useMemo(() => {
-        return players.find(p => p.id === jugglingPlayerId) || null;
-    }, [players, jugglingPlayerId]);
+        return displayPlayers.find(p => p.id === jugglingPlayerId) || null;
+    }, [displayPlayers, jugglingPlayerId]);
 
     const getHonorBadge = (max: number) => {
         if (max >= 100) return { label: '五星传奇', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
@@ -91,7 +121,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const handleAddJuggling = () => {
         const count = parseInt(jugglingCount);
         if (!jugglingPlayerId || isNaN(count)) return;
-        const player = players.find(p => p.id === jugglingPlayerId);
+        const player = displayPlayers.find(p => p.id === jugglingPlayerId);
         if (player) {
             const newRecord: JugglingRecord = { id: `jug-${Date.now()}`, playerId: jugglingPlayerId, date: jugglingDate, count };
             onUpdatePlayer({ ...player, jugglingHistory: [...(player.jugglingHistory || []), newRecord] });
@@ -242,7 +272,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             const lines = text.split('\n');
             let successCount = 0;
             
-            // 假设首行是标题
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
@@ -256,9 +285,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
                     if (isNaN(score)) continue;
 
-                    // 匹配球员
                     const player = players.find(p => p.name === name && p.number === number);
-                    // 匹配项目定义
                     const testDef = techTests.find(t => t.name === testName);
 
                     if (player && testDef) {
@@ -335,13 +362,14 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                         <span className="px-4 font-black text-xs min-w-[90px] text-center">{viewYear}年 {viewMonth + 1}月</span>
                         <button onClick={() => { if(viewMonth === 11) { setViewMonth(0); setViewYear(viewYear+1); } else setViewMonth(viewMonth+1); }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRightIcon className="w-5 h-5 text-gray-400" /></button>
                     </div>
+                    {/* 梯队筛选器：受权限控制 */}
                     <select 
                         value={selectedTeamId} 
                         onChange={e => setSelectedTeamId(e.target.value)}
                         className="p-2 border rounded-xl text-xs font-black bg-white outline-none focus:ring-2 focus:ring-bvb-yellow"
                     >
-                        <option value="all">所有梯队</option>
-                        {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        {isDirector && <option value="all">所有梯队</option>}
+                        {managedTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                 </div>
             </div>
@@ -499,7 +527,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-6 bg-gray-50 border-b flex justify-between items-center flex-wrap gap-4">
                                 <div>
                                     <h4 className="font-black text-gray-800 uppercase tracking-tighter">
-                                        {selectedTeamId === 'all' ? '请先选择梯队' : `${teams.find(t => t.id === selectedTeamId)?.name} 成绩单`}
+                                        {selectedTeamId === 'all' ? '请先选择梯队' : `${managedTeams.find(t => t.id === selectedTeamId)?.name} 成绩单`}
                                     </h4>
                                     <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">批量录入成绩，点击下方球员可查看个人趋势</p>
                                 </div>
@@ -523,7 +551,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {selectedTeamId === 'all' ? (
+                                        {selectedTeamId === 'all' && isDirector ? (
                                             <tr><td colSpan={4} className="py-20 text-center text-gray-400 italic font-bold">-- 请在顶部先选择一个具体的梯队 --</td></tr>
                                         ) : displayPlayers.map(p => {
                                             const latest = getPlayerLatestResult(p, selectedTestId);
@@ -767,7 +795,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             ? score <= avgValue
                                             : score >= avgValue;
 
-                                        // 计算进步状态
                                         const allResults = (p.testResults || [])
                                             .filter(r => r.testId === selectedTestId)
                                             .sort((a, b) => b.date.localeCompare(a.date));
@@ -1072,7 +1099,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 )}
             </div>
 
-            {/* Comment: Detail Modal for Home Training logs */}
+            {/* 打卡详情模态框：受权限控制 */}
             {detailPlayerId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
