@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -248,6 +248,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [statsTeamFilter, setStatsTeamFilter] = useState<string>('all');
 
   const userManagedSessions = useMemo(() => {
       if (currentUser?.role === 'director') return trainings;
@@ -326,7 +327,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
       const sessions = userManagedSessions.filter(t => {
           const d = new Date(t.date);
-          return d >= startDate && d <= endDate;
+          const matchDate = d >= startDate && d <= endDate;
+          const matchTeam = statsTeamFilter === 'all' || t.teamId === statsTeamFilter;
+          return matchDate && matchTeam;
       }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
       const focusCounts: Record<string, number> = {};
@@ -338,7 +341,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           value: focusCounts[key]
       }));
       return { filteredSessions: sessions, dateLabel: label, statsData: chartData };
-  }, [currentDate, timeScope, userManagedSessions]);
+  }, [currentDate, timeScope, userManagedSessions, statsTeamFilter]);
 
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
@@ -409,11 +412,38 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   };
 
   const renderStats = () => (
-    <div className="bg-white p-4 rounded-xl border border-gray-200 h-64">
-        <h4 className="font-bold text-gray-800 mb-2 text-xs uppercase">训练重点分布</h4>
-        <ResponsiveContainer width="100%" height="100%">
-            <PieChart><Pie data={statsData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">{statsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={['#FDE100', '#000000', '#9CA3AF', '#D1D5DB'][index % 4]} />))}</Pie><Tooltip /><Legend iconSize={8} wrapperStyle={{ fontSize: '10px' }} /></PieChart>
-        </ResponsiveContainer>
+    <div className="bg-white p-4 rounded-xl border border-gray-200 h-80 flex flex-col">
+        <div className="flex flex-col gap-2 mb-4 shrink-0">
+            <h4 className="font-bold text-gray-800 text-xs uppercase flex items-center">
+                <PieChartIcon className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练重点分布
+            </h4>
+            <div className="relative group">
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-bvb-black transition-colors">
+                    <Filter className="w-3 h-3" />
+                </div>
+                <select 
+                    value={statsTeamFilter} 
+                    onChange={e => setStatsTeamFilter(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-black uppercase text-gray-600 outline-none focus:ring-2 focus:ring-bvb-yellow focus:bg-white transition-all cursor-pointer"
+                >
+                    <option value="all">全部管理梯队</option>
+                    {availableTeams.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                </select>
+            </div>
+        </div>
+        <div className="flex-1 min-h-0">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie data={statsData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
+                        {statsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={['#FDE100', '#000000', '#9CA3AF', '#D1D5DB'][index % 4]} />))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} verticalAlign="bottom" />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
     </div>
   );
 
