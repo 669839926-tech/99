@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -32,7 +32,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
       const d = new Date();
-      d.setDate(1); // Default to 1st day of current month
+      d.setDate(1); 
       return d.toISOString().split('T')[0];
   });
   const [customEndDate, setCustomEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
@@ -42,6 +42,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [analysisView, setAnalysisView] = useState<AnalysisView>('player');
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingCredits, setIsExportingCredits] = useState(false);
+  
+  // New State for Credit Alert Filter
+  const [creditAlertTeamId, setCreditAlertTeamId] = useState<string>('all');
   
   // Birthday Card State
   const [selectedBirthdayPlayer, setSelectedBirthdayPlayer] = useState<any>(null);
@@ -146,10 +150,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [players, trainings, isDirector]);
 
   const stats = useMemo(() => {
-    const wins = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) > parseInt(m.result.split('-')[1])).length;
-    const losses = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) < parseInt(m.result.split('-')[1])).length;
-    const draws = matches.filter(m => m.status === 'Completed' && m.result && parseInt(m.result.split('-')[0]) === parseInt(m.result.split('-')[1])).length;
-    const sortedPlayers = [...displayPlayers].sort((a, b) => b.goals - a.goals);
     const today = new Date();
     today.setHours(0,0,0,0);
     
@@ -176,23 +176,14 @@ const Dashboard: React.FC<DashboardProps> = ({
         return { ...p, daysUntil: diffDays, monthDay, turningAge };
     }).sort((a,b) => a.daysUntil - b.daysUntil);
 
-    const lowCreditPlayers = displayPlayers.filter(p => p.credits <= 2).sort((a,b) => a.credits - b.credits);
+    // Modified lowCreditPlayers with team filter
+    const lowCreditPlayers = displayPlayers
+        .filter(p => p.credits <= 2)
+        .filter(p => creditAlertTeamId === 'all' || p.teamId === creditAlertTeamId)
+        .sort((a,b) => a.credits - b.credits);
+
     const teamCounts = displayTeams.map(t => ({ id: t.id, name: t.name, count: displayPlayers.filter(p => p.teamId === t.id).length }));
     
-    // Technical Leaderboards
-    const jugglingLeaders = displayPlayers.map(p => {
-        const history = p.jugglingHistory || [];
-        const max = history.length > 0 ? Math.max(...history.map(h => h.count)) : 0;
-        return { ...p, maxJuggling: max };
-    }).sort((a, b) => b.maxJuggling - a.maxJuggling).slice(0, 3);
-
-    const currentMonthStr = today.toISOString().substring(0, 7);
-    const effortLeaders = displayPlayers.map(p => {
-        const history = p.homeTrainingLogs || [];
-        const count = history.filter(h => h.date.startsWith(currentMonthStr)).length;
-        return { ...p, monthEffort: count };
-    }).sort((a, b) => b.monthEffort - a.monthEffort).slice(0, 3);
-
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
     const monthlyTransactions = transactions.filter(t => {
@@ -212,8 +203,15 @@ const Dashboard: React.FC<DashboardProps> = ({
     const monthlyIncome = monthlyTransactions.reduce((s, t) => s + (Number(t.income) || 0), 0);
     const monthlyExpense = monthlyTransactions.reduce((s, t) => s + (Number(t.expense) || 0), 0);
 
-    return { wins, losses, draws, topScorer: sortedPlayers[0], nextMatch: matches.find(m => m.status === 'Upcoming'), totalPlayers: displayPlayers.length, upcomingBirthdays, lowCreditPlayers, teamCounts, jugglingLeaders, effortLeaders, finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense } };
-  }, [matches, displayPlayers, displayTeams, transactions, isDirector]);
+    return { 
+        nextMatch: matches.find(m => m.status === 'Upcoming'), 
+        totalPlayers: displayPlayers.length, 
+        upcomingBirthdays, 
+        lowCreditPlayers, 
+        teamCounts, 
+        finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense } 
+    };
+  }, [displayPlayers, displayTeams, transactions, matches, isDirector, creditAlertTeamId]);
 
   const { chartData, averageRate, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
     const start = new Date(customStartDate);
@@ -266,7 +264,6 @@ const Dashboard: React.FC<DashboardProps> = ({
          const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
          const pInjury = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Injury')).length;
          const pAbsent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Absent')).length;
-         // Note: If no attendance record exists for the session, consider it an implicit absence
          const pNoRecord = pSessions.filter(t => !t.attendance?.some(r => r.playerId === p.id)).length;
          
          const rate = pSessions.length > 0 ? Math.round((pPresent / pSessions.length) * 100) : 0;
@@ -360,6 +357,15 @@ const Dashboard: React.FC<DashboardProps> = ({
     } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
   };
 
+  // Export Low Credit Alert PDF
+  const handleExportCreditsPDF = async () => {
+    setIsExportingCredits(true);
+    const teamLabel = creditAlertTeamId === 'all' ? '全部梯队' : teams.find(t => t.id === creditAlertTeamId)?.name || '未知梯队';
+    try {
+        await exportToPDF('low-credits-export', `课时余额预警名单_${teamLabel}`);
+    } catch (e) { alert('导出失败'); } finally { setIsExportingCredits(false); }
+  };
+
   const handleDownloadBirthdayCard = async () => {
     if (!birthdayCardRef.current || !selectedBirthdayPlayer) return;
     setIsCapturingCard(true);
@@ -395,7 +401,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end bg-bvb-yellow rounded-2xl p-6 shadow-lg relative overflow-hidden">
            <div className="relative z-10">
               <h2 className="text-4xl font-black text-bvb-black uppercase tracking-tighter mb-2">俱乐部概览</h2>
-              <p className="text-bvb-black font-bold opacity-80">欢迎回来，{currentUser?.name || '教练'}。这是{isCoach ? '您管理球队' : '本周'}的状态报告。</p>
+              <p className="text-bvb-black font-bold opacity-80">欢迎回来，{currentUser?.name || '教练'}。这是本周的状态报告。</p>
            </div>
            <div className="relative z-10 mt-4 md:mt-0 flex gap-4 text-center">
                 <div className="bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-sm">
@@ -409,63 +415,6 @@ const Dashboard: React.FC<DashboardProps> = ({
            </div>
            <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/20 to-transparent pointer-events-none"></div>
            <Trophy className="absolute -right-6 -bottom-6 w-48 h-48 text-white/20 rotate-12 pointer-events-none" />
-        </div>
-
-        {/* Technical Honor Wall - New Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Juggling King Board */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => onNavigate?.('growth')}>
-                <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-800 flex items-center">
-                        <Medal className="w-5 h-5 mr-2 text-yellow-500" /> 颠球挑战光荣榜 (历史最高)
-                    </h3>
-                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-bvb-black transition-colors" />
-                </div>
-                <div className="p-5 space-y-4">
-                    {stats.jugglingLeaders.length > 0 ? stats.jugglingLeaders.map((p, idx) => (
-                        <div key={p.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${idx === 0 ? 'bg-yellow-400 text-white' : idx === 1 ? 'bg-gray-300 text-white' : 'bg-amber-600 text-white'}`}>
-                                    {idx + 1}
-                                </div>
-                                <img src={p.image} className="w-8 h-8 rounded-full object-cover border" />
-                                <span className="font-bold text-sm text-gray-700">{p.name}</span>
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="font-black text-lg text-bvb-black">{p.maxJuggling}</span>
-                                <span className="text-[10px] text-gray-400 font-bold uppercase">个</span>
-                            </div>
-                        </div>
-                    )) : <p className="text-center text-gray-400 py-4 text-sm italic">暂无纪录</p>}
-                </div>
-            </div>
-
-            {/* Home Effort Board */}
-            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden group hover:shadow-lg transition-all cursor-pointer" onClick={() => onNavigate?.('growth')}>
-                <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-800 flex items-center">
-                        <Flame className="w-5 h-5 mr-2 text-orange-500" /> 居家勤奋标兵 (本月)
-                    </h3>
-                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-bvb-black transition-colors" />
-                </div>
-                <div className="p-5 space-y-4">
-                    {stats.effortLeaders.length > 0 ? stats.effortLeaders.map((p, idx) => (
-                        <div key={p.id} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-6 h-6 rounded-full flex items-center justify-center font-black text-[10px] ${idx === 0 ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                    {idx + 1}
-                                </div>
-                                <img src={p.image} className="w-8 h-8 rounded-full object-cover border" />
-                                <span className="font-bold text-sm text-gray-700">{p.name}</span>
-                            </div>
-                            <div className="flex items-baseline gap-1">
-                                <span className="font-black text-lg text-orange-600">{p.monthEffort}</span>
-                                <span className="text-[10px] text-gray-400 font-bold uppercase">次</span>
-                            </div>
-                        </div>
-                    )) : <p className="text-center text-gray-400 py-4 text-sm italic">暂无打卡数据</p>}
-                </div>
-            </div>
         </div>
 
         {/* Club Status Summary */}
@@ -524,34 +473,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             ) : null}
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-green-500">
-                <div className="flex justify-between items-start">
-                    <div><p className="text-xs font-bold text-gray-400 uppercase">胜场</p><h3 className="text-3xl font-black text-gray-800">{stats.wins}</h3></div>
-                    <div className="p-2 bg-green-50 rounded-lg text-green-600"><TrendingUp className="w-5 h-5" /></div>
-                </div>
-            </div>
-            <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-gray-400">
-                 <div className="flex justify-between items-start">
-                    <div><p className="text-xs font-bold text-gray-400 uppercase">平局</p><h3 className="text-3xl font-black text-gray-800">{stats.draws}</h3></div>
-                    <div className="p-2 bg-gray-100 rounded-lg text-gray-600"><Activity className="w-5 h-5" /></div>
-                </div>
-            </div>
-            <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500">
-                 <div className="flex justify-between items-start">
-                    <div><p className="text-xs font-bold text-gray-400 uppercase">负场</p><h3 className="text-3xl font-black text-gray-800">{stats.losses}</h3></div>
-                    <div className="p-2 bg-red-50 rounded-lg text-red-600"><AlertCircle className="w-5 h-5" /></div>
-                </div>
-            </div>
-            <div className="bg-white p-5 rounded-xl shadow-sm border-l-4 border-bvb-yellow">
-                 <div className="flex justify-between items-start">
-                    <div><p className="text-xs font-bold text-gray-400 uppercase">头号射手</p><h3 className="text-xl font-black text-gray-800 truncate max-w-[120px]">{stats.topScorer?.name || '-'}</h3><p className="text-xs text-bvb-yellow font-bold bg-black inline-block px-1 rounded mt-1">{stats.topScorer?.goals || 0} 球</p></div>
-                    <div className="p-2 bg-yellow-50 rounded-lg text-yellow-600"><Trophy className="w-5 h-5" /></div>
-                </div>
-            </div>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-4">
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
@@ -567,14 +488,45 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 {isDirector && (
                     <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
-                        <h3 className="font-bold flex items-center text-gray-800 mb-3"><AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 课时余额预警</h3>
-                        <div className="space-y-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                            {stats.lowCreditPlayers.map(p => (
-                                <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm cursor-pointer hover:bg-red-100 transition-colors group">
-                                    <span className="font-bold text-gray-700">{p.name}</span>
-                                    <span className="font-mono font-bold text-red-600">{p.credits} 节</span>
-                                </div>
-                            ))}
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="font-bold flex items-center text-gray-800">
+                                <AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 课时余额预警
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                <select 
+                                    value={creditAlertTeamId} 
+                                    onChange={(e) => setCreditAlertTeamId(e.target.value)}
+                                    className="text-[10px] bg-gray-100 border-none rounded px-1.5 py-0.5 font-bold outline-none focus:ring-1 focus:ring-bvb-yellow"
+                                >
+                                    <option value="all">全部</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                                </select>
+                                <button 
+                                    onClick={handleExportCreditsPDF} 
+                                    disabled={isExportingCredits || stats.lowCreditPlayers.length === 0}
+                                    className="p-1 text-gray-400 hover:text-bvb-black disabled:opacity-30"
+                                    title="导出预警名单"
+                                >
+                                    {isExportingCredits ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar">
+                            {stats.lowCreditPlayers.map(p => {
+                                const team = teams.find(t => t.id === p.teamId);
+                                return (
+                                    <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm cursor-pointer hover:bg-red-100 transition-colors group">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-700">{p.name}</span>
+                                            <span className="text-[10px] text-gray-400 font-bold uppercase">{team?.name || '未知梯队'}</span>
+                                        </div>
+                                        <span className="font-mono font-black text-red-600">{p.credits} 节</span>
+                                    </div>
+                                );
+                            })}
+                            {stats.lowCreditPlayers.length === 0 && (
+                                <p className="text-center py-4 text-xs text-gray-400 italic">当前筛选条件下暂无预警人员</p>
+                            )}
                         </div>
                     </div>
                 )}
@@ -787,6 +739,84 @@ const Dashboard: React.FC<DashboardProps> = ({
                     )}
                 </div>
             )}
+        </div>
+      </div>
+
+      {/* Hidden PDF Template for Low Credits Alert */}
+      <div id="low-credits-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
+        <div className="w-full min-h-[297mm] p-[15mm] flex flex-col relative overflow-hidden bg-white">
+          <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
+            <div className="flex items-center gap-4">
+              {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
+              <div>
+                <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
+                <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">球员课时余额异常预警名单</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-bold text-gray-500 uppercase">Alert List</div>
+              <div className="text-2xl font-black text-bvb-black">{new Date().toLocaleDateString()}</div>
+            </div>
+          </div>
+
+          <div className="bg-red-50 border-2 border-red-100 rounded-2xl p-6 mb-10 flex items-center gap-6">
+            <div className="p-4 bg-red-500 rounded-2xl text-white shadow-lg">
+                <AlertTriangle className="w-10 h-10" />
+            </div>
+            <div>
+                <h3 className="text-xl font-black text-red-700 uppercase">高危续费提醒</h3>
+                <p className="text-red-600 font-bold">以下球员课时余额已不足 2 节，请及时通知家长完成续费，以免影响正常训练。</p>
+                <div className="mt-2 text-xs font-bold text-red-400 uppercase tracking-widest">筛选范围: {creditAlertTeamId === 'all' ? '全俱乐部' : teams.find(t => t.id === creditAlertTeamId)?.name}</div>
+            </div>
+          </div>
+
+          <div className="flex-1">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-100 border-b-2 border-gray-200 text-[10px] font-black uppercase text-gray-500 tracking-widest">
+                  <th className="p-4">排名</th>
+                  <th className="p-4">球员姓名</th>
+                  <th className="p-4">号码 (No.)</th>
+                  <th className="p-4">所属梯队</th>
+                  <th className="p-4 text-right">剩余课时</th>
+                  <th className="p-4 text-center">状态</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {stats.lowCreditPlayers.map((p, idx) => {
+                  const team = teams.find(t => t.id === p.teamId);
+                  return (
+                    <tr key={p.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}>
+                      <td className="p-4 font-black text-gray-400">{idx + 1}</td>
+                      <td className="p-4 font-bold text-gray-800">{p.name}</td>
+                      <td className="p-4 font-mono text-gray-500">#{p.number}</td>
+                      <td className="p-4 font-bold text-gray-600">{team?.name || '未知'}</td>
+                      <td className="p-4 text-right font-black text-red-600 text-lg">
+                        {p.credits} <span className="text-[10px] uppercase">Sessions</span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="text-[10px] font-black bg-red-100 text-red-700 px-2 py-0.5 rounded border border-red-200 uppercase">Low Balance</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {stats.lowCreditPlayers.length === 0 && (
+                <div className="py-20 text-center text-gray-400 italic font-bold">-- 当前梯队暂无低课时球员 --</div>
+            )}
+          </div>
+
+          <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">教务管理组签章 / Admin Signature</p>
+              <div className="h-16 w-48 border-b border-dashed border-gray-300"></div>
+            </div>
+            <div className="text-right text-[10px] text-gray-300 font-mono">
+                WSZG-CREDIT-ALERT-{new Date().toISOString().substring(0,10).replace(/-/g,'')}<br />
+                GENERATED BY WSZG ACADEMY SYSTEM
+            </div>
+          </div>
         </div>
       </div>
 
