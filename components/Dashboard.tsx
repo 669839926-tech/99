@@ -225,11 +225,14 @@ const Dashboard: React.FC<DashboardProps> = ({
         const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId;
         return matchDate && matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
     const teamPlayers = displayPlayers.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
     if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], exportSessionsData: [], teamPlayersList: teamPlayers };
+    
     let data: any[] = [];
     let grandTotalRate = 0;
     let grandTotalCount = 0;
+
     if (analysisView === 'session') {
         data = filteredSessions.map(s => {
              const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
@@ -256,20 +259,34 @@ const Dashboard: React.FC<DashboardProps> = ({
         });
         data = Object.keys(groupedData).map(key => ({ name: key, rate: Math.round(groupedData[key].totalRate / groupedData[key].count) }));
     }
+
     const exportList = teamPlayers.map(p => {
          const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
          const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
+         const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
+         const pInjury = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Injury')).length;
+         const pAbsent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Absent')).length;
+         // Note: If no attendance record exists for the session, consider it an implicit absence
+         const pNoRecord = pSessions.filter(t => !t.attendance?.some(r => r.playerId === p.id)).length;
+         
          const rate = pSessions.length > 0 ? Math.round((pPresent / pSessions.length) * 100) : 0;
-         return { ...p, present: pPresent, total: pSessions.length, rate };
+         return { ...p, present: pPresent, leave: pLeave, injury: pInjury, absent: pAbsent + pNoRecord, total: pSessions.length, rate };
     }).sort((a,b) => b.rate - a.rate);
+
     const exportSessions = filteredSessions.map(s => {
          const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId);
          const total = sTeamPlayers.length;
          const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
-         return { id: s.id, date: s.date, title: s.title, focus: s.focus, teamName: teams.find(t => t.id === s.teamId)?.name || '未知', total, present, rate: total > 0 ? Math.round((present / total) * 100) : 0 };
+         const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
+         const injury = s.attendance?.filter(r => r.status === 'Injury').length || 0;
+         const absentRecords = s.attendance?.filter(r => r.status === 'Absent').length || 0;
+         const noRecords = total - (present + leave + injury + absentRecords);
+
+         return { id: s.id, date: s.date, title: s.title, focus: s.focus, teamName: teams.find(t => t.id === s.teamId)?.name || '未知', total, present, leave, injury, absent: absentRecords + noRecords, rate: total > 0 ? Math.round((present / total) * 100) : 0 };
     });
+
     return { chartData: data, averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0, exportPlayersData: exportList, exportSessionsData: exportSessions, teamPlayersList: teamPlayers };
-  }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate, analysisView]);
+  }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate, analysisView, teams]);
 
   const renderSessionDetail = () => {
     if (!selectedSessionId) return null;
@@ -677,7 +694,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {individualReport.sessions.map(s => (
                                     <tr key={s.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-3 font-mono text-xs">{s.date}</td><td className="px-4 py-3 font-bold">{s.title}</td>
-                                        <td className="px-4 py-3 text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${s.status === 'Present' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{s.status === 'Present' ? '实到' : s.status}</span></td>
+                                        <td className="px-4 py-3 text-center">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${
+                                                s.status === 'Present' ? 'bg-green-100 text-green-700' : 
+                                                s.status === 'Leave' ? 'bg-yellow-100 text-yellow-700' :
+                                                s.status === 'Injury' ? 'bg-red-100 text-red-700' :
+                                                'bg-gray-100 text-gray-500'
+                                            }`}>
+                                                {s.status === 'Present' ? '实到' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤停' : '缺席'}
+                                            </span>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -694,11 +720,29 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                             <div className="overflow-x-auto rounded-lg border border-gray-200">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-100 font-bold text-xs uppercase"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">梯队</th><th className="px-4 py-3">主题</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th></tr></thead>
+                                    <thead className="bg-gray-100 font-bold text-xs uppercase">
+                                        <tr>
+                                            <th className="px-4 py-3">日期</th>
+                                            <th className="px-4 py-3">梯队</th>
+                                            <th className="px-4 py-3">主题</th>
+                                            <th className="px-4 py-3">出勤率</th>
+                                            <th className="px-4 py-3 text-center">实到</th>
+                                            <th className="px-4 py-3 text-center text-yellow-600">请假</th>
+                                            <th className="px-4 py-3 text-center text-red-600">伤停</th>
+                                            <th className="px-4 py-3 text-center text-gray-400">未到</th>
+                                        </tr>
+                                    </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportSessionsData.map(s => (
                                             <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50 cursor-pointer transition-colors">
-                                                <td className="px-4 py-3 font-mono text-xs">{s.date}</td><td className="px-4 py-3 text-xs font-bold">{s.teamName}</td><td className="px-4 py-3 font-bold text-gray-800">{s.title}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div></div><span className="text-xs">{s.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
+                                                <td className="px-4 py-3 font-mono text-xs">{s.date}</td>
+                                                <td className="px-4 py-3 text-xs font-bold">{s.teamName}</td>
+                                                <td className="px-4 py-3 font-bold text-gray-800">{s.title}</td>
+                                                <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="w-12 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div></div><span className="text-xs">{s.rate}%</span></div></td>
+                                                <td className="px-4 py-3 text-center font-bold text-green-600">{s.present}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-yellow-600">{s.leave}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-red-600">{s.injury}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-gray-400">{s.absent}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -713,11 +757,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                             <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-100 font-bold text-xs sticky top-0 z-10"><tr><th className="px-4 py-3">球员</th><th className="px-4 py-3">出勤率</th><th className="px-4 py-3 text-center">实到</th>{isDirector && <th className="px-4 py-3 text-right">课时余额</th>}</tr></thead>
+                                    <thead className="bg-gray-100 font-bold text-xs sticky top-0 z-10">
+                                        <tr>
+                                            <th className="px-4 py-3">球员</th>
+                                            <th className="px-4 py-3">出勤率</th>
+                                            <th className="px-4 py-3 text-center">实到</th>
+                                            <th className="px-4 py-3 text-center text-yellow-600">请假</th>
+                                            <th className="px-4 py-3 text-center text-red-600">伤停</th>
+                                            <th className="px-4 py-3 text-center text-gray-400">未到</th>
+                                            {isDirector && <th className="px-4 py-3 text-right">课时余额</th>}
+                                        </tr>
+                                    </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportPlayersData.map(p => (
                                             <tr key={p.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-3 font-bold">{p.name}</td><td className="px-4 py-3"><div className="flex items-center gap-2"><div className="flex-1 w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div></div><span className="text-xs">{p.rate}%</span></div></td><td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>{isDirector && <td className={`px-4 py-3 text-right font-black ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{p.credits}</td>}
+                                                <td className="px-4 py-3 font-bold">{p.name}</td>
+                                                <td className="px-4 py-3"><div className="flex items-center gap-2"><div className="flex-1 w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div></div><span className="text-xs">{p.rate}%</span></div></td>
+                                                <td className="px-4 py-3 text-center font-bold text-green-600">{p.present}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-yellow-600">{p.leave}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-red-600">{p.injury}</td>
+                                                <td className="px-4 py-3 text-center font-bold text-gray-400">{p.absent}</td>
+                                                {isDirector && <td className={`px-4 py-3 text-right font-black ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>{p.credits}</td>}
                                             </tr>
                                         ))}
                                     </tbody>
