@@ -45,6 +45,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   // Birthday Card State
   const [selectedBirthdayPlayer, setSelectedBirthdayPlayer] = useState<any>(null);
+  const [birthdayMessage, setBirthdayMessage] = useState('');
   const [isCapturingCard, setIsCapturingCard] = useState(false);
   const birthdayCardRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +97,15 @@ const Dashboard: React.FC<DashboardProps> = ({
           setCustomEndDate(end.toISOString().split('T')[0]);
       }
   };
+
+  // Set default birthday message when player selected
+  useEffect(() => {
+    if (selectedBirthdayPlayer) {
+      const name = selectedBirthdayPlayer.name;
+      const template = `亲爱的${name}家长：\n今天是属于${name}的特别日子，我代表顽石之光足球俱乐部全体教练员和队友们祝他生日快乐！身体健康！在足球的路上越踢越精彩！⚽️\n愿新的一岁里，${name}在球场上继续勇敢追梦，在生活中，学习进步，天天向上。`;
+      setBirthdayMessage(template);
+    }
+  }, [selectedBirthdayPlayer]);
 
   // Quick Action: Jump to individual report from credit alert
   const handleLowCreditPlayerClick = (player: Player) => {
@@ -651,76 +661,92 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Birthday Card Generator Modal */}
       {selectedBirthdayPlayer && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-              <div className="w-full max-w-sm flex flex-col gap-6">
+              <div className="w-full max-w-4xl flex flex-col md:flex-row gap-6">
                   {/* The Card View */}
-                  <div 
-                    ref={birthdayCardRef}
-                    className="aspect-[4/5] w-full bg-bvb-yellow rounded-3xl overflow-hidden shadow-2xl relative flex flex-col items-center justify-center p-8 border-8 border-bvb-black"
-                  >
-                      {/* Decorations */}
-                      <div className="absolute top-0 left-0 w-32 h-32 bg-bvb-black rounded-br-full opacity-10"></div>
-                      <div className="absolute bottom-0 right-0 w-32 h-32 bg-bvb-black rounded-tl-full opacity-10"></div>
-                      <div className="absolute top-10 right-10"><Sparkles className="w-8 h-8 text-bvb-black/20" /></div>
-                      
-                      <div className="z-10 flex flex-col items-center text-center">
-                          <img src={appLogo} alt="Logo" className="w-16 h-16 object-contain mb-6 drop-shadow-md" />
+                  <div className="flex-1 flex flex-col gap-4">
+                      <div 
+                        ref={birthdayCardRef}
+                        className="aspect-[4/5] w-full bg-bvb-yellow rounded-3xl overflow-hidden shadow-2xl relative flex flex-col items-center justify-center p-8 border-8 border-bvb-black"
+                      >
+                          {/* Decorations */}
+                          <div className="absolute top-0 left-0 w-32 h-32 bg-bvb-black rounded-br-full opacity-10"></div>
+                          <div className="absolute bottom-0 right-0 w-32 h-32 bg-bvb-black rounded-tl-full opacity-10"></div>
+                          <div className="absolute top-10 right-10"><Sparkles className="w-8 h-8 text-bvb-black/20" /></div>
                           
-                          <div className="relative mb-6">
-                              <div className="w-40 h-40 rounded-full border-4 border-bvb-black overflow-hidden bg-white shadow-xl relative z-10">
-                                  <img src={selectedBirthdayPlayer.image} alt={selectedBirthdayPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                          <div className="z-10 flex flex-col items-center text-center w-full">
+                              <img src={appLogo} alt="Logo" className="w-12 h-12 object-contain mb-4 drop-shadow-md" />
+                              
+                              <div className="relative mb-4">
+                                  <div className="w-24 h-24 rounded-full border-4 border-bvb-black overflow-hidden bg-white shadow-xl relative z-10">
+                                      <img src={selectedBirthdayPlayer.image} alt={selectedBirthdayPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                  </div>
+                                  <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-bvb-black text-bvb-yellow rounded-full flex items-center justify-center font-black text-sm border-2 border-bvb-yellow shadow-lg z-20">
+                                      {selectedBirthdayPlayer.number}
+                                  </div>
+                                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-white rounded-full flex items-center justify-center text-lg shadow-lg z-0 animate-bounce">🎂</div>
                               </div>
-                              <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-bvb-black text-bvb-yellow rounded-full flex items-center justify-center font-black text-xl border-4 border-bvb-yellow shadow-lg z-20">
-                                  {selectedBirthdayPlayer.number}
-                              </div>
-                              <div className="absolute -top-4 -left-4 w-12 h-12 bg-white rounded-full flex items-center justify-center text-2xl shadow-lg z-0 animate-bounce">🎂</div>
-                          </div>
 
-                          <h2 className="text-4xl font-black text-bvb-black uppercase tracking-tighter mb-2 italic">Happy Birthday</h2>
-                          <div className="h-1 w-20 bg-bvb-black mb-6 rounded-full"></div>
-                          
-                          <h3 className="text-2xl font-black text-bvb-black mb-1">{selectedBirthdayPlayer.name}</h3>
-                          <p className="text-sm font-bold text-bvb-black/60 uppercase tracking-widest mb-4">
-                              {teams.find(t => t.id === selectedBirthdayPlayer.teamId)?.name}
-                          </p>
-                          
-                          <div className="bg-bvb-black text-bvb-yellow px-6 py-2 rounded-2xl font-black text-lg shadow-lg">
-                              {selectedBirthdayPlayer.turningAge} 岁生日快乐
+                              <h2 className="text-2xl font-black text-bvb-black uppercase tracking-tighter mb-1 italic">Happy Birthday</h2>
+                              <div className="h-1 w-16 bg-bvb-black mb-4 rounded-full"></div>
+                              
+                              <div className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-black/5 w-full">
+                                  <p className="text-sm font-bold text-bvb-black leading-relaxed text-justify whitespace-pre-wrap">
+                                      {birthdayMessage}
+                                  </p>
+                              </div>
+                              
+                              <div className="mt-4 bg-bvb-black text-bvb-yellow px-4 py-1.5 rounded-xl font-black text-sm shadow-lg">
+                                  {selectedBirthdayPlayer.turningAge} 岁生日快乐
+                              </div>
                           </div>
                           
-                          <p className="mt-8 text-xs font-bold text-bvb-black/80 italic leading-relaxed">
-                              "愿你在球场上挥洒汗水，<br/>在顽石之光继续闪亮成长！"
-                          </p>
-                      </div>
-                      
-                      <div className="absolute bottom-4 left-0 right-0 text-center">
-                          <span className="text-[10px] font-black text-bvb-black/40 uppercase tracking-[0.3em]">Borussia Dortmund Academy</span>
+                          <div className="absolute bottom-4 left-0 right-0 text-center">
+                              <span className="text-[8px] font-black text-bvb-black/40 uppercase tracking-[0.3em]">Borussia Dortmund Academy</span>
+                          </div>
                       </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-4">
-                      <button 
-                        onClick={() => setSelectedBirthdayPlayer(null)}
-                        className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl transition-all flex items-center justify-center"
-                      >
-                          <X className="w-5 h-5 mr-2" /> 取消
-                      </button>
-                      <button 
-                        onClick={handleDownloadBirthdayCard}
-                        disabled={isCapturingCard}
-                        className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-xl hover:brightness-105 active:scale-95 transition-all flex items-center justify-center"
-                      >
-                          {isCapturingCard ? (
-                              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                          ) : (
-                              <Camera className="w-5 h-5 mr-2" />
-                          )}
-                          生成并下载贺卡
-                      </button>
+                  {/* Message Editor & Actions */}
+                  <div className="md:w-96 flex flex-col gap-4">
+                      <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/10 flex flex-col flex-1">
+                          <h3 className="text-white font-black text-lg mb-4 flex items-center">
+                              <Edit2 className="w-5 h-5 mr-2 text-bvb-yellow" /> 编辑祝福寄语
+                          </h3>
+                          <textarea 
+                             className="flex-1 w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:ring-2 focus:ring-bvb-yellow resize-none leading-relaxed transition-all"
+                             value={birthdayMessage}
+                             onChange={(e) => setBirthdayMessage(e.target.value)}
+                             placeholder="输入生日祝福内容..."
+                          />
+                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-4 italic text-center">
+                              温馨提示：可直接点击上方文字区域进行自由修改
+                          </p>
+                      </div>
+
+                      <div className="flex gap-4 shrink-0">
+                          <button 
+                            onClick={() => setSelectedBirthdayPlayer(null)}
+                            className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl transition-all flex items-center justify-center"
+                          >
+                              <X className="w-5 h-5 mr-2" /> 取消
+                          </button>
+                          <button 
+                            onClick={handleDownloadBirthdayCard}
+                            disabled={isCapturingCard}
+                            className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-xl hover:brightness-105 active:scale-95 transition-all flex items-center justify-center"
+                          >
+                              {isCapturingCard ? (
+                                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                              ) : (
+                                  <Camera className="w-5 h-5 mr-2" />
+                              )}
+                              生成并下载贺卡
+                          </button>
+                      </div>
+                      <p className="text-center text-white/40 text-xs font-bold uppercase tracking-widest animate-pulse">
+                          <Sparkles className="w-3 h-3 inline mr-1" /> 正在准备专属惊喜...
+                      </p>
                   </div>
-                  <p className="text-center text-white/40 text-xs font-bold uppercase tracking-widest animate-pulse">
-                      <Sparkles className="w-3 h-3 inline mr-1" /> 正在准备专属惊喜...
-                  </p>
               </div>
           </div>
       )}
