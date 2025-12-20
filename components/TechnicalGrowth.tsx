@@ -398,7 +398,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 </div>
                                 <div className="space-y-3 pt-4 border-t border-gray-100">
                                     <h4 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-xs"><LayoutList className="w-4 h-4 mr-2 text-bvb-yellow" /> 详细挑战清单</h4>
-                                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-1"><table className="w-full text-left text-[11px]"><thead className="bg-gray-50 text-gray-400 font-black uppercase sticky top-0"><tr><th className="p-2 border-b">日期</th><th className="p-2 border-b text-right">成绩</th></tr></thead><tbody className="divide-y divide-gray-100">{(focusedPlayer.jugglingHistory || []).sort((a,b) => b.date.localeCompare(a.date)).map(h => (<tr key={h.id} className="hover:bg-gray-50 transition-colors"><td className="p-2 font-mono text-gray-500">{h.date}</td><td className="p-2 text-right font-black text-bvb-black">{h.count} 个</td></tr>))}</tbody></table></div>
+                                    <div className="max-h-60 overflow-y-auto custom-scrollbar pr-1"><table className="w-full text-left text-[11px]"><thead className="bg-gray-50 text-gray-400 font-black uppercase sticky top-0"><tr><th className="p-2 border-b">日期</th><th className="p-2 border-b text-right">成绩</th></tr></thead><tbody className="divide-y divide-gray-50">{(focusedPlayer.jugglingHistory || []).sort((a,b) => b.date.localeCompare(a.date)).map(h => (<tr key={h.id} className="hover:bg-gray-50 transition-colors"><td className="p-2 font-mono text-gray-500">{h.date}</td><td className="p-2 text-right font-black text-bvb-black">{h.count} 个</td></tr>))}</tbody></table></div>
                                 </div>
                             </div>
                         )}
@@ -571,12 +571,19 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 {selectedTestId ? (
                                     <div className="h-64 w-full">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={displayPlayers.map(p => ({ name: p.name, val: getPlayerLatestResult(p, selectedTestId)?.value || 0 }))}>
+                                            <AreaChart data={displayPlayers.map(p => ({ name: p.name, val: getPlayerLatestResult(p, selectedTestId)?.value || 0 })).sort((a,b) => a.val - b.val)}>
+                                                <defs>
+                                                    <linearGradient id="colorTeamTech" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#FDE100" stopOpacity={0.3}/>
+                                                        <stop offset="95%" stopColor="#FDE100" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                                                 <XAxis dataKey="name" hide />
                                                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}} reversed={isLowerBetter(techTests.find(t => t.id === selectedTestId)?.unit)} />
-                                                <Tooltip cursor={{fill: '#fefce8'}} contentStyle={{borderRadius: '12px', border: 'none'}} />
-                                                <Bar dataKey="val" fill="#FDE100" radius={[4, 4, 0, 0]} />
-                                            </BarChart>
+                                                <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                                                <Area type="monotone" dataKey="val" stroke="#FDE100" strokeWidth={3} fillOpacity={1} fill="url(#colorTeamTech)" />
+                                            </AreaChart>
                                         </ResponsiveContainer>
                                     </div>
                                 ) : <div className="h-64 flex flex-col items-center justify-center text-gray-400 italic text-sm text-center">-- 请选择测试项以查看分布 --</div>}
