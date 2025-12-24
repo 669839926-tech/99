@@ -1,7 +1,7 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User, PlayerPhoto } from '../types';
-// Comment: Added Shield to the lucide-react import list
-import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, ImageIcon, Camera, Share2, Sparkles, Heart, Quote, Shield } from 'lucide-react';
+import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, ImageIcon, Camera, Share2, Sparkles, Heart } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -827,123 +827,70 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 </div>
             )}
 
-            {/* HIDDEN PDF TEMPLATES - PERSONALIZED GROWTH ARCHIVE */}
+            {/* HIDDEN PDF TEMPLATES */}
             <div id="growth-album-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
                 {albumPlayer && (
-                    <div className="w-full min-h-[297mm] p-[15mm] flex flex-col relative overflow-hidden bg-white">
-                        {/* AESTHETIC BG ACCENTS */}
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-bvb-yellow opacity-[0.03] rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
-                        <div className="absolute bottom-0 left-0 w-96 h-96 bg-bvb-black opacity-[0.02] rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2"></div>
-
-                        {/* COVER HEADER */}
-                        <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-12 relative z-10">
-                            <div className="flex items-center gap-6">
-                                {appLogo && <img src={appLogo} alt="Club Logo" className="w-24 h-24 object-contain" />}
+                    <div className="w-full min-h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white">
+                        <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
+                            <div className="flex items-center gap-4">
+                                {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
                                 <div>
-                                    <h1 className="text-4xl font-black uppercase tracking-tighter text-bvb-black italic">球员成长精彩相册档案</h1>
-                                    <p className="text-sm font-bold text-gray-400 tracking-[0.4em] uppercase mt-1">Growth Memory Archive Book</p>
-                                    <div className="flex items-center gap-3 mt-4">
-                                        <span className="bg-bvb-black text-bvb-yellow px-3 py-1 rounded text-xs font-black uppercase tracking-widest">OFFICIAL REPORT</span>
-                                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest italic">顽石之光足球青训基地出品</span>
-                                    </div>
+                                    <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
+                                    <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">青少年球员年度成长精彩相册档案</p>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="text-6xl font-black text-bvb-yellow text-outline leading-none mb-2">{new Date().getFullYear()}</div>
-                                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Season Edition</div>
+                                <div className="text-5xl font-black text-bvb-yellow text-outline">{new Date().getFullYear()}</div>
+                                <div className="text-sm font-bold text-gray-500 uppercase italic">Growth Album</div>
                             </div>
                         </div>
 
-                        {/* PLAYER BIOGRAPHY CARD - PROFESSIONAL STYLE */}
-                        <div className="flex gap-10 bg-bvb-black text-white rounded-[40px] p-10 mb-12 relative overflow-hidden shadow-2xl">
-                            {/* Decorative Stripes in Black Card */}
-                            <div className="absolute top-0 left-0 w-full h-full opacity-5 pointer-events-none overflow-hidden">
-                                <div className="absolute -top-10 -left-10 w-40 h-[500px] bg-white rotate-45"></div>
-                                <div className="absolute -top-10 left-40 w-20 h-[500px] bg-white rotate-45"></div>
-                            </div>
-
-                            <div className="w-48 h-48 rounded-[48px] overflow-hidden border-4 border-bvb-yellow shadow-2xl bg-white shrink-0 relative z-10">
+                        <div className="flex gap-10 bg-bvb-black text-white rounded-[40px] p-10 mb-10 relative overflow-hidden">
+                            <div className="w-40 h-40 rounded-[32px] overflow-hidden border-4 border-bvb-yellow shadow-2xl bg-white shrink-0 relative z-10">
                                 <img src={albumPlayer.image} crossOrigin="anonymous" className="w-full h-full object-cover" />
                             </div>
-                            <div className="flex flex-col justify-center relative z-10 flex-1">
-                                <div className="flex items-center gap-4 mb-2">
-                                    <h2 className="text-5xl font-black text-white italic uppercase tracking-tighter">{albumPlayer.name}</h2>
-                                    <span className="text-3xl font-black text-bvb-yellow italic">#{albumPlayer.number}</span>
-                                </div>
-                                <p className="text-gray-400 font-black uppercase tracking-[0.2em] mb-6 flex items-center gap-3">
-                                    <Shield className="w-4 h-4 text-bvb-yellow fill-current" />
-                                    {teams.find(t => t.id === albumPlayer.teamId)?.name} • 精英梯队成员
-                                </p>
-                                
-                                {/* Personal Mini Stats in Album Cover */}
-                                <div className="grid grid-cols-3 gap-6">
-                                    <div className="bg-white/5 backdrop-blur-sm p-4 rounded-3xl border border-white/10">
-                                        <p className="text-[9px] font-black text-gray-500 uppercase mb-1">年度居家训练</p>
-                                        <p className="text-xl font-black text-white">{albumPlayer.homeTrainingLogs?.length || 0} <span className="text-[10px] text-gray-400 uppercase">Times</span></p>
-                                    </div>
-                                    <div className="bg-white/5 backdrop-blur-sm p-4 rounded-3xl border border-white/10">
-                                        <p className="text-[9px] font-black text-gray-500 uppercase mb-1">颠球最高纪录</p>
-                                        <p className="text-xl font-black text-white">{getJugglingStats(albumPlayer).max} <span className="text-[10px] text-gray-400 uppercase">Max</span></p>
-                                    </div>
-                                    <div className="bg-white/5 backdrop-blur-sm p-4 rounded-3xl border border-white/10">
-                                        <p className="text-[9px] font-black text-gray-500 uppercase mb-1">记录精彩瞬间</p>
-                                        <p className="text-xl font-black text-white">{albumPlayer.gallery?.length || 0} <span className="text-[10px] text-gray-400 uppercase">Moments</span></p>
+                            <div className="flex flex-col justify-center relative z-10">
+                                <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-2">{albumPlayer.name}</h2>
+                                <p className="text-bvb-yellow font-black uppercase tracking-[0.3em] mb-4">#{albumPlayer.number} • {teams.find(t => t.id === albumPlayer.teamId)?.name}</p>
+                                <div className="flex gap-4">
+                                    <div className="bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2">
+                                        <Camera className="w-4 h-4 text-bvb-yellow" />
+                                        <span className="text-xs font-black uppercase tracking-widest">{albumPlayer.gallery?.length || 0} Growth Moments Captured</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="absolute top-0 right-0 w-64 h-64 bg-bvb-yellow/10 rounded-full blur-[80px]"></div>
                         </div>
 
-                        {/* GALLERY GRID - EMPHASIZED ON MEMORY */}
-                        <div className="grid grid-cols-2 gap-x-12 gap-y-16 flex-1 pb-16 relative z-10 px-4">
+                        <div className="grid grid-cols-2 gap-x-10 gap-y-12 flex-1 pb-10">
                             {(albumPlayer.gallery || []).slice(0, 8).map((photo, idx) => (
-                                <div key={photo.id} className="flex flex-col break-inside-avoid relative group">
-                                    {/* Small Index Tag */}
-                                    <div className="absolute -top-4 -left-4 z-20 bg-bvb-yellow text-bvb-black font-black text-[11px] px-3 py-1 rounded-xl shadow-lg border-2 border-white uppercase tracking-tighter">
-                                        Moment #{idx + 1}
+                                <div key={photo.id} className="flex flex-col break-inside-avoid">
+                                    <div className="relative aspect-[4/3] rounded-[24px] overflow-hidden shadow-xl border border-gray-100 bg-gray-50">
+                                        <img src={photo.url} crossOrigin="anonymous" className="w-full h-full object-cover" />
+                                        <div className="absolute top-4 left-4 bg-bvb-yellow text-bvb-black font-black text-[10px] px-3 py-1 rounded-full shadow-lg border border-bvb-black/10">#{idx + 1}</div>
                                     </div>
-                                    
-                                    <div className="relative aspect-[4/3] rounded-[32px] overflow-hidden shadow-2xl border-4 border-gray-50 bg-gray-50 flex items-center justify-center">
-                                        <img src={photo.url} crossOrigin="anonymous" className="w-full h-full object-cover transition-transform duration-700 hover:scale-105" />
-                                    </div>
-                                    
-                                    <div className="mt-6 flex flex-col items-center text-center">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Quote className="w-3 h-3 text-bvb-yellow fill-current" />
-                                            <h4 className="font-black text-gray-800 uppercase tracking-tight text-base">{photo.caption || '顽石之光成长记录'}</h4>
-                                            <Quote className="w-3 h-3 text-bvb-yellow fill-current rotate-180" />
+                                    <div className="mt-4 px-2">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <h4 className="font-black text-gray-800 uppercase tracking-tighter truncate text-sm">{photo.caption || '技术成长瞬间'}</h4>
+                                            <span className="text-[10px] font-black text-gray-400 font-mono italic">{photo.date}</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Calendar className="w-3 h-3 text-gray-300" />
-                                            <span className="text-[10px] font-black text-gray-400 font-mono tracking-widest">{photo.date}</span>
-                                        </div>
-                                        <div className="mt-3 w-16 h-1.5 bg-bvb-yellow/20 rounded-full overflow-hidden">
-                                            <div className="h-full bg-bvb-yellow rounded-full w-1/2"></div>
-                                        </div>
+                                        <div className="h-1 w-12 bg-bvb-yellow rounded-full"></div>
                                     </div>
                                 </div>
                             ))}
                         </div>
 
-                        {/* ALBUM FOOTER */}
-                        <div className="mt-auto pt-10 border-t-2 border-gray-100 flex justify-between items-end relative z-10">
-                            <div className="flex items-center gap-6">
-                                <img src={appLogo} className="w-12 h-12 grayscale opacity-40" />
+                        <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
+                            <div className="flex items-center gap-4">
+                                <img src={appLogo} className="w-10 h-10 grayscale opacity-30" />
                                 <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] italic">足球梦想 · 始于顽石之光</p>
-                                    <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Every training counts, every moment shines. © {new Date().getFullYear()}</p>
+                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest italic">顽石之光青训基地出品 / Published by WSZG Academy Base</p>
+                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-[0.2em]">Authentic Growth Archive © {new Date().getFullYear()}</p>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <div className="flex items-center justify-end gap-2 mb-2">
-                                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Verified by Coaching Staff</span>
-                                    <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center shadow-sm">
-                                        <CheckCircle className="w-3 h-3 text-white" />
-                                    </div>
-                                </div>
-                                <div className="text-[10px] text-gray-400 font-mono font-black tracking-widest uppercase">
-                                    ARCHIVE-WSZG-{albumPlayer.id.substring(0,8).toUpperCase()}
-                                </div>
+                            <div className="text-right text-[9px] text-gray-300 font-mono tracking-tighter">
+                                ARCHIVE-ALBUM-{albumPlayer.id.substring(0,8).toUpperCase()}-{new Date().getTime().toString().slice(-6)}<br />
+                                RECORDING EVERY STEP OF THE FOOTBALL JOURNEY
                             </div>
                         </div>
                     </div>
@@ -1053,7 +1000,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                     <div className="w-full min-h-[297mm] p-[15mm] flex flex-col relative overflow-hidden bg-white">
                         <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
                             <div className="flex items-center gap-4">
-                                {appLogo && <img src={appLogo} alt="Club Logo" className="w-24 h-24 object-contain" />}
+                                {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
                                 <div>
                                     <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
                                     <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">球员专项技术测评历史档案</p>
