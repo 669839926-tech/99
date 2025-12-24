@@ -850,8 +850,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       {selectedBirthdayPlayer.number}
                                   </span>
                                   
-                                  {/* Birthday Hat Overlay */}
-                                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 z-30 pointer-events-none rotate-[-15deg]">
+                                  {/* Birthday Hat Overlay - Adjusted to not cover face center */}
+                                  <div className="absolute -top-14 left-[65%] -translate-x-1/2 w-20 h-20 z-30 pointer-events-none rotate-[15deg]">
                                       <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
                                           {/* Main Triangle */}
                                           <path d="M50 10 L85 85 L15 85 Z" fill="#1C1C1C" />
@@ -892,13 +892,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   <img src={appLogo} alt="Logo" className="w-14 h-14 object-contain drop-shadow-lg" />
                               </div>
 
-                              <div className="flex-1 bg-white/40 backdrop-blur-md p-8 rounded-[32px] border-2 border-bvb-black/5 shadow-inner relative overflow-hidden">
+                              {/* Adjusted padding and text size to ensure complete display */}
+                              <div className="flex-1 bg-white/40 backdrop-blur-md p-6 rounded-[32px] border-2 border-bvb-black/5 shadow-inner relative overflow-hidden flex flex-col justify-center">
                                   {/* Decorative texture or lines */}
                                   <div className="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none">
                                       <svg viewBox="0 0 100 100" className="w-full h-full"><circle cx="100" cy="0" r="100" fill="currentColor"/></svg>
                                   </div>
                                   
-                                  <p className="text-lg font-bold text-bvb-black leading-relaxed whitespace-pre-wrap relative z-10 italic">
+                                  <p className="text-[15px] font-bold text-bvb-black leading-relaxed whitespace-pre-wrap relative z-10 italic">
                                       {birthdayMessage}
                                   </p>
                               </div>
