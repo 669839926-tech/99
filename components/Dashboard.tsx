@@ -44,7 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingCredits, setIsExportingCredits] = useState(false);
   
-  // New State for Credit Alert Filter
+  // Credit Alert Filter
   const [creditAlertTeamId, setCreditAlertTeamId] = useState<string>('all');
   
   // Birthday Card State
@@ -106,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     if (selectedBirthdayPlayer) {
       const name = selectedBirthdayPlayer.name;
-      const template = `亲爱的${name}家长：\n今天是属于${name}的特别日子，我代表顽石之光足球俱乐部全体教练员和队友们祝他生日快乐！身体健康！在足球的路上越踢越精彩！⚽️\n愿新的一岁里，${name}在球场上继续勇敢追梦，在生活中，学习进步，天天向上。`;
+      const template = `亲爱的${name}家长：\n今天是属于${name}的特别日子，我代表顽石之光足球俱乐部全体教练员和队友们祝他生日快乐！在足球的路上越踢越精彩！⚽️\n愿新的一岁里，${name}在球场上继续勇敢追梦，在生活中，学习进步，天天向上。`;
       setBirthdayMessage(template);
     }
   }, [selectedBirthdayPlayer]);
@@ -176,7 +176,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         return { ...p, daysUntil: diffDays, monthDay, turningAge };
     }).sort((a,b) => a.daysUntil - b.daysUntil);
 
-    // Modified lowCreditPlayers with team filter
     const lowCreditPlayers = displayPlayers
         .filter(p => p.credits <= 2)
         .filter(p => creditAlertTeamId === 'all' || p.teamId === creditAlertTeamId)
@@ -213,7 +212,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [displayPlayers, displayTeams, transactions, matches, isDirector, creditAlertTeamId]);
 
-  const { chartData, averageRate, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
+  const { chartData, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
     const start = new Date(customStartDate);
     const end = new Date(customEndDate);
     end.setHours(23, 59, 59, 999);
@@ -357,7 +356,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
   };
 
-  // Export Low Credit Alert PDF
   const handleExportCreditsPDF = async () => {
     setIsExportingCredits(true);
     const teamLabel = creditAlertTeamId === 'all' ? '全部梯队' : teams.find(t => t.id === creditAlertTeamId)?.name || '未知梯队';
@@ -556,7 +554,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h3 className="font-bold text-gray-800 flex items-center"><Megaphone className="w-5 h-5 mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
                     {isDirector && (
-                        <button onClick={showAnnounceForm ? () => setShowAnnounceForm(false) : () => setShowAnnounceForm(true)} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold">
+                        <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold">
                             {showAnnounceForm ? <X className="w-3 h-3 mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
                             {showAnnounceForm ? '取消' : '发布公告'}
                         </button>
@@ -586,7 +584,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                             <p className="text-sm text-gray-600">{item.content}</p>
                             {isDirector && (
-                                <button onClick={() => onDeleteAnnouncement?.(item.id)} className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3" /></button>
+                                <button onClick={() => onDeleteAnnouncement?.(item.id)} className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
                             )}
                         </div>
                     )) : <div className="text-center py-10 text-gray-400 text-sm italic">暂无公告</div>}
@@ -820,94 +818,151 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Birthday Card Generator Modal */}
+      {/* Optimized Horizontal Birthday Card Generator Modal */}
       {selectedBirthdayPlayer && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-              <div className="w-full max-w-4xl flex flex-col md:flex-row gap-6">
-                  {/* The Card View */}
-                  <div className="flex-1 flex flex-col gap-4">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-in fade-in duration-300">
+              <div className="w-full max-w-6xl flex flex-col gap-6">
+                  {/* The Horizontal Card View */}
+                  <div className="flex-1 flex flex-col items-center">
                       <div 
                         ref={birthdayCardRef}
-                        className="aspect-[4/5] w-full bg-bvb-yellow rounded-3xl overflow-hidden shadow-2xl relative flex flex-col items-center justify-center p-8 border-8 border-bvb-black"
+                        className="aspect-[1.6/1] w-full max-w-[800px] bg-bvb-yellow rounded-[40px] overflow-hidden shadow-2xl relative flex border-[12px] border-bvb-black"
                       >
-                          {/* Decorations */}
-                          <div className="absolute top-0 left-0 w-32 h-32 bg-bvb-black rounded-br-full opacity-10"></div>
-                          <div className="absolute bottom-0 right-0 w-32 h-32 bg-bvb-black rounded-tl-full opacity-10"></div>
-                          <div className="absolute top-10 right-10"><Sparkles className="w-8 h-8 text-bvb-black/20" /></div>
-                          
-                          <div className="z-10 flex flex-col items-center text-center w-full">
-                              <img src={appLogo} alt="Logo" className="w-12 h-12 object-contain mb-4 drop-shadow-md" />
-                              
-                              <div className="relative mb-4">
-                                  <div className="w-24 h-24 rounded-full border-4 border-bvb-black overflow-hidden bg-white shadow-xl relative z-10">
+                          {/* 1. Large Watermark Logo Background */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.06] overflow-hidden">
+                              <img src={appLogo} alt="Watermark" className="w-[80%] h-[80%] object-contain grayscale rotate-[-12deg]" />
+                          </div>
+
+                          {/* 2. Professional Geometric Accents */}
+                          <div className="absolute top-0 left-0 w-48 h-48 bg-bvb-black rounded-br-full opacity-5"></div>
+                          <div className="absolute bottom-0 right-0 w-32 h-80 bg-bvb-black/5 -rotate-45 translate-x-12 translate-y-12"></div>
+                          <div className="absolute top-8 right-8 flex gap-1">
+                              {[1, 2, 3, 4].map(i => (
+                                  <div key={i} className="w-1.5 h-8 bg-bvb-black/10 rounded-full -rotate-12"></div>
+                              ))}
+                          </div>
+
+                          {/* Left Column: Player Focus */}
+                          <div className="w-2/5 flex flex-col items-center justify-center p-10 relative z-10 border-r-4 border-bvb-black/5">
+                              <div className="relative mb-6">
+                                  {/* Large Decorative Number in background */}
+                                  <span className="absolute -top-10 -left-6 text-[120px] font-black text-bvb-black/10 select-none italic leading-none">
+                                      {selectedBirthdayPlayer.number}
+                                  </span>
+                                  
+                                  {/* Birthday Hat Overlay */}
+                                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-24 h-24 z-30 pointer-events-none rotate-[-15deg]">
+                                      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
+                                          {/* Main Triangle */}
+                                          <path d="M50 10 L85 85 L15 85 Z" fill="#1C1C1C" />
+                                          {/* Decorative Stripes */}
+                                          <path d="M50 10 L60 30 L40 30 Z" fill="#FDE100" />
+                                          <path d="M50 10 L70 50 L30 50 Z" fill="#FDE100" opacity="0.3" />
+                                          <rect x="15" y="75" width="70" height="5" fill="#FDE100" />
+                                          {/* Pom pom */}
+                                          <circle cx="50" cy="10" r="8" fill="#FDE100" />
+                                          <circle cx="50" cy="10" r="4" fill="white" opacity="0.5" />
+                                      </svg>
+                                  </div>
+
+                                  <div className="w-48 h-48 rounded-full border-8 border-bvb-black overflow-hidden bg-white shadow-2xl relative z-10">
                                       <img src={selectedBirthdayPlayer.image} alt={selectedBirthdayPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                                   </div>
-                                  <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-bvb-black text-bvb-yellow rounded-full flex items-center justify-center font-black text-sm border-2 border-bvb-yellow shadow-lg z-20">
+                                  
+                                  <div className="absolute -bottom-2 right-4 w-12 h-12 bg-bvb-black text-bvb-yellow rounded-xl flex items-center justify-center font-black text-xl border-4 border-bvb-yellow shadow-xl z-20 rotate-6">
                                       {selectedBirthdayPlayer.number}
                                   </div>
-                                  <div className="absolute -top-2 -left-2 w-8 h-8 bg-white rounded-full flex items-center justify-center text-lg shadow-lg z-0 animate-bounce">🎂</div>
                               </div>
 
-                              <h2 className="text-2xl font-black text-bvb-black uppercase tracking-tighter mb-1 italic">Happy Birthday</h2>
-                              <div className="h-1 w-16 bg-bvb-black mb-4 rounded-full"></div>
-                              
-                              <div className="bg-white/40 backdrop-blur-sm p-4 rounded-2xl border border-black/5 w-full">
-                                  <p className="text-sm font-bold text-bvb-black leading-relaxed text-justify whitespace-pre-wrap">
+                              <h3 className="text-3xl font-black text-bvb-black uppercase tracking-tighter italic mb-1">
+                                  {selectedBirthdayPlayer.name}
+                              </h3>
+                              <div className="bg-bvb-black text-bvb-yellow px-4 py-1.5 rounded-full font-black text-xs shadow-lg uppercase tracking-widest">
+                                  {selectedBirthdayPlayer.turningAge} YEARS OLD
+                              </div>
+                          </div>
+
+                          {/* Right Column: Greetings & Branding */}
+                          <div className="w-3/5 flex flex-col p-12 relative z-10">
+                              <div className="flex justify-between items-start mb-8">
+                                  <div>
+                                      <h2 className="text-4xl font-black text-bvb-black uppercase tracking-tighter leading-none mb-1 italic">Happy Birthday</h2>
+                                      <p className="text-xs font-black text-bvb-black/40 uppercase tracking-[0.4em]">Official Academy Greeting</p>
+                                  </div>
+                                  <img src={appLogo} alt="Logo" className="w-14 h-14 object-contain drop-shadow-lg" />
+                              </div>
+
+                              <div className="flex-1 bg-white/40 backdrop-blur-md p-8 rounded-[32px] border-2 border-bvb-black/5 shadow-inner relative overflow-hidden">
+                                  {/* Decorative texture or lines */}
+                                  <div className="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none">
+                                      <svg viewBox="0 0 100 100" className="w-full h-full"><circle cx="100" cy="0" r="100" fill="currentColor"/></svg>
+                                  </div>
+                                  
+                                  <p className="text-lg font-bold text-bvb-black leading-relaxed whitespace-pre-wrap relative z-10 italic">
                                       {birthdayMessage}
                                   </p>
                               </div>
-                              
-                              <div className="mt-4 bg-bvb-black text-bvb-yellow px-4 py-1.5 rounded-xl font-black text-sm shadow-lg">
-                                  {selectedBirthdayPlayer.turningAge} 岁生日快乐
+
+                              <div className="mt-8 flex justify-between items-end">
+                                  <div className="space-y-1">
+                                      <p className="text-[10px] font-black text-bvb-black/60 uppercase tracking-widest">顽石之光青训基地 / Training Base</p>
+                                      <div className="flex items-center gap-2">
+                                          <div className="w-8 h-8 rounded-lg bg-bvb-black flex items-center justify-center"><Trophy className="w-4 h-4 text-bvb-yellow" /></div>
+                                          <span className="text-[10px] font-black text-bvb-black uppercase tracking-widest">Borussia Dortmund Style</span>
+                                      </div>
+                                  </div>
+                                  <div className="text-right">
+                                      <p className="text-[8px] font-black text-bvb-black/30 uppercase tracking-[0.3em] mb-1">Authentic Member</p>
+                                      <div className="text-xs font-mono font-black text-bvb-black/80">WSZG-{selectedBirthdayPlayer.id.substring(0, 6).toUpperCase()}-BDAY</div>
+                                  </div>
                               </div>
-                          </div>
-                          
-                          <div className="absolute bottom-4 left-0 right-0 text-center">
-                              <span className="text-[8px] font-black text-bvb-black/40 uppercase tracking-[0.3em]">Borussia Dortmund Academy</span>
                           </div>
                       </div>
                   </div>
 
-                  {/* Message Editor & Actions */}
-                  <div className="md:w-96 flex flex-col gap-4">
-                      <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/10 flex flex-col flex-1">
-                          <h3 className="text-white font-black text-lg mb-4 flex items-center">
-                              <Edit2 className="w-5 h-5 mr-2 text-bvb-yellow" /> 编辑祝福寄语
-                          </h3>
+                  {/* Horizontal Control Panel */}
+                  <div className="flex flex-col md:flex-row gap-4">
+                      <div className="flex-1 bg-white/10 backdrop-blur-lg rounded-3xl p-6 border border-white/10 flex flex-col">
+                          <div className="flex justify-between items-center mb-4">
+                              <h3 className="text-white font-black text-lg flex items-center">
+                                  <Edit2 className="w-5 h-5 mr-2 text-bvb-yellow" /> 编辑祝福寄语
+                              </h3>
+                              <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">Real-time sync</span>
+                          </div>
                           <textarea 
-                             className="flex-1 w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:ring-2 focus:ring-bvb-yellow resize-none leading-relaxed transition-all"
+                             className="w-full h-24 bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:ring-2 focus:ring-bvb-yellow resize-none leading-relaxed transition-all"
                              value={birthdayMessage}
                              onChange={(e) => setBirthdayMessage(e.target.value)}
                              placeholder="输入生日祝福内容..."
                           />
-                          <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mt-4 italic text-center">
-                              温馨提示：可直接点击上方文字区域进行自由修改
-                          </p>
                       </div>
 
-                      <div className="flex gap-4 shrink-0">
-                          <button 
-                            onClick={() => setSelectedBirthdayPlayer(null)}
-                            className="flex-1 py-4 bg-white/10 hover:bg-white/20 text-white font-black rounded-2xl transition-all flex items-center justify-center"
-                          >
-                              <X className="w-5 h-5 mr-2" /> 取消
-                          </button>
+                      <div className="flex flex-col gap-3 w-full md:w-80 shrink-0">
                           <button 
                             onClick={handleDownloadBirthdayCard}
                             disabled={isCapturingCard}
-                            className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-xl hover:brightness-105 active:scale-95 transition-all flex items-center justify-center"
+                            className="w-full py-5 bg-bvb-yellow text-bvb-black font-black rounded-3xl shadow-xl hover:brightness-105 active:scale-95 transition-all flex items-center justify-center text-lg"
                           >
                               {isCapturingCard ? (
-                                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                                  <Loader2 className="w-6 h-6 mr-3 animate-spin" />
                               ) : (
-                                  <Camera className="w-5 h-5 mr-2" />
+                                  <Camera className="w-6 h-6 mr-3" />
                               )}
-                              生成并下载贺卡
+                              下载高清横版贺卡
+                          </button>
+                          <button 
+                            onClick={() => setSelectedBirthdayPlayer(null)}
+                            className="w-full py-4 bg-white/5 hover:bg-white/10 text-white/60 hover:white font-black rounded-2xl transition-all flex items-center justify-center text-sm"
+                          >
+                              <X className="w-4 h-4 mr-2" /> 关闭预览
                           </button>
                       </div>
-                      <p className="text-center text-white/40 text-xs font-bold uppercase tracking-widest animate-pulse">
-                          <Sparkles className="w-3 h-3 inline mr-1" /> 正在准备专属惊喜...
-                      </p>
+                  </div>
+                  
+                  <div className="flex justify-center gap-8 text-white/20">
+                      <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"><CheckCircle className="w-3 h-3" /> 高清 3x 采样</p>
+                      <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"><CheckCircle className="w-3 h-3" /> 俱乐部水印已加注</p>
+                      <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"><CheckCircle className="w-3 h-3" /> PNG 透明无损格式</p>
                   </div>
               </div>
           </div>
