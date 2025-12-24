@@ -26,7 +26,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
   const navItems = [
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
     { id: 'players', label: '球队管理', icon: Shirt },
-    { id: 'growth', label: '球员成长', icon: TrendingUp },
+    { id: 'growth', label: '技术成长', icon: TrendingUp },
     { id: 'finance', label: '账务管理', icon: Wallet },
     { id: 'design', label: '教案设计', icon: PenTool },
     { id: 'training', label: '训练计划', icon: Calendar },
@@ -37,7 +37,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
     if (label === '俱乐部概览') return '概览';
     if (label === '教案设计') return '教案';
     if (label === '账务管理') return '账务';
-    if (label === '球员成长') return '成长';
+    if (label === '技术成长') return '成长';
     return label.substring(0, 2);
   };
 

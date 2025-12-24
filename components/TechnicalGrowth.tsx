@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User, PlayerPhoto } from '../types';
-import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, ImageIcon, Camera, Share2, Sparkles, Heart } from 'lucide-react';
+import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
+import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -28,14 +28,15 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         return teams.filter(t => currentUser?.teamIds?.includes(t.id));
     }, [teams, currentUser, isDirector]);
 
-    const [activeTab, setActiveTab] = useState<'juggling' | 'home' | 'tests' | 'album'>('juggling');
+    const [activeTab, setActiveTab] = useState<'juggling' | 'home' | 'tests'>('juggling');
     
-    // 初始化选中的梯队
+    // 初始化选中的梯队：如果是教练，默认为其管理的第一个梯队
     const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
         if (isCoach && managedTeams.length > 0) return managedTeams[0].id;
         return 'all';
     });
 
+    // 当用户管理的梯队发生变化时（虽然通常不会），确保选中的 ID 有效
     useEffect(() => {
         if (selectedTeamId !== 'all' && !managedTeams.some(t => t.id === selectedTeamId)) {
             setSelectedTeamId(managedTeams.length > 0 ? managedTeams[0].id : 'all');
@@ -46,7 +47,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [isExporting, setIsExporting] = useState(false);
     const [isExportingHome, setIsExportingHome] = useState(false);
     const [isExportingIndividualTech, setIsExportingIndividualTech] = useState(false);
-    const [isExportingAlbum, setIsExportingAlbum] = useState(false);
 
     // 颠球录入状态
     const [jugglingPlayerId, setJugglingPlayerId] = useState<string>('');
@@ -77,30 +77,27 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [isImportingResults, setIsImportingResults] = useState(false);
     const resultsFileInputRef = useRef<HTMLInputElement>(null);
 
-    // 成长相册状态
-    const [albumPlayerId, setAlbumPlayerId] = useState<string>('');
-    const [albumSearch, setAlbumSearch] = useState('');
-
+    // 辅助逻辑：判断是否是“数值越小越好”的单位
     const isLowerBetter = (unit?: string) => {
         if (!unit) return false;
         const u = unit.toLowerCase();
         return u.includes('秒') || u.includes('s') || u.includes('分') || u.includes('min');
     };
 
+    // 核心数据隔离：计算当前视图下可见的球员列表
     const displayPlayers = useMemo(() => {
+        // 第一层过滤：基于用户权限的球员基数
         const basePlayers = isDirector 
             ? players 
             : players.filter(p => currentUser?.teamIds?.includes(p.teamId));
+
+        // 第二层过滤：基于页面顶部选中的梯队筛选器
         return basePlayers.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
     }, [players, selectedTeamId, currentUser, isDirector]);
 
     const focusedPlayer = useMemo(() => {
         return displayPlayers.find(p => p.id === jugglingPlayerId) || null;
     }, [displayPlayers, jugglingPlayerId]);
-
-    const albumPlayer = useMemo(() => {
-        return displayPlayers.find(p => p.id === albumPlayerId) || null;
-    }, [displayPlayers, albumPlayerId]);
 
     const getHonorBadge = (max: number) => {
         if (max >= 100) return { label: '五星传奇', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
@@ -120,6 +117,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         return { monthCount, yearCount };
     };
 
+    // --- 颠球逻辑 ---
     const handleAddJuggling = () => {
         const count = parseInt(jugglingCount);
         if (!jugglingPlayerId || isNaN(count)) return;
@@ -160,6 +158,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         return [...focusedPlayer.jugglingHistory].sort((a, b) => a.date.localeCompare(b.date)).map(h => ({ date: h.date, displayDate: h.date.substring(5), count: h.count }));
     }, [focusedPlayer]);
 
+    // --- 技术测试逻辑 ---
     const handleAddTestDef = () => {
         if (!newTestDef.name || !newTestDef.unit || !onUpdateTechTests) return;
         const test: TechTestDefinition = { id: `test-${Date.now()}`, ...newTestDef };
@@ -237,7 +236,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const t = techTests.find(t => t.id === selectedTestId);
         try {
             await exportToPDF('individual-tech-test-pdf', `专项测评报告_${p?.name}_${t?.name}`);
-        } catch (error) {
+        } catch (e) {
             alert('导出失败');
         } finally {
             setIsExportingIndividualTech(false);
@@ -283,9 +282,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                     const testName = cols[2];
                     const testDate = cols[4];
                     const score = parseFloat(cols[5]);
+
                     if (isNaN(score)) continue;
+
                     const player = players.find(p => p.name === name && p.number === number);
                     const testDef = techTests.find(t => t.name === testName);
+
                     if (player && testDef) {
                         const newResult: TechTestResult = {
                             id: `res-imp-${Date.now()}-${player.id}-${Math.random().toString(36).substr(2,4)}`,
@@ -313,6 +315,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         if (results.length === 0) return { avg: 0, best: 0, count: 0 };
         const values = results.map(r => r.value);
         const unit = techTests.find(t => t.id === selectedTestId)?.unit;
+        
         return {
             avg: (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2),
             best: isLowerBetter(unit) ? Math.min(...values) : Math.max(...values),
@@ -320,6 +323,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         };
     }, [displayPlayers, selectedTestId, techTests]);
 
+    // --- 居家训练导出逻辑 ---
     const handleExportHomeTeamPDF = async () => {
         setIsExportingHome(true);
         const teamName = teams.find(t => t.id === selectedTeamId)?.name || '全部梯队';
@@ -344,24 +348,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     };
 
-    const handleExportGrowthAlbum = async () => {
-        if (!albumPlayer) return;
-        setIsExportingAlbum(true);
-        try {
-            await exportToPDF('growth-album-pdf', `成长相册档案_${albumPlayer.name}_${new Date().getFullYear()}`);
-        } catch (e) {
-            alert('导出失败');
-        } finally {
-            setIsExportingAlbum(false);
-        }
-    };
-
     return (
         <div className="space-y-6 pb-20">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-black text-bvb-black uppercase italic tracking-tighter">球员成长中心</h2>
+                    <h2 className="text-3xl font-black text-bvb-black uppercase italic tracking-tighter">技术成长中心</h2>
                     <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Digital Performance Tracking & Analytics</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -370,6 +362,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                         <span className="px-4 font-black text-xs min-w-[90px] text-center">{viewYear}年 {viewMonth + 1}月</span>
                         <button onClick={() => { if(viewMonth === 11) { setViewMonth(0); setViewYear(viewYear+1); } else setViewMonth(viewMonth+1); }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRightIcon className="w-5 h-5 text-gray-400" /></button>
                     </div>
+                    {/* 梯队筛选器：受权限控制 */}
                     <select 
                         value={selectedTeamId} 
                         onChange={e => setSelectedTeamId(e.target.value)}
@@ -386,7 +379,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 <button onClick={() => setActiveTab('juggling')} className={`flex-1 min-w-[120px] py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${activeTab === 'juggling' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Medal className="w-4 h-4" /> 颠球挑战</button>
                 <button onClick={() => setActiveTab('home')} className={`flex-1 min-w-[120px] py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${activeTab === 'home' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><TrendingUp className="w-4 h-4" /> 居家打卡</button>
                 <button onClick={() => setActiveTab('tests')} className={`flex-1 min-w-[120px] py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${activeTab === 'tests' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Target className="w-4 h-4" /> 技术测评</button>
-                <button onClick={() => setActiveTab('album')} className={`flex-1 min-w-[120px] py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all ${activeTab === 'album' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><ImageIcon className="w-4 h-4" /> 成长相册</button>
             </div>
 
             {/* TAB: Juggling Challenge */}
@@ -420,7 +412,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-3">
                                         <img src={focusedPlayer.image} className="w-12 h-12 rounded-full object-cover border-2 border-bvb-yellow" />
-                                        <div><h3 className="font-black text-gray-800 text-lg leading-tight">{focusedPlayer.name}</h3><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{focusedPlayer.number} • 球员成长档案</p></div>
+                                        <div><h3 className="font-black text-gray-800 text-lg leading-tight">{focusedPlayer.name}</h3><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{focusedPlayer.number} • 技术成长档案</p></div>
                                     </div>
                                     <button onClick={async () => { setIsExporting(true); try { await exportToPDF('juggling-report-pdf', `颠球挑战档案_${focusedPlayer.name}`); } catch (e) { alert('导出失败'); } finally { setIsExporting(false); } }} disabled={isExporting} className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-bvb-black hover:text-bvb-yellow transition-all">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}</button>
                                 </div>
@@ -493,6 +485,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             {/* TAB: Technical Tests */}
             {activeTab === 'tests' && (
                 <div className="space-y-6 animate-in slide-in-from-right-4">
+                    {/* Header with Settings */}
                     <div className="flex justify-between items-center bg-white p-4 rounded-2xl border shadow-sm flex-wrap gap-4">
                         <div className="flex items-center gap-4 flex-wrap">
                             <h3 className="font-black text-gray-800 uppercase italic flex items-center"><Gauge className="w-6 h-6 mr-2 text-bvb-yellow" /> 技术测评录入</h3>
@@ -529,6 +522,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* Score Entry Table */}
                         <div className="lg:col-span-8 bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
                             <div className="p-6 bg-gray-50 border-b flex justify-between items-center flex-wrap gap-4">
                                 <div>
@@ -598,6 +592,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             </div>
                         </div>
 
+                        {/* Right: Team Overview or Selected Player Trend */}
                         <div className="lg:col-span-4 space-y-6">
                             <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
                                 <h4 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-sm mb-6"><BarChart3 className="w-5 h-5 mr-2 text-bvb-yellow" /> 团队成绩分布</h4>
@@ -621,6 +616,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </div>
                                 ) : <div className="h-64 flex flex-col items-center justify-center text-gray-400 italic text-sm text-center">-- 请选择测试项以查看分布 --</div>}
                             </div>
+                            
                             <div className="bg-bvb-black p-6 rounded-3xl shadow-xl text-white overflow-hidden relative">
                                 <div className="z-10 relative">
                                     <h4 className="font-black uppercase tracking-widest text-xs text-bvb-yellow mb-4">测试项目说明</h4>
@@ -634,106 +630,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <div className="absolute -right-8 -bottom-8 w-32 h-32 bg-white/5 rounded-full"></div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
-
-            {/* TAB: Growth Album */}
-            {activeTab === 'album' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-4">
-                    <div className="lg:col-span-4 space-y-6">
-                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
-                            <h3 className="font-black text-gray-800 mb-6 flex items-center uppercase tracking-tighter text-lg"><Plus className="w-6 h-6 mr-2 text-bvb-yellow" /> 选择球员档案</h3>
-                            <div className="space-y-4">
-                                <div className="relative">
-                                    <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                                        <input className="w-full pl-9 pr-4 py-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-sm" placeholder="快速定位球员..." value={albumSearch} onChange={e => setAlbumSearch(e.target.value)} />
-                                    </div>
-                                    <div className="mt-4 space-y-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-1">
-                                        {displayPlayers.filter(p => p.name.includes(albumSearch)).map(p => (
-                                            <button 
-                                                key={p.id} 
-                                                onClick={() => setAlbumPlayerId(p.id)} 
-                                                className={`w-full p-3 rounded-2xl border-2 transition-all flex items-center gap-3 ${albumPlayerId === p.id ? 'bg-bvb-black text-white border-bvb-black shadow-xl scale-[1.02]' : 'bg-white text-gray-600 border-gray-100 hover:border-bvb-yellow'}`}
-                                            >
-                                                <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                <div className="text-left">
-                                                    <p className={`font-black text-sm ${albumPlayerId === p.id ? 'text-bvb-yellow' : 'text-gray-800'}`}>{p.name}</p>
-                                                    <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest">#{p.number} • {teams.find(t => t.id === p.teamId)?.level}</p>
-                                                </div>
-                                                <div className="ml-auto">
-                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${albumPlayerId === p.id ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                                                        {p.gallery?.length || 0} 张
-                                                    </span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="lg:col-span-8">
-                        {albumPlayer ? (
-                            <div className="space-y-6">
-                                <div className="bg-white rounded-[32px] shadow-sm border border-gray-200 p-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                                    <div className="flex items-center gap-6">
-                                        <div className="relative">
-                                            <img src={albumPlayer.image} className="w-24 h-24 rounded-full object-cover border-4 border-bvb-yellow shadow-xl" />
-                                            <div className="absolute -bottom-1 -right-1 bg-bvb-black text-bvb-yellow text-xs font-black w-8 h-8 rounded-full border-2 border-white flex items-center justify-center">#{albumPlayer.number}</div>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-3xl font-black text-gray-800 italic uppercase tracking-tighter mb-1">{albumPlayer.name} 成长瞬间</h3>
-                                            <div className="flex gap-2 items-center">
-                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded border">Season {new Date().getFullYear()}</span>
-                                                <span className="text-[10px] font-black text-bvb-yellow bg-bvb-black px-2 py-1 rounded uppercase tracking-widest">{albumPlayer.gallery?.length || 0} Moments Recorded</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={handleExportGrowthAlbum}
-                                        disabled={isExportingAlbum || !albumPlayer.gallery?.length}
-                                        className="px-8 py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-xl hover:brightness-105 active:scale-95 transition-all flex items-center gap-3 uppercase italic disabled:opacity-50"
-                                    >
-                                        {isExportingAlbum ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
-                                        导出个性化相册 PDF
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                                    {(albumPlayer.gallery || []).length > 0 ? (
-                                        albumPlayer.gallery?.map((photo) => (
-                                            <div key={photo.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-xl transition-all group hover:-translate-y-1">
-                                                <div className="aspect-square relative overflow-hidden bg-gray-50">
-                                                    <img src={photo.url} alt={photo.caption} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                                                        <span className="text-[10px] font-black text-white/80 uppercase flex items-center gap-1"><Calendar className="w-3 h-3" /> {photo.date}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="p-4 bg-white">
-                                                    <p className="text-sm font-black text-gray-800 truncate mb-1">{photo.caption || '球员成长记录'}</p>
-                                                    <p className="text-[10px] font-bold text-gray-400 font-mono italic">{photo.date}</p>
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="col-span-full py-24 bg-white rounded-[32px] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
-                                            <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center mb-4"><ImageIcon className="w-10 h-10 opacity-20" /></div>
-                                            <p className="font-black text-lg italic">尚未上传任何成长照片</p>
-                                            <p className="text-xs font-bold uppercase tracking-widest mt-1 opacity-60">请在球员详情中上传照片以激活相册功能</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-[32px] h-[500px] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 text-center p-12">
-                                <Sparkles className="w-16 h-16 mb-4 opacity-10" />
-                                <h3 className="text-xl font-black text-gray-300 uppercase tracking-widest italic">Growth Moments Wall</h3>
-                                <p className="text-sm font-bold opacity-60 max-w-xs mt-2">请从左侧列表选择一名球员，即可预览并导出其个性化的成长相册档案。</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}
@@ -827,76 +723,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 </div>
             )}
 
-            {/* HIDDEN PDF TEMPLATES */}
-            <div id="growth-album-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
-                {albumPlayer && (
-                    <div className="w-full min-h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white">
-                        <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
-                            <div className="flex items-center gap-4">
-                                {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
-                                <div>
-                                    <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
-                                    <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">青少年球员年度成长精彩相册档案</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-5xl font-black text-bvb-yellow text-outline">{new Date().getFullYear()}</div>
-                                <div className="text-sm font-bold text-gray-500 uppercase italic">Growth Album</div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-10 bg-bvb-black text-white rounded-[40px] p-10 mb-10 relative overflow-hidden">
-                            <div className="w-40 h-40 rounded-[32px] overflow-hidden border-4 border-bvb-yellow shadow-2xl bg-white shrink-0 relative z-10">
-                                <img src={albumPlayer.image} crossOrigin="anonymous" className="w-full h-full object-cover" />
-                            </div>
-                            <div className="flex flex-col justify-center relative z-10">
-                                <h2 className="text-4xl font-black text-white italic uppercase tracking-tighter mb-2">{albumPlayer.name}</h2>
-                                <p className="text-bvb-yellow font-black uppercase tracking-[0.3em] mb-4">#{albumPlayer.number} • {teams.find(t => t.id === albumPlayer.teamId)?.name}</p>
-                                <div className="flex gap-4">
-                                    <div className="bg-white/10 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/10 flex items-center gap-2">
-                                        <Camera className="w-4 h-4 text-bvb-yellow" />
-                                        <span className="text-xs font-black uppercase tracking-widest">{albumPlayer.gallery?.length || 0} Growth Moments Captured</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-bvb-yellow/10 rounded-full blur-[80px]"></div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-x-10 gap-y-12 flex-1 pb-10">
-                            {(albumPlayer.gallery || []).slice(0, 8).map((photo, idx) => (
-                                <div key={photo.id} className="flex flex-col break-inside-avoid">
-                                    <div className="relative aspect-[4/3] rounded-[24px] overflow-hidden shadow-xl border border-gray-100 bg-gray-50">
-                                        <img src={photo.url} crossOrigin="anonymous" className="w-full h-full object-cover" />
-                                        <div className="absolute top-4 left-4 bg-bvb-yellow text-bvb-black font-black text-[10px] px-3 py-1 rounded-full shadow-lg border border-bvb-black/10">#{idx + 1}</div>
-                                    </div>
-                                    <div className="mt-4 px-2">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <h4 className="font-black text-gray-800 uppercase tracking-tighter truncate text-sm">{photo.caption || '球员成长瞬间'}</h4>
-                                            <span className="text-[10px] font-black text-gray-400 font-mono italic">{photo.date}</span>
-                                        </div>
-                                        <div className="h-1 w-12 bg-bvb-yellow rounded-full"></div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
-                            <div className="flex items-center gap-4">
-                                <img src={appLogo} className="w-10 h-10 grayscale opacity-30" />
-                                <div className="space-y-1">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest italic">顽石之光青训基地出品 / Published by WSZG Academy Base</p>
-                                    <p className="text-[8px] font-bold text-gray-300 uppercase tracking-[0.2em]">Authentic Growth Archive © {new Date().getFullYear()}</p>
-                                </div>
-                            </div>
-                            <div className="text-right text-[9px] text-gray-300 font-mono tracking-tighter">
-                                ARCHIVE-ALBUM-{albumPlayer.id.substring(0,8).toUpperCase()}-{new Date().getTime().toString().slice(-6)}<br />
-                                RECORDING EVERY STEP OF THE FOOTBALL JOURNEY
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-
             {/* Hidden PDF Template for Technical Test Assessment */}
             <div id="tech-test-report-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
                 <div className="w-full min-h-[297mm] p-[15mm] flex flex-col relative overflow-hidden bg-white">
@@ -961,9 +787,18 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                         const avgValue = parseFloat(String(techSummary.avg));
                                         const unit = techTests.find(t => t.id === selectedTestId)?.unit;
                                         const lowerBetter = isLowerBetter(unit);
-                                        const isExcellent = lowerBetter ? score <= (avgValue * 0.8) : score >= (avgValue * 1.2);
-                                        const isStandard = lowerBetter ? score <= avgValue : score >= avgValue;
-                                        const allResults = (p.testResults || []).filter(r => r.testId === selectedTestId).sort((a, b) => b.date.localeCompare(a.date));
+                                        
+                                        const isExcellent = lowerBetter 
+                                            ? score <= (avgValue * 0.8) 
+                                            : score >= (avgValue * 1.2);
+                                        const isStandard = lowerBetter
+                                            ? score <= avgValue
+                                            : score >= avgValue;
+
+                                        const allResults = (p.testResults || [])
+                                            .filter(r => r.testId === selectedTestId)
+                                            .sort((a, b) => b.date.localeCompare(a.date));
+                                        
                                         const previousScore = allResults[1]?.value;
                                         let trendLabel = null;
                                         if (previousScore !== undefined) {
@@ -972,24 +807,46 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             if (isImproved) trendLabel = <span className="text-green-600 font-bold">↑ 进步</span>;
                                             else if (isRegressed) trendLabel = <span className="text-red-500 font-bold">↓ 倒退</span>;
                                             else trendLabel = <span className="text-gray-400">持平</span>;
-                                        } else trendLabel = <span className="text-gray-300">首测</span>;
+                                        } else {
+                                            trendLabel = <span className="text-gray-300">首测</span>;
+                                        }
+
                                         return (
                                             <tr key={p.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}>
                                                 <td className="p-4 font-black text-gray-400">{idx + 1}</td>
                                                 <td className="p-4 font-bold text-gray-800">{p.name}</td>
                                                 <td className="p-4 font-mono text-gray-500">#{p.number}</td>
-                                                <td className="p-4 text-right font-black text-bvb-black">{score} {techTests.find(t => t.id === selectedTestId)?.unit}</td>
-                                                <td className="p-4 text-center">{isExcellent ? (<span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded border border-green-200">优秀</span>) : isStandard ? (<span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">达标</span>) : (<span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded">待提高</span>)}</td>
-                                                <td className="p-4 text-center text-xs">{trendLabel}</td>
+                                                <td className="p-4 text-right font-black text-bvb-black">
+                                                    {score} {techTests.find(t => t.id === selectedTestId)?.unit}
+                                                </td>
+                                                <td className="p-4 text-center">
+                                                    {isExcellent ? (
+                                                        <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded border border-green-200">优秀</span>
+                                                    ) : isStandard ? (
+                                                        <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">达标</span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded">待提高</span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 text-center text-xs">
+                                                    {trendLabel}
+                                                </td>
                                             </tr>
                                         );
                                     })}
                             </tbody>
                         </table>
                     </div>
+
                     <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
-                        <div className="space-y-1"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">教练组签章 / Coaching Signature</p><div className="h-16 w-48 border-b border-dashed border-gray-300"></div></div>
-                        <div className="text-right text-[10px] text-gray-300 font-mono">WSZG-TECH-REPORT-{selectedTestId.substring(0,8).toUpperCase()}<br />GENERATED BY WSZG ACADEMY SYSTEM</div>
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">教练组签章 / Coaching Signature</p>
+                            <div className="h-16 w-48 border-b border-dashed border-gray-300"></div>
+                        </div>
+                        <div className="text-right text-[10px] text-gray-300 font-mono">
+                            WSZG-TECH-REPORT-{selectedTestId.substring(0,8).toUpperCase()}<br />
+                            GENERATED BY WSZG ACADEMY SYSTEM
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1011,27 +868,94 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <div className="text-2xl font-black text-bvb-black">{new Date().toLocaleDateString()}</div>
                             </div>
                         </div>
+
                         <div className="flex gap-8 bg-gray-50 rounded-3xl p-8 border border-gray-100 mb-10 relative overflow-hidden">
                             <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-bvb-yellow shadow-lg bg-white shrink-0">
                                 <img src={players.find(p => p.id === showTestHistoryPlayerId)?.image} crossOrigin="anonymous" className="w-full h-full object-cover" />
                             </div>
                             <div className="flex flex-col justify-center">
                                 <h2 className="text-3xl font-black text-gray-900">{players.find(p => p.id === showTestHistoryPlayerId)?.name}</h2>
-                                <p className="text-gray-500 font-bold uppercase tracking-widest mt-1">#{players.find(p => p.id === showTestHistoryPlayerId)?.number} • {teams.find(t => t.id === players.find(p => p.id === showTestHistoryPlayerId)?.teamId)?.name}</p>
+                                <p className="text-gray-500 font-bold uppercase tracking-widest mt-1">
+                                    #{players.find(p => p.id === showTestHistoryPlayerId)?.number} • {teams.find(t => t.id === players.find(p => p.id === showTestHistoryPlayerId)?.teamId)?.name}
+                                </p>
                                 <div className="flex gap-4 mt-4">
-                                    <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center"><p className="text-[9px] font-black text-gray-400 uppercase">测评项目</p><p className="text-lg font-black text-bvb-black">{techTests.find(t => t.id === selectedTestId)?.name}</p></div>
-                                    <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center"><p className="text-[9px] font-black text-gray-400 uppercase">历史最佳</p><p className="text-lg font-black text-green-600">{(() => { const all = (players.find(p => p.id === showTestHistoryPlayerId)?.testResults || []).filter(r => r.testId === selectedTestId).map(r => r.value); const unit = techTests.find(t => t.id === selectedTestId)?.unit; return all.length ? (isLowerBetter(unit) ? Math.min(...all) : Math.max(...all)) : '-'; })()} {techTests.find(t => t.id === selectedTestId)?.unit}</p></div>
+                                    <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">测评项目</p>
+                                        <p className="text-lg font-black text-bvb-black">{techTests.find(t => t.id === selectedTestId)?.name}</p>
+                                    </div>
+                                    <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">历史最佳</p>
+                                        <p className="text-lg font-black text-green-600">
+                                            {(() => {
+                                                const all = (players.find(p => p.id === showTestHistoryPlayerId)?.testResults || []).filter(r => r.testId === selectedTestId).map(r => r.value);
+                                                const unit = techTests.find(t => t.id === selectedTestId)?.unit;
+                                                return all.length ? (isLowerBetter(unit) ? Math.min(...all) : Math.max(...all)) : '-';
+                                            })()} {techTests.find(t => t.id === selectedTestId)?.unit}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
                         <div className="space-y-6">
                             <h3 className="font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 text-lg uppercase">历史测评数据日志 (Historical Logs)</h3>
                             <table className="w-full text-left border-collapse">
-                                <thead><tr className="bg-gray-100 border-b-2 border-gray-200 text-[10px] font-black uppercase text-gray-500 tracking-widest"><th className="p-4">测评序号 (Index)</th><th className="p-4">测评日期 (Date)</th><th className="p-4 text-right">测评成绩 (Result)</th><th className="p-4 text-center">进步状态</th></tr></thead>
-                                <tbody className="divide-y divide-gray-100">{(players.find(p => p.id === showTestHistoryPlayerId)?.testResults || []).filter(r => r.testId === selectedTestId).sort((a,b) => b.date.localeCompare(a.date)).map((res, idx, arr) => { const isBest = isLowerBetter(techTests.find(t => t.id === selectedTestId)?.unit) ? res.value === Math.min(...arr.map(r => r.value)) : res.value === Math.max(...arr.map(r => r.value)); let trendIcon = null; if (idx < arr.length - 1) { const nextRes = arr[idx + 1]; const isImproved = isLowerBetter(techTests.find(t => t.id === selectedTestId)?.unit) ? res.value < nextRes.value : res.value > nextRes.value; trendIcon = isImproved ? <span className="text-green-500 text-xs">↑ 进步</span> : <span className="text-red-500 text-xs">↓ 倒退</span>; } return (<tr key={res.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}><td className="p-4 font-black text-gray-400">{arr.length - idx}</td><td className="p-4 font-mono font-bold text-gray-600">{res.date}</td><td className="p-4 text-right font-black text-bvb-black"><div className="flex flex-col items-end"><span>{res.value} {techTests.find(t => t.id === selectedTestId)?.unit}</span>{isBest && <span className="text-[8px] bg-yellow-100 text-yellow-700 px-1 rounded border border-yellow-200 uppercase font-black tracking-tighter">Personal Best</span>}</div></td><td className="p-4 text-center font-bold">{trendIcon || <span className="text-gray-300 text-[10px]">首测数据</span>}</td></tr>); })}</tbody>
+                                <thead>
+                                    <tr className="bg-gray-100 border-b-2 border-gray-200 text-[10px] font-black uppercase text-gray-500 tracking-widest">
+                                        <th className="p-4">测评序号 (Index)</th>
+                                        <th className="p-4">测评日期 (Date)</th>
+                                        <th className="p-4 text-right">测评成绩 (Result)</th>
+                                        <th className="p-4 text-center">进步状态</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {(players.find(p => p.id === showTestHistoryPlayerId)?.testResults || [])
+                                        .filter(r => r.testId === selectedTestId)
+                                        .sort((a,b) => b.date.localeCompare(a.date))
+                                        .map((res, idx, arr) => {
+                                            const isBest = isLowerBetter(techTests.find(t => t.id === selectedTestId)?.unit)
+                                                ? res.value === Math.min(...arr.map(r => r.value))
+                                                : res.value === Math.max(...arr.map(r => r.value));
+                                            
+                                            let trendIcon = null;
+                                            if (idx < arr.length - 1) {
+                                                const nextRes = arr[idx + 1];
+                                                const isImproved = isLowerBetter(techTests.find(t => t.id === selectedTestId)?.unit)
+                                                    ? res.value < nextRes.value
+                                                    : res.value > nextRes.value;
+                                                trendIcon = isImproved ? <span className="text-green-500 text-xs">↑ 进步</span> : <span className="text-red-500 text-xs">↓ 倒退</span>;
+                                            }
+
+                                            return (
+                                                <tr key={res.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}>
+                                                    <td className="p-4 font-black text-gray-400">{arr.length - idx}</td>
+                                                    <td className="p-4 font-mono font-bold text-gray-600">{res.date}</td>
+                                                    <td className="p-4 text-right font-black text-bvb-black">
+                                                        <div className="flex flex-col items-end">
+                                                            <span>{res.value} {techTests.find(t => t.id === selectedTestId)?.unit}</span>
+                                                            {isBest && <span className="text-[8px] bg-yellow-100 text-yellow-700 px-1 rounded border border-yellow-200 uppercase font-black tracking-tighter">Personal Best</span>}
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-4 text-center font-bold">
+                                                        {trendIcon || <span className="text-gray-300 text-[10px]">首测数据</span>}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
                             </table>
                         </div>
-                        <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end"><div className="space-y-1"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">技术部审核 / Technical Dept.</p><div className="h-16 w-48 border-b border-dashed border-gray-300"></div></div><div className="text-right text-[10px] text-gray-300 font-mono">PLAYER-TECH-{showTestHistoryPlayerId.substring(0,8).toUpperCase()}<br />SYSTEM GENERATED ARCHIVE</div></div>
+
+                        <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
+                            <div className="space-y-1">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">技术部审核 / Technical Dept.</p>
+                                <div className="h-16 w-48 border-b border-dashed border-gray-300"></div>
+                            </div>
+                            <div className="text-right text-[10px] text-gray-300 font-mono">
+                                PLAYER-TECH-{showTestHistoryPlayerId.substring(0,8).toUpperCase()}<br />
+                                SYSTEM GENERATED ARCHIVE
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
@@ -1040,11 +964,64 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             <div id="home-training-team-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
                 <div className="w-full min-h-[297mm] p-[15mm] flex flex-col bg-white">
                     <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
-                        <div className="flex items-center gap-4">{appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}<div><h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1><p className="text-sm font-bold text-gray-400 tracking-widest uppercase">居家训练完成情况汇总表</p></div></div>
-                        <div className="text-right"><div className="text-sm font-bold text-gray-500 uppercase">Training Report</div><div className="text-2xl font-black text-bvb-black">{viewYear}年{viewMonth + 1}月</div></div>
+                        <div className="flex items-center gap-4">
+                            {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
+                            <div>
+                                <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
+                                <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">居家训练完成情况汇总表</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-sm font-bold text-gray-500 uppercase">Training Report</div>
+                            <div className="text-2xl font-black text-bvb-black">{viewYear}年{viewMonth + 1}月</div>
+                        </div>
                     </div>
-                    <div className="mb-10"><h3 className="font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 text-lg uppercase mb-6">梯队成员训练统计 (Team Statistics)</h3><table className="w-full text-left border-collapse"><thead><tr className="bg-gray-100 border-b-2 border-gray-200 text-[10px] font-black uppercase text-gray-500 tracking-widest"><th className="p-4">排名</th><th className="p-4">球员姓名</th><th className="p-4 text-center">本月打卡 (次)</th><th className="p-4 text-center">年度总计 (次)</th><th className="p-4 text-center">状态评估</th></tr></thead><tbody className="divide-y divide-gray-100">{displayPlayers.map(p => ({ ...p, stats: getHomeStats(p) })).sort((a, b) => b.stats.monthCount - a.stats.monthCount).map((p, idx) => (<tr key={p.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}><td className="p-4 font-black text-gray-400">{idx + 1}</td><td className="p-4 font-bold text-gray-800">{p.name}</td><td className="p-4 text-center font-black text-lg">{p.stats.monthCount}</td><td className="p-4 text-center font-bold text-gray-400">{p.stats.yearCount}</td><td className="p-4 text-center">{p.stats.monthCount >= 15 ? (<span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded border border-green-200 uppercase">勤奋标兵</span>) : p.stats.monthCount > 0 ? (<span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 uppercase">表现良好</span>) : <span className="text-gray-300 text-[10px] font-black uppercase">尚未开启</span>}</td></tr>))}</tbody></table></div>
-                    <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end"><div className="space-y-1"><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">审核签章 / Verifying Signature</p><div className="h-16 w-48 border-b border-dashed border-gray-300"></div></div><div className="text-right text-[10px] text-gray-300 font-mono italic">WSZG-HOME-TEAM-{selectedTeamId.substring(0,6).toUpperCase()}<br />SYSTEM GENERATED AT {new Date().toLocaleString()}</div></div>
+
+                    <div className="mb-10">
+                        <h3 className="font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 text-lg uppercase mb-6">梯队成员训练统计 (Team Statistics)</h3>
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-100 border-b-2 border-gray-200 text-[10px] font-black uppercase text-gray-500 tracking-widest">
+                                    <th className="p-4">排名</th>
+                                    <th className="p-4">球员姓名</th>
+                                    <th className="p-4 text-center">本月打卡 (次)</th>
+                                    <th className="p-4 text-center">年度总计 (次)</th>
+                                    <th className="p-4 text-center">状态评估</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {displayPlayers
+                                    .map(p => ({ ...p, stats: getHomeStats(p) }))
+                                    .sort((a, b) => b.stats.monthCount - a.stats.monthCount)
+                                    .map((p, idx) => (
+                                        <tr key={p.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}>
+                                            <td className="p-4 font-black text-gray-400">{idx + 1}</td>
+                                            <td className="p-4 font-bold text-gray-800">{p.name}</td>
+                                            <td className="p-4 text-center font-black text-lg">{p.stats.monthCount}</td>
+                                            <td className="p-4 text-center font-bold text-gray-400">{p.stats.yearCount}</td>
+                                            <td className="p-4 text-center">
+                                                {p.stats.monthCount >= 15 ? (
+                                                    <span className="text-[10px] font-black bg-green-100 text-green-700 px-2 py-0.5 rounded border border-green-200 uppercase">勤奋标兵</span>
+                                                ) : p.stats.monthCount > 0 ? (
+                                                    <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 uppercase">表现良好</span>
+                                                ) : <span className="text-gray-300 text-[10px] font-black uppercase">尚未开启</span>}
+                                            </td>
+                                        </tr>
+                                    ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
+                        <div className="space-y-1">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">审核签章 / Verifying Signature</p>
+                            <div className="h-16 w-48 border-b border-dashed border-gray-300"></div>
+                        </div>
+                        <div className="text-right text-[10px] text-gray-300 font-mono italic">
+                            WSZG-HOME-TEAM-{selectedTeamId.substring(0,6).toUpperCase()}<br />
+                            SYSTEM GENERATED AT {new Date().toLocaleString()}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1053,29 +1030,100 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 {detailPlayerId && (
                     <div className="w-full min-h-[297mm] p-[15mm] flex flex-col bg-white">
                         <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
-                            <div className="flex items-center gap-4">{appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}<div><h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1><p className="text-sm font-bold text-gray-400 tracking-widest uppercase">球员居家训练个人成长档案</p></div></div>
-                            <div className="text-right"><div className="text-sm font-bold text-gray-500 uppercase">Individual Growth</div><div className="text-2xl font-black text-bvb-black">{viewYear}年度</div></div>
+                            <div className="flex items-center gap-4">
+                                {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
+                                <div>
+                                    <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
+                                    <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">球员居家训练个人成长档案</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-sm font-bold text-gray-500 uppercase">Individual Growth</div>
+                                <div className="text-2xl font-black text-bvb-black">{viewYear}年度</div>
+                            </div>
                         </div>
-                        <div className="flex gap-8 bg-gray-50 rounded-3xl p-8 border border-gray-100 mb-10 relative overflow-hidden"><div className="w-28 h-28 rounded-full overflow-hidden border-4 border-bvb-yellow shadow-lg bg-white shrink-0"><img src={players.find(p => p.id === detailPlayerId)?.image} crossOrigin="anonymous" className="w-full h-full object-cover" /></div><div className="flex flex-col justify-center"><h2 className="text-3xl font-black text-gray-900">{players.find(p => p.id === detailPlayerId)?.name}</h2><p className="text-gray-500 font-bold uppercase tracking-widest mt-1">#{players.find(p => p.id === detailPlayerId)?.number} • {teams.find(t => t.id === players.find(p => p.id === detailPlayerId)?.teamId)?.name}</p><div className="flex gap-4 mt-4"><div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center"><p className="text-[9px] font-black text-gray-400 uppercase">年度累计打卡</p><p className="text-xl font-black text-bvb-black">{players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.filter(l => l.date.startsWith(String(viewYear))).length || 0} 次</p></div><div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center"><p className="text-[9px] font-black text-gray-400 uppercase">本月完成</p><p className="text-xl font-black text-green-600">{getHomeStats(players.find(p => p.id === detailPlayerId)!).monthCount} 次</p></div></div></div></div>
-                        <div className="flex-1"><h3 className="font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 text-lg uppercase mb-6">训练记录明细 (Training Logs)</h3><div className="grid grid-cols-2 gap-4">{players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.filter(l => l.date.startsWith(String(viewYear))).sort((a,b) => b.date.localeCompare(a.date)).map(log => (<div key={log.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex justify-between items-center"><div><p className="font-black text-gray-800 text-sm">{log.title}</p><p className="text-[10px] text-gray-400 font-mono">{log.date}</p></div><span className="text-[9px] font-black text-green-600 uppercase border border-green-200 px-2 py-0.5 rounded-full bg-green-50">Verified</span></div>))}</div>{(!players.find(p => p.id === detailPlayerId)?.homeTrainingLogs || players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.length === 0) && (<p className="text-center py-20 text-gray-400 italic">本年度暂无打卡记录</p>)}</div>
-                        <div className="mt-10 pt-10 border-t border-gray-200 flex justify-between items-end"><div className="text-[10px] text-gray-400 leading-relaxed italic max-w-sm">* 此报告基于家长通过“顽石之光青训系统”提交的居家自主训练打卡数据生成，仅供教练组参考评价球员训练积极性使用。</div><div className="text-right text-[10px] text-gray-300 font-mono">PLAYER-LOG-{detailPlayerId.substring(0,8).toUpperCase()}<br />GENERATED ON {new Date().toLocaleDateString()}</div></div>
+
+                        <div className="flex gap-8 bg-gray-50 rounded-3xl p-8 border border-gray-100 mb-10 relative overflow-hidden">
+                            <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-bvb-yellow shadow-lg bg-white shrink-0">
+                                <img src={players.find(p => p.id === detailPlayerId)?.image} crossOrigin="anonymous" className="w-full h-full object-cover" />
+                            </div>
+                            <div className="flex flex-col justify-center">
+                                <h2 className="text-3xl font-black text-gray-900">{players.find(p => p.id === detailPlayerId)?.name}</h2>
+                                <p className="text-gray-500 font-bold uppercase tracking-widest mt-1">
+                                    #{players.find(p => p.id === detailPlayerId)?.number} • {teams.find(t => t.id === players.find(p => p.id === detailPlayerId)?.teamId)?.name}
+                                </p>
+                                <div className="flex gap-4 mt-4">
+                                    <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">年度累计打卡</p>
+                                        <p className="text-xl font-black text-bvb-black">{players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.filter(l => l.date.startsWith(String(viewYear))).length || 0} 次</p>
+                                    </div>
+                                    <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase">本月完成</p>
+                                        <p className="text-xl font-black text-green-600">{getHomeStats(players.find(p => p.id === detailPlayerId)!).monthCount} 次</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1">
+                            <h3 className="font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 text-lg uppercase mb-6">训练记录明细 (Training Logs)</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                {players.find(p => p.id === detailPlayerId)?.homeTrainingLogs
+                                    ?.filter(l => l.date.startsWith(String(viewYear)))
+                                    .sort((a,b) => b.date.localeCompare(a.date))
+                                    .map(log => (
+                                        <div key={log.id} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 flex justify-between items-center">
+                                            <div>
+                                                <p className="font-black text-gray-800 text-sm">{log.title}</p>
+                                                <p className="text-[10px] text-gray-400 font-mono">{log.date}</p>
+                                            </div>
+                                            <span className="text-[9px] font-black text-green-600 uppercase border border-green-200 px-2 py-0.5 rounded-full bg-green-50">Verified</span>
+                                        </div>
+                                    ))}
+                            </div>
+                            {(!players.find(p => p.id === detailPlayerId)?.homeTrainingLogs || players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.length === 0) && (
+                                <p className="text-center py-20 text-gray-400 italic">本年度暂无打卡记录</p>
+                            )}
+                        </div>
+
+                        <div className="mt-10 pt-10 border-t border-gray-200 flex justify-between items-end">
+                            <div className="text-[10px] text-gray-400 leading-relaxed italic max-w-sm">
+                                * 此报告基于家长通过“顽石之光青训系统”提交的居家自主训练打卡数据生成，仅供教练组参考评价球员训练积极性使用。
+                            </div>
+                            <div className="text-right text-[10px] text-gray-300 font-mono">
+                                PLAYER-LOG-{detailPlayerId.substring(0,8).toUpperCase()}<br />
+                                GENERATED ON {new Date().toLocaleDateString()}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
 
-            {/* 打卡详情模态框 */}
+            {/* 打卡详情模态框：受权限控制 */}
             {detailPlayerId && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                            <div><h3 className="font-bold text-xl flex items-center tracking-tighter uppercase">打卡记录详情</h3><p className="text-xs text-gray-400 mt-1">{players.find(p => p.id === detailPlayerId)?.name}</p></div>
+                            <div>
+                                <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase">打卡记录详情</h3>
+                                <p className="text-xs text-gray-400 mt-1">{players.find(p => p.id === detailPlayerId)?.name}</p>
+                            </div>
                             <div className="flex gap-2">
-                                <button onClick={() => handleExportHomeIndividualPDF(detailPlayerId)} disabled={isExportingHome} className="p-2 hover:bg-white/10 rounded-full transition-colors text-bvb-yellow" title="导出个人年度报告">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-5 h-5" />}</button>
+                                <button 
+                                    onClick={() => handleExportHomeIndividualPDF(detailPlayerId)}
+                                    disabled={isExportingHome}
+                                    className="p-2 hover:bg-white/10 rounded-full transition-colors text-bvb-yellow"
+                                    title="导出个人年度报告"
+                                >
+                                    {isExportingHome ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
+                                </button>
                                 <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                             </div>
                         </div>
                         <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-3">
-                            {players.find(p => p.id === detailPlayerId)?.homeTrainingLogs?.filter(l => l.date.startsWith(String(viewYear)))?.sort((a, b) => b.date.localeCompare(a.date)).map(log => (
+                            {players.find(p => p.id === detailPlayerId)?.homeTrainingLogs
+                                ?.filter(l => l.date.startsWith(String(viewYear)))
+                                ?.sort((a, b) => b.date.localeCompare(a.date)).map(log => (
                                 <div key={log.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl border border-gray-100"><div><p className="font-black text-gray-800 text-sm">{log.title}</p><p className="text-[10px] text-gray-400 font-mono">{log.date}</p></div><div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">计次 +1</div></div>
                             )) || <p className="text-center py-10 text-gray-400 italic text-sm">暂无记录</p>}
                         </div>
