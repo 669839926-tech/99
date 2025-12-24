@@ -359,6 +359,10 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const isCoach = currentUser?.role === 'coach';
     const isDirector = currentUser?.role === 'director';
 
+    // Gallery editing state
+    const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+    const [tempCaption, setTempCaption] = useState('');
+
     useEffect(() => {
         if (!isEditing && player) {
              if (player.id === editedPlayer.id && JSON.stringify(editedPlayer) !== JSON.stringify(player)) {
@@ -532,6 +536,17 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         }
     };
 
+    const handleSavePhotoCaption = (photoId: string) => {
+        const updatedGallery = (editedPlayer.gallery || []).map(p => {
+            if (p.id === photoId) return { ...p, caption: tempCaption };
+            return p;
+        });
+        const updatedPlayer = { ...editedPlayer, gallery: updatedGallery };
+        setEditedPlayer(updatedPlayer);
+        onUpdatePlayer(updatedPlayer);
+        setEditingPhotoId(null);
+    };
+
     const renderStatSliders = (category: AttributeCategory) => {
         const attributes = attributeConfig[category];
         if (attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
@@ -635,13 +650,72 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         let balance = 0; const historyWithBalance = events.map(e => { if (e.type === 'recharge') { balance += e.amount; } else if (e.type === 'training') { if (e.status === 'Present') { balance -= 1; e.amount = -1; } else if (e.status === 'Leave') { e.amount = 0; e.desc += ' (消耗额度)'; } } return { ...e, balanceAfter: balance }; });
         const displayList = [...historyWithBalance].reverse();
         return (
-            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-20 md:pb-0"><div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">类型</th><th className="px-4 py-3">详情</th><th className="px-4 py-3 text-right">变动</th><th className="px-4 py-3 text-right">结余</th><th className="px-4 py-3 w-10"></th></tr></thead><tbody className="divide-y divide-gray-100">{displayList.map((item) => (<tr key={item.id} className="hover:bg-gray-50 group"><td className="px-4 py-3 whitespace-nowrap text-gray-600 font-mono text-xs">{item.date}</td><td className="px-4 py-3">{item.type === 'recharge' ? '充值' : item.status}</td><td className="px-4 py-3 text-gray-700">{item.desc}</td><td className={`px-4 py-3 text-right font-bold ${item.amount > 0 ? 'text-green-600' : item.amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>{item.amount > 0 ? `+${item.amount}` : item.amount}</td><td className="px-4 py-3 text-right font-mono font-bold text-gray-800">{item.balanceAfter}</td><td className="px-4 py-3 text-right">{item.type === 'recharge' && isDirector && (<button onClick={(e) => { e.stopPropagation(); if(item.originalId) handleDeleteRechargeAction(item.originalId); }} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="删除记录"><Trash2 className="w-4 h-4" /></button>)}</td></tr>))}</tbody></table></div></div>
+            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-20 md:pb-0"><div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">类型</th><th className="px-4 py-3">详情</th><th className="px-4 py-3 text-right">变动</th><th className="px-4 py-3 text-right">结余</th><th className="px-4 py-3 w-10"></th></tr></thead><tbody className="divide-y divide-gray-100">{displayList.map((item) => (<tr key={item.id} className="hover:bg-gray-50 group"><td className="px-4 py-3 whitespace-nowrap text-gray-600 font-mono text-xs">{item.date}</td><td className="px-4 py-3">{item.type === 'recharge' ? '充值' : item.status}</td><td className="px-4 py-3 text-gray-700">{item.desc}</td><td className={`px-4 py-3 text-right font-bold ${item.amount > 0 ? 'text-green-600' : item.amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>{item.amount > 0 ? `+${item.amount}` : item.amount}</td><td className="px-4 py-3 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{item.balanceAfter}</td><td className="px-4 py-3 text-right">{item.type === 'recharge' && isDirector && (<button onClick={(e) => { e.stopPropagation(); if(item.originalId) handleDeleteRechargeAction(item.originalId); }} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="删除记录"><Trash2 className="w-4 h-4" /></button>)}</td></tr>))}</tbody></table></div></div>
         );
     };
 
     const renderGallery = () => {
         return (
-            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-24 md:pb-6"><div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2"><h3 className="font-bold text-gray-800 flex items-center"><ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 精彩瞬间</h3><button onClick={() => galleryInputRef.current?.click()} className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 flex items-center shadow-sm"><Upload className="w-4 h-4 mr-2" /> 上传照片</button><input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleUploadPhoto} /></div><div className="flex-1 overflow-y-auto custom-scrollbar">{(!editedPlayer.gallery || editedPlayer.gallery.length === 0) ? (<div className="h-64 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl"><ImageIcon className="w-12 h-12 mb-2 opacity-20" /><p className="text-sm">暂无照片，记录球员的训练瞬间吧！</p></div>) : (<div className="grid grid-cols-2 md:grid-cols-3 gap-4">{editedPlayer.gallery.map(photo => (<div key={photo.id} className="relative group bg-gray-100 rounded-lg overflow-hidden aspect-square border border-gray-200 shadow-sm"><img src={photo.url} alt="Gallery" className="w-full h-full object-cover" /><div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-8"><p className="text-white text-xs font-bold">{photo.date}</p></div><button onClick={() => handleDeletePhoto(photo.id)} className="absolute top-2 right-2 p-1.5 bg-white/90 text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-sm" title="删除"><Trash2 className="w-4 h-4" /></button></div>))}</div>)}</div></div>
+            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-24 md:pb-6">
+                <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2">
+                    <h3 className="font-bold text-gray-800 flex items-center">
+                        <ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 精彩瞬间
+                    </h3>
+                    <button onClick={() => galleryInputRef.current?.click()} className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 flex items-center shadow-sm">
+                        <Upload className="w-4 h-4 mr-2" /> 上传照片
+                    </button>
+                    <input type="file" ref={galleryInputRef} className="hidden" accept="image/*" onChange={handleUploadPhoto} />
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    {(!editedPlayer.gallery || editedPlayer.gallery.length === 0) ? (
+                        <div className="h-64 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                            <ImageIcon className="w-12 h-12 mb-2 opacity-20" />
+                            <p className="text-sm">暂无照片，记录球员的训练瞬间吧！</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {editedPlayer.gallery.map(photo => (
+                                <div key={photo.id} className="relative group bg-gray-100 rounded-lg overflow-hidden aspect-square border border-gray-200 shadow-sm flex flex-col">
+                                    <div className="flex-1 overflow-hidden relative">
+                                        <img src={photo.url} alt="Gallery" className="w-full h-full object-cover" />
+                                        <div className="absolute top-2 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => { setEditingPhotoId(photo.id); setTempCaption(photo.caption || ''); }} className="p-1.5 bg-white/90 text-bvb-black rounded-full hover:bg-white shadow-sm" title="编辑名称">
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
+                                            <button onClick={() => handleDeletePhoto(photo.id)} className="p-1.5 bg-white/90 text-red-500 rounded-full hover:bg-white shadow-sm" title="删除">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="bg-gradient-to-t from-black/80 to-black/20 p-3 pt-6 shrink-0 mt-[-40px] relative z-10">
+                                        <div className="flex justify-between items-end gap-2">
+                                            {editingPhotoId === photo.id ? (
+                                                <div className="flex-1 flex gap-1">
+                                                    <input 
+                                                        autoFocus
+                                                        className="flex-1 bg-white/20 border border-white/30 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-bvb-yellow"
+                                                        value={tempCaption}
+                                                        onChange={(e) => setTempCaption(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleSavePhotoCaption(photo.id)}
+                                                    />
+                                                    <button onClick={() => handleSavePhotoCaption(photo.id)} className="text-bvb-yellow hover:text-white">
+                                                        <CheckCircle className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-white text-xs font-black truncate">{photo.caption || '未命名'}</p>
+                                                    <p className="text-white/50 text-[10px] font-mono">{photo.date}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
         );
     };
 
