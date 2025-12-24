@@ -236,7 +236,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const t = techTests.find(t => t.id === selectedTestId);
         try {
             await exportToPDF('individual-tech-test-pdf', `专项测评报告_${p?.name}_${t?.name}`);
-        } catch (e) {
+        } catch (error) {
             alert('导出失败');
         } finally {
             setIsExportingIndividualTech(false);
@@ -353,7 +353,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-black text-bvb-black uppercase italic tracking-tighter">技术成长中心</h2>
+                    <h2 className="text-3xl font-black text-bvb-black uppercase italic tracking-tighter">球员成长中心</h2>
                     <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest">Digital Performance Tracking & Analytics</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -412,7 +412,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <div className="flex justify-between items-start">
                                     <div className="flex items-center gap-3">
                                         <img src={focusedPlayer.image} className="w-12 h-12 rounded-full object-cover border-2 border-bvb-yellow" />
-                                        <div><h3 className="font-black text-gray-800 text-lg leading-tight">{focusedPlayer.name}</h3><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{focusedPlayer.number} • 技术成长档案</p></div>
+                                        <div><h3 className="font-black text-gray-800 text-lg leading-tight">{focusedPlayer.name}</h3><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">#{focusedPlayer.number} • 球员成长档案</p></div>
                                     </div>
                                     <button onClick={async () => { setIsExporting(true); try { await exportToPDF('juggling-report-pdf', `颠球挑战档案_${focusedPlayer.name}`); } catch (e) { alert('导出失败'); } finally { setIsExporting(false); } }} disabled={isExporting} className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-bvb-black hover:text-bvb-yellow transition-all">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}</button>
                                 </div>
@@ -1115,7 +1115,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     className="p-2 hover:bg-white/10 rounded-full transition-colors text-bvb-yellow"
                                     title="导出个人年度报告"
                                 >
-                                    {isExportingHome ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />}
+                                    {isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-5 h-5" />}
                                 </button>
                                 <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                             </div>

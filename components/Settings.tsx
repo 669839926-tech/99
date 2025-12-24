@@ -25,7 +25,7 @@ interface SettingsProps {
 const MODULES: { id: ModuleId; label: string }[] = [
     { id: 'dashboard', label: '俱乐部概览' },
     { id: 'players', label: '球队管理' },
-    { id: 'growth', label: '技术成长' },
+    { id: 'growth', label: '球员成长' },
     { id: 'finance', label: '账务管理' },
     { id: 'design', label: '教案设计' },
     { id: 'training', label: '训练计划' },
