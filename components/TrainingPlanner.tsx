@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -237,7 +237,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter 
+    trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo 
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScope, setTimeScope] = useState<TimeScope>('month');
@@ -391,7 +391,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               );
           } else {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : 'bg-green-50 border-green-500 text-green-700'}`}><span className="truncate flex-1">{team?.level} - {s.title}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}</div>); })}</div></div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level} - {s.title}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}</div>); })}</div></div>
               );
           }
       }
@@ -439,7 +439,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <Pie data={statsData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
                         {statsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={['#FDE100', '#000000', '#9CA3AF', '#D1D5DB'][index % 4]} />))}
                     </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
                     <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} verticalAlign="bottom" />
                 </PieChart>
             </ResponsiveContainer>
@@ -449,7 +449,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const handleExportPDF = async () => {
         setIsExporting(true);
-        try { await exportToPDF('training-plan-export', `训练计划_${dateLabel}`); } catch (e) { alert('导出失败'); } finally { setIsExporting(false); }
+        try { 
+            // Target the detailed list container
+            await exportToPDF('training-plan-list-pdf', `训练计划业务详细报表_${dateLabel}`); 
+        } catch (e) { 
+            alert('导出失败'); 
+        } finally { 
+            setIsExporting(false); 
+        }
     };
     
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -487,10 +494,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
     <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] md:h-auto pb-20 md:pb-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
             <div><h2 className="text-3xl font-black text-bvb-black uppercase">训练计划</h2><div className="flex items-center gap-2 mt-1"><button onClick={() => setTimeScope('month')} className={`text-xs font-bold px-2 py-1 rounded ${timeScope === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-600'}`}>月视图</button><button onClick={() => setTimeScope('quarter')} className={`text-xs font-bold px-2 py-1 rounded ${timeScope === 'quarter' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-600'}`}>季视图</button><button onClick={() => setTimeScope('year')} className={`text-xs font-bold px-2 py-1 rounded ${timeScope === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-600'}`}>年视图</button></div></div>
-            <div className="flex items-center gap-3"><div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 shadow-sm"><button onClick={handlePrevPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft className="w-5 h-5"/></button><span className="px-3 font-bold text-sm min-w-[100px] text-center">{dateLabel}</span><button onClick={handleNextPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronRight className="w-5 h-5"/></button></div><button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600" title="导出PDF">{isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}</button><button onClick={() => setShowAddModal(true)} className="flex items-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105"><Plus className="w-5 h-5 mr-2" /> 新建计划</button></div>
+            <div className="flex items-center gap-3"><div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 shadow-sm"><button onClick={handlePrevPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft className="w-5 h-5"/></button><span className="px-3 font-bold text-sm min-w-[100px] text-center">{dateLabel}</span><button onClick={handleNextPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronRight className="w-5 h-5"/></button></div><button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600" title="导出详细业务报表 (PDF)">{isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}</button><button onClick={() => setShowAddModal(true)} className="flex items-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105"><Plus className="w-5 h-5 mr-2" /> 新建计划</button></div>
         </div>
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-             <div className="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative" id="training-plan-export"><h3 className="font-bold text-gray-800 mb-4 flex items-center"><CalendarIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 日程安排</h3>{renderCalendar()}</div>
+             <div className="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative"><h3 className="font-bold text-gray-800 mb-4 flex items-center"><CalendarIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 日程安排</h3>{renderCalendar()}</div>
              <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0">{renderStats()}<div className="bg-white p-4 rounded-xl border border-gray-200 flex-1 overflow-y-auto custom-scrollbar"><h4 className="font-bold text-gray-800 mb-3 text-sm uppercase flex justify-between items-center"><span>{selectedDate} 安排</span>{selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[10px] bg-bvb-yellow px-1.5 rounded text-bvb-black">Today</span>}</h4><div className="space-y-3">
                  {userManagedSessions.filter(t => t.date === selectedDate).length > 0 ? (
                      userManagedSessions.filter(t => t.date === selectedDate).map(s => {
@@ -500,6 +507,181 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                  ) : (<div className="text-center py-8 text-gray-400 text-sm"><CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-20" />当日无训练安排</div>)}
              </div></div></div>
         </div>
+
+        {/* --- EXPORT TEMPLATE (DETAILED LOGS VIEW) --- */}
+        <div id="training-plan-list-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
+            <div className="w-full p-[15mm] flex flex-col bg-white">
+                {/* PDF Header */}
+                <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
+                    <div className="flex items-center gap-4">
+                        {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
+                        <div>
+                            <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
+                            <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">训练计划执行明细报表</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-sm font-bold text-gray-500 uppercase">Training Journal</div>
+                        <div className="text-2xl font-black text-bvb-black">{dateLabel}</div>
+                    </div>
+                </div>
+
+                {/* PDF Body: Iterative Session List */}
+                <div className="space-y-12">
+                    {filteredSessions.length > 0 ? (
+                        filteredSessions.map((s, idx) => {
+                            const team = teams.find(t => t.id === s.teamId);
+                            const sessionAttendance = s.attendance || [];
+                            
+                            // Categorize players for this session
+                            const presentPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Present'));
+                            const leavePlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Leave'));
+                            const injuryPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Injury'));
+                            const absentPlayers = players.filter(p => p.teamId === s.teamId && (!sessionAttendance.find(a => a.playerId === p.id) || sessionAttendance.find(a => a.playerId === p.id && a.status === 'Absent')));
+
+                            return (
+                                <div key={s.id} className="relative border-b border-gray-100 pb-10 last:border-b-0 break-inside-avoid">
+                                    {/* Session Header Card */}
+                                    <div className="flex justify-between items-center mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                                        <div className="flex items-center gap-5">
+                                            <div className="w-14 h-14 bg-bvb-black text-bvb-yellow rounded-2xl flex flex-col items-center justify-center font-black">
+                                                <span className="text-[10px] leading-none uppercase">ENTRY</span>
+                                                <span className="text-xl leading-none">{idx + 1}</span>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">{s.title}</h3>
+                                                <div className="flex gap-4 text-xs font-bold text-gray-500 mt-1">
+                                                    <span className="flex items-center"><CalendarIcon className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> {s.date}</span>
+                                                    <span className="flex items-center"><Users className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> {team?.name} ({team?.level})</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right flex flex-col items-end gap-1.5">
+                                            <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${s.intensity === 'High' ? 'bg-red-50 border-red-200 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                                                {s.intensity} INTENSITY
+                                            </span>
+                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.duration} MINS • FOCUS: {s.focus}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Grid Content */}
+                                    <div className="grid grid-cols-12 gap-8 px-2">
+                                        {/* Left: Drills List */}
+                                        <div className="col-span-5 space-y-4">
+                                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
+                                                <List className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练项目清单 / Drills List
+                                            </h4>
+                                            <ul className="space-y-2.5">
+                                                {s.drills.map((drill, dIdx) => (
+                                                    <li key={dIdx} className="text-xs font-bold text-gray-600 flex items-start bg-gray-50/50 p-2 rounded-lg border border-gray-100">
+                                                        <span className="w-4 h-4 rounded bg-bvb-black text-bvb-yellow text-[8px] flex items-center justify-center mr-2 shrink-0 mt-0.5">{dIdx + 1}</span>
+                                                        {drill}
+                                                    </li>
+                                                ))}
+                                                {s.drills.length === 0 && <li className="text-xs italic text-gray-400">未定义具体训练科目</li>}
+                                            </ul>
+                                        </div>
+
+                                        {/* Right: Coach feedback & Attendance Summary */}
+                                        <div className="col-span-7 space-y-6">
+                                            {/* Log Content */}
+                                            <div className="bg-gray-50 rounded-2xl p-6 border-l-4 border-bvb-black">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h4 className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center">
+                                                        <FileText className="w-3.5 h-3.5 mr-1.5" /> 实际执行日志 / Coach Journal
+                                                    </h4>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-2 h-2 rounded-full ${s.submissionStatus === 'Reviewed' ? 'bg-green-500' : s.submissionStatus === 'Submitted' ? 'bg-blue-500' : 'bg-gray-300'}`}></span>
+                                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Status: {s.submissionStatus || 'Draft'}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-sm text-gray-700 leading-relaxed italic whitespace-pre-wrap">
+                                                    {s.coachFeedback || "-- 暂无教练员训练日志记录 --"}
+                                                </div>
+                                                {s.directorReview && (
+                                                    <div className="mt-6 pt-5 border-t border-gray-200">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <ShieldCheck className="w-3.5 h-3.5 text-bvb-yellow" />
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">总监审核点评 / Director Review:</p>
+                                                        </div>
+                                                        <p className="text-xs text-gray-500 font-bold leading-relaxed">{s.directorReview}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Attendance Results */}
+                                            <div className="bg-white border border-gray-100 rounded-2xl p-5">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
+                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 球员考勤明细 / Attendance Register
+                                                    </h4>
+                                                    <div className="flex gap-3">
+                                                        <div className="text-center"><p className="text-[8px] text-gray-400 uppercase font-black">实到</p><p className="text-xs font-black text-green-600">{presentPlayers.length}</p></div>
+                                                        <div className="text-center"><p className="text-[8px] text-gray-400 uppercase font-black">异常</p><p className="text-xs font-black text-red-500">{leavePlayers.length + injuryPlayers.length + absentPlayers.length}</p></div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-2">正常参训名单 / Present Players:</p>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {presentPlayers.map(p => (
+                                                                <span key={p.id} className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded text-[10px] font-bold">#{p.number} {p.name}</span>
+                                                            ))}
+                                                            {presentPlayers.length === 0 && <span className="text-[10px] text-gray-300 italic">无参训记录</span>}
+                                                        </div>
+                                                    </div>
+
+                                                    {(leavePlayers.length > 0 || injuryPlayers.length > 0 || absentPlayers.length > 0) && (
+                                                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-50">
+                                                            <div>
+                                                                <p className="text-[9px] font-black text-yellow-600 uppercase mb-2 flex items-center"><Clock className="w-2 h-2 mr-1" /> 请假/伤停 (Excused):</p>
+                                                                <div className="space-y-1">
+                                                                    {leavePlayers.map(p => <div key={p.id} className="text-[10px] font-bold text-gray-600">#{p.number} {p.name} <span className="text-[8px] text-yellow-500">(请假)</span></div>)}
+                                                                    {injuryPlayers.map(p => <div key={p.id} className="text-[10px] font-bold text-gray-600">#{p.number} {p.name} <span className="text-[8px] text-red-500">(伤停)</span></div>)}
+                                                                </div>
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[9px] font-black text-red-600 uppercase mb-2 flex items-center"><UserMinus className="w-2 h-2 mr-1" /> 缺席 (Absent):</p>
+                                                                <div className="space-y-1">
+                                                                    {absentPlayers.map(p => <div key={p.id} className="text-[10px] font-bold text-gray-600">#{p.number} {p.name}</div>)}
+                                                                    {absentPlayers.length === 0 && <span className="text-[9px] text-gray-300">无未授权缺席</span>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="py-24 text-center text-gray-300 italic font-bold">
+                            -- 当前选定周期内暂无任何训练记录 --
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer Signature Area */}
+                <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">教务组确认签章 / Authorized Signature</p>
+                        <div className="h-20 w-56 border-b border-dashed border-gray-300"></div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[9px] text-gray-300 font-mono tracking-tighter uppercase mb-1">
+                            LOG-BATCH-{new Date().toISOString().substring(0,10).replace(/-/g,'')}
+                        </p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                            Generated by WSZG Internal Academy System
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {showAddModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white w-full h-full md:h-auto md:max-w-lg rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建训练计划</h3><button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button></div><form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto pb-24 md:pb-6"><div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center"><div className="flex items-center"><Zap className="w-4 h-4 text-bvb-black mr-2" /><span className="text-sm font-bold text-gray-800">启用 AI 辅助生成</span></div><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => { setIsAiMode(e.target.checked); if(e.target.checked) setFormData(p => ({...p, linkedDesignId: undefined})) }}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>{!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>{!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题 (Title)</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>)}<div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.focus} onChange={e => setFormData({...formData, focus: e.target.value})}>
                                     {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
