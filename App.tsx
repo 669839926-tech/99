@@ -225,7 +225,8 @@ function App() {
       case 'growth':
         return <TechnicalGrowth players={derivedPlayers} teams={teams} currentUser={currentUser} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} onUpdateTechTests={setTechTests} />;
       case 'finance':
-        return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} onBulkDeleteTransactions={handleBulkDeleteTransactions} users={users} players={derivedPlayers} trainings={trainings} salarySettings={salarySettings} onUpdateUser={handleUpdateUser} />;
+        // Comment: Passed 'teams' prop to FinanceManager
+        return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} onBulkDeleteTransactions={handleBulkDeleteTransactions} users={users} players={derivedPlayers} teams={teams} trainings={trainings} salarySettings={salarySettings} onUpdateUser={handleUpdateUser} />;
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':

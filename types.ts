@@ -314,6 +314,20 @@ export interface MonthlyEvaluation {
     comment: string;
 }
 
+export interface MonthlySalaryRecord {
+    id: string;
+    year: number;
+    month: number;
+    baseSalary: number;
+    sessionFees: number;
+    attendanceReward: number;
+    renewalReward: number;
+    performanceReward: number;
+    totalSalary: number;
+    isDisbursed?: boolean;
+    disbursedDate?: string;
+}
+
 // --- RBAC Types ---
 export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings';
 export type PermissionLevel = 'none' | 'view' | 'edit';
@@ -331,4 +345,5 @@ export interface User {
   // Salary fields
   level?: CoachLevel;
   monthlyEvaluations?: MonthlyEvaluation[];
+  monthlySalaryRecords?: MonthlySalaryRecord[];
 }
