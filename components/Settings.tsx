@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight, Zap, TrendingUp, Calculator, ShieldCheck, Star } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight, Zap, TrendingUp, Calculator, ShieldCheck, Star, Shirt, Square } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -359,42 +359,116 @@ const Settings: React.FC<SettingsProps> = ({
         {activeTab === 'users' && isDirector && (
              <div className="flex-1 p-6">
                  <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Users className="w-5 h-5 mr-2 text-bvb-yellow" /> 用户与角色管理</h3>
-                <div className={`p-4 rounded-lg border border-gray-200 mb-6 transition-colors ${editingUserId ? 'bg-yellow-50 border-bvb-yellow' : 'bg-gray-50'}`}>
-                    <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-bold text-sm text-gray-700 flex items-center">{editingUserId ? <><Edit2 className="w-4 h-4 mr-2" /> 编辑用户</> : '新增用户'}</h4>
-                        {editingUserId && <button onClick={cancelEditUser} className="text-xs text-gray-500 hover:text-red-500 flex items-center"><X className="w-3 h-3 mr-1" /> 取消</button>}
+                <div className={`p-6 rounded-2xl border transition-all ${editingUserId ? 'bg-yellow-50 border-bvb-yellow shadow-inner' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex justify-between items-center mb-5">
+                        <h4 className="font-black text-sm text-gray-700 flex items-center uppercase tracking-widest">{editingUserId ? <><Edit2 className="w-4 h-4 mr-2 text-bvb-yellow" /> 编辑账户信息</> : <><Plus className="w-4 h-4 mr-2 text-bvb-yellow" /> 创建新账户</>}</h4>
+                        {editingUserId && <button onClick={cancelEditUser} className="text-xs text-gray-400 hover:text-red-500 flex items-center font-bold"><X className="w-3 h-3 mr-1" /> 放弃修改</button>}
                     </div>
-                    <form onSubmit={handleUserFormSubmit} className="space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <input placeholder="用户名" className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
-                            <input placeholder="显示名称" className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} required />
-                            <select className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as any})}>
-                                {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
-                            </select>
-                            {newUser.role === 'coach' && (
-                                <select className="p-2 border rounded focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm bg-white" value={newUser.level} onChange={e => setNewUser({...newUser, level: e.target.value as CoachLevel})}>
-                                    {COACH_LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                    <form onSubmit={handleUserFormSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">用户名</label>
+                                <input placeholder="登录账号" className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">显示名称</label>
+                                <input placeholder="真实姓名" className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} required />
+                            </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">系统角色</label>
+                                <select className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as any})}>
+                                    {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                                 </select>
+                            </div>
+                            {newUser.role === 'coach' && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">教练等级</label>
+                                    <select className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.level} onChange={e => setNewUser({...newUser, level: e.target.value as CoachLevel})}>
+                                        {COACH_LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                                    </select>
+                                </div>
                             )}
                         </div>
-                        <div className="flex justify-end"><button className="bg-bvb-black text-white font-bold rounded px-4 py-2 hover:bg-gray-800 text-sm shadow-md">{editingUserId ? '保存修改' : '添加用户'}</button></div>
+
+                        {/* Team Selection Section (Crucial Fix) */}
+                        {(newUser.role === 'coach' || newUser.role === 'assistant_coach') && (
+                            <div className="animate-in slide-in-from-top-2 duration-300">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 tracking-widest flex items-center gap-2">
+                                    <Shirt className="w-3 h-3 text-bvb-yellow" /> 管理范围：请选择该教练负责的梯队
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                                    {teams.map(team => {
+                                        const isSelected = newUser.teamIds?.includes(team.id);
+                                        return (
+                                            <button 
+                                                key={team.id}
+                                                type="button"
+                                                onClick={() => toggleTeamSelection(team.id)}
+                                                className={`flex items-center gap-2 p-2.5 rounded-xl border-2 transition-all text-xs font-bold ${isSelected ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'}`}
+                                            >
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 ${isSelected ? 'bg-bvb-yellow' : 'bg-gray-100'}`}>
+                                                    {isSelected ? <CheckCircle className="w-3 h-3 text-bvb-black" /> : <Square className="w-3 h-3 text-gray-200" />}
+                                                </div>
+                                                <span className="truncate">{team.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {(!teams || teams.length === 0) && <p className="text-[10px] text-gray-400 italic">暂无可选梯队，请先在“球队管理”中创建。</p>}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end pt-2 border-t border-gray-200">
+                            <button type="submit" className="bg-bvb-black text-white font-black rounded-xl px-8 py-3 hover:bg-gray-800 text-sm shadow-xl active:scale-95 transition-all flex items-center gap-2">
+                                {editingUserId ? <Save className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                {editingUserId ? '确认更新账号' : '立即创建账号'}
+                            </button>
+                        </div>
                     </form>
                 </div>
-                <div className="space-y-2">
-                    {users.map(u => (
-                        <div key={u.id} className="flex justify-between items-center px-4 py-3 bg-white border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
-                            <div className="flex items-center gap-6">
-                                <div className="font-mono text-sm w-24">{u.username}</div>
-                                <div className="font-bold text-sm text-gray-800 w-32">{u.name}</div>
-                                <div className={`text-xs px-2 py-0.5 rounded font-bold ${u.role === 'director' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{u.role}</div>
-                                {u.role === 'coach' && <div className="text-[10px] font-black uppercase text-gray-400">Level: {u.level || 'Junior'}</div>}
+
+                <div className="mt-8">
+                    <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4">当前系统账户列表</h4>
+                    <div className="space-y-3">
+                        {users.map(u => (
+                            <div key={u.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-all group relative overflow-hidden">
+                                <div className="flex items-center gap-6 z-10 w-full">
+                                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0 border-2 border-white shadow-sm">
+                                        <Users className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-3 mb-1">
+                                            <span className="font-black text-gray-800 text-lg leading-none">{u.name}</span>
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-tighter ${u.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : u.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-500'}`}>{u.role}</span>
+                                            {u.role === 'coach' && <span className="text-[9px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{u.level || 'Junior'}</span>}
+                                        </div>
+                                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 font-bold">
+                                            <span className="flex items-center gap-1 font-mono">ID: {u.username}</span>
+                                            {(u.teamIds && u.teamIds.length > 0) && (
+                                                <span className="flex items-center gap-1 text-blue-500">
+                                                    <Shirt className="w-3 h-3" /> 负责: {u.teamIds.map(tid => teams.find(t => t.id === tid)?.level || tid).join(', ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 mt-4 md:mt-0 z-10">
+                                    <button onClick={() => handleResetPasswordClick(u.id)} className="p-2.5 text-gray-400 hover:text-bvb-black hover:bg-gray-100 rounded-xl transition-all" title="重置密码 (123)">
+                                        <RotateCcw className="w-5 h-5" />
+                                    </button>
+                                    <button onClick={() => startEditUser(u)} className="p-2.5 text-gray-400 hover:text-bvb-black hover:bg-yellow-50 rounded-xl transition-all" title="修改资料">
+                                        <Edit2 className="w-5 h-5" />
+                                    </button>
+                                    {u.id !== 'u1' && (
+                                        <button onClick={() => handleDeleteUserClick(u.id)} className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="注销账户">
+                                            <Trash2 className="w-5 h-5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="absolute right-0 top-0 w-32 h-full bg-gradient-to-l from-gray-50/50 to-transparent pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => startEditUser(u)} className="text-gray-400 hover:text-bvb-black p-1"><Edit2 className="w-4 h-4" /></button>
-                                <button onClick={() => handleDeleteUserClick(u.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
              </div>
         )}
