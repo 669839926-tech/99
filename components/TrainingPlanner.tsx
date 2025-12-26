@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2 } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -27,6 +27,8 @@ interface SessionDetailModalProps {
     session: TrainingSession;
     teams: Team[];
     players: Player[];
+    drillLibrary: string[];
+    trainingFoci: string[];
     currentUser: User | null;
     onUpdate: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
     onDuplicate: (session: TrainingSession) => void;
@@ -34,53 +36,40 @@ interface SessionDetailModalProps {
     onClose: () => void;
 }
 
-const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'attendance' | 'log'>('attendance');
+const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, drillLibrary, trainingFoci, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
 
-    const [localAttendance, setLocalAttendance] = useState<AttendanceRecord[]>(session.attendance || []);
-    const [coachFeedback, setCoachFeedback] = useState(session.coachFeedback || '');
-    const [directorReview, setDirectorReview] = useState(session.directorReview || '');
-    const [logStatus, setLogStatus] = useState<'Planned' | 'Submitted' | 'Reviewed'>(session.submissionStatus || 'Planned');
+    // Local state for all editable fields
+    const [localSession, setLocalSession] = useState<TrainingSession>(JSON.parse(JSON.stringify(session)));
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-
-    useEffect(() => {
-        if (session.submissionStatus !== logStatus) {
-            setLogStatus(session.submissionStatus || 'Planned');
-        }
-    }, [session.submissionStatus]);
+    const [drillInput, setDrillInput] = useState('');
 
     useEffect(() => {
         const timer = setTimeout(() => {
             setSaveStatus('saving');
-            const updatedSession: TrainingSession = {
-                ...session,
-                attendance: localAttendance,
-                coachFeedback,
-                directorReview,
-                submissionStatus: logStatus
-            };
-            onUpdate(updatedSession, localAttendance);
+            onUpdate(localSession, localSession.attendance);
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1500);
         return () => clearTimeout(timer);
-    }, [localAttendance, coachFeedback, directorReview, logStatus]); 
+    }, [localSession]);
 
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
-    const canEditLog = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector;
+    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector;
     
     const getStatus = (playerId: string): AttendanceStatus => {
-        const record = localAttendance.find(r => r.playerId === playerId);
+        const record = localSession.attendance?.find(r => r.playerId === playerId);
         return record ? record.status : 'Absent';
     };
 
     const setPlayerStatus = (playerId: string, status: AttendanceStatus) => {
-        setLocalAttendance(prev => {
-            const others = prev.filter(r => r.playerId !== playerId);
-            if (status === 'Absent') return others;
-            return [...others, { playerId, status }];
+        setLocalSession(prev => {
+            const currentAttendance = prev.attendance || [];
+            const others = currentAttendance.filter(r => r.playerId !== playerId);
+            const nextAttendance = status === 'Absent' ? others : [...others, { playerId, status }];
+            return { ...prev, attendance: nextAttendance };
         });
     };
 
@@ -89,52 +78,25 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
             playerId: p.id,
             status: 'Present'
         }));
-        setLocalAttendance(allPresent);
+        setLocalSession(prev => ({ ...prev, attendance: allPresent }));
     };
 
-    const handleForceSave = () => {
-        const updatedSession: TrainingSession = { 
-            ...session, 
-            attendance: localAttendance, 
-            coachFeedback, 
-            directorReview, 
-            submissionStatus: logStatus 
-        };
-        onUpdate(updatedSession, localAttendance);
-        setSaveStatus('saved');
+    const addDrill = () => {
+        if (drillInput.trim()) {
+            setLocalSession(prev => ({ ...prev, drills: [...prev.drills, drillInput.trim()] }));
+            setDrillInput('');
+        }
     };
 
-    const handleSubmitLog = () => {
-        const newStatus: 'Submitted' = 'Submitted';
-        setLogStatus(newStatus);
-        const updatedSession: TrainingSession = { 
-            ...session, 
-            attendance: localAttendance,
-            coachFeedback, 
-            directorReview,
-            submissionStatus: newStatus
-        };
-        onUpdate(updatedSession, localAttendance);
-        setSaveStatus('saved');
-    };
-
-    const handleDirectorApprove = () => {
-        const newStatus: 'Reviewed' = 'Reviewed';
-        setLogStatus(newStatus);
-        const updatedSession: TrainingSession = {
-            ...session,
-            attendance: localAttendance,
-            coachFeedback, 
-            directorReview,
-            submissionStatus: newStatus
-        };
-        onUpdate(updatedSession, localAttendance);
-        setSaveStatus('saved');
+    const removeDrill = (idx: number) => {
+        setLocalSession(prev => ({ ...prev, drills: prev.drills.filter((_, i) => i !== idx) }));
     };
 
     const handleDelete = () => {
-        onDelete(session.id);
-        onClose();
+        if (confirm('确定要删除这项训练安排吗？')) {
+            onDelete(session.id);
+            onClose();
+        }
     };
 
     return (
@@ -142,18 +104,18 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
             <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
                 <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                     <div>
-                      <h3 className="font-bold text-lg leading-tight">{session.title}</h3>
-                      <p className="text-xs text-gray-400">{session.date} • {team?.name}</p>
+                      <h3 className="font-bold text-lg leading-tight">{localSession.title}</h3>
+                      <p className="text-xs text-gray-400">{localSession.date} • {team?.name}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="flex items-center gap-2">
                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                            {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                       </div>
-                      <button onClick={() => onDuplicate(session)} className="p-1 hover:text-bvb-yellow" title="复制并选择日期">
+                      <button onClick={() => onDuplicate(localSession)} className="p-1 hover:text-bvb-yellow" title="复制并选择日期">
                           <Copy className="w-5 h-5" />
                       </button>
-                      {canEditLog && (
+                      {canEdit && (
                           <button onClick={handleDelete} className="p-1 hover:text-red-500" title="删除训练计划">
                               <Trash2 className="w-5 h-5" />
                           </button>
@@ -161,22 +123,120 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                       <button onClick={onClose}><X className="w-6 h-6" /></button>
                     </div>
                 </div>
-                <div className="flex border-b border-gray-200 shrink-0 sticky top-0 bg-white z-10">
-                    <button onClick={() => setActiveTab('attendance')} className={`flex-1 py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><UserCheck className="w-4 h-4 mr-2" /> 考勤管理</button>
-                    <button onClick={() => setActiveTab('log')} className={`flex-1 py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><FileText className="w-4 h-4 mr-2" /> 训练日志</button>
+                <div className="flex border-b border-gray-200 shrink-0 sticky top-0 bg-white z-10 overflow-x-auto no-scrollbar">
+                    <button onClick={() => setActiveTab('info')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'info' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><Settings2 className="w-4 h-4 mr-2" /> 计划内容</button>
+                    <button onClick={() => setActiveTab('attendance')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><UserCheck className="w-4 h-4 mr-2" /> 考勤管理</button>
+                    <button onClick={() => setActiveTab('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><FileText className="w-4 h-4 mr-2" /> 训练日志</button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
+                    {activeTab === 'info' && (
+                        <div className="animate-in fade-in duration-200 space-y-6">
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
+                                    <input 
+                                        disabled={!canEdit}
+                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                        value={localSession.title}
+                                        onChange={e => setLocalSession({...localSession, title: e.target.value})}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练日期</label>
+                                        <input 
+                                            disabled={!canEdit}
+                                            type="date"
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.date}
+                                            onChange={e => setLocalSession({...localSession, date: e.target.value})}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">时长 (分钟)</label>
+                                        <input 
+                                            disabled={!canEdit}
+                                            type="number"
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.duration}
+                                            onChange={e => setLocalSession({...localSession, duration: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">重点科目</label>
+                                        <select 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.focus}
+                                            onChange={e => setLocalSession({...localSession, focus: e.target.value})}
+                                        >
+                                            {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
+                                        <select 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.intensity}
+                                            onChange={e => setLocalSession({...localSession, intensity: e.target.value as any})}
+                                        >
+                                            <option value="Low">低强度</option>
+                                            <option value="Medium">中等强度</option>
+                                            <option value="High">高强度</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                        <List className="w-3 h-3" /> 训练项目清单 (Drills)
+                                    </label>
+                                    <div className="space-y-2 mb-3">
+                                        {localSession.drills.map((drill, idx) => (
+                                            <div key={idx} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 group">
+                                                <span className="text-sm font-bold text-gray-700 flex items-center">
+                                                    <span className="w-5 h-5 rounded-full bg-gray-200 text-[10px] flex items-center justify-center mr-2 text-gray-500 font-black">{idx + 1}</span>
+                                                    {drill}
+                                                </span>
+                                                {canEdit && (
+                                                    <button onClick={() => removeDrill(idx)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <Trash2 className="w-4 h-4"/>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {canEdit && (
+                                        <div className="flex gap-2">
+                                            <input 
+                                                className="flex-1 p-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                                                placeholder="输入新的训练科目..." 
+                                                value={drillInput} 
+                                                onChange={e => setDrillInput(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && addDrill()}
+                                            />
+                                            <button onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110">
+                                                <Plus className="w-5 h-5"/>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {activeTab === 'attendance' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                           <div className="grid grid-cols-3 gap-3 text-center">
-                              <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">时长</span><div className="font-bold text-sm">{session.duration}分钟</div></div>
-                              <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">重点</span><div className="font-bold text-sm truncate">{session.focus}</div></div>
-                              <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">强度</span><div className={`font-bold text-sm ${session.intensity === 'High' ? 'text-red-600' : 'text-green-600'}`}>{session.intensity === 'High' ? '高' : session.intensity === 'Medium' ? '中' : '低'}</div></div>
+                              <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">时长</span><div className="font-bold text-sm">{localSession.duration}分钟</div></div>
+                              <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">重点</span><div className="font-bold text-sm truncate">{localSession.focus}</div></div>
+                              <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">强度</span><div className={`font-bold text-sm ${localSession.intensity === 'High' ? 'text-red-600' : 'text-green-600'}`}>{localSession.intensity === 'High' ? '高' : localSession.intensity === 'Medium' ? '中' : '低'}</div></div>
                           </div>
                           <div>
                               <div className="flex justify-between items-center mb-4">
                                   <h4 className="font-bold text-gray-800 flex items-center"><UserCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 考勤列表</h4>
-                                  <div className="text-xs"><span className="font-bold">{localAttendance.filter(r => r.status === 'Present').length}</span> / {teamPlayers.length} 实到<button onClick={markAllPresent} className="ml-3 text-bvb-black underline hover:text-bvb-yellow">全勤</button></div>
+                                  <div className="text-xs"><span className="font-bold">{localSession.attendance?.filter(r => r.status === 'Present').length || 0}</span> / {teamPlayers.length} 实到<button onClick={markAllPresent} className="ml-3 text-bvb-black underline hover:text-bvb-yellow">全勤</button></div>
                               </div>
                               <div className="space-y-3">
                                   {teamPlayers.map(player => {
@@ -206,11 +266,11 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                     {activeTab === 'log' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                             <div className="space-y-3">
-                                <div className="flex justify-between items-center"><h4 className="font-bold text-gray-800 flex items-center"><UserIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 教练日志 (Coach)</h4><span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${logStatus === 'Planned' ? 'bg-gray-100 text-gray-500' : logStatus === 'Submitted' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{logStatus === 'Planned' ? '未提交' : logStatus === 'Submitted' ? '待审核' : '已审核'}</span></div>
+                                <div className="flex justify-between items-center"><h4 className="font-bold text-gray-800 flex items-center"><UserIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 教练日志 (Coach)</h4><span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${localSession.submissionStatus === 'Planned' ? 'bg-gray-100 text-gray-500' : localSession.submissionStatus === 'Submitted' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{localSession.submissionStatus === 'Planned' ? '未提交' : localSession.submissionStatus === 'Submitted' ? '待审核' : '已审核'}</span></div>
                                 <div className="relative">
-                                    <textarea disabled={!canEditLog || logStatus === 'Reviewed'} className="w-full h-40 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100" placeholder="请描述球队整体训练状态，以及教案实际执行效果..." value={coachFeedback} onChange={e => setCoachFeedback(e.target.value)} />
-                                    {canEditLog && logStatus !== 'Reviewed' && (
-                                        <div className="absolute bottom-2 right-2"><button onClick={handleSubmitLog} disabled={!coachFeedback.trim()} className="bg-bvb-black text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 flex items-center disabled:opacity-50"><Send className="w-3 h-3 mr-1" /> 提交</button></div>
+                                    <textarea disabled={!canEdit || localSession.submissionStatus === 'Reviewed'} className="w-full h-40 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100" placeholder="请描述球队整体训练状态，以及教案实际执行效果..." value={localSession.coachFeedback || ''} onChange={e => setLocalSession({...localSession, coachFeedback: e.target.value})} />
+                                    {canEdit && localSession.submissionStatus !== 'Reviewed' && (
+                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Submitted'})} disabled={!(localSession.coachFeedback || '').trim()} className="bg-bvb-black text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 flex items-center disabled:opacity-50"><Send className="w-3 h-3 mr-1" /> 提交</button></div>
                                     )}
                                 </div>
                             </div>
@@ -218,18 +278,26 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                                 <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 总监审核 (Director)</h4>
                                 {isDirector ? (
                                     <div className="relative">
-                                        <textarea className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors" placeholder="请对本次训练及教练反馈进行点评..." value={directorReview} onChange={e => setDirectorReview(e.target.value)} />
-                                        <div className="absolute bottom-2 right-2"><button onClick={handleDirectorApprove} disabled={!directorReview.trim() || logStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-green-700 flex items-center disabled:opacity-50 disabled:bg-gray-400"><CheckCircle className="w-3 h-3 mr-1" /> {logStatus === 'Reviewed' ? '已审核' : '确认审核'}</button></div>
+                                        <textarea className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors" placeholder="请对本次训练及教练反馈进行点评..." value={localSession.directorReview || ''} onChange={e => setLocalSession({...localSession, directorReview: e.target.value})} />
+                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Reviewed'})} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-green-700 flex items-center disabled:opacity-50 disabled:bg-gray-400"><CheckCircle className="w-3 h-3 mr-1" /> {localSession.submissionStatus === 'Reviewed' ? '已审核' : '确认审核'}</button></div>
                                     </div>
                                 ) : (
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 min-h-[80px] text-sm text-gray-600 italic">{directorReview || "暂无总监点评..."}</div>
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 min-h-[80px] text-sm text-gray-600 italic">{localSession.directorReview || "暂无总监点评..."}</div>
                                 )}
                             </div>
                         </div>
                     )}
                 </div>
-                {activeTab === 'attendance' && (
-                    <div className="bg-gray-50 p-4 border-t flex justify-end shrink-0 hidden md:flex"><button onClick={handleForceSave} className="px-6 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 transition-colors flex items-center">{saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <RefreshCw className={`w-4 h-4 mr-2 ${saveStatus === 'saving' ? 'animate-spin' : ''}`} />}保存考勤并更新</button></div>
+                {(activeTab === 'attendance' || activeTab === 'info') && (
+                    <div className="bg-gray-50 p-4 border-t flex justify-end shrink-0 hidden md:flex">
+                        <button 
+                            onClick={() => { onUpdate(localSession, localSession.attendance); setSaveStatus('saved'); }} 
+                            className="px-6 py-2 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 transition-colors flex items-center"
+                        >
+                            {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <RefreshCw className={`w-4 h-4 mr-2 ${saveStatus === 'saving' ? 'animate-spin' : ''}`} />}
+                            立即保存所有更改
+                        </button>
+                    </div>
                 )}
             </div>
         </div>
@@ -391,7 +459,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               );
           } else {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level} - {s.title}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}</div>); })}</div></div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level} - {s.title}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}</div>); })}</div></div>
               );
           }
       }
@@ -450,7 +518,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const handleExportPDF = async () => {
         setIsExporting(true);
         try { 
-            // Target the detailed list container
             await exportToPDF('training-plan-list-pdf', `训练计划业务详细报表_${dateLabel}`); 
         } catch (e) { 
             alert('导出失败'); 
@@ -508,10 +575,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
              </div></div></div>
         </div>
 
-        {/* --- EXPORT TEMPLATE (DETAILED LOGS VIEW) --- */}
+        {/* --- EXPORT TEMPLATE --- */}
         <div id="training-plan-list-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
             <div className="w-full p-[15mm] flex flex-col bg-white">
-                {/* PDF Header */}
                 <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
                     <div className="flex items-center gap-4">
                         {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
@@ -526,14 +592,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </div>
                 </div>
 
-                {/* PDF Body: Iterative Session List */}
                 <div className="space-y-12">
                     {filteredSessions.length > 0 ? (
                         filteredSessions.map((s, idx) => {
                             const team = teams.find(t => t.id === s.teamId);
                             const sessionAttendance = s.attendance || [];
-                            
-                            // Categorize players for this session
                             const presentPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Present'));
                             const leavePlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Leave'));
                             const injuryPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Injury'));
@@ -541,7 +604,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
                             return (
                                 <div key={s.id} className="relative border-b border-gray-100 pb-10 last:border-b-0 break-inside-avoid">
-                                    {/* Session Header Card */}
                                     <div className="flex justify-between items-center mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
                                         <div className="flex items-center gap-5">
                                             <div className="w-14 h-14 bg-bvb-black text-bvb-yellow rounded-2xl flex flex-col items-center justify-center font-black">
@@ -564,12 +626,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Grid Content */}
                                     <div className="grid grid-cols-12 gap-8 px-2">
-                                        {/* Left: Drills List */}
                                         <div className="col-span-5 space-y-4">
                                             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                                                <List className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练项目清单 / Drills List
+                                                <List className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练项目清单
                                             </h4>
                                             <ul className="space-y-2.5">
                                                 {s.drills.map((drill, dIdx) => (
@@ -578,78 +638,36 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                         {drill}
                                                     </li>
                                                 ))}
-                                                {s.drills.length === 0 && <li className="text-xs italic text-gray-400">未定义具体训练科目</li>}
                                             </ul>
                                         </div>
 
-                                        {/* Right: Coach feedback & Attendance Summary */}
                                         <div className="col-span-7 space-y-6">
-                                            {/* Log Content */}
                                             <div className="bg-gray-50 rounded-2xl p-6 border-l-4 border-bvb-black">
                                                 <div className="flex justify-between items-center mb-4">
                                                     <h4 className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center">
-                                                        <FileText className="w-3.5 h-3.5 mr-1.5" /> 实际执行日志 / Coach Journal
+                                                        <FileText className="w-3.5 h-3.5 mr-1.5" /> 实际执行日志
                                                     </h4>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className={`w-2 h-2 rounded-full ${s.submissionStatus === 'Reviewed' ? 'bg-green-500' : s.submissionStatus === 'Submitted' ? 'bg-blue-500' : 'bg-gray-300'}`}></span>
-                                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Status: {s.submissionStatus || 'Draft'}</span>
-                                                    </div>
                                                 </div>
                                                 <div className="text-sm text-gray-700 leading-relaxed italic whitespace-pre-wrap">
                                                     {s.coachFeedback || "-- 暂无教练员训练日志记录 --"}
                                                 </div>
-                                                {s.directorReview && (
-                                                    <div className="mt-6 pt-5 border-t border-gray-200">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <ShieldCheck className="w-3.5 h-3.5 text-bvb-yellow" />
-                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">总监审核点评 / Director Review:</p>
-                                                        </div>
-                                                        <p className="text-xs text-gray-500 font-bold leading-relaxed">{s.directorReview}</p>
-                                                    </div>
-                                                )}
                                             </div>
 
-                                            {/* Attendance Results */}
                                             <div className="bg-white border border-gray-100 rounded-2xl p-5">
                                                 <div className="flex justify-between items-center mb-4">
                                                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 球员考勤明细 / Attendance Register
+                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 球员考勤明细
                                                     </h4>
-                                                    <div className="flex gap-3">
-                                                        <div className="text-center"><p className="text-[8px] text-gray-400 uppercase font-black">实到</p><p className="text-xs font-black text-green-600">{presentPlayers.length}</p></div>
-                                                        <div className="text-center"><p className="text-[8px] text-gray-400 uppercase font-black">异常</p><p className="text-xs font-black text-red-500">{leavePlayers.length + injuryPlayers.length + absentPlayers.length}</p></div>
-                                                    </div>
                                                 </div>
-                                                
                                                 <div className="space-y-4">
                                                     <div>
-                                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-2">正常参训名单 / Present Players:</p>
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-2">正常参训名单:</p>
                                                         <div className="flex flex-wrap gap-1.5">
                                                             {presentPlayers.map(p => (
                                                                 <span key={p.id} className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded text-[10px] font-bold">#{p.number} {p.name}</span>
                                                             ))}
-                                                            {presentPlayers.length === 0 && <span className="text-[10px] text-gray-300 italic">无参训记录</span>}
                                                         </div>
                                                     </div>
-
-                                                    {(leavePlayers.length > 0 || injuryPlayers.length > 0 || absentPlayers.length > 0) && (
-                                                        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-50">
-                                                            <div>
-                                                                <p className="text-[9px] font-black text-yellow-600 uppercase mb-2 flex items-center"><Clock className="w-2 h-2 mr-1" /> 请假/伤停 (Excused):</p>
-                                                                <div className="space-y-1">
-                                                                    {leavePlayers.map(p => <div key={p.id} className="text-[10px] font-bold text-gray-600">#{p.number} {p.name} <span className="text-[8px] text-yellow-500">(请假)</span></div>)}
-                                                                    {injuryPlayers.map(p => <div key={p.id} className="text-[10px] font-bold text-gray-600">#{p.number} {p.name} <span className="text-[8px] text-red-500">(伤停)</span></div>)}
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <p className="text-[9px] font-black text-red-600 uppercase mb-2 flex items-center"><UserMinus className="w-2 h-2 mr-1" /> 缺席 (Absent):</p>
-                                                                <div className="space-y-1">
-                                                                    {absentPlayers.map(p => <div key={p.id} className="text-[10px] font-bold text-gray-600">#{p.number} {p.name}</div>)}
-                                                                    {absentPlayers.length === 0 && <span className="text-[9px] text-gray-300">无未授权缺席</span>}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -663,30 +681,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         </div>
                     )}
                 </div>
-
-                {/* Footer Signature Area */}
-                <div className="mt-auto pt-10 border-t border-gray-200 flex justify-between items-end">
-                    <div className="space-y-2">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">教务组确认签章 / Authorized Signature</p>
-                        <div className="h-20 w-56 border-b border-dashed border-gray-300"></div>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-[9px] text-gray-300 font-mono tracking-tighter uppercase mb-1">
-                            LOG-BATCH-{new Date().toISOString().substring(0,10).replace(/-/g,'')}
-                        </p>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                            Generated by WSZG Internal Academy System
-                        </p>
-                    </div>
-                </div>
             </div>
         </div>
 
         {showAddModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white w-full h-full md:h-auto md:max-w-lg rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建训练计划</h3><button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button></div><form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto pb-24 md:pb-6"><div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center"><div className="flex items-center"><Zap className="w-4 h-4 text-bvb-black mr-2" /><span className="text-sm font-bold text-gray-800">启用 AI 辅助生成</span></div><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => { setIsAiMode(e.target.checked); if(e.target.checked) setFormData(p => ({...p, linkedDesignId: undefined})) }}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>{!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>{!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题 (Title)</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>)}<div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.focus} onChange={e => setFormData({...formData, focus: e.target.value})}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white w-full h-full md:h-auto md:max-lg rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建训练计划</h3><button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button></div><form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto pb-24 md:pb-6"><div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center"><div className="flex items-center"><Zap className="w-4 h-4 text-bvb-black mr-2" /><span className="text-sm font-bold text-gray-800">启用 AI 辅助生成</span></div><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => { setIsAiMode(e.target.checked); if(e.target.checked) setFormData(p => ({...p, linkedDesignId: undefined})) }}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>{!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>{!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>)}<div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.focus} onChange={e => setFormData({...formData, focus: e.target.value})}>
                                     {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
                                     <option value="Custom">自定义...</option>
-                                </select>{formData.focus === 'Custom' && (<input className="w-full p-2 border rounded mt-2 text-xs" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />)}</div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div></div>{!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目 (Drills)</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div>{drillLibrary && drillLibrary.length > 0 && (<div className="mt-2 flex flex-wrap gap-1"><span className="text-xs text-gray-400 mr-1">快捷添加:</span>{drillLibrary.slice(0, 4).map(d => (<button key={d} type="button" onClick={() => setFormData(prev => ({...prev, drills: [...prev.drills, d]}))} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded hover:bg-yellow-50 hover:text-bvb-black transition-colors">{d}</button>))}</div>)}</div>)}<button type="submit" disabled={loading} className="w-full py-3 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button></form></div></div>
+                                </select>{formData.focus === 'Custom' && (<input className="w-full p-2 border rounded mt-2 text-xs" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />)}</div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div></div>{!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div>{drillLibrary && drillLibrary.length > 0 && (<div className="mt-2 flex flex-wrap gap-1"><span className="text-xs text-gray-400 mr-1">快捷添加:</span>{drillLibrary.slice(0, 4).map(d => (<button key={d} type="button" onClick={() => setFormData(prev => ({...prev, drills: [...prev.drills, d]}))} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded hover:bg-yellow-50 hover:text-bvb-black transition-colors">{d}</button>))}</div>)}</div>)}<button type="submit" disabled={loading} className="w-full py-3 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button></form></div></div>
         )}
         {sessionToDuplicate && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"><div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200"><div className="bg-bvb-black p-4 flex justify-between items-center text-white"><h3 className="font-bold flex items-center"><Copy className="w-4 h-4 mr-2 text-bvb-yellow" /> 复制训练计划</h3><button onClick={() => setSessionToDuplicate(null)}><X className="w-5 h-5" /></button></div><div className="p-6 space-y-4"><div className="bg-gray-50 p-3 rounded border border-gray-100"><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">正在复制</span><div className="font-bold text-gray-800">{sessionToDuplicate.title}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center"><CalendarDays className="w-3 h-3 mr-1 text-bvb-yellow" /> 选择新计划的日期</label><input type="date" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition-colors" value={duplicateDate} onChange={e => setDuplicateDate(e.target.value)}/></div><div className="pt-2 flex gap-3"><button onClick={() => setSessionToDuplicate(null)} className="flex-1 py-2 bg-gray-100 text-gray-600 font-bold rounded hover:bg-gray-200 transition-colors">取消</button><button onClick={handleDuplicateConfirm} className="flex-1 py-2 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 transition-colors shadow-sm">确认复制</button></div></div></div></div>
@@ -695,7 +697,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} currentUser={currentUser} onUpdate={(s, att) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s, att) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
         )}
     </div>
   );
