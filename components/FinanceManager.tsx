@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team } from '../types';
-// Comment: Added missing X and BarChart3 icon imports
 import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
@@ -143,7 +142,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     // --- Coach Salary Calculation Engine ---
     const coachSalaries = useMemo(() => {
         const coaches = users.filter(u => u.role === 'coach');
-        
+        const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth); // 季末月份 (0-indexed)
+
         return coaches.map(coach => {
             const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
             const coachTeams = coach.teamIds || [];
@@ -152,50 +152,49 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             let totalAttendanceReward = 0;
             let totalRenewalReward = 0;
             
-            // Per Team calculations
             const teamBreakdown = coachTeams.map(teamId => {
                 const teamPlayers = players.filter(p => p.teamId === teamId);
                 const teamSize = teamPlayers.length;
                 const effectiveTeamSize = Math.max(salarySettings.minPlayersForCalculation, teamSize);
                 const sessionFeePerSession = levelConfig.sessionBaseFee + (effectiveTeamSize - salarySettings.minPlayersForCalculation) * salarySettings.incrementalPlayerFee;
                 
-                // Monthly Sessions
+                // 本月训练课次统计
                 const monthlySessions = trainings.filter(t => {
                     const d = new Date(t.date);
                     return t.teamId === teamId && d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
                 });
                 const monthlySessionFee = monthlySessions.length * sessionFeePerSession;
 
-                // Quarterly Calculations (for rewards)
-                const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
-                const quarterlySessions = trainings.filter(t => {
-                    const d = new Date(t.date);
-                    return t.teamId === teamId && d.getFullYear() === selectedYear && quarterMonths.includes(d.getMonth());
-                });
-
-                // Attendance Rate (Quarterly)
-                let quarterlyAttendanceRate = 0;
-                if (quarterlySessions.length > 0) {
-                    const totalPossible = quarterlySessions.length * teamSize;
-                    const totalPresent = quarterlySessions.reduce((sum, s) => sum + (s.attendance?.filter(r => r.status === 'Present').length || 0), 0);
-                    quarterlyAttendanceRate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
+                // --- 参训率奖励：改为按月统计和发放 ---
+                let monthlyAttendanceRate = 0;
+                let attendanceReward = 0;
+                if (monthlySessions.length > 0) {
+                    const totalPossible = monthlySessions.length * teamSize;
+                    const totalPresent = monthlySessions.reduce((sum, s) => sum + (s.attendance?.filter(r => r.status === 'Present').length || 0), 0);
+                    monthlyAttendanceRate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
+                    
+                    attendanceReward = salarySettings.monthlyAttendanceRewards
+                        .sort((a,b) => b.threshold - a.threshold)
+                        .find(r => monthlyAttendanceRate >= r.threshold)?.amount || 0;
                 }
 
-                const attendanceReward = salarySettings.quarterlyAttendanceRewards
-                    .sort((a,b) => b.threshold - a.threshold)
-                    .find(r => quarterlyAttendanceRate >= r.threshold)?.amount || 0;
-
-                // Renewal Rate (Quarterly)
-                // Defined as: players who recharged in this quarter OR joined in this quarter
-                const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
-                const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
-                const renewedCount = teamPlayers.filter(p => {
-                    const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
-                    const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
-                    return rechargedInQ || joinedInQ;
-                }).length;
-                const renewalRate = teamSize > 0 ? (renewedCount / teamSize) * 100 : 0;
-                const renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? salarySettings.quarterlyRenewalReward.amount : 0;
+                // --- 续费奖励：按季度统计，仅季末月发放 ---
+                let renewalReward = 0;
+                let renewalRate = 0;
+                if (isDistributionMonth) {
+                    const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
+                    const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
+                    const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
+                    
+                    const renewedCount = teamPlayers.filter(p => {
+                        const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
+                        const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
+                        return rechargedInQ || joinedInQ;
+                    }).length;
+                    
+                    renewalRate = teamSize > 0 ? (renewedCount / teamSize) * 100 : 0;
+                    renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? salarySettings.quarterlyRenewalReward.amount : 0;
+                }
 
                 return {
                     teamId,
@@ -203,7 +202,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     sessionCount: monthlySessions.length,
                     sessionFeePerSession,
                     monthlySessionFee,
-                    quarterlyAttendanceRate,
+                    monthlyAttendanceRate,
                     attendanceReward,
                     renewalRate,
                     renewalReward
@@ -214,7 +213,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             totalAttendanceReward = teamBreakdown.reduce((sum, b) => sum + b.attendanceReward, 0);
             totalRenewalReward = teamBreakdown.reduce((sum, b) => sum + b.renewalReward, 0);
 
-            // Performance Score Reward (Monthly)
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
             const performanceReward = salarySettings.monthlyPerformanceRewards.find(r => evaluation && evaluation.score >= r.minScore && evaluation.score <= r.maxScore)?.amount || 0;
 
@@ -412,9 +410,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         <th className="px-6 py-4">教练姓名/等级</th>
                                         <th className="px-6 py-4 text-right">基础工资</th>
                                         <th className="px-6 py-4 text-right">课时费总额</th>
-                                        <th className="px-6 py-4 text-right">参训率奖励</th>
-                                        <th className="px-6 py-4 text-right">续费奖励</th>
-                                        <th className="px-6 py-4 text-center">总监评分</th>
+                                        <th className="px-6 py-4 text-right">月参训率奖励</th>
+                                        <th className="px-6 py-4 text-right">季度续费奖</th>
+                                        <th className="px-6 py-4 text-center">考核分</th>
                                         <th className="px-6 py-4 text-right">绩效考核奖</th>
                                         <th className="px-6 py-4 text-right font-black text-bvb-black">应发合计</th>
                                     </tr>
@@ -453,14 +451,12 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                     <div className="flex flex-wrap gap-6">
                                                         {sal.teamBreakdown.map(teamInfo => (
                                                             <div key={teamInfo.teamId} className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm min-w-[180px]">
-                                                                {/* Comment: Corrected variable name from 'teams' to find the team from the user-managed context if needed, but here we can find it in the component context */}
-                                                                <p className="text-[10px] font-black text-bvb-black uppercase mb-2 border-b pb-1">{sal.teamBreakdown.find(tb => tb.teamId === teamInfo.teamId) ? "队组数据" : "未知"}</p>
+                                                                <p className="text-[10px] font-black text-bvb-black uppercase mb-2 border-b pb-1">队组数据记录</p>
                                                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-bold text-gray-400">
                                                                     <span>队内人数:</span><span className="text-gray-700 text-right">{teamInfo.teamSize}人</span>
                                                                     <span>本月课次:</span><span className="text-gray-700 text-right">{teamInfo.sessionCount}次</span>
-                                                                    <span>单节课酬:</span><span className="text-gray-700 text-right">¥{teamInfo.sessionFeePerSession}</span>
-                                                                    <span>本季参训:</span><span className={`text-right ${teamInfo.quarterlyAttendanceRate >= 80 ? 'text-green-600' : 'text-red-500'}`}>{teamInfo.quarterlyAttendanceRate.toFixed(1)}%</span>
-                                                                    <span>本季续费:</span><span className={`text-right ${teamInfo.renewalRate >= 80 ? 'text-green-600' : 'text-red-500'}`}>{teamInfo.renewalRate.toFixed(1)}%</span>
+                                                                    <span>本月参训:</span><span className={`text-right ${teamInfo.monthlyAttendanceRate >= 80 ? 'text-green-600' : 'text-red-500'}`}>{teamInfo.monthlyAttendanceRate.toFixed(1)}%</span>
+                                                                    <span>本季续费:</span><span className={`text-right ${teamInfo.renewalRate >= 80 ? 'text-green-600' : 'text-red-500'}`}>{teamInfo.renewalRate > 0 ? teamInfo.renewalRate.toFixed(1) + '%' : '-'}</span>
                                                                 </div>
                                                             </div>
                                                         ))}
@@ -479,12 +475,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     <div className="bg-yellow-50 p-4 rounded-2xl border border-yellow-200 flex items-start gap-3">
                         <Info className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
                         <div className="text-xs text-yellow-800 leading-relaxed">
-                            <p className="font-bold mb-1">薪酬计算逻辑说明：</p>
+                            <p className="font-bold mb-1">最新薪酬核算逻辑说明：</p>
                             <ul className="list-disc pl-4 space-y-1 opacity-80">
-                                <li>基础工资按等级设定；课时费按队内人数计算（未满6人按6人计），等级基础费随人数递增（每超1人+5元）。</li>
-                                <li><strong>参训率绩效：</strong>季度平均参训率 ≥80% 奖100元，≥90% 奖200元。</li>
-                                <li><strong>续费绩效：</strong>季度续费率（含新注册） ≥80% 每队奖300元。</li>
-                                <li><strong>考核奖：</strong>由总监打分（10分制），8-8.9分奖100元，9分及以上奖200元。</li>
+                                <li><strong>参训率奖励：按月统计并发放。</strong> 统计本月所属梯队所有课次的平均参训率。</li>
+                                <li><strong>续费奖励：按季度统计，仅季末发放。</strong> 即在 3月、6月、9月、12月的薪资中核算。</li>
+                                <li>基础工资按等级设定；课时费按队内人数计算（未满6人按6人计），等级基础费随人数递增。</li>
                             </ul>
                         </div>
                     </div>
@@ -573,9 +568,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
             ) : (
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                     {/* Year Selector - Annual Summary Header */}
                      <div className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-                        {/* Comment: Replaced missing BarChart3 with available BarChart from lucide-react */}
                         <h3 className="font-bold text-lg text-gray-800 flex items-center"><BarChart3 className="w-6 h-6 mr-2 text-bvb-yellow" /> 年度财务趋势与统计汇总</h3>
                         <div className="flex items-center gap-3">
                             <button onClick={() => setSelectedYear(v => v - 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"><ChevronLeft className="w-4 h-4 text-gray-400"/></button>
@@ -602,7 +595,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         </div>
                     </div>
 
-                    {/* Category Breakdowns */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Income Analysis */}
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -693,7 +685,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
                         <div className="bg-bvb-black p-8 flex justify-between items-center text-white">
                             <div><h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入统计报告</h3></div>
-                            {/* Comment: Corrected missing X icon */}
                             <button onClick={() => setImportSummary(null)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="p-10 space-y-8 bg-gray-50/50">
@@ -718,10 +709,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
             {showImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
                             <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase"><FileSpreadsheet className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入向导</h3>
-                            {/* Comment: Corrected missing X icon */}
                             <button onClick={() => setShowImportModal(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="p-8 space-y-6 bg-gray-50/50">
@@ -744,7 +734,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white">
                             <h3 className="font-black text-xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 手动入账</h3>
-                            {/* Comment: Corrected missing X icon */}
                             <button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="flex p-2 gap-2 bg-gray-100/50 mx-6 mt-6 rounded-2xl border border-gray-200">

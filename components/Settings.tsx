@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-// Comment: Added missing Star icon import
 import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight, Zap, TrendingUp, Calculator, ShieldCheck, Star } from 'lucide-react';
 
 interface SettingsProps {
@@ -468,19 +467,19 @@ const Settings: React.FC<SettingsProps> = ({
                             <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> 绩效奖励阈值设置</h4>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度参训率奖励 (≥ X% 奖 Y元)</label>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">月度参训率奖励 (≥ X% 奖 Y元)</label>
                                     <div className="space-y-2">
-                                        {localSalarySettings.quarterlyAttendanceRewards.map((r, i) => (
+                                        {localSalarySettings.monthlyAttendanceRewards.map((r, i) => (
                                             <div key={i} className="flex gap-2 items-center">
                                                 <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={r.threshold} onChange={e => {
                                                     const next = { ...localSalarySettings };
-                                                    next.quarterlyAttendanceRewards[i].threshold = parseInt(e.target.value) || 0;
+                                                    next.monthlyAttendanceRewards[i].threshold = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }} />
                                                 <span className="text-xs font-bold text-gray-400">%</span>
                                                 <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={r.amount} onChange={e => {
                                                     const next = { ...localSalarySettings };
-                                                    next.quarterlyAttendanceRewards[i].amount = parseInt(e.target.value) || 0;
+                                                    next.monthlyAttendanceRewards[i].amount = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }} />
                                                 <span className="text-xs font-bold text-gray-400">元</span>
@@ -490,6 +489,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 </div>
                                 <div className="pt-2 border-t border-gray-200">
                                     <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度续费率奖励 (≥ X% 奖 Y元)</label>
+                                    <p className="text-[9px] text-blue-500 font-bold mb-2">注：按季度统计，仅在季末月份(3/6/9/12)发放。</p>
                                     <div className="flex gap-2 items-center">
                                         <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.threshold} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, threshold: parseInt(e.target.value) || 0}})} />
                                         <span className="text-xs font-bold text-gray-400">%</span>

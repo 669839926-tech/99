@@ -96,7 +96,7 @@ export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
     ],
     incrementalPlayerFee: 5,
     minPlayersForCalculation: 6,
-    quarterlyAttendanceRewards: [
+    monthlyAttendanceRewards: [
         { threshold: 80, amount: 100 },
         { threshold: 90, amount: 200 },
     ],
