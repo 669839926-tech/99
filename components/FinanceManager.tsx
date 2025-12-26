@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
     transactions: FinanceTransaction[];
@@ -21,12 +21,19 @@ interface FinanceManagerProps {
     onUpdateUser: (user: User) => void;
 }
 
-const getSafeYear = (dateStr: string) => {
-    if (!dateStr) return 0;
-    const match = dateStr.match(/^(\d{4})/);
-    if (match) return parseInt(match[1]);
+// 增强型日期解析器
+const parseDateInfo = (dateStr: string) => {
+    if (!dateStr) return { year: 0, month: -1 };
     const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? 0 : d.getFullYear();
+    if (!isNaN(d.getTime())) {
+        return { year: d.getFullYear(), month: d.getMonth() };
+    }
+    const yMatch = dateStr.match(/(\d{4})/);
+    const mMatch = dateStr.match(/(?:\-|年|\/)(\d{1,2})(?:\-|月|\/)?/);
+    return {
+        year: yMatch ? parseInt(yMatch[1]) : 0,
+        month: mMatch ? parseInt(mMatch[1]) - 1 : -1
+    };
 };
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ 
@@ -40,12 +47,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
-    // 薪酬视图专用：教练员筛选
     const [filterCoachId, setFilterCoachId] = useState<string>('all');
-    
-    // 编辑状态：用于暂存手动修改的金额
     const [editPayroll, setEditPayroll] = useState<Record<string, Partial<MonthlySalaryRecord>>>({});
-
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
 
     const [activeType, setActiveType] = useState<'income' | 'expense'>('income');
@@ -78,18 +81,20 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const journalWithBalance = useMemo(() => {
         let balance = 0;
         return sortedTransactions.map(t => {
-            balance += (Number(t.income) - Number(t.expense));
+            balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
             return { ...t, balance };
         }).reverse(); 
     }, [sortedTransactions]);
 
-    const currentStats = useMemo(() => {
-        const yearTransactions = transactions.filter(t => getSafeYear(t.date) === selectedYear);
+    // 年度全局统计
+    const annualStats = useMemo(() => {
+        const yearTransactions = transactions.filter(t => parseDateInfo(t.date).year === selectedYear);
         const income = yearTransactions.reduce((sum, t) => sum + (Number(t.income) || 0), 0);
         const expense = yearTransactions.reduce((sum, t) => sum + (Number(t.expense) || 0), 0);
         return { income, expense, profit: income - expense };
     }, [transactions, selectedYear]);
 
+    // 月度趋势数据 (BarChart)
     const monthlySummaryData = useMemo(() => {
         const data = Array.from({ length: 12 }, (_, i) => ({
             month: `${i + 1}月`,
@@ -98,31 +103,24 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             profit: 0
         }));
         transactions.forEach(t => {
-            const year = getSafeYear(t.date);
-            if (year === selectedYear) {
-                const d = new Date(t.date);
-                let m = isNaN(d.getTime()) ? -1 : d.getMonth();
-                if (m === -1) {
-                    const mMatch = t.date.match(/年(\d{1,2})月/) || t.date.match(/-(\d{1,2})-/);
-                    if (mMatch) m = parseInt(mMatch[1]) - 1;
-                }
-                
-                if (m >= 0 && m < 12) {
-                    data[m].income += (Number(t.income) || 0);
-                    data[m].expense += (Number(t.expense) || 0);
-                    data[m].profit = data[m].income - data[m].expense;
-                }
+            const { year, month } = parseDateInfo(t.date);
+            if (year === selectedYear && month >= 0 && month < 12) {
+                data[month].income += (Number(t.income) || 0);
+                data[month].expense += (Number(t.expense) || 0);
+                data[month].profit = data[month].income - data[month].expense;
             }
         });
         return data;
     }, [transactions, selectedYear]);
 
-    const categoryAnalysis = useMemo(() => {
+    // --- 核心更新：年度科目构成分析逻辑 ---
+    const annualCategoryAnalysis = useMemo(() => {
         const incomeMap: Record<string, number> = {};
         const expenseMap: Record<string, number> = {};
         
         transactions.forEach(t => {
-            if (getSafeYear(t.date) === selectedYear) {
+            const { year } = parseDateInfo(t.date);
+            if (year === selectedYear) {
                 const cat = financeCategories.find(c => c.id === t.category);
                 if (cat) {
                     if (cat.type === 'income') incomeMap[cat.label] = (incomeMap[cat.label] || 0) + (Number(t.income) || 0);
@@ -134,17 +132,53 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const incomeData = Object.keys(incomeMap).map(label => ({ 
             name: label, 
             value: incomeMap[label],
-            percent: currentStats.income > 0 ? (incomeMap[label] / currentStats.income * 100).toFixed(1) : '0'
+            percent: annualStats.income > 0 ? (incomeMap[label] / annualStats.income * 100).toFixed(1) : '0'
         })).sort((a,b) => b.value - a.value);
 
         const expenseData = Object.keys(expenseMap).map(label => ({ 
             name: label, 
             value: expenseMap[label],
-            percent: currentStats.expense > 0 ? (expenseMap[label] / currentStats.expense * 100).toFixed(1) : '0'
+            percent: annualStats.expense > 0 ? (expenseMap[label] / annualStats.expense * 100).toFixed(1) : '0'
         })).sort((a,b) => b.value - a.value);
 
         return { incomeData, expenseData };
-    }, [transactions, selectedYear, financeCategories, currentStats]);
+    }, [transactions, selectedYear, financeCategories, annualStats]);
+
+    // 月度细分统计逻辑
+    const monthlyAnalysis = useMemo(() => {
+        const monthTransactions = transactions.filter(t => {
+            const info = parseDateInfo(t.date);
+            return info.year === selectedYear && info.month === selectedMonth;
+        });
+
+        const income = monthTransactions.reduce((sum, t) => sum + (Number(t.income) || 0), 0);
+        const expense = monthTransactions.reduce((sum, t) => sum + (Number(t.expense) || 0), 0);
+
+        const incomeMap: Record<string, number> = {};
+        const expenseMap: Record<string, number> = {};
+        
+        monthTransactions.forEach(t => {
+            const cat = financeCategories.find(c => c.id === t.category);
+            if (cat) {
+                if (cat.type === 'income') incomeMap[cat.label] = (incomeMap[cat.label] || 0) + (Number(t.income) || 0);
+                else expenseMap[cat.label] = (expenseMap[cat.label] || 0) + (Number(t.expense) || 0);
+            }
+        });
+
+        const incomeData = Object.keys(incomeMap).map(label => ({ 
+            name: label, 
+            value: incomeMap[label],
+            percent: income > 0 ? (incomeMap[label] / income * 100).toFixed(1) : '0'
+        })).sort((a,b) => b.value - a.value);
+
+        const expenseData = Object.keys(expenseMap).map(label => ({ 
+            name: label, 
+            value: expenseMap[label],
+            percent: expense > 0 ? (expenseMap[label] / expense * 100).toFixed(1) : '0'
+        })).sort((a,b) => b.value - a.value);
+
+        return { income, expense, profit: income - expense, incomeData, expenseData };
+    }, [transactions, selectedYear, selectedMonth, financeCategories]);
 
     const coachSalaries = useMemo(() => {
         const coaches = users.filter(u => u.role === 'coach' && (filterCoachId === 'all' || u.id === filterCoachId));
@@ -166,8 +200,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 const sessionFeePerSession = levelConfig.sessionBaseFee + (effectiveTeamSize - salarySettings.minPlayersForCalculation) * salarySettings.incrementalPlayerFee;
                 
                 const monthlySessions = trainings.filter(t => {
-                    const d = new Date(t.date);
-                    return t.teamId === teamId && d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
+                    const { year, month } = parseDateInfo(t.date);
+                    return t.teamId === teamId && year === selectedYear && month === selectedMonth;
                 });
                 const monthlySessionFee = monthlySessions.length * sessionFeePerSession;
 
@@ -371,7 +405,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         setFormData({ ...formData, details: '', amount: '', attachment: '' });
     };
 
-    // Comment: Added missing handleDownloadTemplate function for CSV template generation
     const handleDownloadTemplate = () => {
         const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户\n";
         const example = "2023-11-01,课时续费,张三续费50节,5200,,黔农云\n2023-11-02,租金支出,11月场地租金,,2000,黔农云\n";
@@ -634,28 +667,196 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
             ) : (
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                     <div className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-                        <h3 className="font-bold text-lg text-gray-800 flex items-center"><BarChart3 className="w-6 h-6 mr-2 text-bvb-yellow" /> 年度财务趋势与统计汇总</h3>
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
+                        <h3 className="font-bold text-lg text-gray-800 flex items-center"><BarChart3 className="w-6 h-6 mr-2 text-bvb-yellow" /> 年度财务趋势与月度深度分析</h3>
                         <div className="flex items-center gap-3">
-                            <button onClick={() => setSelectedYear(v => v - 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"><ChevronLeft className="w-4 h-4 text-gray-400"/></button>
-                            <span className="font-black text-xl px-6 min-w-[100px] text-center">{selectedYear}</span>
-                            <button onClick={() => setSelectedYear(v => v + 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"><ChevronRight className="w-4 h-4 text-gray-400"/></button>
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                                <button onClick={() => setSelectedYear(v => v - 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronLeft className="w-4 h-4 text-gray-400"/></button>
+                                <span className="font-black text-base min-w-[60px] text-center">{selectedYear}年</span>
+                                <button onClick={() => setSelectedYear(v => v + 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronRight className="w-4 h-4 text-gray-400"/></button>
+                            </div>
+                            <span className="text-gray-200">/</span>
+                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                                <select 
+                                    value={selectedMonth} 
+                                    onChange={e => setSelectedMonth(parseInt(e.target.value))}
+                                    className="bg-transparent text-xs font-black outline-none focus:ring-0 cursor-pointer"
+                                >
+                                    {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月 (深度分析)</option>)}
+                                </select>
+                            </div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 h-[450px]">
-                            <h4 className="text-sm font-black text-gray-400 uppercase tracking-[0.15em] mb-8">月度收支趋势对比表</h4>
+
+                    <div className="grid grid-cols-1 gap-6">
+                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 h-[400px]">
+                            <div className="flex justify-between items-start mb-8">
+                                <h4 className="text-sm font-black text-gray-400 uppercase tracking-[0.15em]">年度收支趋势对比 ({selectedYear})</h4>
+                                <div className="flex gap-6">
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase">总收入</p>
+                                        <p className="text-lg font-black text-green-600">¥{annualStats.income.toLocaleString()}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase">总支出</p>
+                                        <p className="text-lg font-black text-red-500">¥{annualStats.expense.toLocaleString()}</p>
+                                    </div>
+                                </div>
+                            </div>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={monthlySummaryData} margin={{ top: 10, right: 10, left: 10, bottom: 40 }}>
+                                <BarChart data={monthlySummaryData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                     <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#6b7280' }} />
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
                                     <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }} />
-                                    <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', paddingTop: '30px'}} />
+                                    <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', paddingTop: '20px'}} />
                                     <Bar dataKey="income" name="总收入" fill="#22C55E" radius={[6, 6, 0, 0]} barSize={32} />
                                     <Bar dataKey="expense" name="总支出" fill="#EF4444" radius={[6, 6, 0, 0]} barSize={32} />
                                 </BarChart>
                             </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* --- 新增：年度项目汇总构成分析 --- */}
+                    <div className="flex items-center gap-3 py-2">
+                        <div className="h-px flex-1 bg-gray-200"></div>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">{selectedYear} 年度项目汇总分析</span>
+                        <div className="h-px flex-1 bg-gray-200"></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* 年度收入构成 */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="p-5 border-b flex justify-between items-center bg-green-50/30">
+                                <h4 className="font-black text-sm uppercase tracking-widest flex items-center text-green-700">
+                                    <ArrowUpRight className="w-5 h-5 mr-2" /> 年度收入构成汇总
+                                </h4>
+                                <span className="text-[10px] font-black text-green-600 bg-white px-2 py-1 rounded shadow-sm border border-green-100">累计 ¥{annualStats.income.toLocaleString()}</span>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                {annualCategoryAnalysis.incomeData.length > 0 ? annualCategoryAnalysis.incomeData.map((item, idx) => (
+                                    <div key={idx} className="space-y-1.5">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-bold text-gray-700">{item.name}</span>
+                                            <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
+                                        </div>
+                                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-green-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${item.percent}%` }}></div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="py-10 text-center text-gray-300 italic text-sm">本年度暂无收入记录</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 年度支出构成 */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="p-5 border-b flex justify-between items-center bg-red-50/30">
+                                <h4 className="font-black text-sm uppercase tracking-widest flex items-center text-red-700">
+                                    <ArrowDownRight className="w-5 h-5 mr-2" /> 年度支出构成汇总
+                                </h4>
+                                <span className="text-[10px] font-black text-red-600 bg-white px-2 py-1 rounded shadow-sm border border-red-100">累计 ¥{annualStats.expense.toLocaleString()}</span>
+                            </div>
+                            <div className="p-6 space-y-5">
+                                {annualCategoryAnalysis.expenseData.length > 0 ? annualCategoryAnalysis.expenseData.map((item, idx) => (
+                                    <div key={idx} className="space-y-1.5">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-bold text-gray-700">{item.name}</span>
+                                            <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
+                                        </div>
+                                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-red-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${item.percent}%` }}></div>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="py-10 text-center text-gray-300 italic text-sm">本年度暂无支出记录</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 py-2">
+                        <div className="h-px flex-1 bg-gray-200"></div>
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">{selectedMonth + 1}月 业务明细统计</span>
+                        <div className="h-px flex-1 bg-gray-200"></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-bvb-black rounded-2xl shadow-xl p-6 flex flex-col justify-between overflow-hidden relative group">
+                            <div className="z-10">
+                                <p className="text-bvb-yellow text-[10px] font-black uppercase tracking-widest mb-1">{selectedMonth + 1}月 经营总结</p>
+                                <h4 className="text-white font-black text-2xl italic tracking-tighter mb-6 uppercase">Monthly Status</h4>
+                            </div>
+                            <div className="space-y-4 z-10">
+                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                    <span className="text-gray-400 text-xs font-bold">本月收入</span>
+                                    <span className="text-green-400 font-black">¥{monthlyAnalysis.income.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                    <span className="text-gray-400 text-xs font-bold">本月支出</span>
+                                    <span className="text-red-400 font-black">¥{monthlyAnalysis.expense.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center pt-2">
+                                    <span className="text-white text-sm font-black uppercase">月盈余</span>
+                                    <span className={`text-2xl font-black ${monthlyAnalysis.profit >= 0 ? 'text-bvb-yellow' : 'text-orange-500'}`}>¥{monthlyAnalysis.profit.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <Wallet className="absolute -right-8 -bottom-8 w-40 h-40 text-white/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                            <div className="p-4 bg-gray-50/50 border-b flex justify-between items-center">
+                                <h4 className="font-black text-xs uppercase tracking-widest flex items-center text-green-600">
+                                    <ArrowUpRight className="w-4 h-4 mr-2" /> 收入项目 ({selectedMonth + 1}月)
+                                </h4>
+                                <PieChartIcon className="w-4 h-4 text-gray-300" />
+                            </div>
+                            <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
+                                <table className="w-full text-xs">
+                                    <tbody className="divide-y divide-gray-50">
+                                        {monthlyAnalysis.incomeData.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-4 py-3">
+                                                    <p className="font-bold text-gray-700">{item.name}</p>
+                                                    <p className="text-[9px] text-gray-400 font-mono">{item.percent}% 占比</p>
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-black text-green-600 tabular-nums">¥{item.value.toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                        {monthlyAnalysis.incomeData.length === 0 && (
+                                            <tr><td className="py-20 text-center text-gray-300 italic">本月无收入数据</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                            <div className="p-4 bg-gray-50/50 border-b flex justify-between items-center">
+                                <h4 className="font-black text-xs uppercase tracking-widest flex items-center text-red-600">
+                                    <ArrowDownRight className="w-4 h-4 mr-2" /> 支出项目 ({selectedMonth + 1}月)
+                                </h4>
+                                <TrendingDown className="w-4 h-4 text-gray-300" />
+                            </div>
+                            <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
+                                <table className="w-full text-xs">
+                                    <tbody className="divide-y divide-gray-50">
+                                        {monthlyAnalysis.expenseData.map((item, idx) => (
+                                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-4 py-3">
+                                                    <p className="font-bold text-gray-700">{item.name}</p>
+                                                    <p className="text-[9px] text-gray-400 font-mono">{item.percent}% 占比</p>
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-black text-red-600 tabular-nums">¥{item.value.toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                        {monthlyAnalysis.expenseData.length === 0 && (
+                                            <tr><td className="py-20 text-center text-gray-300 italic">本月无支出数据</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
