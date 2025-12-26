@@ -287,6 +287,33 @@ export interface Announcement {
 
 export type UserRole = 'director' | 'coach' | 'assistant_coach' | 'parent';
 
+// --- Coach Salary Types ---
+export type CoachLevel = 'Junior' | 'Intermediate' | 'Senior';
+
+export interface CoachLevelSetting {
+    level: CoachLevel;
+    label: string;
+    baseSalary: number;
+    sessionBaseFee: number;
+}
+
+export interface SalarySettings {
+    levels: CoachLevelSetting[];
+    incrementalPlayerFee: number; // 5
+    minPlayersForCalculation: number; // 6
+    quarterlyAttendanceRewards: { threshold: number; amount: number }[]; // [{80, 100}, {90, 200}]
+    quarterlyRenewalReward: { threshold: number; amount: number }; // {80, 300}
+    monthlyPerformanceRewards: { minScore: number; maxScore: number; amount: number }[]; // [{8, 8.9, 100}, {9, 10, 200}]
+}
+
+export interface MonthlyEvaluation {
+    id: string;
+    year: number;
+    month: number;
+    score: number;
+    comment: string;
+}
+
 // --- RBAC Types ---
 export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings';
 export type PermissionLevel = 'none' | 'view' | 'edit';
@@ -301,4 +328,7 @@ export interface User {
   role: UserRole;
   teamIds?: string[];
   playerId?: string;
+  // Salary fields
+  level?: CoachLevel;
+  monthlyEvaluations?: MonthlyEvaluation[];
 }

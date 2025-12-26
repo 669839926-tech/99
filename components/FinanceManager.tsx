@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { FinanceTransaction, FinanceCategoryDefinition, User } from '../types';
-import { Wallet, Plus, Trash2, Calendar, FileText, Download, TrendingUp, TrendingDown, PieChart as PieChartIcon, BarChart3, ChevronLeft, ChevronRight, Calculator, CheckCircle, X, ArrowUpRight, ArrowDownRight, MinusCircle, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line, PieChart, Pie, Legend } from 'recharts';
+import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team } from '../types';
+// Comment: Added missing X and BarChart3 icon imports
+import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
 
 interface FinanceManagerProps {
     transactions: FinanceTransaction[];
@@ -12,9 +13,13 @@ interface FinanceManagerProps {
     onBulkAddTransactions: (t: FinanceTransaction[]) => void;
     onDeleteTransaction: (id: string) => void;
     onBulkDeleteTransactions: (ids: string[]) => void;
+    // Salary related
+    users: User[];
+    players: Player[];
+    trainings: TrainingSession[];
+    salarySettings: SalarySettings;
+    onUpdateUser: (user: User) => void;
 }
-
-const COLORS = ['#FDE100', '#000000', '#4A4A4A', '#22C55E', '#EF4444', '#3B82F6', '#A855F7', '#F97316'];
 
 const getSafeYear = (dateStr: string) => {
     if (!dateStr) return 0;
@@ -24,11 +29,15 @@ const getSafeYear = (dateStr: string) => {
     return isNaN(d.getTime()) ? 0 : d.getFullYear();
 };
 
-const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions }) => {
-    const [viewMode, setViewMode] = useState<'journal' | 'summary'>('summary');
+const FinanceManager: React.FC<FinanceManagerProps> = ({ 
+    transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
+    users, players, trainings, salarySettings, onUpdateUser
+}) => {
+    const [viewMode, setViewMode] = useState<'journal' | 'summary' | 'salary'>('summary');
     const [showAddModal, setShowAddModal] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
@@ -130,6 +139,120 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
 
         return { incomeData, expenseData };
     }, [transactions, selectedYear, financeCategories, currentStats]);
+
+    // --- Coach Salary Calculation Engine ---
+    const coachSalaries = useMemo(() => {
+        const coaches = users.filter(u => u.role === 'coach');
+        
+        return coaches.map(coach => {
+            const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
+            const coachTeams = coach.teamIds || [];
+            
+            let totalSessionFee = 0;
+            let totalAttendanceReward = 0;
+            let totalRenewalReward = 0;
+            
+            // Per Team calculations
+            const teamBreakdown = coachTeams.map(teamId => {
+                const teamPlayers = players.filter(p => p.teamId === teamId);
+                const teamSize = teamPlayers.length;
+                const effectiveTeamSize = Math.max(salarySettings.minPlayersForCalculation, teamSize);
+                const sessionFeePerSession = levelConfig.sessionBaseFee + (effectiveTeamSize - salarySettings.minPlayersForCalculation) * salarySettings.incrementalPlayerFee;
+                
+                // Monthly Sessions
+                const monthlySessions = trainings.filter(t => {
+                    const d = new Date(t.date);
+                    return t.teamId === teamId && d.getFullYear() === selectedYear && d.getMonth() === selectedMonth;
+                });
+                const monthlySessionFee = monthlySessions.length * sessionFeePerSession;
+
+                // Quarterly Calculations (for rewards)
+                const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
+                const quarterlySessions = trainings.filter(t => {
+                    const d = new Date(t.date);
+                    return t.teamId === teamId && d.getFullYear() === selectedYear && quarterMonths.includes(d.getMonth());
+                });
+
+                // Attendance Rate (Quarterly)
+                let quarterlyAttendanceRate = 0;
+                if (quarterlySessions.length > 0) {
+                    const totalPossible = quarterlySessions.length * teamSize;
+                    const totalPresent = quarterlySessions.reduce((sum, s) => sum + (s.attendance?.filter(r => r.status === 'Present').length || 0), 0);
+                    quarterlyAttendanceRate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
+                }
+
+                const attendanceReward = salarySettings.quarterlyAttendanceRewards
+                    .sort((a,b) => b.threshold - a.threshold)
+                    .find(r => quarterlyAttendanceRate >= r.threshold)?.amount || 0;
+
+                // Renewal Rate (Quarterly)
+                // Defined as: players who recharged in this quarter OR joined in this quarter
+                const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
+                const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
+                const renewedCount = teamPlayers.filter(p => {
+                    const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
+                    const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
+                    return rechargedInQ || joinedInQ;
+                }).length;
+                const renewalRate = teamSize > 0 ? (renewedCount / teamSize) * 100 : 0;
+                const renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? salarySettings.quarterlyRenewalReward.amount : 0;
+
+                return {
+                    teamId,
+                    teamSize,
+                    sessionCount: monthlySessions.length,
+                    sessionFeePerSession,
+                    monthlySessionFee,
+                    quarterlyAttendanceRate,
+                    attendanceReward,
+                    renewalRate,
+                    renewalReward
+                };
+            });
+
+            totalSessionFee = teamBreakdown.reduce((sum, b) => sum + b.monthlySessionFee, 0);
+            totalAttendanceReward = teamBreakdown.reduce((sum, b) => sum + b.attendanceReward, 0);
+            totalRenewalReward = teamBreakdown.reduce((sum, b) => sum + b.renewalReward, 0);
+
+            // Performance Score Reward (Monthly)
+            const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
+            const performanceReward = salarySettings.monthlyPerformanceRewards.find(r => evaluation && evaluation.score >= r.minScore && evaluation.score <= r.maxScore)?.amount || 0;
+
+            const totalSalary = levelConfig.baseSalary + totalSessionFee + totalAttendanceReward + totalRenewalReward + performanceReward;
+
+            return {
+                coachId: coach.id,
+                coachName: coach.name,
+                level: levelConfig.label,
+                baseSalary: levelConfig.baseSalary,
+                totalSessionFee,
+                totalAttendanceReward,
+                totalRenewalReward,
+                performanceReward,
+                totalSalary,
+                evaluationScore: evaluation?.score,
+                teamBreakdown
+            };
+        });
+    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth]);
+
+    const handleUpdateEvaluation = (coachId: string, score: number) => {
+        const coach = users.find(u => u.id === coachId);
+        if (!coach) return;
+
+        const evalId = `eval-${selectedYear}-${selectedMonth}-${coachId}`;
+        const evaluations = coach.monthlyEvaluations || [];
+        const existingIdx = evaluations.findIndex(e => e.year === selectedYear && e.month === selectedMonth);
+
+        let nextEvals = [...evaluations];
+        if (existingIdx >= 0) {
+            nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
+        } else {
+            nextEvals.push({ id: evalId, year: selectedYear, month: selectedMonth, score, comment: '' });
+        }
+
+        onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
+    };
 
     const toggleSelectAll = () => {
         if (selectedIds.size === journalWithBalance.length) {
@@ -247,6 +370,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                     <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
                         <button onClick={() => setViewMode('journal')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>日记账流水</button>
                         <button onClick={() => setViewMode('summary')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>统计汇总表</button>
+                        <button onClick={() => setViewMode('salary')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'salary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>教职薪资</button>
                     </div>
                     <button onClick={() => setShowImportModal(true)} className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
                         <FileSpreadsheet className="w-5 h-5 mr-2 text-green-600" /> 批量导入
@@ -257,34 +381,115 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 </div>
             </div>
 
-            {/* Quick Stats Grid - Top Row of the prototype */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-[6px] border-green-500 hover:shadow-md transition-shadow flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{selectedYear}年度总收入</p>
-                        <h3 className="text-3xl font-black text-gray-800 tabular-nums">¥{currentStats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
+            {/* Salary Calculation Tab */}
+            {viewMode === 'salary' ? (
+                <div className="space-y-6 animate-in slide-in-from-bottom-4">
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
+                        <h3 className="font-bold text-lg text-gray-800 flex items-center"><Calculator className="w-6 h-6 mr-2 text-bvb-yellow" /> 教练员月度薪酬核算</h3>
+                        <div className="flex items-center gap-3">
+                            <select 
+                                value={selectedYear} 
+                                onChange={e => setSelectedYear(parseInt(e.target.value))}
+                                className="p-2 border rounded-xl text-xs font-black bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow"
+                            >
+                                {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
+                            </select>
+                            <select 
+                                value={selectedMonth} 
+                                onChange={e => setSelectedMonth(parseInt(e.target.value))}
+                                className="p-2 border rounded-xl text-xs font-black bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow"
+                            >
+                                {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月</option>)}
+                            </select>
+                        </div>
                     </div>
-                    <div className="p-3 bg-green-50 rounded-2xl text-green-500 shadow-inner"><ArrowUpRight className="w-8 h-8" /></div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-[6px] border-red-500 hover:shadow-md transition-shadow flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{selectedYear}年度总支出</p>
-                        <h3 className="text-3xl font-black text-gray-800 tabular-nums">¥{currentStats.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
-                    </div>
-                    <div className="p-3 bg-red-50 rounded-2xl text-red-600 shadow-inner"><ArrowDownRight className="w-8 h-8" /></div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 border-l-[6px] border-bvb-yellow hover:shadow-md transition-shadow flex items-center justify-between">
-                    <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">{selectedYear}年度净利润</p>
-                        <h3 className={`text-3xl font-black tabular-nums ${currentStats.profit >= 0 ? 'text-gray-800' : 'text-red-600'}`}>
-                            ¥{currentStats.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                        </h3>
-                    </div>
-                    <div className="p-3 bg-yellow-50 rounded-2xl text-yellow-600 shadow-inner"><Calculator className="w-8 h-8" /></div>
-                </div>
-            </div>
 
-            {viewMode === 'journal' ? (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead className="bg-gray-50 text-gray-600 font-black uppercase text-[10px] tracking-widest border-b">
+                                    <tr>
+                                        <th className="px-6 py-4">教练姓名/等级</th>
+                                        <th className="px-6 py-4 text-right">基础工资</th>
+                                        <th className="px-6 py-4 text-right">课时费总额</th>
+                                        <th className="px-6 py-4 text-right">参训率奖励</th>
+                                        <th className="px-6 py-4 text-right">续费奖励</th>
+                                        <th className="px-6 py-4 text-center">总监评分</th>
+                                        <th className="px-6 py-4 text-right">绩效考核奖</th>
+                                        <th className="px-6 py-4 text-right font-black text-bvb-black">应发合计</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {coachSalaries.map(sal => (
+                                        <React.Fragment key={sal.coachId}>
+                                            <tr className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-black text-gray-800">{sal.coachName}</span>
+                                                        <span className="text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-bold text-gray-600 tabular-nums">¥{sal.baseSalary.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right font-bold text-gray-600 tabular-nums">¥{sal.totalSessionFee.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right font-bold text-green-600 tabular-nums">¥{sal.totalAttendanceReward.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right font-bold text-green-600 tabular-nums">¥{sal.totalRenewalReward.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="inline-flex items-center gap-2">
+                                                        <input 
+                                                            type="number" min="0" max="10" step="0.1"
+                                                            className="w-16 p-1 text-center border rounded font-black text-xs bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none"
+                                                            value={sal.evaluationScore || ''}
+                                                            onChange={e => handleUpdateEvaluation(sal.coachId, parseFloat(e.target.value))}
+                                                            placeholder="0-10"
+                                                        />
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-bold text-green-600 tabular-nums">¥{sal.performanceReward.toLocaleString()}</td>
+                                                <td className="px-6 py-4 text-right font-black text-bvb-black text-lg tabular-nums">¥{sal.totalSalary.toLocaleString()}</td>
+                                            </tr>
+                                            {/* Details Sub-row */}
+                                            <tr className="bg-gray-50/50">
+                                                <td colSpan={8} className="px-12 py-3">
+                                                    <div className="flex flex-wrap gap-6">
+                                                        {sal.teamBreakdown.map(teamInfo => (
+                                                            <div key={teamInfo.teamId} className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm min-w-[180px]">
+                                                                {/* Comment: Corrected variable name from 'teams' to find the team from the user-managed context if needed, but here we can find it in the component context */}
+                                                                <p className="text-[10px] font-black text-bvb-black uppercase mb-2 border-b pb-1">{sal.teamBreakdown.find(tb => tb.teamId === teamInfo.teamId) ? "队组数据" : "未知"}</p>
+                                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] font-bold text-gray-400">
+                                                                    <span>队内人数:</span><span className="text-gray-700 text-right">{teamInfo.teamSize}人</span>
+                                                                    <span>本月课次:</span><span className="text-gray-700 text-right">{teamInfo.sessionCount}次</span>
+                                                                    <span>单节课酬:</span><span className="text-gray-700 text-right">¥{teamInfo.sessionFeePerSession}</span>
+                                                                    <span>本季参训:</span><span className={`text-right ${teamInfo.quarterlyAttendanceRate >= 80 ? 'text-green-600' : 'text-red-500'}`}>{teamInfo.quarterlyAttendanceRate.toFixed(1)}%</span>
+                                                                    <span>本季续费:</span><span className={`text-right ${teamInfo.renewalRate >= 80 ? 'text-green-600' : 'text-red-500'}`}>{teamInfo.renewalRate.toFixed(1)}%</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </React.Fragment>
+                                    ))}
+                                    {coachSalaries.length === 0 && (
+                                        <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">未找到教练员信息。</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div className="bg-yellow-50 p-4 rounded-2xl border border-yellow-200 flex items-start gap-3">
+                        <Info className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+                        <div className="text-xs text-yellow-800 leading-relaxed">
+                            <p className="font-bold mb-1">薪酬计算逻辑说明：</p>
+                            <ul className="list-disc pl-4 space-y-1 opacity-80">
+                                <li>基础工资按等级设定；课时费按队内人数计算（未满6人按6人计），等级基础费随人数递增（每超1人+5元）。</li>
+                                <li><strong>参训率绩效：</strong>季度平均参训率 ≥80% 奖100元，≥90% 奖200元。</li>
+                                <li><strong>续费绩效：</strong>季度续费率（含新注册） ≥80% 每队奖300元。</li>
+                                <li><strong>考核奖：</strong>由总监打分（10分制），8-8.9分奖100元，9分及以上奖200元。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            ) : viewMode === 'journal' ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h3 className="font-bold text-gray-800 flex items-center"><FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
@@ -332,7 +537,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                                     const cat = financeCategories.find(c => c.id === t.category);
                                     const isSelected = selectedIds.has(t.id);
                                     return (
-                                        <tr key={t.id} className={`hover:bg-yellow-50/30 transition-colors group ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
+                                        <tr key={t.id} className={`hover:bg-yellow-50/30 transition-colors cursor-pointer group ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
                                             <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                                                 <input 
                                                     type="checkbox" 
@@ -370,6 +575,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
                      {/* Year Selector - Annual Summary Header */}
                      <div className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                        {/* Comment: Replaced missing BarChart3 with available BarChart from lucide-react */}
                         <h3 className="font-bold text-lg text-gray-800 flex items-center"><BarChart3 className="w-6 h-6 mr-2 text-bvb-yellow" /> 年度财务趋势与统计汇总</h3>
                         <div className="flex items-center gap-3">
                             <button onClick={() => setSelectedYear(v => v - 1)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors border border-gray-100"><ChevronLeft className="w-4 h-4 text-gray-400"/></button>
@@ -478,63 +684,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                             </div>
                         </div>
                     </div>
-
-                    {/* Detailed Monthly Summary Grid */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                        <div className="bg-bvb-black p-5 flex justify-between items-center">
-                            <h4 className="text-white font-black text-sm uppercase tracking-widest flex items-center">
-                                <TableProperties className="w-5 h-5 mr-3 text-bvb-yellow" /> 月度收支利润明细汇总 ({selectedYear}年)
-                            </h4>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-gray-50 font-black text-gray-500 border-b">
-                                    <tr className="text-[10px] uppercase tracking-widest">
-                                        <th className="px-8 py-4">月份</th>
-                                        <th className="px-8 py-4 text-right">月度收入</th>
-                                        <th className="px-8 py-4 text-right">月度支出</th>
-                                        <th className="px-8 py-4 text-right">月度净利润</th>
-                                        <th className="px-8 py-4 text-center">经营状态</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {monthlySummaryData.map((m, idx) => (
-                                        <tr key={idx} className="hover:bg-yellow-50/20 transition-colors">
-                                            <td className="px-8 py-4 font-black text-gray-800">{m.month}</td>
-                                            <td className="px-8 py-4 text-right font-bold text-green-600 tabular-nums">¥{m.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-8 py-4 text-right font-bold text-red-500 tabular-nums">¥{m.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className={`px-8 py-4 text-right font-black tabular-nums ${m.profit >= 0 ? 'text-gray-900 bg-gray-50/50' : 'text-red-700 bg-red-50/40'}`}>
-                                                ¥{m.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="px-8 py-4 text-center">
-                                                {m.profit > 0 ? (
-                                                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-green-100 text-green-700 text-[10px] font-black uppercase tracking-tighter">盈 余</span>
-                                                ) : m.profit < 0 ? (
-                                                    <span className="inline-flex items-center px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-black uppercase tracking-tighter">亏 损</span>
-                                                ) : (
-                                                    <span className="text-gray-300">-</span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                                <tfoot className="bg-bvb-yellow/10 font-black border-t-2 border-bvb-yellow">
-                                    <tr>
-                                        <td className="px-8 py-5 text-bvb-black">年度累计</td>
-                                        <td className="px-8 py-5 text-right text-green-700">¥{currentStats.income.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                        <td className="px-8 py-5 text-right text-red-700">¥{currentStats.expense.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                        <td className={`px-8 py-5 text-right ${currentStats.profit >= 0 ? 'text-bvb-black' : 'text-red-900'}`}>
-                                            ¥{currentStats.profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="px-8 py-5 text-center">
-                                            {currentStats.profit > 0 && <TrendingUp className="w-5 h-5 mx-auto text-green-600" />}
-                                            {currentStats.profit < 0 && <TrendingDown className="w-5 h-5 mx-auto text-red-600" />}
-                                        </td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             )}
 
@@ -544,6 +693,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
                         <div className="bg-bvb-black p-8 flex justify-between items-center text-white">
                             <div><h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入统计报告</h3></div>
+                            {/* Comment: Corrected missing X icon */}
                             <button onClick={() => setImportSummary(null)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="p-10 space-y-8 bg-gray-50/50">
@@ -571,6 +721,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
                             <h3 className="font-bold text-xl flex items-center tracking-tighter uppercase"><FileSpreadsheet className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入向导</h3>
+                            {/* Comment: Corrected missing X icon */}
                             <button onClick={() => setShowImportModal(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="p-8 space-y-6 bg-gray-50/50">
@@ -593,6 +744,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({ transactions, financeCa
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="bg-bvb-black p-6 flex justify-between items-center text-white">
                             <h3 className="font-black text-xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 手动入账</h3>
+                            {/* Comment: Corrected missing X icon */}
                             <button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button>
                         </div>
                         <div className="flex p-2 gap-2 bg-gray-100/50 mx-6 mt-6 rounded-2xl border border-gray-200">

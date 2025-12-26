@@ -12,8 +12,8 @@ export interface AppData {
     transactions?: any[];
     permissions?: any;
     financeCategories?: any[]; // New: Finance Categories
-    // Comment: Added techTests to AppData for cloud storage persistence
     techTests?: any[];
+    salarySettings?: any;
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

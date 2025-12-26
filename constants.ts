@@ -1,5 +1,5 @@
 
-import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions, FinanceCategoryDefinition } from './types';
+import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions, FinanceCategoryDefinition, SalarySettings } from './types';
 
 // ... CHINA_GEO_DATA保持原样
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
@@ -28,7 +28,7 @@ export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
         "成都市": ["锦江区", "青羊区", "金牛区", "武侯区", "成华区", "龙泉驿区", "青白江区", "新都区", "温江区", "双流区", "郫都区"]
     },
     "湖北省": {
-        "武汉市": ["江岸区", "江汉区", "硚口区", "汉阳区", "武昌区", "青山区", "洪山区", "东西湖区", "汉南区", "蔡甸区", "江夏区", "黄陂区", "新洲区"]
+        "武汉市": ["江岸区", "江汉区", "硚口区", "汉阳区", "武昌区", "青山区", "虹山区", "东西湖区", "汉南区", "蔡甸区", "江夏区", "黄陂区", "新洲区"]
     },
     "山东省": {
         "济南市": ["历下区", "市中区", "槐荫区", "天桥区", "历城区", "长清区", "章丘区", "济阳区", "莱芜区", "钢城区"],
@@ -53,7 +53,6 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'edit',
         training: 'edit',
         matches: 'edit',
-        // Comment: Added missing growth module permission
         growth: 'edit',
         settings: 'edit'
     },
@@ -64,7 +63,6 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'edit',
         training: 'edit',
         matches: 'view',
-        // Comment: Added missing growth module permission
         growth: 'edit',
         settings: 'view'
     },
@@ -75,7 +73,6 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'view',
         training: 'view',
         matches: 'view',
-        // Comment: Added missing growth module permission
         growth: 'view',
         settings: 'view'
     },
@@ -86,10 +83,28 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         design: 'none',
         training: 'view',
         matches: 'view',
-        // Comment: Added missing growth module permission
         growth: 'view',
         settings: 'view'
     }
+};
+
+export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
+    levels: [
+        { level: 'Junior', label: '初级', baseSalary: 3000, sessionBaseFee: 60 },
+        { level: 'Intermediate', label: '中级', baseSalary: 4500, sessionBaseFee: 70 },
+        { level: 'Senior', label: '高级', baseSalary: 6000, sessionBaseFee: 90 },
+    ],
+    incrementalPlayerFee: 5,
+    minPlayersForCalculation: 6,
+    quarterlyAttendanceRewards: [
+        { threshold: 80, amount: 100 },
+        { threshold: 90, amount: 200 },
+    ],
+    quarterlyRenewalReward: { threshold: 80, amount: 300 },
+    monthlyPerformanceRewards: [
+        { minScore: 8, maxScore: 8.9, amount: 100 },
+        { minScore: 9, maxScore: 10, amount: 200 },
+    ],
 };
 
 export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [
@@ -109,9 +124,9 @@ export const MOCK_TEAMS: Team[] = [
 
 export const MOCK_USERS: User[] = [
   { id: 'u1', username: 'admin', password: '123', name: '青训总监', role: 'director' },
-  { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamIds: ['t1'] },
-  { id: 'u3', username: 'coach_u17', password: '123', name: 'U17 主教练', role: 'coach', teamIds: ['t2'] },
-  { id: 'u4', username: 'head_coach', password: '123', name: '梯队总教头', role: 'coach', teamIds: ['t1', 't2'] },
+  { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamIds: ['t1'], level: 'Intermediate' },
+  { id: 'u3', username: 'coach_u17', password: '123', name: 'U17 主教练', role: 'coach', teamIds: ['t2'], level: 'Junior' },
+  { id: 'u4', username: 'head_coach', password: '123', name: '梯队总教头', role: 'coach', teamIds: ['t1', 't2'], level: 'Senior' },
 ];
 
 export const MOCK_ANNOUNCEMENTS: Announcement[] = [
