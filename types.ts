@@ -123,6 +123,7 @@ export interface Player {
   birthDate: string;
   number: number;
   position: Position;
+  secondaryPosition?: Position;
   isCaptain?: boolean;
   age: number;
   goals: number;
