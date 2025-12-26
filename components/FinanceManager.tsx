@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft } from 'lucide-react';
+import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
@@ -47,6 +47,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     
+    // 排序状态
+    const [journalSortField, setJournalSortField] = useState<'date' | 'income' | 'expense' | 'category'>('date');
+    const [journalSortOrder, setJournalSortOrder] = useState<'asc' | 'desc'>('desc');
+
     const [filterCoachId, setFilterCoachId] = useState<string>('all');
     const [editPayroll, setEditPayroll] = useState<Record<string, Partial<MonthlySalaryRecord>>>({});
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
@@ -74,17 +78,48 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
     const isDirector = currentUser?.role === 'director';
 
-    const sortedTransactions = useMemo(() => {
-        return [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    }, [transactions]);
-
+    // 核心财务计算：流水与结余
     const journalWithBalance = useMemo(() => {
+        // 1. 首先确保按日期升序排列以计算正确结余
+        const baseSorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
         let balance = 0;
-        return sortedTransactions.map(t => {
+        const recordsWithBalance = baseSorted.map(t => {
             balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
             return { ...t, balance };
-        }).reverse(); 
-    }, [sortedTransactions]);
+        });
+
+        // 2. 根据用户选定的字段和方向进行二次视图排序
+        return recordsWithBalance.sort((a, b) => {
+            let valA: any = a[journalSortField];
+            let valB: any = b[journalSortField];
+
+            if (journalSortField === 'date') {
+                valA = new Date(valA).getTime();
+                valB = new Date(valB).getTime();
+            } else if (journalSortField === 'income' || journalSortField === 'expense') {
+                valA = Number(valA) || 0;
+                valB = Number(valB) || 0;
+            } else if (journalSortField === 'category') {
+                valA = financeCategories.find(c => c.id === valA)?.label || '';
+                valB = financeCategories.find(c => c.id === valB)?.label || '';
+            }
+
+            if (valA < valB) return journalSortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return journalSortOrder === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [transactions, journalSortField, journalSortOrder, financeCategories]);
+
+    // 处理排序切换
+    const toggleSort = (field: 'date' | 'income' | 'expense' | 'category') => {
+        if (journalSortField === field) {
+            setJournalSortOrder(journalSortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setJournalSortField(field);
+            setJournalSortOrder('desc');
+        }
+    };
 
     // 年度全局统计
     const annualStats = useMemo(() => {
@@ -113,7 +148,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         return data;
     }, [transactions, selectedYear]);
 
-    // --- 核心更新：年度科目构成分析逻辑 ---
+    // 年度科目构成分析逻辑
     const annualCategoryAnalysis = useMemo(() => {
         const incomeMap: Record<string, number> = {};
         const expenseMap: Record<string, number> = {};
@@ -634,13 +669,29 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         <table className="w-full text-sm text-left">
                             <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[10px] tracking-widest sticky top-0 z-10 border-b border-gray-200">
                                 <tr>
-                                    <th className="px-6 py-4 w-10"><input type="checkbox" className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow" checked={selectedIds.size > 0 && selectedIds.size === journalWithBalance.length} onChange={toggleSelectAll} /></th>
-                                    <th className="px-6 py-4">日期</th>
-                                    <th className="px-6 py-4">项目分类</th>
+                                    <th className="px-6 py-4 w-10 text-center"><input type="checkbox" className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow" checked={selectedIds.size > 0 && selectedIds.size === journalWithBalance.length} onChange={toggleSelectAll} /></th>
+                                    <th className="px-6 py-4">
+                                        <button onClick={() => toggleSort('date')} className="flex items-center gap-1 hover:text-bvb-black transition-colors uppercase">
+                                            日期 {journalSortField === 'date' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                        </button>
+                                    </th>
+                                    <th className="px-6 py-4">
+                                        <button onClick={() => toggleSort('category')} className="flex items-center gap-1 hover:text-bvb-black transition-colors uppercase">
+                                            项目分类 {journalSortField === 'category' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                        </button>
+                                    </th>
                                     <th className="px-6 py-4">明细/摘要</th>
-                                    <th className="px-6 py-4 text-right">收入</th>
-                                    <th className="px-6 py-4 text-right">支出</th>
-                                    <th className="px-6 py-4 text-right">余额</th>
+                                    <th className="px-6 py-4 text-right">
+                                        <button onClick={() => toggleSort('income')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors uppercase">
+                                            收入 {journalSortField === 'income' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                        </button>
+                                    </th>
+                                    <th className="px-6 py-4 text-right">
+                                        <button onClick={() => toggleSort('expense')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors uppercase">
+                                            支出 {journalSortField === 'expense' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                        </button>
+                                    </th>
+                                    <th className="px-6 py-4 text-right font-black">余额</th>
                                     <th className="px-6 py-4 text-center">操作</th>
                                 </tr>
                             </thead>
@@ -649,8 +700,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     const cat = financeCategories.find(c => c.id === t.category);
                                     const isSelected = selectedIds.has(t.id);
                                     return (
-                                        <tr key={t.id} className={`hover:bg-yellow-50/30 transition-colors cursor-pointer group ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
-                                            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td>
+                                        <tr key={t.id} className={`hover:bg-yellow-50/30 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
+                                            <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td>
                                             <td className="px-6 py-4 font-mono text-xs whitespace-nowrap text-gray-500">{t.date}</td>
                                             <td className="px-6 py-4 whitespace-nowrap"><span className={`text-[10px] px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知分类'}</span></td>
                                             <td className="px-6 py-4 font-bold text-gray-800">{t.details}</td>
