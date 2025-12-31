@@ -30,6 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
+  const [analysisYear, setAnalysisYear] = useState<number>(new Date().getFullYear());
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
       const d = new Date();
       d.setDate(1); 
@@ -83,24 +84,41 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
 
   // Handle Preset Range Changes
-  const handleRangeChange = (range: TimeRange) => {
+  const handleRangeChange = (range: TimeRange, yearToUse: number = analysisYear) => {
       setAttendanceRange(range);
-      const end = new Date();
-      const start = new Date();
+      const isCurrentYear = yearToUse === new Date().getFullYear();
+      const end = isCurrentYear ? new Date() : new Date(yearToUse, 11, 31);
+      const start = new Date(yearToUse, new Date().getMonth(), 1);
       
       if (range === 'month') {
+          if (!isCurrentYear) {
+              start.setMonth(0); // 非当前年份默认显示1月
+          }
           start.setDate(1);
       } else if (range === 'quarter') {
-          start.setMonth(end.getMonth() - 3);
+          if (isCurrentYear) {
+              start.setMonth(end.getMonth() - 3);
+          } else {
+              start.setMonth(9); // 非当前年份默认显示第四季度
+          }
+          start.setDate(1);
       } else if (range === 'year') {
           start.setMonth(0);
           start.setDate(1);
       }
+
       if (range !== 'custom') {
           setCustomStartDate(start.toISOString().split('T')[0]);
           setCustomEndDate(end.toISOString().split('T')[0]);
       }
   };
+
+  // 当年份改变且不在自定义模式下时，自动更新日期范围
+  useEffect(() => {
+      if (attendanceRange !== 'custom') {
+          handleRangeChange(attendanceRange, analysisYear);
+      }
+  }, [analysisYear]);
 
   // Set default birthday message when player selected
   useEffect(() => {
@@ -606,13 +624,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex flex-wrap gap-1.5 md:gap-2 items-center justify-end w-full md:w-auto">
                     {attendancePlayerId === 'all' && (
                         <div className="flex bg-gray-100 p-0.5 md:p-1 rounded-lg">
-                            <button onClick={() => setAnalysisView('player')} className={`px-2 py-1 md:px-3 md:py-1.5 rounded-md text-[9px] md:text-xs font-black transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>按球员</button>
-                            <button onClick={() => setAnalysisView('session')} className={`px-2 py-1 md:px-3 md:py-1.5 rounded-md text-[9px] md:text-xs font-black transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>按课次</button>
+                            <button onClick={() => setAnalysisView('player')} className={`px-2 py-1 md:px-3 md:py-1.5 rounded-md text-[9px] md:text-xs font-black transition-all ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>按球员</button>
+                            <button onClick={() => setAnalysisView('session')} className={`px-2 py-1 md:px-3 md:py-1.5 rounded-md text-[9px] md:text-xs font-black transition-all ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>按课次</button>
                         </div>
                     )}
-                    <div className="flex bg-gray-100 p-0.5 md:p-1 rounded-lg">
-                        {['month', 'quarter', 'year', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-2 py-1 md:px-3 md:py-1.5 rounded-md text-[9px] md:text-xs font-black transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '月' : r === 'quarter' ? '季' : r === 'year' ? '年' : '自'}</button>)}
+                    
+                    <div className="flex items-center gap-1 bg-gray-100 p-0.5 md:p-1 rounded-lg">
+                        <select 
+                            value={analysisYear}
+                            onChange={(e) => setAnalysisYear(parseInt(e.target.value))}
+                            className="bg-transparent text-[9px] md:text-xs font-black px-1 outline-none border-none cursor-pointer"
+                        >
+                            {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
+                        </select>
+                        <div className="w-px h-3 bg-gray-300 mx-0.5"></div>
+                        {['month', 'quarter', 'year', 'custom'].map(r => (
+                            <button 
+                                key={r} 
+                                onClick={() => handleRangeChange(r as any)} 
+                                className={`px-2 py-1 md:px-3 md:py-1.5 rounded-md text-[9px] md:text-xs font-black transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}
+                            >
+                                {r === 'month' ? '月' : r === 'quarter' ? '季' : r === 'year' ? '年' : '自'}
+                            </button>
+                        ))}
                     </div>
+
                     <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="text-[9px] md:text-xs p-1.5 md:p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[80px] md:max-w-none">
                         <option value="all">所有梯队</option>
                         {displayTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
