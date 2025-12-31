@@ -106,7 +106,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     if (selectedBirthdayPlayer) {
       const name = selectedBirthdayPlayer.name;
-      const template = `亲爱的${name}家长：\n今天是属于${name}的特别日子，我代表顽石之光足球俱乐部全体教练员和队友们祝他生日快乐！在足球的路上越踢越精彩！⚽️\n愿新的一岁里，${name}在球场上继续勇敢追梦，在生活中学习进步，天天向上。`;
+      const template = `亲爱的${name}家长：\n今天是属于${name}的特别日子，我代表顽石之光足球俱乐部全体教练员和队友们祝他生日快乐！在足球的路上越踢越精彩！⚽️\n愿新的一岁里，${name}在球场上继续勇敢追梦，在生活中，学习进步，天天向上。`;
       setBirthdayMessage(template);
     }
   }, [selectedBirthdayPlayer]);
@@ -368,22 +368,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (!birthdayCardRef.current || !selectedBirthdayPlayer) return;
     setIsCapturingCard(true);
     try {
-        const canvas = await html2canvas(birthdayCardRef.current, { 
-            scale: 3, 
-            useCORS: true, 
-            backgroundColor: '#FDE100',
-            logging: false
-        });
+        const canvas = await html2canvas(birthdayCardRef.current, { scale: 3, useCORS: true, backgroundColor: '#FDE100' });
         const link = document.createElement('a');
         link.download = `${selectedBirthdayPlayer.name}_生日贺卡.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-    } catch (e) { 
-        console.error("Card capture error:", e);
-        alert('生成贺卡失败，请重试'); 
-    } finally { 
-        setIsCapturingCard(false); 
-    }
+    } catch (e) { alert('导出失败'); } finally { setIsCapturingCard(false); }
   };
 
   const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
@@ -769,83 +759,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             )}
         </div>
       </div>
-
-      {/* Birthday Card Modal Overlay */}
-      {selectedBirthdayPlayer && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-              <div className="relative max-w-lg w-full py-10">
-                  {/* Action Buttons above the card */}
-                  <div className="flex justify-between items-center mb-4 px-2">
-                      <button onClick={() => setSelectedBirthdayPlayer(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors">
-                          <X className="w-6 h-6" />
-                      </button>
-                      <button 
-                          onClick={handleDownloadBirthdayCard} 
-                          disabled={isCapturingCard}
-                          className="flex items-center gap-2 px-6 py-2 bg-bvb-yellow text-bvb-black font-black rounded-full shadow-xl hover:brightness-105 active:scale-95 transition-all"
-                      >
-                          {isCapturingCard ? <Loader2 className="w-5 h-5 animate-spin" /> : <Camera className="w-5 h-5" />}
-                          保存贺卡并发送
-                      </button>
-                  </div>
-
-                  {/* THE CARD (Target for html2canvas) */}
-                  <div 
-                      ref={birthdayCardRef}
-                      className="bg-bvb-yellow w-full aspect-[3/4.2] rounded-3xl overflow-hidden shadow-2xl relative flex flex-col p-8 md:p-12 text-bvb-black border-4 border-bvb-black"
-                      style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, rgba(255,255,255,0.4) 0%, transparent 40%)' }}
-                  >
-                      {/* Decorative Background Elements */}
-                      <Trophy className="absolute -top-10 -right-10 w-48 h-48 opacity-10 rotate-12 pointer-events-none" />
-                      <Sparkles className="absolute top-10 left-10 w-8 h-8 text-white animate-pulse pointer-events-none" />
-                      <Flame className="absolute bottom-20 right-10 w-12 h-12 text-black/10 pointer-events-none" />
-                      <div className="absolute top-1/2 left-0 w-full h-1 bg-bvb-black/5 -translate-y-1/2"></div>
-
-                      <div className="relative z-10 flex flex-col h-full items-center text-center">
-                          {/* Player Photo Section */}
-                          <div className="mb-6 relative">
-                              <div className="w-32 h-32 md:w-44 md:h-44 rounded-full border-[6px] border-bvb-black overflow-hidden shadow-2xl bg-white flex items-center justify-center">
-                                  <img 
-                                    src={selectedBirthdayPlayer.image} 
-                                    crossOrigin="anonymous" 
-                                    className="w-full h-full object-cover" 
-                                    onError={(e) => { (e.target as any).src = 'https://picsum.photos/200'; }}
-                                  />
-                              </div>
-                              <div className="absolute -bottom-2 -right-2 bg-bvb-black text-bvb-yellow px-3 py-1.5 rounded-2xl font-black text-xl shadow-lg border-2 border-white leading-none">
-                                  {selectedBirthdayPlayer.turningAge}
-                              </div>
-                          </div>
-
-                          {/* Greeting Text */}
-                          <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-1 italic leading-none">Happy Birthday</h2>
-                          <h3 className="text-xl md:text-2xl font-black mb-6 border-b-4 border-bvb-black pb-1.5 inline-block px-4">{selectedBirthdayPlayer.name}</h3>
-                          
-                          {/* Message Area (Editable in-app before save) */}
-                          <div className="flex-1 w-full flex items-center justify-center">
-                              <textarea 
-                                  className="w-full h-full text-xs md:text-sm font-bold leading-relaxed whitespace-pre-wrap text-left bg-white/40 p-4 md:p-6 rounded-2xl border border-white/40 outline-none focus:bg-white/60 transition-all resize-none shadow-inner"
-                                  value={birthdayMessage}
-                                  onChange={(e) => setBirthdayMessage(e.target.value)}
-                                  placeholder="在此输入您的生日祝词..."
-                              />
-                          </div>
-
-                          {/* Footer Info */}
-                          <div className="mt-8 flex flex-col items-center gap-2">
-                              {appLogo && (
-                                <img src={appLogo} className="h-10 md:h-12 object-contain" crossOrigin="anonymous" />
-                              )}
-                              <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40">顽石之光足球俱乐部 • 青训中心</p>
-                          </div>
-                      </div>
-                  </div>
-                  
-                  {/* Prompt for mobile users */}
-                  <p className="text-center text-white/50 text-[10px] mt-4 font-bold uppercase tracking-widest">提示：点击右上方“保存贺卡”下载图片至相册</p>
-              </div>
-          </div>
-      )}
     </div>
   );
 };
