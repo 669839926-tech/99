@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -21,6 +21,7 @@ interface TrainingPlannerProps {
 }
 
 type TimeScope = 'month' | 'quarter' | 'year';
+type ViewType = 'calendar' | 'list';
 
 interface SessionDetailModalProps {
     session: TrainingSession;
@@ -308,6 +309,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScope, setTimeScope] = useState<TimeScope>('month');
+  const [viewType, setViewType] = useState<ViewType>('calendar');
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
@@ -468,7 +470,82 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       );
   };
 
-  const renderCalendar = () => {
+  const renderListView = () => {
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-gray-50 text-gray-600 font-black uppercase text-[10px] tracking-widest border-b">
+                        <tr>
+                            <th className="px-6 py-4">训练日期</th>
+                            <th className="px-6 py-4">负责梯队</th>
+                            <th className="px-6 py-4">训练主题</th>
+                            <th className="px-6 py-4">时长</th>
+                            <th className="px-6 py-4">科目重点</th>
+                            <th className="px-6 py-4">强度</th>
+                            <th className="px-6 py-4">状态</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {filteredSessions.length > 0 ? (
+                            filteredSessions.map(s => {
+                                const team = teams.find(t => t.id === s.teamId);
+                                return (
+                                    <tr 
+                                        key={s.id} 
+                                        onClick={() => setSelectedSession(s)}
+                                        className="hover:bg-yellow-50/50 cursor-pointer transition-colors group"
+                                    >
+                                        <td className="px-6 py-4 font-mono text-sm text-gray-500">{s.date}</td>
+                                        <td className="px-6 py-4 font-bold text-gray-700">{team?.name || '-'}</td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-bvb-black group-hover:underline">{s.title}</span>
+                                                {s.linkedDesignId && <PenTool className="w-3.5 h-3.5 text-purple-500" title="关联教案" />}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{s.duration} min</td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-bold uppercase">{s.focus}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border ${
+                                                s.intensity === 'High' ? 'bg-red-50 text-red-700 border-red-100' : 
+                                                s.intensity === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' : 
+                                                'bg-green-50 text-green-700 border-green-100'
+                                            }`}>
+                                                {s.intensity === 'High' ? '高' : s.intensity === 'Medium' ? '中' : '低'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center">
+                                                {s.submissionStatus === 'Reviewed' ? (
+                                                    <span className="flex items-center gap-1 text-[10px] font-black text-green-600 uppercase"><ShieldCheck className="w-3 h-3" /> 已审核</span>
+                                                ) : s.submissionStatus === 'Submitted' ? (
+                                                    <span className="flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase"><RefreshCw className="w-3 h-3 animate-spin" /> 待审核</span>
+                                                ) : (
+                                                    <span className="text-[10px] font-black text-gray-400 uppercase">未提交</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        ) : (
+                            <tr>
+                                <td colSpan={7} className="px-6 py-20 text-center text-gray-400 italic font-bold">
+                                    -- 本月暂无训练计划安排 --
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+  };
+
+  const renderCalendarView = () => {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
       if (timeScope === 'month') return renderMonthGrid(year, month, false);
@@ -559,19 +636,86 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] md:h-auto pb-20 md:pb-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-            <div><h2 className="text-3xl font-black text-bvb-black uppercase">训练计划</h2><div className="flex items-center gap-2 mt-1"><button onClick={() => setTimeScope('month')} className={`text-xs font-bold px-2 py-1 rounded ${timeScope === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-600'}`}>月视图</button><button onClick={() => setTimeScope('quarter')} className={`text-xs font-bold px-2 py-1 rounded ${timeScope === 'quarter' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-600'}`}>季视图</button><button onClick={() => setTimeScope('year')} className={`text-xs font-bold px-2 py-1 rounded ${timeScope === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-600'}`}>年视图</button></div></div>
-            <div className="flex items-center gap-3"><div className="flex items-center bg-white border border-gray-200 rounded-lg p-1 shadow-sm"><button onClick={handlePrevPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronLeft className="w-5 h-5"/></button><span className="px-3 font-bold text-sm min-w-[100px] text-center">{dateLabel}</span><button onClick={handleNextPeriod} className="p-1 hover:bg-gray-100 rounded"><ChevronRight className="w-5 h-5"/></button></div><button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600" title="导出详细业务报表 (PDF)">{isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}</button><button onClick={() => setShowAddModal(true)} className="flex items-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105"><Plus className="w-5 h-5 mr-2" /> 新建计划</button></div>
+            <div>
+                <h2 className="text-3xl font-black text-bvb-black uppercase">训练计划</h2>
+                <div className="flex items-center gap-2 mt-2">
+                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <button onClick={() => setViewType('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black transition-all ${viewType === 'calendar' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                            <Calendar className="w-3.5 h-3.5" /> 日历
+                        </button>
+                        <button onClick={() => setViewType('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black transition-all ${viewType === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                            <LayoutList className="w-3.5 h-3.5" /> 列表
+                        </button>
+                    </div>
+                    <div className="h-4 w-px bg-gray-300 mx-1"></div>
+                    <button onClick={() => setTimeScope('month')} className={`text-[10px] font-black uppercase px-2 py-1 rounded transition-colors ${timeScope === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>月</button>
+                    <button onClick={() => setTimeScope('quarter')} className={`text-[10px] font-black uppercase px-2 py-1 rounded transition-colors ${timeScope === 'quarter' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>季</button>
+                    <button onClick={() => setTimeScope('year')} className={`text-[10px] font-black uppercase px-2 py-1 rounded transition-colors ${timeScope === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>年</button>
+                </div>
+            </div>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0">
+                    <button onClick={handlePrevPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400"/></button>
+                    <span className="px-4 font-black text-sm min-w-[110px] text-center">{dateLabel}</span>
+                    <button onClick={handleNextPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400"/></button>
+                </div>
+                <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出计划表 (PDF)">
+                    {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
+                </button>
+                <button onClick={() => setShowAddModal(true)} className="flex-1 md:flex-none flex items-center justify-center px-5 py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
+                    <Plus className="w-5 h-5 mr-2" /> 新建计划
+                </button>
+            </div>
         </div>
+
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-             <div className="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-sm border border-gray-200 p-4 relative"><h3 className="font-bold text-gray-800 mb-4 flex items-center"><CalendarIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 日程安排</h3>{renderCalendar()}</div>
-             <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0">{renderStats()}<div className="bg-white p-4 rounded-xl border border-gray-200 flex-1 overflow-y-auto custom-scrollbar"><h4 className="font-bold text-gray-800 mb-3 text-sm uppercase flex justify-between items-center"><span>{selectedDate} 安排</span>{selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[10px] bg-bvb-yellow px-1.5 rounded text-bvb-black">Today</span>}</h4><div className="space-y-3">
-                 {userManagedSessions.filter(t => t.date === selectedDate).length > 0 ? (
-                     userManagedSessions.filter(t => t.date === selectedDate).map(s => {
-                         const team = teams.find(t => t.id === s.teamId);
-                         return (<div key={s.id} onClick={() => setSelectedSession(s)} className="p-3 bg-gray-50 border border-gray-100 rounded-lg cursor-pointer hover:bg-yellow-50 transition-colors group"><div className="flex justify-between items-start mb-1"><span className="text-xs font-bold text-gray-500">{team?.name}</span><div className="flex items-center">{s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500 mr-1" />}{s.submissionStatus === 'Submitted' && <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>}{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-green-600 mr-1" />}<span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${s.intensity === 'High' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{s.intensity}</span></div></div><h5 className="font-bold text-gray-800 text-sm">{s.title}</h5><div className="flex items-center text-xs text-gray-400 mt-2"><Clock className="w-3 h-3 mr-1" /> {s.duration} min<span className="mx-2">•</span><Target className="w-3 h-3 mr-1" /> {s.focus}</div></div>)
-                     })
-                 ) : (<div className="text-center py-8 text-gray-400 text-sm"><CalendarIcon className="w-8 h-8 mx-auto mb-2 opacity-20" />当日无训练安排</div>)}
-             </div></div></div>
+             <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+                 {viewType === 'calendar' ? renderCalendarView() : renderListView()}
+             </div>
+             
+             {/* Right Sidebar: Stats & Selected Day Summary (only shown in calendar mode on desktop) */}
+             <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0">
+                 {renderStats()}
+                 <div className="bg-white p-5 rounded-2xl border border-gray-200 flex-1 overflow-y-auto custom-scrollbar shadow-sm">
+                    <h4 className="font-black text-gray-800 mb-4 text-[10px] uppercase tracking-widest flex justify-between items-center border-b pb-3 border-gray-50">
+                        <span>{selectedDate} 当日详情</span>
+                        {selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[10px] bg-bvb-black px-2 py-0.5 rounded-full text-bvb-yellow font-black">TODAY</span>}
+                    </h4>
+                    <div className="space-y-4">
+                        {userManagedSessions.filter(t => t.date === selectedDate).length > 0 ? (
+                            userManagedSessions.filter(t => t.date === selectedDate).map(s => {
+                                const team = teams.find(t => t.id === s.teamId);
+                                return (
+                                    <div key={s.id} onClick={() => setSelectedSession(s)} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl cursor-pointer hover:bg-yellow-50 hover:border-bvb-yellow/30 transition-all group relative">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{team?.name}</span>
+                                            <div className="flex items-center gap-1.5">
+                                                {s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500" />}
+                                                {s.submissionStatus === 'Submitted' && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>}
+                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                                                    s.intensity === 'High' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'
+                                                }`}>{s.intensity}</span>
+                                            </div>
+                                        </div>
+                                        <h5 className="font-black text-gray-800 group-hover:text-bvb-black leading-tight">{s.title}</h5>
+                                        <div className="flex items-center gap-3 text-[10px] text-gray-400 font-bold mt-4 uppercase">
+                                            <div className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {s.duration} MIN</div>
+                                            <div className="flex items-center"><Target className="w-3 h-3 mr-1" /> {s.focus}</div>
+                                        </div>
+                                        {/* Comment: Fixed undefined ChevronRightIcon by using the correctly imported ChevronRight */}
+                                        <ChevronRight className="absolute right-3 bottom-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                    </div>
+                                )
+                            })
+                        ) : (
+                            <div className="text-center py-16 flex flex-col items-center gap-4 text-gray-300">
+                                <CalendarIcon className="w-12 h-12 opacity-10" />
+                                <p className="text-xs font-bold uppercase tracking-widest">当日无训练记录</p>
+                            </div>
+                        )}
+                    </div>
+                 </div>
+             </div>
         </div>
 
         {/* --- EXPORT TEMPLATE --- */}
@@ -606,7 +750,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                     <div className="flex justify-between items-center mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
                                         <div className="flex items-center gap-5">
                                             <div className="w-14 h-14 bg-bvb-black text-bvb-yellow rounded-2xl flex flex-col items-center justify-center font-black">
-                                                <span className="text-[10px] leading-none uppercase">ENTRY</span>
+                                                <span className="text-[10px] font-black leading-none uppercase">ENTRY</span>
                                                 <span className="text-xl leading-none">{idx + 1}</span>
                                             </div>
                                             <div>
