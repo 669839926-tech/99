@@ -30,6 +30,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
+  const [attendanceYear, setAttendanceYear] = useState<number>(new Date().getFullYear());
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
       const d = new Date();
       d.setDate(1); 
@@ -83,19 +84,33 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
 
   // Handle Preset Range Changes
-  const handleRangeChange = (range: TimeRange) => {
+  const handleRangeChange = (range: TimeRange, year: number = attendanceYear) => {
       setAttendanceRange(range);
-      const end = new Date();
-      const start = new Date();
+      const start = new Date(year, 0, 1);
+      const end = new Date(year, 11, 31);
+      const now = new Date();
       
       if (range === 'month') {
+          // 如果是选中的年份是今年，默认到当前月，否则1月
+          const targetMonth = (year === now.getFullYear()) ? now.getMonth() : 0;
+          start.setMonth(targetMonth);
           start.setDate(1);
+          end.setFullYear(year, targetMonth + 1, 0);
       } else if (range === 'quarter') {
-          start.setMonth(end.getMonth() - 3);
+          const targetMonth = (year === now.getFullYear()) ? Math.floor(now.getMonth() / 3) * 3 : 0;
+          start.setMonth(targetMonth);
+          start.setDate(1);
+          end.setFullYear(year, targetMonth + 3, 0);
       } else if (range === 'year') {
           start.setMonth(0);
           start.setDate(1);
+          end.setFullYear(year, 11, 31);
+          // 如果是今年，截止到今天
+          if (year === now.getFullYear()) {
+              end.setMonth(now.getMonth(), now.getDate());
+          }
       }
+
       if (range !== 'custom') {
           setCustomStartDate(start.toISOString().split('T')[0]);
           setCustomEndDate(end.toISOString().split('T')[0]);
@@ -351,7 +366,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (attendancePlayerId !== 'all' && individualReport) {
             await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}`);
         } else {
-            await exportToPDF('attendance-report-export', `训练出勤分析报告`);
+            await exportToPDF('attendance-report-export', `训练出勤分析报告_${attendanceYear}年`);
         }
     } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
   };
@@ -604,6 +619,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     )}
                     <div className="flex bg-gray-100 p-1 rounded-lg">
+                        <div className="flex items-center gap-1.5 px-2 border-r border-gray-200">
+                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                            <select 
+                                value={attendanceYear} 
+                                onChange={(e) => {
+                                    const y = parseInt(e.target.value);
+                                    setAttendanceYear(y);
+                                    handleRangeChange(attendanceRange, y);
+                                }}
+                                className="bg-transparent text-xs font-black text-gray-600 outline-none focus:ring-0 cursor-pointer"
+                            >
+                                {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
+                            </select>
+                        </div>
                         {['month', 'quarter', 'year', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自定义'}</button>)}
                     </div>
                     {attendanceRange === 'custom' && (
