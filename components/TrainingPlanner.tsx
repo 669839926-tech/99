@@ -41,7 +41,6 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
 
-    // Local state for all editable fields
     const [localSession, setLocalSession] = useState<TrainingSession>(JSON.parse(JSON.stringify(session)));
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [drillInput, setDrillInput] = useState('');
@@ -444,7 +443,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const startDay = new Date(year, month, 1).getDay();
       const days = [];
       for (let i = 0; i < startDay; i++) {
-          days.push(<div key={`empty-${i}`} className={`${isCompact ? 'h-8' : 'h-24 md:h-32'} bg-gray-50/50 border-r border-b border-gray-200`}></div>);
+          days.push(<div key={`empty-${i}`} className={`${isCompact ? 'h-8' : 'h-16 md:h-32'} bg-gray-50/50 border-r border-b border-gray-200`}></div>);
       }
       for (let d = 1; d <= daysInMonth; d++) {
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -460,13 +459,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               );
           } else {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-24 md:h-32 border-r border-b border-gray-200 p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-2 h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-1 overflow-y-auto max-h-[calc(100%-24px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[10px] px-1.5 py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level} - {s.title}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-3 h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 ml-1 flex-shrink-0"></div>}</div>); })}</div></div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}</div>); })}</div></div>
               );
           }
       }
       const weekDays = isCompact ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
       return (
-          <div className={`flex flex-col border-gray-200 overflow-hidden ${isCompact ? 'border rounded-lg' : 'border rounded-lg'}`}>{isCompact && <div className="text-center text-xs font-bold bg-gray-100 py-1 text-gray-600 border-b border-gray-200">{month + 1}月</div>}<div className="grid grid-cols-7 gap-px bg-gray-200">{weekDays.map((day, i) => (<div key={i} className={`bg-gray-100 text-center font-bold text-gray-500 uppercase ${isCompact ? 'text-[8px] py-0.5' : 'text-xs p-2'}`}>{day}</div>))}{days}</div></div>
+          <div className={`flex flex-col border-gray-200 overflow-hidden ${isCompact ? 'border rounded-lg' : 'border rounded-lg'}`}>{isCompact && <div className="text-center text-xs font-bold bg-gray-100 py-1 text-gray-600 border-b border-gray-200">{month + 1}月</div>}<div className="grid grid-cols-7 gap-px bg-gray-200">{weekDays.map((day, i) => (<div key={i} className={`bg-gray-100 text-center font-bold text-gray-500 uppercase ${isCompact ? 'text-[8px] py-0.5' : 'text-[10px] md:text-xs p-1 md:p-2'}`}>{day}</div>))}{days}</div></div>
       );
   };
 
@@ -477,13 +476,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 <table className="w-full text-left border-collapse">
                     <thead className="bg-gray-50 text-gray-600 font-black uppercase text-[10px] tracking-widest border-b">
                         <tr>
-                            <th className="px-6 py-4">训练日期</th>
-                            <th className="px-6 py-4">负责梯队</th>
-                            <th className="px-6 py-4">训练主题</th>
-                            <th className="px-6 py-4">时长</th>
-                            <th className="px-6 py-4">科目重点</th>
-                            <th className="px-6 py-4">强度</th>
-                            <th className="px-6 py-4">状态</th>
+                            <th className="px-3 md:px-6 py-4">训练日期</th>
+                            <th className="px-3 md:px-6 py-4">梯队</th>
+                            <th className="px-3 md:px-6 py-4">主题</th>
+                            <th className="px-3 md:px-6 py-4 hidden md:table-cell">时长</th>
+                            <th className="px-3 md:px-6 py-4 hidden md:table-cell">重点</th>
+                            <th className="px-3 md:px-6 py-4 hidden md:table-cell">强度</th>
+                            <th className="px-3 md:px-6 py-4 text-right">状态</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -496,19 +495,19 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         onClick={() => setSelectedSession(s)}
                                         className="hover:bg-yellow-50/50 cursor-pointer transition-colors group"
                                     >
-                                        <td className="px-6 py-4 font-mono text-sm text-gray-500">{s.date}</td>
-                                        <td className="px-6 py-4 font-bold text-gray-700">{team?.name || '-'}</td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-bvb-black group-hover:underline">{s.title}</span>
-                                                {s.linkedDesignId && <PenTool className="w-3.5 h-3.5 text-purple-500" title="关联教案" />}
+                                        <td className="px-3 md:px-6 py-4 font-mono text-xs md:text-sm text-gray-500 whitespace-nowrap">{s.date}</td>
+                                        <td className="px-3 md:px-6 py-4 font-bold text-xs md:text-sm text-gray-700">{team?.level || '-'}</td>
+                                        <td className="px-3 md:px-6 py-4">
+                                            <div className="flex items-center gap-1.5 md:gap-2">
+                                                <span className="font-bold text-xs md:text-sm text-bvb-black group-hover:underline truncate max-w-[100px] md:max-w-none">{s.title}</span>
+                                                {s.linkedDesignId && <PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" title="关联教案" />}
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">{s.duration} min</td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 md:px-6 py-4 text-sm text-gray-500 hidden md:table-cell">{s.duration} min</td>
+                                        <td className="px-3 md:px-6 py-4 hidden md:table-cell">
                                             <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-bold uppercase">{s.focus}</span>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-3 md:px-6 py-4 hidden md:table-cell">
                                             <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border ${
                                                 s.intensity === 'High' ? 'bg-red-50 text-red-700 border-red-100' : 
                                                 s.intensity === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' : 
@@ -517,14 +516,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                 {s.intensity === 'High' ? '高' : s.intensity === 'Medium' ? '中' : '低'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center">
+                                        <td className="px-3 md:px-6 py-4 text-right whitespace-nowrap">
+                                            <div className="flex items-center justify-end">
                                                 {s.submissionStatus === 'Reviewed' ? (
-                                                    <span className="flex items-center gap-1 text-[10px] font-black text-green-600 uppercase"><ShieldCheck className="w-3 h-3" /> 已审核</span>
+                                                    <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-black text-green-600 uppercase"><ShieldCheck className="w-3 h-3" /> <span className="hidden sm:inline">已审核</span></span>
                                                 ) : s.submissionStatus === 'Submitted' ? (
-                                                    <span className="flex items-center gap-1 text-[10px] font-black text-blue-600 uppercase"><RefreshCw className="w-3 h-3 animate-spin" /> 待审核</span>
+                                                    <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-black text-blue-600 uppercase"><RefreshCw className="w-3 h-3 animate-spin" /> <span className="hidden sm:inline">待审核</span></span>
                                                 ) : (
-                                                    <span className="text-[10px] font-black text-gray-400 uppercase">未提交</span>
+                                                    <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase">未提交</span>
                                                 )}
                                             </div>
                                         </td>
@@ -556,7 +555,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   };
 
   const renderStats = () => (
-    <div className="bg-white p-4 rounded-xl border border-gray-200 h-80 flex flex-col">
+    <div className="bg-white p-4 rounded-xl border border-gray-200 h-64 md:h-80 flex flex-col">
         <div className="flex flex-col gap-2 mb-4 shrink-0">
             <h4 className="font-bold text-gray-800 text-xs uppercase flex items-center">
                 <PieChartIcon className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练重点分布
@@ -580,7 +579,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                    <Pie data={statsData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
+                    <Pie data={statsData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={5} dataKey="value">
                         {statsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={['#FDE100', '#000000', '#9CA3AF', '#D1D5DB'][index % 4]} />))}
                     </Pie>
                     <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
@@ -634,17 +633,17 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const removeDrill = (idx: number) => { setFormData(prev => ({ ...prev, drills: prev.drills.filter((_, i) => i !== idx) })); };
 
   return (
-    <div className="space-y-6 flex flex-col h-[calc(100vh-100px)] md:h-auto pb-20 md:pb-0">
+    <div className="space-y-6 flex flex-col h-auto pb-20 md:pb-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
             <div>
-                <h2 className="text-3xl font-black text-bvb-black uppercase">训练计划</h2>
+                <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase">训练计划</h2>
                 <div className="flex items-center gap-2 mt-2">
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button onClick={() => setViewType('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black transition-all ${viewType === 'calendar' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
-                            <Calendar className="w-3.5 h-3.5" /> 日历
+                        <button onClick={() => setViewType('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'calendar' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                            <CalendarIcon className="w-3 h-3 md:w-3.5 md:h-3.5" /> 日历
                         </button>
-                        <button onClick={() => setViewType('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-black transition-all ${viewType === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
-                            <LayoutList className="w-3.5 h-3.5" /> 列表
+                        <button onClick={() => setViewType('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                            <LayoutList className="w-3 h-3 md:w-3.5 md:h-3.5" /> 列表
                         </button>
                     </div>
                     <div className="h-4 w-px bg-gray-300 mx-1"></div>
@@ -653,30 +652,30 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <button onClick={() => setTimeScope('year')} className={`text-[10px] font-black uppercase px-2 py-1 rounded transition-colors ${timeScope === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>年</button>
                 </div>
             </div>
-            <div className="flex items-center gap-3 w-full md:w-auto">
-                <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0">
+            <div className="flex items-center gap-2 w-full md:w-auto">
+                <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0 flex-1 md:flex-none">
                     <button onClick={handlePrevPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400"/></button>
-                    <span className="px-4 font-black text-sm min-w-[110px] text-center">{dateLabel}</span>
+                    <span className="px-2 font-black text-xs md:text-sm flex-1 md:min-w-[110px] text-center whitespace-nowrap">{dateLabel}</span>
                     <button onClick={handleNextPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400"/></button>
                 </div>
                 <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出计划表 (PDF)">
                     {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
                 </button>
-                <button onClick={() => setShowAddModal(true)} className="flex-1 md:flex-none flex items-center justify-center px-5 py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
-                    <Plus className="w-5 h-5 mr-2" /> 新建计划
+                <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
+                    <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建计划</span>
                 </button>
             </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-             <div className="flex-1 overflow-y-auto custom-scrollbar p-1">
+             <div className="flex-1 p-1">
                  {viewType === 'calendar' ? renderCalendarView() : renderListView()}
              </div>
              
-             {/* Right Sidebar: Stats & Selected Day Summary (only shown in calendar mode on desktop) */}
-             <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0">
+             {/* Right Sidebar: Stats & Selected Day Summary */}
+             <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
                  {renderStats()}
-                 <div className="bg-white p-5 rounded-2xl border border-gray-200 flex-1 overflow-y-auto custom-scrollbar shadow-sm">
+                 <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-h-[300px]">
                     <h4 className="font-black text-gray-800 mb-4 text-[10px] uppercase tracking-widest flex justify-between items-center border-b pb-3 border-gray-50">
                         <span>{selectedDate} 当日详情</span>
                         {selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[10px] bg-bvb-black px-2 py-0.5 rounded-full text-bvb-yellow font-black">TODAY</span>}
@@ -702,15 +701,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             <div className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {s.duration} MIN</div>
                                             <div className="flex items-center"><Target className="w-3 h-3 mr-1" /> {s.focus}</div>
                                         </div>
-                                        {/* Comment: Fixed undefined ChevronRightIcon by using the correctly imported ChevronRight */}
                                         <ChevronRight className="absolute right-3 bottom-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                     </div>
                                 )
                             })
                         ) : (
                             <div className="text-center py-16 flex flex-col items-center gap-4 text-gray-300">
-                                <CalendarIcon className="w-12 h-12 opacity-10" />
-                                <p className="text-xs font-bold uppercase tracking-widest">当日无训练记录</p>
+                                <CalendarIcon className="w-10 h-10 md:w-12 md:h-12 opacity-10" />
+                                <p className="text-xs font-bold uppercase tracking-widest text-center">当日无训练记录<br/>(双击日期添加)</p>
                             </div>
                         )}
                     </div>
@@ -741,9 +739,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             const team = teams.find(t => t.id === s.teamId);
                             const sessionAttendance = s.attendance || [];
                             const presentPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Present'));
-                            const leavePlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Leave'));
-                            const injuryPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Injury'));
-                            const absentPlayers = players.filter(p => p.teamId === s.teamId && (!sessionAttendance.find(a => a.playerId === p.id) || sessionAttendance.find(a => a.playerId === p.id && a.status === 'Absent')));
 
                             return (
                                 <div key={s.id} className="relative border-b border-gray-100 pb-10 last:border-b-0 break-inside-avoid">
@@ -843,21 +838,21 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </label>
                   </div>
                   {!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}
-                  <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>)}
+                  <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>)}
                   <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.focus} onChange={e => setFormData({...formData, focus: e.target.value})}>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.focus} onChange={e => setFormData({...formData, focus: e.target.value})}>
                       {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
                       <option value="Custom">自定义...</option>
-                    </select>{formData.focus === 'Custom' && (<input className="w-full p-2 border rounded mt-2 text-xs" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />)}</div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
+                    </select>{formData.focus === 'Custom' && (<input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />)}</div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
                   </div>
-                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div>{drillLibrary && drillLibrary.length > 0 && (<div className="mt-2 flex flex-wrap gap-1"><span className="text-xs text-gray-400 mr-1">快捷添加:</span>{drillLibrary.slice(0, 4).map(d => (<button key={d} type="button" onClick={() => setFormData(prev => ({...prev, drills: [...prev.drills, d]}))} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded hover:bg-yellow-50 hover:text-bvb-black transition-colors">{d}</button>))}</div>)}</div>)}
-                  <button type="submit" disabled={loading} className="w-full py-3 bg-bvb-black text-white font-bold rounded hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button>
+                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm font-bold bg-white" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div>{drillLibrary && drillLibrary.length > 0 && (<div className="mt-2 flex flex-wrap gap-1"><span className="text-xs text-gray-400 mr-1">快捷添加:</span>{drillLibrary.slice(0, 4).map(d => (<button key={d} type="button" onClick={() => setFormData(prev => ({...prev, drills: [...prev.drills, d]}))} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded hover:bg-yellow-50 hover:text-bvb-black transition-colors">{d}</button>))}</div>)}</div>)}
+                  <button type="submit" disabled={loading} className="w-full py-4 bg-bvb-black text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center shadow-lg transition-all">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button>
                 </form>
               </div>
             </div>
