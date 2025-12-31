@@ -91,7 +91,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       const now = new Date();
       
       if (range === 'month') {
-          // 如果是选中的年份是今年，默认到当前月，否则1月
           const targetMonth = (year === now.getFullYear()) ? now.getMonth() : 0;
           start.setMonth(targetMonth);
           start.setDate(1);
@@ -105,7 +104,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           start.setMonth(0);
           start.setDate(1);
           end.setFullYear(year, 11, 31);
-          // 如果是今年，截止到今天
           if (year === now.getFullYear()) {
               end.setMonth(now.getMonth(), now.getDate());
           }
@@ -116,15 +114,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           setCustomEndDate(end.toISOString().split('T')[0]);
       }
   };
-
-  // Set default birthday message when player selected
-  useEffect(() => {
-    if (selectedBirthdayPlayer) {
-      const name = selectedBirthdayPlayer.name;
-      const template = `亲爱的${name}家长：\n今天是属于${name}的特别日子，我代表顽石之光足球俱乐部全体教练员和队友们祝他生日快乐！在足球的路上越踢越精彩！⚽️\n愿新的一岁里，${name}在球场上继续勇敢追梦，在生活中，学习进步，天天向上。`;
-      setBirthdayMessage(template);
-    }
-  }, [selectedBirthdayPlayer]);
 
   // Quick Action: Jump to individual report from credit alert
   const handleLowCreditPlayerClick = (player: Player) => {
@@ -313,27 +302,28 @@ const Dashboard: React.FC<DashboardProps> = ({
         else groups['Absent'].push(p);
     });
     return (
-        <div className="space-y-6 animate-in slide-in-from-right-4">
-            <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
-                <button onClick={() => setSelectedSessionId(null)} className="p-2 hover:bg-gray-100 rounded-full flex items-center justify-center"><ChevronDown className="w-5 h-5 text-gray-500 rotate-90" /></button>
+        <div className="space-y-4 md:space-y-6 animate-in slide-in-from-right-4">
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                <button onClick={() => setSelectedSessionId(null)} className="p-1.5 hover:bg-gray-100 rounded-full flex items-center justify-center"><ChevronDown className="w-5 h-5 text-gray-500 rotate-90" /></button>
                 <div>
-                    <h3 className="text-lg font-black text-gray-800">{session.title}</h3>
-                    <div className="flex items-center text-xs text-gray-500 gap-2 mt-1">
-                        <span className="font-mono bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">{session.date}</span>
-                        <span>{team?.name}</span>
-                        <span className="bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded border border-yellow-100 font-bold">{session.focus}</span>
+                    <h3 className="text-base md:text-lg font-black text-gray-800 leading-tight">{session.title}</h3>
+                    <div className="flex flex-wrap items-center text-[10px] text-gray-500 gap-2 mt-1">
+                        <span className="font-mono bg-gray-100 px-1 py-0.5 rounded border border-gray-200">{session.date}</span>
+                        <span className="font-bold">{team?.name}</span>
+                        <span className="bg-yellow-50 text-yellow-700 px-1 py-0.5 rounded border border-yellow-100 font-black">{session.focus}</span>
                     </div>
                 </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {Object.entries(groups).map(([status, members]) => (
-                    <div key={status} className="bg-white rounded-xl p-4 border border-gray-100 flex flex-col">
-                        <span className="text-sm font-bold text-gray-800 flex items-center mb-3">
-                             {status === 'Present' ? <CheckCircle className="w-4 h-4 mr-1.5 text-green-500"/> : status === 'Leave' ? <Clock className="w-4 h-4 mr-1.5 text-yellow-500"/> : status === 'Injury' ? <AlertTriangle className="w-4 h-4 mr-1.5 text-red-500"/> : <Ban className="w-4 h-4 mr-1.5 text-gray-400"/>}
+                    <div key={status} className="bg-white rounded-xl p-3 md:p-4 border border-gray-100 flex flex-col shadow-sm">
+                        <span className="text-[11px] md:text-sm font-black text-gray-800 flex items-center mb-2 md:mb-3">
+                             {status === 'Present' ? <CheckCircle className="w-3.5 h-3.5 mr-1 text-green-500"/> : status === 'Leave' ? <Clock className="w-3.5 h-3.5 mr-1 text-yellow-500"/> : status === 'Injury' ? <AlertTriangle className="w-3.5 h-3.5 mr-1 text-red-500"/> : <Ban className="w-3.5 h-3.5 mr-1 text-gray-400"/>}
                              {status === 'Present' ? '实到' : status === 'Leave' ? '请假' : status === 'Injury' ? '伤停' : '缺席'} ({members.length})
                         </span>
-                        <div className="space-y-2 flex-1 overflow-y-auto max-h-[200px] custom-scrollbar">
-                            {members.map(p => <div key={p.id} className="text-xs font-bold text-gray-600 bg-gray-50 p-2 rounded">{p.name}</div>)}
+                        <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[150px] md:max-h-[200px] custom-scrollbar">
+                            {members.map(p => <div key={p.id} className="text-[10px] md:text-xs font-bold text-gray-600 bg-gray-50 p-1.5 rounded truncate">{p.name}</div>)}
+                            {members.length === 0 && <div className="text-[9px] text-gray-300 italic">无人员</div>}
                         </div>
                     </div>
                 ))}
@@ -379,18 +369,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     } catch (e) { alert('导出失败'); } finally { setIsExportingCredits(false); }
   };
 
-  const handleDownloadBirthdayCard = async () => {
-    if (!birthdayCardRef.current || !selectedBirthdayPlayer) return;
-    setIsCapturingCard(true);
-    try {
-        const canvas = await html2canvas(birthdayCardRef.current, { scale: 3, useCORS: true, backgroundColor: '#FDE100' });
-        const link = document.createElement('a');
-        link.download = `${selectedBirthdayPlayer.name}_生日贺卡.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    } catch (e) { alert('导出失败'); } finally { setIsCapturingCard(false); }
-  };
-
   const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newAnnouncement.title && newAnnouncement.content) {
@@ -407,93 +385,93 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div id="dashboard-content" className="space-y-8">
+    <div className="space-y-4 md:space-y-6 pb-20 md:pb-6">
+      <div id="dashboard-content" className="space-y-6 md:space-y-8">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end bg-bvb-yellow rounded-2xl p-6 shadow-lg relative overflow-hidden">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end bg-bvb-yellow rounded-2xl p-4 md:p-6 shadow-lg relative overflow-hidden">
            <div className="relative z-10">
-              <h2 className="text-4xl font-black text-bvb-black uppercase tracking-tighter mb-2">俱乐部概览</h2>
-              <p className="text-bvb-black font-bold opacity-80">欢迎回来，{currentUser?.name || '教练'}。这是本周的状态报告。</p>
+              <h2 className="text-2xl md:text-4xl font-black text-bvb-black uppercase tracking-tighter mb-1 md:mb-2 italic">俱乐部概览</h2>
+              <p className="text-[11px] md:text-sm text-bvb-black font-bold opacity-80">欢迎，{currentUser?.name || '教练'}。这是俱乐部当前状态实时报告。</p>
            </div>
-           <div className="relative z-10 mt-4 md:mt-0 flex gap-4 text-center">
-                <div className="bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-sm">
-                    <div className="text-xs font-bold text-gray-500 uppercase">球员总数</div>
-                    <div className="text-2xl font-black text-bvb-black">{stats.totalPlayers}</div>
+           <div className="relative z-10 mt-4 md:mt-0 flex gap-3 md:gap-4 text-center">
+                <div className="bg-white/90 backdrop-blur-sm p-2.5 md:p-3 rounded-xl shadow-sm border border-black/5 flex-1 md:flex-none">
+                    <div className="text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-widest">球员总数</div>
+                    <div className="text-xl md:text-2xl font-black text-bvb-black leading-none mt-1">{stats.totalPlayers}</div>
                 </div>
-                 <div className="bg-white/90 backdrop-blur-sm p-3 rounded-xl shadow-sm">
-                    <div className="text-xs font-bold text-gray-500 uppercase">下场比赛</div>
-                    <div className="text-sm font-black text-bvb-black max-w-[100px] truncate">{stats.nextMatch ? stats.nextMatch.opponent : '无'}</div>
+                 <div className="bg-white/90 backdrop-blur-sm p-2.5 md:p-3 rounded-xl shadow-sm border border-black/5 flex-1 md:flex-none">
+                    <div className="text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-widest">下场对手</div>
+                    <div className="text-xs md:text-sm font-black text-bvb-black max-w-[100px] truncate leading-none mt-1.5">{stats.nextMatch ? stats.nextMatch.opponent : '无安排'}</div>
                 </div>
            </div>
            <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-white/20 to-transparent pointer-events-none"></div>
-           <Trophy className="absolute -right-6 -bottom-6 w-48 h-48 text-white/20 rotate-12 pointer-events-none" />
+           <Trophy className="absolute -right-6 -bottom-6 w-32 md:w-48 h-32 md:h-48 text-white/20 rotate-12 pointer-events-none" />
         </div>
 
         {/* Club Status Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {isDirector && (
-                <div className="bg-white rounded-xl shadow-md border-l-4 border-green-500 p-6 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate?.('finance')}>
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-green-500 p-4 md:p-6 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate?.('finance')}>
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-lg text-gray-800 flex items-center">
-                            <Wallet className="w-6 h-6 mr-2 text-green-500" /> 本月财务快报
+                        <h3 className="font-black text-sm md:text-lg text-gray-800 flex items-center">
+                            <Wallet className="w-4 h-4 md:w-6 md:h-6 mr-1.5 md:mr-2 text-green-500" /> 本月财务快报
                         </h3>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().getMonth() + 1}月实时流水</span>
+                        <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date().getMonth() + 1}月实时流水</span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-green-50 p-3 rounded-lg border border-green-100">
-                             <div className="text-[10px] text-green-600 font-black uppercase">本月收入</div>
-                             <div className="text-lg font-black text-green-700">¥{stats.finance.income.toLocaleString()}</div>
+                        <div className="bg-green-50 p-2 md:p-3 rounded-lg border border-green-100">
+                             <div className="text-[8px] md:text-[10px] text-green-600 font-black uppercase">本月收入</div>
+                             <div className="text-sm md:text-lg font-black text-green-700 leading-none mt-1">¥{stats.finance.income.toLocaleString()}</div>
                         </div>
-                        <div className="bg-red-50 p-3 rounded-lg border border-red-100">
-                             <div className="text-[10px] text-red-600 font-black uppercase">本月支出</div>
-                             <div className="text-lg font-black text-red-700">¥{stats.finance.expense.toLocaleString()}</div>
+                        <div className="bg-red-50 p-2 md:p-3 rounded-lg border border-red-100">
+                             <div className="text-[8px] md:text-[10px] text-red-600 font-black uppercase">本月支出</div>
+                             <div className="text-sm md:text-lg font-black text-red-700 leading-none mt-1">¥{stats.finance.expense.toLocaleString()}</div>
                         </div>
-                        <div className="bg-bvb-yellow/10 p-3 rounded-lg border border-bvb-yellow/20">
-                             <div className="text-[10px] text-bvb-black font-black uppercase">本月盈余</div>
-                             <div className={`text-lg font-black ${stats.finance.profit >= 0 ? 'text-gray-800' : 'text-red-600'}`}>¥{stats.finance.profit.toLocaleString()}</div>
+                        <div className="bg-bvb-yellow/10 p-2 md:p-3 rounded-lg border border-bvb-yellow/20">
+                             <div className="text-[8px] md:text-[10px] text-bvb-black font-black uppercase">本月盈余</div>
+                             <div className={`text-sm md:text-lg font-black leading-none mt-1 ${stats.finance.profit >= 0 ? 'text-gray-800' : 'text-red-600'}`}>¥{stats.finance.profit.toLocaleString()}</div>
                         </div>
                     </div>
                 </div>
             )}
             {isDirector && pendingTasks.total > 0 ? (
-                <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-6">
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-lg text-gray-800 flex items-center">
-                            <ClipboardCheck className="w-6 h-6 mr-2 text-bvb-yellow" /> 待办审核事项
+                        <h3 className="font-black text-sm md:text-lg text-gray-800 flex items-center">
+                            <ClipboardCheck className="w-4 h-4 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 待办审核事项
                         </h3>
-                        <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full animate-pulse">{pendingTasks.total} 个待处理</span>
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{pendingTasks.total} 个待处理</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div onClick={() => onNavigate?.('players', 'pending_reviews')} className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">球员点评</span>
-                            <span className="text-2xl font-black text-blue-600">{pendingTasks.reviews}</span>
+                    <div className="grid grid-cols-3 gap-2 md:gap-4">
+                        <div onClick={() => onNavigate?.('players', 'pending_reviews')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
+                            <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">球员点评</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.reviews}</span>
                         </div>
-                        <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">数据更新</span>
-                            <span className="text-2xl font-black text-blue-600">{pendingTasks.stats}</span>
+                        <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
+                            <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">数据更新</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.stats}</span>
                         </div>
-                        <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志</span>
-                            <span className="text-2xl font-black text-blue-600">{pendingTasks.logs}</span>
+                        <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
+                            <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.logs}</span>
                         </div>
                     </div>
                 </div>
             ) : isDirector ? (
-                <div className="bg-white rounded-xl shadow-md border-l-4 border-gray-200 p-6 flex items-center justify-center">
-                    <div className="text-center"><CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" /><p className="text-sm font-bold text-gray-500 uppercase tracking-widest">所有审核事项已处理完毕</p></div>
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-gray-200 p-4 md:p-6 flex items-center justify-center">
+                    <div className="text-center"><CheckCircle className="w-6 md:w-8 h-6 md:h-8 text-green-500 mx-auto mb-1 md:mb-2" /><p className="text-[10px] md:text-sm font-black text-gray-500 uppercase tracking-widest">所有审核事项已处理完毕</p></div>
                 </div>
             ) : null}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="space-y-4">
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
-                    <h3 className="font-bold flex items-center text-gray-800 mb-3"><Shirt className="w-5 h-5 mr-2 text-indigo-500" /> 梯队人数统计</h3>
+                    <h3 className="font-black text-sm flex items-center text-gray-800 mb-3"><Shirt className="w-4 h-4 mr-1.5 text-indigo-500" /> 梯队人数统计</h3>
                     <div className="space-y-2">
                         {stats.teamCounts.map(t => (
-                            <div key={t.id} onClick={() => onNavigate?.('players', t.id)} className="flex justify-between items-center bg-indigo-50 p-2 rounded text-sm group cursor-pointer hover:bg-indigo-100 transition-all">
-                                <span className="font-bold text-gray-700 group-hover:text-indigo-800">{t.name}</span>
+                            <div key={t.id} onClick={() => onNavigate?.('players', t.id)} className="flex justify-between items-center bg-indigo-50 p-2 rounded-lg text-xs group cursor-pointer hover:bg-indigo-100 transition-all">
+                                <span className="font-black text-gray-700 group-hover:text-indigo-800">{t.name}</span>
                                 <span className="font-mono font-black text-indigo-600">{t.count} 人</span>
                             </div>
                         ))}
@@ -502,14 +480,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {isDirector && (
                     <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
                         <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-bold flex items-center text-gray-800">
-                                <AlertTriangle className={`w-5 h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 课时余额预警
+                            <h3 className="font-black text-sm flex items-center text-gray-800">
+                                <AlertTriangle className={`w-4 h-4 mr-1.5 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 余额预警
                             </h3>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                                 <select 
                                     value={creditAlertTeamId} 
                                     onChange={(e) => setCreditAlertTeamId(e.target.value)}
-                                    className="text-[10px] bg-gray-100 border-none rounded px-1.5 py-0.5 font-bold outline-none focus:ring-1 focus:ring-bvb-yellow"
+                                    className="text-[10px] bg-gray-100 border-none rounded px-1 py-0.5 font-black outline-none focus:ring-1 focus:ring-bvb-yellow"
                                 >
                                     <option value="all">全部</option>
                                     {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
@@ -524,54 +502,54 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </button>
                             </div>
                         </div>
-                        <div className="space-y-2 max-h-[180px] overflow-y-auto custom-scrollbar">
+                        <div className="space-y-2 max-h-[160px] md:max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
                             {stats.lowCreditPlayers.map(p => {
                                 const team = teams.find(t => t.id === p.teamId);
                                 return (
-                                    <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded text-sm cursor-pointer hover:bg-red-100 transition-colors group">
+                                    <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded-lg text-xs cursor-pointer hover:bg-red-100 transition-colors group">
                                         <div className="flex flex-col">
-                                            <span className="font-bold text-gray-700">{p.name}</span>
-                                            <span className="text-[10px] text-gray-400 font-bold uppercase">{team?.name || '未知梯队'}</span>
+                                            <span className="font-black text-gray-700">{p.name}</span>
+                                            <span className="text-[9px] text-gray-400 font-bold uppercase">{team?.name || '未知梯队'}</span>
                                         </div>
                                         <span className="font-mono font-black text-red-600">{p.credits} 节</span>
                                     </div>
                                 );
                             })}
                             {stats.lowCreditPlayers.length === 0 && (
-                                <p className="text-center py-4 text-xs text-gray-400 italic">当前筛选条件下暂无预警人员</p>
+                                <p className="text-center py-4 text-[11px] text-gray-400 italic">暂无低额度预警</p>
                             )}
                         </div>
                     </div>
                 )}
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-pink-500 p-4">
-                    <h3 className="font-bold flex items-center text-gray-800 mb-3"><Cake className="w-5 h-5 mr-2 text-pink-500" /> 近期生日</h3>
+                    <h3 className="font-black text-sm flex items-center text-gray-800 mb-3"><Cake className="w-4 h-4 mr-1.5 text-pink-500" /> 近期生日</h3>
                     {stats.upcomingBirthdays.length > 0 ? (
                         <div className="space-y-2">
-                            <p className="text-[10px] text-gray-400 font-bold uppercase mb-2">点击名字生成专属生日贺卡</p>
-                            <div className="flex flex-wrap gap-2">
+                            <p className="text-[9px] text-gray-400 font-black uppercase mb-2">本周生日球员 (共{stats.upcomingBirthdays.length}人)</p>
+                            <div className="flex flex-wrap gap-1.5 md:gap-2">
                                 {stats.upcomingBirthdays.map(p => (
                                     <button 
                                         key={p.id} 
                                         onClick={() => setSelectedBirthdayPlayer(p)}
-                                        className="bg-pink-50 text-pink-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-pink-100 hover:bg-pink-100 transition-all flex items-center group shadow-sm active:scale-95"
+                                        className="bg-pink-50 text-pink-700 px-2.5 py-1 rounded-lg text-[11px] font-black border border-pink-100 hover:bg-pink-100 transition-all flex items-center group shadow-sm active:scale-95 whitespace-nowrap"
                                     >
-                                        <Sparkles className="w-3 h-3 mr-1.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Sparkles className="w-3 h-3 mr-1 opacity-0 group-hover:opacity-100 transition-opacity" />
                                         {p.name} [{p.monthDay}]
                                     </button>
                                 ))}
                             </div>
                         </div>
-                    ) : <p className="text-xs text-gray-400 text-center py-4">近期无生日</p>}
+                    ) : <p className="text-[11px] text-gray-400 text-center py-4 italic">近期无生日安排</p>}
                 </div>
             </div>
 
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-gray-800 flex items-center"><Megaphone className="w-5 h-5 mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
+                <div className="p-3 md:p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                    <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center italic uppercase tracking-tighter"><Megaphone className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
                     {isDirector && (
-                        <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold">
+                        <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 md:px-3 py-1.5 rounded-lg font-black transition-all hover:bg-gray-100 active:scale-95 shadow-sm">
                             {showAnnounceForm ? <X className="w-3 h-3 mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
-                            {showAnnounceForm ? '取消' : '发布公告'}
+                            {showAnnounceForm ? '取消' : '发布'}
                         </button>
                     )}
                 </div>
@@ -579,48 +557,51 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="p-4 bg-yellow-50 border-b border-yellow-100 animate-in slide-in-from-top-2">
                         <form onSubmit={handleAddAnnouncementSubmit} className="space-y-3">
                             <div className="flex gap-3">
-                                <input placeholder="标题..." className="flex-1 p-2 border rounded-lg text-sm" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} required />
-                                <select className="p-2 border rounded-lg text-sm" value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as any})}>
-                                    <option value="info">通知</option>
-                                    <option value="urgent">紧急</option>
+                                <input placeholder="公告标题..." className="flex-1 p-2 border rounded-lg text-xs md:text-sm font-bold" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} required />
+                                <select className="p-2 border rounded-lg text-xs font-bold bg-white" value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as any})}>
+                                    <option value="info">常规通知</option>
+                                    <option value="urgent">紧急公告</option>
                                 </select>
                             </div>
-                            <textarea placeholder="内容..." rows={2} className="w-full p-2 border rounded-lg text-sm" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} required />
-                            <div className="flex justify-end"><button type="submit" className="px-4 py-1.5 bg-bvb-black text-white text-xs font-bold rounded">发布</button></div>
+                            <textarea placeholder="输入公告详情内容..." rows={2} className="w-full p-2 border rounded-lg text-xs md:text-sm font-bold" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} required />
+                            <div className="flex justify-end"><button type="submit" className="px-5 py-2 bg-bvb-black text-bvb-yellow text-[11px] font-black rounded-lg uppercase italic tracking-widest shadow-md">发布公告</button></div>
                         </form>
                     </div>
                 )}
-                <div className="flex-1 overflow-y-auto max-h-[300px] p-4 space-y-3 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto max-h-[250px] md:max-h-[300px] p-3 md:p-4 space-y-3 custom-scrollbar">
                     {announcements.length > 0 ? announcements.map(item => (
-                        <div key={item.id} className="relative group border border-gray-100 rounded-lg p-3 bg-white">
+                        <div key={item.id} className="relative group border border-gray-100 rounded-xl p-3 bg-white shadow-sm hover:shadow-md transition-all">
                             <div className="flex justify-between items-start mb-1">
-                                <h4 className={`font-bold text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>{item.title}</h4>
-                                <span className="text-[10px] text-gray-400 font-mono">{item.date}</span>
+                                <h4 className={`font-black text-[12px] md:text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>{item.title}</h4>
+                                <span className="text-[9px] text-gray-400 font-mono font-bold tracking-tighter">{item.date}</span>
                             </div>
-                            <p className="text-sm text-gray-600">{item.content}</p>
+                            <p className="text-[11px] md:text-sm text-gray-600 leading-relaxed">{item.content}</p>
                             {isDirector && (
                                 <button onClick={() => onDeleteAnnouncement?.(item.id)} className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button>
                             )}
                         </div>
-                    )) : <div className="text-center py-10 text-gray-400 text-sm italic">暂无公告</div>}
+                    )) : <div className="text-center py-10 text-gray-300 text-xs italic font-black uppercase tracking-widest">No active announcements</div>}
                 </div>
             </div>
         </div>
         
         {/* Attendance Analysis Section */}
-        <div id="attendance-analysis-section" className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col scroll-mt-20">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-bold text-gray-800 flex items-center"><Activity className="w-6 h-6 mr-2 text-bvb-yellow" /> 训练出勤与分析</h3>
-                <div className="flex flex-wrap gap-2 items-center justify-end">
+        <div id="attendance-analysis-section" className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6 flex flex-col scroll-mt-20">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 border-b border-gray-100 pb-4">
+                <div>
+                    <h3 className="text-base md:text-xl font-black text-gray-800 flex items-center italic uppercase tracking-tighter"><Activity className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 训练出勤深度分析</h3>
+                    <p className="text-[9px] md:text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Attendance Analytics & Insights</p>
+                </div>
+                <div className="flex flex-wrap gap-2 items-center justify-end w-full lg:w-auto">
                     {attendancePlayerId === 'all' && (
-                        <div className="flex bg-gray-100 p-1 rounded-lg mr-2">
-                            <button onClick={() => setAnalysisView('player')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><Users className="w-3 h-3 mr-1" /> 按球员</button>
-                            <button onClick={() => setAnalysisView('session')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><LayoutList className="w-3 h-3 mr-1" /> 按课次</button>
+                        <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner shrink-0">
+                            <button onClick={() => setAnalysisView('player')} className={`px-2.5 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><Users className="w-3 h-3 mr-1" /> 按球员</button>
+                            <button onClick={() => setAnalysisView('session')} className={`px-2.5 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><LayoutList className="w-3 h-3 mr-1" /> 按课次</button>
                         </div>
                     )}
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <div className="flex items-center gap-1.5 px-2 border-r border-gray-200">
-                            <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner shrink-0 overflow-x-auto no-scrollbar">
+                        <div className="flex items-center gap-1 px-1.5 border-r border-gray-200">
+                            <Calendar className="w-3 h-3 text-gray-400" />
                             <select 
                                 value={attendanceYear} 
                                 onChange={(e) => {
@@ -628,64 +609,60 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     setAttendanceYear(y);
                                     handleRangeChange(attendanceRange, y);
                                 }}
-                                className="bg-transparent text-xs font-black text-gray-600 outline-none focus:ring-0 cursor-pointer"
+                                className="bg-transparent text-[10px] md:text-xs font-black text-gray-600 outline-none focus:ring-0 cursor-pointer"
                             >
                                 {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
                             </select>
                         </div>
-                        {['month', 'quarter', 'year', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自定义'}</button>)}
+                        {['month', 'quarter', 'year', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-2 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all whitespace-nowrap ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自选'}</button>)}
                     </div>
-                    {attendanceRange === 'custom' && (
-                        <div className="flex gap-1 items-center bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                            <input type="date" className="text-xs bg-transparent" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} />
-                            <span className="text-gray-400">-</span>
-                            <input type="date" className="text-xs bg-transparent" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} />
-                        </div>
-                    )}
-                    <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow">
-                        <option value="all">所有梯队</option>
-                        {displayTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </select>
-                    <select value={attendancePlayerId} onChange={e => setAttendancePlayerId(e.target.value)} className="text-xs p-2 bg-gray-100 rounded-lg border-none outline-none font-bold text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[120px]">
-                        <option value="all">全体球员</option>
-                        {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <button onClick={handleExportPDF} disabled={isExporting} className="p-2 bg-gray-800 text-bvb-yellow rounded-lg">{isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}</button>
+                    
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="flex-1 sm:flex-none text-[10px] md:text-xs p-2 bg-gray-100 rounded-xl border-none outline-none font-black text-gray-600 focus:ring-2 focus:ring-bvb-yellow shadow-inner">
+                            <option value="all">所有梯队</option>
+                            {displayTeams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                        </select>
+                        <select value={attendancePlayerId} onChange={e => setAttendancePlayerId(e.target.value)} className="flex-1 sm:flex-none text-[10px] md:text-xs p-2 bg-gray-100 rounded-xl border-none outline-none font-black text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[150px] shadow-inner">
+                            <option value="all">全体球员</option>
+                            {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                        <button onClick={handleExportPDF} disabled={isExporting} className="p-2 md:p-2.5 bg-bvb-black text-bvb-yellow rounded-xl shadow-lg hover:brightness-110 transition-all disabled:opacity-50 shrink-0">{isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}</button>
+                    </div>
                 </div>
             </div>
 
             {attendancePlayerId !== 'all' && individualReport ? (
-                <div id="individual-attendance-export" className="space-y-6 animate-in fade-in bg-white p-4 rounded-xl">
-                    <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center border border-gray-100">
-                        <div className="flex items-center gap-4">
-                            <img src={individualReport.player.image} className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-sm" />
-                            <div><h3 className="text-lg font-black text-gray-800">{individualReport.player.name}</h3><p className="text-xs text-gray-500">#{individualReport.player.number} • {individualReport.player.position}</p></div>
+                <div id="individual-attendance-export" className="space-y-4 md:space-y-6 animate-in fade-in bg-white rounded-xl">
+                    <div className="bg-gray-50 rounded-2xl p-4 flex justify-between items-center border border-gray-100 shadow-inner">
+                        <div className="flex items-center gap-3 md:gap-4">
+                            <img src={individualReport.player.image} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-white shadow-sm" />
+                            <div><h3 className="text-base md:text-lg font-black text-gray-800">{individualReport.player.name}</h3><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">#{individualReport.player.number} • {individualReport.player.position}</p></div>
                         </div>
-                        <div className="flex gap-4 text-center">
-                            <div><div className="text-xs text-gray-400 font-bold">出勤率</div><div className="text-2xl font-black">{individualReport.stats.rate}%</div></div>
-                            <div><div className="text-xs text-gray-400 font-bold">已参训</div><div className="text-2xl font-black text-green-600">{individualReport.stats.present}</div></div>
+                        <div className="flex gap-4 md:gap-8 text-center pr-2">
+                            <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">参训率</div><div className="text-xl md:text-2xl font-black tabular-nums">{individualReport.stats.rate}%</div></div>
+                            <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">实到</div><div className="text-xl md:text-2xl font-black text-green-600 tabular-nums">{individualReport.stats.present}</div></div>
                         </div>
                     </div>
-                    <div className="overflow-x-auto rounded-lg border border-gray-200">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 font-black text-gray-600 text-[10px] md:text-xs uppercase tracking-widest">
+                    <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 font-black text-gray-500 text-[9px] md:text-xs uppercase tracking-widest border-b">
                                 <tr>
-                                    <th className="px-2 py-3 md:px-4">日期</th>
-                                    <th className="px-2 py-3 md:px-4">主题</th>
-                                    <th className="px-2 py-3 md:px-4 text-center">状态</th>
+                                    <th className="px-3 py-3 md:px-4">日期</th>
+                                    <th className="px-3 py-3 md:px-4">训练主题</th>
+                                    <th className="px-3 py-3 md:px-4 text-center">状态</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {individualReport.sessions.map(s => (
-                                    <tr key={s.id} className="hover:bg-gray-50 text-[11px] md:text-sm">
-                                        <td className="px-2 py-2.5 md:px-4 md:py-3 font-mono text-[9px] md:text-xs text-gray-500">{s.date}</td>
-                                        <td className="px-2 py-2.5 md:px-4 md:py-3 font-bold text-gray-800">{s.title}</td>
-                                        <td className="px-2 py-2.5 md:px-4 md:py-3 text-center whitespace-nowrap">
-                                            <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] md:text-xs font-black uppercase ${
-                                                s.status === 'Present' ? 'bg-green-100 text-green-700' : 
-                                                s.status === 'Leave' ? 'bg-yellow-100 text-yellow-700' :
-                                                s.status === 'Injury' ? 'bg-red-100 text-red-700' :
-                                                'bg-gray-100 text-gray-500'
+                                    <tr key={s.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-3 py-3 md:px-4 font-mono text-[9px] md:text-xs text-gray-400 whitespace-nowrap">{s.date}</td>
+                                        <td className="px-3 py-3 md:px-4 font-black text-gray-700 text-[11px] md:text-sm truncate max-w-[100px] md:max-w-none">{s.title}</td>
+                                        <td className="px-3 py-3 md:px-4 text-center whitespace-nowrap">
+                                            <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] md:text-[10px] font-black uppercase border tracking-tighter ${
+                                                s.status === 'Present' ? 'bg-green-50 text-green-700 border-green-100' : 
+                                                s.status === 'Leave' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
+                                                s.status === 'Injury' ? 'bg-red-50 text-red-700 border-red-100' :
+                                                'bg-gray-100 text-gray-400 border-gray-200'
                                             }`}>
                                                 {s.status === 'Present' ? '实到' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤停' : '缺席'}
                                             </span>
@@ -697,45 +674,44 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 </div>
             ) : (
-                <div id="attendance-report-export" className="space-y-6 bg-white p-2 md:p-4 rounded-xl">
+                <div id="attendance-report-export" className="space-y-6 bg-white rounded-xl">
                     {analysisView === 'session' ? (
                         selectedSessionId ? renderSessionDetail() : (
                         <div className="space-y-6">
-                            <div className="h-32 w-full">
-                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={40} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
+                            <div className="h-32 md:h-48 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50">
+                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" /><Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
                             </div>
-                            <div className="overflow-x-auto rounded-lg border border-gray-200">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-100 font-black text-[10px] md:text-xs uppercase tracking-widest text-gray-600">
+                            <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 border-b">
                                         <tr>
-                                            <th className="px-2 py-3 md:px-4">日期</th>
-                                            <th className="px-2 py-3 md:px-4">梯队</th>
-                                            <th className="px-2 py-3 md:px-4">主题</th>
-                                            <th className="px-2 py-3 md:px-4">出勤率</th>
-                                            <th className="px-2 py-3 md:px-4 text-center">实到</th>
-                                            <th className="px-2 py-3 md:px-4 text-center text-yellow-600">请假</th>
-                                            <th className="px-2 py-3 md:px-4 text-center text-red-600">伤停</th>
-                                            <th className="px-2 py-3 md:px-4 text-center text-gray-400">未到</th>
+                                            <th className="px-3 py-3 md:px-4">日期/梯队</th>
+                                            <th className="px-3 py-3 md:px-4">训练主题</th>
+                                            <th className="px-3 py-3 md:px-4">实到率</th>
+                                            <th className="px-2 py-3 text-center text-green-600">到</th>
+                                            <th className="px-2 py-3 text-center text-yellow-600">假</th>
+                                            <th className="px-2 py-3 text-center text-red-600">伤</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportSessionsData.map(s => (
-                                            <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50 cursor-pointer transition-colors text-[11px] md:text-sm">
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 font-mono text-[9px] md:text-xs text-gray-500 whitespace-nowrap">{s.date}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 font-black text-gray-600">{s.teamName}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 font-bold text-gray-800 truncate max-w-[80px] md:max-w-none">{s.title}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3">
+                                            <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50/30 cursor-pointer transition-colors text-[11px] md:text-sm">
+                                                <td className="px-3 py-3 md:px-4">
+                                                    <div className="font-mono text-[9px] text-gray-400 leading-none">{s.date}</div>
+                                                    <div className="font-black text-gray-600 text-[10px] mt-1 uppercase tracking-tighter">{s.teamName}</div>
+                                                </td>
+                                                <td className="px-3 py-3 md:px-4 font-bold text-gray-800 truncate max-w-[80px] md:max-w-none">{s.title}</td>
+                                                <td className="px-3 py-3 md:px-4">
                                                     <div className="flex items-center gap-1.5 md:gap-2">
-                                                        <div className="w-8 md:w-12 h-1 md:h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-bvb-black" style={{ width: `${s.rate}%` }}></div>
+                                                        <div className="w-8 md:w-16 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-bvb-black rounded-full" style={{ width: `${s.rate}%` }}></div>
                                                         </div>
-                                                        <span className="text-[9px] md:text-xs font-black">{s.rate}%</span>
+                                                        <span className="text-[10px] font-black tabular-nums">{s.rate}%</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-green-600">{s.present}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-yellow-600">{s.leave}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-red-600">{s.injury}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-gray-400">{s.absent}</td>
+                                                <td className="px-2 py-3 text-center font-black text-green-600 tabular-nums">{s.present}</td>
+                                                <td className="px-2 py-3 text-center font-black text-yellow-600 tabular-nums">{s.leave}</td>
+                                                <td className="px-2 py-3 text-center font-black text-red-600 tabular-nums">{s.injury}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -745,40 +721,40 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )
                     ) : (
                         <div className="space-y-6">
-                            <div className="h-44 w-full">
-                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10 }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10 }} unit="%" /><Tooltip contentStyle={{ borderRadius: '8px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={40} /></BarChart></ResponsiveContainer>
+                            <div className="h-40 md:h-56 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50">
+                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" /><Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30}/></BarChart></ResponsiveContainer>
                             </div>
-                            <div className="overflow-x-auto rounded-lg border border-gray-200 max-h-[400px]">
-                                <table className="w-full text-sm text-left border-collapse">
-                                    <thead className="bg-gray-100 font-black text-[10px] md:text-xs uppercase tracking-widest text-gray-600 sticky top-0 z-10">
+                            <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm max-h-[400px]">
+                                <table className="w-full text-left border-collapse">
+                                    <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 sticky top-0 z-10 border-b">
                                         <tr>
-                                            <th className="px-2 py-3 md:px-4">球员</th>
-                                            <th className="px-2 py-3 md:px-4">出勤率</th>
-                                            <th className="px-2 py-3 md:px-4 text-center">实到</th>
-                                            <th className="px-2 py-3 md:px-4 text-center text-yellow-600">请假</th>
-                                            <th className="px-2 py-3 md:px-4 text-center text-red-600">伤停</th>
-                                            <th className="px-2 py-3 md:px-4 text-center text-gray-400">未到</th>
-                                            {isDirector && <th className="px-2 py-3 md:px-4 text-right">余额</th>}
+                                            <th className="px-3 py-3 md:px-4">球员</th>
+                                            <th className="px-3 py-3 md:px-4">参训率</th>
+                                            <th className="px-2 py-3 text-center text-green-600">到</th>
+                                            <th className="px-2 py-3 text-center text-yellow-600">假</th>
+                                            <th className="px-2 py-3 text-center text-red-600">伤</th>
+                                            <th className="px-2 py-3 text-center text-gray-400">缺</th>
+                                            {isDirector && <th className="px-3 py-3 md:px-4 text-right">余额</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportPlayersData.map(p => (
-                                            <tr key={p.id} className="hover:bg-gray-50 text-[11px] md:text-sm">
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 font-black text-gray-800 truncate max-w-[60px] md:max-w-none">{p.name}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3">
-                                                    <div className="flex items-center gap-1 md:gap-2">
-                                                        <div className="flex-1 min-w-[30px] md:min-w-[60px] h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-bvb-black" style={{ width: `${p.rate}%` }}></div>
+                                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors text-[11px] md:text-sm">
+                                                <td className="px-3 py-3 md:px-4 font-black text-gray-800 truncate max-w-[60px] md:max-w-none">{p.name}</td>
+                                                <td className="px-3 py-3 md:px-4">
+                                                    <div className="flex items-center gap-1.5 md:gap-2">
+                                                        <div className="flex-1 min-w-[30px] md:min-w-[80px] h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-bvb-black rounded-full" style={{ width: `${p.rate}%` }}></div>
                                                         </div>
-                                                        <span className="text-[9px] md:text-xs font-black">{p.rate}%</span>
+                                                        <span className="text-[10px] font-black tabular-nums">{p.rate}%</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-green-600">{p.present}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-yellow-600">{p.leave}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-red-600">{p.injury}</td>
-                                                <td className="px-2 py-2.5 md:px-4 md:py-3 text-center font-black text-gray-400">{p.absent}</td>
+                                                <td className="px-2 py-3 text-center font-black text-green-600 tabular-nums">{p.present}</td>
+                                                <td className="px-2 py-3 text-center font-black text-yellow-600 tabular-nums">{p.leave}</td>
+                                                <td className="px-2 py-3 text-center font-black text-red-600 tabular-nums">{p.injury}</td>
+                                                <td className="px-2 py-3 text-center font-black text-gray-300 tabular-nums">{p.absent}</td>
                                                 {isDirector && (
-                                                    <td className={`px-2 py-2.5 md:px-4 md:py-3 text-right font-black tabular-nums ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
+                                                    <td className={`px-3 py-3 md:px-4 text-right font-black tabular-nums ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
                                                         {p.credits}
                                                     </td>
                                                 )}
@@ -793,7 +769,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             )}
         </div>
       </div>
-      {/* ... (此处省略后续模态框内容) */}
     </div>
   );
 };
