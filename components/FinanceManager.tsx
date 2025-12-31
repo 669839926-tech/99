@@ -514,20 +514,20 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-black text-bvb-black uppercase">财务管理</h2>
-                    <p className="text-gray-500">记录日常收支，分析俱乐部经营状况。</p>
+                    <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase tracking-tighter">财务管理</h2>
+                    <p className="text-gray-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest">Financial Records & Performance Analytics</p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                    <div className="flex bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                        <button onClick={() => setViewMode('journal')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>日记账流水</button>
-                        <button onClick={() => setViewMode('summary')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>统计汇总表</button>
-                        <button onClick={() => setViewMode('salary')} className={`px-4 py-2 rounded-md text-xs font-black transition-all ${viewMode === 'salary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>教职薪资</button>
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
+                        <button onClick={() => setViewMode('journal')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>流水</button>
+                        <button onClick={() => setViewMode('summary')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>统计</button>
+                        <button onClick={() => setViewMode('salary')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'salary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>薪资</button>
                     </div>
-                    <button onClick={() => setShowImportModal(true)} className="flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
-                        <FileSpreadsheet className="w-5 h-5 mr-2 text-green-600" /> 批量导入
+                    <button onClick={() => setShowImportModal(true)} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-xs">
+                        <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" /> 导入
                     </button>
-                    <button onClick={() => { setActiveType('income'); setShowAddModal(true); }} className="flex items-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 active:scale-95 transition-all">
-                        <Plus className="w-5 h-5 mr-2" /> 记一笔
+                    <button onClick={() => { setActiveType('income'); setShowAddModal(true); }} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-md hover:brightness-105 active:scale-95 transition-all text-xs">
+                        <Plus className="w-4 h-4 mr-1.5" /> 记账
                     </button>
                 </div>
             </div>
@@ -535,27 +535,27 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             {/* Salary Calculation Tab */}
             {viewMode === 'salary' ? (
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                    <div className="flex flex-col lg:flex-row justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
-                        <h3 className="font-bold text-lg text-gray-800 flex items-center shrink-0"><Calculator className="w-6 h-6 mr-2 text-bvb-yellow" /> 教练员月度薪酬核算表</h3>
-                        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                                <UserCheck className="w-4 h-4 text-gray-400" />
+                    <div className="flex flex-col lg:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
+                        <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center shrink-0 uppercase italic tracking-tighter"><Calculator className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 教练员薪酬核算表</h3>
+                        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
+                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
+                                <UserCheck className="w-3.5 h-3.5 text-gray-400" />
                                 <select 
                                     value={filterCoachId} 
                                     onChange={e => setFilterCoachId(e.target.value)}
-                                    className="bg-transparent text-xs font-black outline-none focus:ring-0 cursor-pointer"
+                                    className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer"
                                 >
-                                    <option value="all">显示全部教练员</option>
+                                    <option value="all">全部教练</option>
                                     {users.filter(u => u.role === 'coach').map(c => (
                                         <option key={c.id} value={c.id}>{c.name}</option>
                                     ))}
                                 </select>
                             </div>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
                                 <select 
                                     value={selectedYear} 
                                     onChange={e => setSelectedYear(parseInt(e.target.value))}
-                                    className="bg-transparent text-xs font-black outline-none focus:ring-0 cursor-pointer"
+                                    className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer"
                                 >
                                     {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
                                 </select>
@@ -563,7 +563,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                 <select 
                                     value={selectedMonth} 
                                     onChange={e => setSelectedMonth(parseInt(e.target.value))}
-                                    className="bg-transparent text-xs font-black outline-none focus:ring-0 cursor-pointer"
+                                    className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer"
                                 >
                                     {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月</option>)}
                                 </select>
@@ -572,63 +572,63 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     </div>
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm text-left border-collapse">
-                                <thead className="bg-gray-50 text-gray-600 font-black uppercase text-[10px] tracking-widest border-b">
+                            <table className="w-full text-xs text-left border-collapse">
+                                <thead className="bg-gray-50 text-gray-500 font-black uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest border-b">
                                     <tr>
-                                        <th className="px-4 py-4">教练信息</th>
-                                        <th className="px-4 py-4 text-right">基础底薪</th>
-                                        <th className="px-4 py-4 text-right">课时费总额</th>
-                                        <th className="px-4 py-4 text-right">月参训奖</th>
-                                        <th className="px-4 py-4 text-right">季度续费奖</th>
-                                        <th className="px-4 py-4 text-center">考核分</th>
-                                        <th className="px-4 py-4 text-right">绩效考核奖</th>
-                                        <th className="px-4 py-4 text-right font-black text-bvb-black">核算应发</th>
-                                        <th className="px-4 py-4 text-center">操作</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4">教练信息</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">底薪</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">课时费</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">参训奖</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">续费奖</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-center">分</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">绩效</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right font-black text-bvb-black">应发总计</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-center">操作</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {coachSalaries.map(sal => {
                                         return (
                                             <React.Fragment key={sal.coachId}>
-                                                <tr className={`hover:bg-gray-50 transition-colors ${sal.isSaved ? 'bg-green-50/20' : ''}`}>
-                                                    <td className="px-4 py-4">
+                                                <tr className={`hover:bg-yellow-50/20 transition-colors ${sal.isSaved ? 'bg-green-50/10' : ''}`}>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4">
                                                         <div className="flex flex-col">
                                                             <div className="flex items-center gap-1">
-                                                                <span className="font-black text-gray-800">{sal.coachName}</span>
-                                                                {sal.isDisbursed && <span className="text-[8px] bg-green-500 text-white px-1 rounded font-black uppercase">已发放</span>}
+                                                                <span className="font-black text-gray-800 text-[11px] md:text-sm">{sal.coachName}</span>
+                                                                {sal.isDisbursed && <span className="text-[7px] md:text-[8px] bg-green-500 text-white px-1 rounded font-black uppercase">已发</span>}
                                                             </div>
-                                                            <span className="text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span>
+                                                            <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-4 text-right">
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-right">
                                                         <input 
                                                             type="number" 
-                                                            className={`w-20 p-1.5 border rounded text-right font-black text-xs bg-transparent focus:bg-white focus:ring-2 focus:ring-bvb-yellow outline-none transition-all ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`}
+                                                            className={`w-12 md:w-20 p-1 border rounded text-right font-black text-[10px] md:text-xs bg-transparent focus:bg-white outline-none ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`}
                                                             value={sal.baseSalary}
                                                             onChange={(e) => handleUpdatePayrollField(sal.coachId, 'baseSalary', e.target.value)}
                                                         />
                                                     </td>
-                                                    <td className="px-4 py-4 text-right"><input type="number" className="w-20 p-1.5 border border-transparent rounded text-right font-black text-xs hover:border-gray-200 focus:bg-white focus:border-bvb-yellow outline-none transition-all" value={sal.sessionFees} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} /></td>
-                                                    <td className="px-4 py-4 text-right"><input type="number" className="w-20 p-1.5 border border-transparent rounded text-right font-black text-xs hover:border-gray-200 focus:bg-white focus:border-bvb-yellow outline-none transition-all" value={sal.attendanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} /></td>
-                                                    <td className="px-4 py-4 text-right"><input type="number" className="w-20 p-1.5 border border-transparent rounded text-right font-black text-xs hover:border-gray-200 focus:bg-white focus:border-bvb-yellow outline-none transition-all" value={sal.renewalReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
-                                                    <td className="px-4 py-4 text-center"><input type="number" min="0" max="10" step="0.1" className="w-14 p-1.5 text-center border rounded font-black text-xs bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none" value={sal.evaluationScore || ''} onChange={e => handleUpdateEvaluation(sal.coachId, parseFloat(e.target.value))} placeholder="0" /></td>
-                                                    <td className="px-4 py-4 text-right"><input type="number" className="w-20 p-1.5 border border-transparent rounded text-right font-black text-xs hover:border-gray-200 focus:bg-white focus:border-bvb-yellow outline-none transition-all" value={sal.performanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'performanceReward', e.target.value)} /></td>
-                                                    <td className="px-4 py-4 text-right font-black text-bvb-black text-base tabular-nums">¥{sal.totalSalary.toLocaleString()}</td>
-                                                    <td className="px-4 py-4 text-center">
-                                                        <div className="flex justify-center gap-1">
-                                                            <button onClick={() => handleSavePayroll(sal.coachId)} className={`p-2 rounded-lg transition-all ${sal.isModified ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'text-gray-300 hover:text-bvb-black hover:bg-gray-100'}`} title="固化月度快照"><Save className="w-4 h-4" /></button>
-                                                            <button onClick={() => handleDisburseSalary(sal.coachId)} className={`p-2 rounded-lg transition-all ${sal.isDisbursed ? 'text-green-500 bg-green-50 cursor-default' : 'bg-green-600 text-white hover:bg-green-700 shadow-md'}`} title="确认发放并记入财务流水" disabled={sal.isDisbursed}>{sal.isDisbursed ? <CheckSquare className="w-4 h-4" /> : <Banknote className="w-4 h-4" />}</button>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} /></td>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.attendanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} /></td>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.renewalReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-center"><input type="number" min="0" max="10" step="0.1" className="w-8 md:w-14 p-1 text-center border rounded font-black text-[10px] md:text-xs bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" value={sal.evaluationScore || ''} onChange={e => handleUpdateEvaluation(sal.coachId, parseFloat(e.target.value))} placeholder="0" /></td>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.performanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'performanceReward', e.target.value)} /></td>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-right font-black text-bvb-black text-[11px] md:text-base tabular-nums leading-none">¥{sal.totalSalary.toLocaleString()}</td>
+                                                    <td className="px-2 py-3 md:px-4 md:py-4 text-center">
+                                                        <div className="flex justify-center gap-0.5 md:gap-1">
+                                                            <button onClick={() => handleSavePayroll(sal.coachId)} className={`p-1.5 md:p-2 rounded-lg transition-all ${sal.isModified ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-300 hover:text-bvb-black hover:bg-gray-100'}`}><Save className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                                                            <button onClick={() => handleDisburseSalary(sal.coachId)} className={`p-1.5 md:p-2 rounded-lg transition-all ${sal.isDisbursed ? 'text-green-500 bg-green-50' : 'bg-green-600 text-white hover:bg-green-700'}`} disabled={sal.isDisbursed}>{sal.isDisbursed ? <CheckSquare className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Banknote className="w-3.5 h-3.5 md:w-4 md:h-4" />}</button>
                                                         </div>
                                                     </td>
                                                 </tr>
                                                 {!sal.isSaved && (
-                                                    <tr className="bg-gray-50/30">
-                                                        <td colSpan={9} className="px-10 py-2 border-b border-gray-100/50">
-                                                            <div className="flex flex-wrap gap-2 text-[9px] font-bold text-gray-400">
+                                                    <tr className="bg-gray-50/10">
+                                                        <td colSpan={9} className="px-4 md:px-10 py-1.5 md:py-2 border-b border-gray-100/30">
+                                                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[8px] md:text-[9px] font-bold text-gray-400">
                                                                 {sal.teamBreakdown.map(teamInfo => (
-                                                                    <div key={teamInfo.teamId} className="flex gap-2">
-                                                                        <span className="text-gray-600">{teams.find(t => t.id === teamInfo.teamId)?.level}:</span>
-                                                                        <span>{teamInfo.sessionCount}次课 / {teamInfo.monthlyAttendanceRate.toFixed(1)}% 参训 {teamInfo.renewalRate > 0 ? `/ ${teamInfo.renewalRate.toFixed(1)}% 续费` : ''}</span>
+                                                                    <div key={teamInfo.teamId} className="flex gap-1">
+                                                                        <span className="text-gray-500">{teams.find(t => t.id === teamInfo.teamId)?.level}:</span>
+                                                                        <span>{teamInfo.sessionCount}课 / {teamInfo.monthlyAttendanceRate.toFixed(0)}%参训 {teamInfo.renewalRate > 0 ? `/ ${teamInfo.renewalRate.toFixed(0)}%续费` : ''}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -645,10 +645,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
             ) : viewMode === 'journal' ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                        <h3 className="font-bold text-gray-800 flex items-center"><FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
-                        <div className="flex items-center gap-4">
-                            {selectedIds.size > 0 && <button onClick={() => onBulkDeleteTransactions(Array.from(selectedIds))} className="text-xs flex items-center bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded-lg font-bold hover:bg-red-100 transition-colors"><Trash2 className="w-3.5 h-3.5 mr-1.5" /> 删除选中 ({selectedIds.size})</button>}
+                    <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center uppercase italic tracking-tighter"><FileText className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
+                        <div className="flex items-center gap-2 md:gap-4">
+                            {selectedIds.size > 0 && <button onClick={() => onBulkDeleteTransactions(Array.from(selectedIds))} className="text-[10px] md:text-xs flex items-center bg-red-50 text-red-600 border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 删除({selectedIds.size})</button>}
                             <button onClick={() => {
                                 const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n";
                                 const rows = journalWithBalance.map(t => {
@@ -660,39 +660,39 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                 link.href = URL.createObjectURL(blob);
                                 link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`;
                                 link.click();
-                            }} className="text-xs flex items-center bg-white border border-gray-300 px-3 py-1.5 rounded-lg font-bold hover:bg-gray-100 transition-colors shadow-sm">
-                                <Download className="w-3.5 h-3.5 mr-1.5" /> 导出表格
+                            }} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100 shadow-sm">
+                                <Download className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 导出
                             </button>
                         </div>
                     </div>
                     <div className="overflow-x-auto max-h-[600px] overflow-y-auto custom-scrollbar">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[10px] tracking-widest sticky top-0 z-10 border-b border-gray-200">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-100 text-gray-500 font-black uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest sticky top-0 z-10 border-b border-gray-200">
                                 <tr>
-                                    <th className="px-6 py-4 w-10 text-center"><input type="checkbox" className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow" checked={selectedIds.size > 0 && selectedIds.size === journalWithBalance.length} onChange={toggleSelectAll} /></th>
-                                    <th className="px-6 py-4">
-                                        <button onClick={() => toggleSort('date')} className="flex items-center gap-1 hover:text-bvb-black transition-colors uppercase">
-                                            日期 {journalSortField === 'date' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                    <th className="px-3 py-3 md:px-6 md:py-4 w-10 text-center"><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={selectedIds.size > 0 && selectedIds.size === journalWithBalance.length} onChange={toggleSelectAll} /></th>
+                                    <th className="px-3 py-3 md:px-6 md:py-4">
+                                        <button onClick={() => toggleSort('date')} className="flex items-center gap-1 hover:text-bvb-black transition-colors">
+                                            日期 {journalSortField === 'date' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}
                                         </button>
                                     </th>
-                                    <th className="px-6 py-4">
-                                        <button onClick={() => toggleSort('category')} className="flex items-center gap-1 hover:text-bvb-black transition-colors uppercase">
-                                            项目分类 {journalSortField === 'category' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                    <th className="px-3 py-3 md:px-6 md:py-4">
+                                        <button onClick={() => toggleSort('category')} className="flex items-center gap-1 hover:text-bvb-black transition-colors">
+                                            分类 {journalSortField === 'category' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}
                                         </button>
                                     </th>
-                                    <th className="px-6 py-4">明细/摘要</th>
-                                    <th className="px-6 py-4 text-right">
-                                        <button onClick={() => toggleSort('income')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors uppercase">
-                                            收入 {journalSortField === 'income' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                    <th className="px-3 py-3 md:px-6 md:py-4">备注/摘要</th>
+                                    <th className="px-3 py-3 md:px-6 md:py-4 text-right">
+                                        <button onClick={() => toggleSort('income')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">
+                                            收入 {journalSortField === 'income' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}
                                         </button>
                                     </th>
-                                    <th className="px-6 py-4 text-right">
-                                        <button onClick={() => toggleSort('expense')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors uppercase">
-                                            支出 {journalSortField === 'expense' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-3 h-3 text-bvb-yellow" /> : <ArrowDown className="w-3 h-3 text-bvb-yellow" />) : <ArrowUpDown className="w-3 h-3 opacity-30" />}
+                                    <th className="px-3 py-3 md:px-6 md:py-4 text-right">
+                                        <button onClick={() => toggleSort('expense')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">
+                                            支出 {journalSortField === 'expense' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}
                                         </button>
                                     </th>
-                                    <th className="px-6 py-4 text-right font-black">余额</th>
-                                    <th className="px-6 py-4 text-center">操作</th>
+                                    <th className="px-3 py-3 md:px-6 md:py-4 text-right font-black">结余</th>
+                                    <th className="px-3 py-3 md:px-6 md:py-4 text-center">操作</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -700,15 +700,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     const cat = financeCategories.find(c => c.id === t.category);
                                     const isSelected = selectedIds.has(t.id);
                                     return (
-                                        <tr key={t.id} className={`hover:bg-yellow-50/30 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
-                                            <td className="px-6 py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-4 h-4 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td>
-                                            <td className="px-6 py-4 font-mono text-xs whitespace-nowrap text-gray-500">{t.date}</td>
-                                            <td className="px-6 py-4 whitespace-nowrap"><span className={`text-[10px] px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知分类'}</span></td>
-                                            <td className="px-6 py-4 font-bold text-gray-800">{t.details}</td>
-                                            <td className="px-6 py-4 text-right font-black text-green-600 tabular-nums">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-black text-red-500 tabular-nums">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}</td>
-                                            <td className="px-6 py-4 text-right font-mono font-black text-gray-700 bg-gray-50/30 tabular-nums">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                                            <td className="px-6 py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-4 h-4" /></button></td>
+                                        <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td>
                                         </tr>
                                     );
                                 })}
@@ -718,20 +718,20 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
             ) : (
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
-                        <h3 className="font-bold text-lg text-gray-800 flex items-center"><BarChart3 className="w-6 h-6 mr-2 text-bvb-yellow" /> 年度财务趋势与月度深度分析</h3>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                                <button onClick={() => setSelectedYear(v => v - 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronLeft className="w-4 h-4 text-gray-400"/></button>
-                                <span className="font-black text-base min-w-[60px] text-center">{selectedYear}年</span>
-                                <button onClick={() => setSelectedYear(v => v + 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronRight className="w-4 h-4 text-gray-400"/></button>
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
+                        <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center uppercase italic tracking-tighter shrink-0"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 年度趋势与深度分析</h3>
+                        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
+                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
+                                <button onClick={() => setSelectedYear(v => v - 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronLeft className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400"/></button>
+                                <span className="font-black text-sm md:text-base min-w-[50px] md:min-w-[60px] text-center">{selectedYear}</span>
+                                <button onClick={() => setSelectedYear(v => v + 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400"/></button>
                             </div>
-                            <span className="text-gray-200">/</span>
-                            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                            <span className="text-gray-200 hidden md:block">/</span>
+                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
                                 <select 
                                     value={selectedMonth} 
                                     onChange={e => setSelectedMonth(parseInt(e.target.value))}
-                                    className="bg-transparent text-xs font-black outline-none focus:ring-0 cursor-pointer"
+                                    className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer"
                                 >
                                     {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月 (深度分析)</option>)}
                                 </select>
@@ -740,170 +740,165 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 gap-6">
-                        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 h-[400px]">
-                            <div className="flex justify-between items-start mb-8">
-                                <h4 className="text-sm font-black text-gray-400 uppercase tracking-[0.15em]">年度收支趋势对比 ({selectedYear})</h4>
-                                <div className="flex gap-6">
+                        <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-gray-200 h-[300px] md:h-[400px]">
+                            <div className="flex justify-between items-start mb-4 md:mb-8">
+                                <h4 className="text-[10px] md:text-sm font-black text-gray-400 uppercase tracking-widest leading-none">年度收支对比 ({selectedYear})</h4>
+                                <div className="flex gap-4 md:gap-6">
                                     <div className="text-right">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase">总收入</p>
-                                        <p className="text-lg font-black text-green-600">¥{annualStats.income.toLocaleString()}</p>
+                                        <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase">收入</p>
+                                        <p className="text-sm md:text-lg font-black text-green-600">¥{annualStats.income.toLocaleString()}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase">总支出</p>
-                                        <p className="text-lg font-black text-red-500">¥{annualStats.expense.toLocaleString()}</p>
+                                        <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase">支出</p>
+                                        <p className="text-sm md:text-lg font-black text-red-500">¥{annualStats.expense.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={monthlySummaryData} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+                                <BarChart data={monthlySummaryData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#6b7280' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', padding: '12px' }} />
-                                    <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '12px', fontWeight: 'bold', paddingTop: '20px'}} />
-                                    <Bar dataKey="income" name="总收入" fill="#22C55E" radius={[6, 6, 0, 0]} barSize={32} />
-                                    <Bar dataKey="expense" name="总支出" fill="#EF4444" radius={[6, 6, 0, 0]} barSize={32} />
+                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
+                                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '10px' }} />
+                                    <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', paddingTop: '10px'}} />
+                                    <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} />
+                                    <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    {/* --- 新增：年度项目汇总构成分析 --- */}
-                    <div className="flex items-center gap-3 py-2">
+                    <div className="flex items-center gap-2 md:gap-3 py-1">
                         <div className="h-px flex-1 bg-gray-200"></div>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">{selectedYear} 年度项目汇总分析</span>
+                        <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">{selectedYear} 年度构成汇总</span>
                         <div className="h-px flex-1 bg-gray-200"></div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         {/* 年度收入构成 */}
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-5 border-b flex justify-between items-center bg-green-50/30">
-                                <h4 className="font-black text-sm uppercase tracking-widest flex items-center text-green-700">
-                                    <ArrowUpRight className="w-5 h-5 mr-2" /> 年度收入构成汇总
+                            <div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30">
+                                <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700">
+                                    <ArrowUpRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度收入分析
                                 </h4>
-                                <span className="text-[10px] font-black text-green-600 bg-white px-2 py-1 rounded shadow-sm border border-green-100">累计 ¥{annualStats.income.toLocaleString()}</span>
+                                <span className="text-[8px] md:text-[10px] font-black text-green-600 bg-white px-1.5 py-0.5 rounded border border-green-100">¥{annualStats.income.toLocaleString()}</span>
                             </div>
-                            <div className="p-6 space-y-5">
+                            <div className="p-4 md:p-6 space-y-4 md:space-y-5">
                                 {annualCategoryAnalysis.incomeData.length > 0 ? annualCategoryAnalysis.incomeData.map((item, idx) => (
-                                    <div key={idx} className="space-y-1.5">
-                                        <div className="flex justify-between items-center text-xs">
-                                            <span className="font-bold text-gray-700">{item.name}</span>
-                                            <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
+                                    <div key={idx} className="space-y-1">
+                                        <div className="flex justify-between items-center text-[10px] md:text-xs">
+                                            <span className="font-bold text-gray-600">{item.name}</span>
+                                            <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
                                         </div>
-                                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-green-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${item.percent}%` }}></div>
+                                        <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-green-500 rounded-full" style={{ width: `${item.percent}%` }}></div>
                                         </div>
                                     </div>
-                                )) : (
-                                    <div className="py-10 text-center text-gray-300 italic text-sm">本年度暂无收入记录</div>
-                                )}
+                                )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}
                             </div>
                         </div>
 
                         {/* 年度支出构成 */}
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-5 border-b flex justify-between items-center bg-red-50/30">
-                                <h4 className="font-black text-sm uppercase tracking-widest flex items-center text-red-700">
-                                    <ArrowDownRight className="w-5 h-5 mr-2" /> 年度支出构成汇总
+                            <div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30">
+                                <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700">
+                                    <ArrowDownRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度支出分析
                                 </h4>
-                                <span className="text-[10px] font-black text-red-600 bg-white px-2 py-1 rounded shadow-sm border border-red-100">累计 ¥{annualStats.expense.toLocaleString()}</span>
+                                <span className="text-[8px] md:text-[10px] font-black text-red-600 bg-white px-1.5 py-0.5 rounded border border-red-100">¥{annualStats.expense.toLocaleString()}</span>
                             </div>
-                            <div className="p-6 space-y-5">
+                            <div className="p-4 md:p-6 space-y-4 md:space-y-5">
                                 {annualCategoryAnalysis.expenseData.length > 0 ? annualCategoryAnalysis.expenseData.map((item, idx) => (
-                                    <div key={idx} className="space-y-1.5">
-                                        <div className="flex justify-between items-center text-xs">
-                                            <span className="font-bold text-gray-700">{item.name}</span>
-                                            <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
+                                    <div key={idx} className="space-y-1">
+                                        <div className="flex justify-between items-center text-[10px] md:text-xs">
+                                            <span className="font-bold text-gray-600">{item.name}</span>
+                                            <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
                                         </div>
-                                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                                            <div className="h-full bg-red-500 rounded-full transition-all duration-1000 ease-out" style={{ width: `${item.percent}%` }}></div>
+                                        <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-red-500 rounded-full" style={{ width: `${item.percent}%` }}></div>
                                         </div>
                                     </div>
-                                )) : (
-                                    <div className="py-10 text-center text-gray-300 italic text-sm">本年度暂无支出记录</div>
-                                )}
+                                )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 py-2">
+                    <div className="flex items-center gap-2 md:gap-3 py-1">
                         <div className="h-px flex-1 bg-gray-200"></div>
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">{selectedMonth + 1}月 业务明细统计</span>
+                        <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">{selectedMonth + 1}月 深度月报</span>
                         <div className="h-px flex-1 bg-gray-200"></div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="bg-bvb-black rounded-2xl shadow-xl p-6 flex flex-col justify-between overflow-hidden relative group">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                        <div className="bg-bvb-black rounded-2xl shadow-xl p-5 md:p-6 flex flex-col justify-between overflow-hidden relative group">
                             <div className="z-10">
-                                <p className="text-bvb-yellow text-[10px] font-black uppercase tracking-widest mb-1">{selectedMonth + 1}月 经营总结</p>
-                                <h4 className="text-white font-black text-2xl italic tracking-tighter mb-6 uppercase">Monthly Status</h4>
+                                <p className="text-bvb-yellow text-[8px] md:text-[10px] font-black uppercase tracking-widest mb-1">{selectedMonth + 1}月 经营汇总</p>
+                                <h4 className="text-white font-black text-xl md:text-2xl italic tracking-tighter mb-4 md:mb-6 uppercase leading-none">Monthly Status</h4>
                             </div>
-                            <div className="space-y-4 z-10">
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span className="text-gray-400 text-xs font-bold">本月收入</span>
-                                    <span className="text-green-400 font-black">¥{monthlyAnalysis.income.toLocaleString()}</span>
+                            <div className="space-y-3 md:space-y-4 z-10">
+                                <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                                    <span className="text-gray-400 text-[10px] md:text-xs font-bold">收入</span>
+                                    <span className="text-green-400 font-black text-xs md:text-sm">¥{monthlyAnalysis.income.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                    <span className="text-gray-400 text-xs font-bold">本月支出</span>
-                                    <span className="text-red-400 font-black">¥{monthlyAnalysis.expense.toLocaleString()}</span>
+                                <div className="flex justify-between items-center border-b border-white/10 pb-1.5">
+                                    <span className="text-gray-400 text-[10px] md:text-xs font-bold">支出</span>
+                                    <span className="text-red-400 font-black text-xs md:text-sm">¥{monthlyAnalysis.expense.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between items-center pt-2">
-                                    <span className="text-white text-sm font-black uppercase">月盈余</span>
-                                    <span className={`text-2xl font-black ${monthlyAnalysis.profit >= 0 ? 'text-bvb-yellow' : 'text-orange-500'}`}>¥{monthlyAnalysis.profit.toLocaleString()}</span>
+                                <div className="flex justify-between items-center pt-1.5">
+                                    <span className="text-white text-[11px] md:text-sm font-black uppercase">盈余</span>
+                                    <span className={`text-xl md:text-2xl font-black ${monthlyAnalysis.profit >= 0 ? 'text-bvb-yellow' : 'text-orange-500'}`}>¥{monthlyAnalysis.profit.toLocaleString()}</span>
                                 </div>
                             </div>
-                            <Wallet className="absolute -right-8 -bottom-8 w-40 h-40 text-white/5 rotate-12 group-hover:rotate-0 transition-transform duration-700" />
+                            <Wallet className="absolute -right-8 -bottom-8 w-32 h-32 md:w-40 md:h-40 text-white/5 rotate-12" />
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                            <div className="p-4 bg-gray-50/50 border-b flex justify-between items-center">
-                                <h4 className="font-black text-xs uppercase tracking-widest flex items-center text-green-600">
-                                    <ArrowUpRight className="w-4 h-4 mr-2" /> 收入项目 ({selectedMonth + 1}月)
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[250px] md:h-auto">
+                            <div className="p-3 md:p-4 bg-gray-50/50 border-b flex justify-between items-center">
+                                <h4 className="font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center text-green-600">
+                                    <ArrowUpRight className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5" /> 收入项目 ({selectedMonth + 1}月)
                                 </h4>
-                                <PieChartIcon className="w-4 h-4 text-gray-300" />
+                                <PieChartIcon className="w-3.5 h-3.5 text-gray-300" />
                             </div>
-                            <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
-                                <table className="w-full text-xs">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <table className="w-full text-[10px] md:text-xs">
                                     <tbody className="divide-y divide-gray-50">
                                         {monthlyAnalysis.incomeData.map((item, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-4 py-3">
+                                                <td className="px-3 py-2.5 md:px-4 md:py-3">
                                                     <p className="font-bold text-gray-700">{item.name}</p>
-                                                    <p className="text-[9px] text-gray-400 font-mono">{item.percent}% 占比</p>
+                                                    <p className="text-[8px] md:text-[9px] text-gray-400 font-mono">{item.percent}%</p>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-black text-green-600 tabular-nums">¥{item.value.toLocaleString()}</td>
+                                                <td className="px-3 py-2.5 md:px-4 md:py-3 text-right font-black text-green-600 tabular-nums">¥{item.value.toLocaleString()}</td>
                                             </tr>
                                         ))}
                                         {monthlyAnalysis.incomeData.length === 0 && (
-                                            <tr><td className="py-20 text-center text-gray-300 italic">本月无收入数据</td></tr>
+                                            <tr><td className="py-12 text-center text-gray-300 italic text-[11px]">本月无收入数据</td></tr>
                                         )}
                                     </tbody>
                                 </table>
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                            <div className="p-4 bg-gray-50/50 border-b flex justify-between items-center">
-                                <h4 className="font-black text-xs uppercase tracking-widest flex items-center text-red-600">
-                                    <ArrowDownRight className="w-4 h-4 mr-2" /> 支出项目 ({selectedMonth + 1}月)
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[250px] md:h-auto">
+                            <div className="p-3 md:p-4 bg-gray-50/50 border-b flex justify-between items-center">
+                                <h4 className="font-black text-[10px] md:text-xs uppercase tracking-widest flex items-center text-red-600">
+                                    <ArrowDownRight className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5" /> 支出项目 ({selectedMonth + 1}月)
                                 </h4>
-                                <TrendingDown className="w-4 h-4 text-gray-300" />
+                                <TrendingDown className="w-3.5 h-3.5 text-gray-300" />
                             </div>
-                            <div className="flex-1 overflow-y-auto max-h-[300px] custom-scrollbar">
-                                <table className="w-full text-xs">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                <table className="w-full text-[10px] md:text-xs">
                                     <tbody className="divide-y divide-gray-50">
                                         {monthlyAnalysis.expenseData.map((item, idx) => (
                                             <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-4 py-3">
+                                                <td className="px-3 py-2.5 md:px-4 md:py-3">
                                                     <p className="font-bold text-gray-700">{item.name}</p>
-                                                    <p className="text-[9px] text-gray-400 font-mono">{item.percent}% 占比</p>
+                                                    <p className="text-[8px] md:text-[9px] text-gray-400 font-mono">{item.percent}%</p>
                                                 </td>
-                                                <td className="px-4 py-3 text-right font-black text-red-600 tabular-nums">¥{item.value.toLocaleString()}</td>
+                                                <td className="px-3 py-2.5 md:px-4 md:py-3 text-right font-black text-red-600 tabular-nums">¥{item.value.toLocaleString()}</td>
                                             </tr>
                                         ))}
                                         {monthlyAnalysis.expenseData.length === 0 && (
-                                            <tr><td className="py-20 text-center text-gray-300 italic">本月无支出数据</td></tr>
+                                            <tr><td className="py-12 text-center text-gray-300 italic text-[11px]">本月无支出数据</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -915,39 +910,39 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
             {/* Modal: Add Transaction (记一笔) */}
             {showAddModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
-                        <div className={`${activeType === 'income' ? 'bg-green-600' : 'bg-red-600'} p-8 flex justify-between items-center text-white`}>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="bg-white w-full h-full md:h-auto md:max-w-lg md:rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                        <div className={`${activeType === 'income' ? 'bg-green-600' : 'bg-red-600'} p-6 md:p-8 flex justify-between items-center text-white shrink-0`}>
                             <div>
-                                <h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic"><Wallet className="w-6 h-6 mr-3" /> {activeType === 'income' ? '录入收入' : '录入支出'}</h3>
-                                <p className="text-white/70 text-xs font-bold mt-1">请填写详细的账目信息</p>
+                                <h3 className="font-black text-xl md:text-2xl flex items-center uppercase tracking-tighter italic"><Wallet className="w-5 h-5 md:w-6 md:h-6 mr-3" /> {activeType === 'income' ? '录入收入' : '录入支出'}</h3>
+                                <p className="text-white/70 text-[10px] md:text-xs font-bold mt-1 uppercase tracking-widest">Entry Accounting Record</p>
                             </div>
                             <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                         </div>
-                        <form onSubmit={handleSubmit} className="p-8 space-y-6 bg-gray-50/50">
+                        <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50 flex-1 overflow-y-auto pb-24 md:pb-8">
                             <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2">
-                                <button type="button" onClick={() => setActiveType('income')} className={`py-3 rounded-xl text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入模式</button>
-                                <button type="button" onClick={() => setActiveType('expense')} className={`py-3 rounded-xl text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出模式</button>
+                                <button type="button" onClick={() => setActiveType('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button>
+                                <button type="button" onClick={() => setActiveType('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">发生日期</label><input type="date" required className="w-full p-3.5 border rounded-2xl font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
-                                <div><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label><select required className="w-full p-3.5 border rounded-2xl font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
+                            <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">发生日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label><select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
                             </div>
-                            <div><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">摘要/明细</label><input required className="w-full p-3.5 border rounded-2xl font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" placeholder="输入具体款项用途或来源..." value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} /></div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">金额 (¥)</label><input type="number" step="0.01" required className="w-full p-3.5 border rounded-2xl font-black text-xl bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" placeholder="0.00" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /></div>
-                                <div><label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">结算账户</label><input className="w-full p-3.5 border rounded-2xl font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" value={formData.account} onChange={e => setFormData({...formData, account: e.target.value})} /></div>
+                            <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">摘要/明细</label><input required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" placeholder="用途或来源..." value={formData.details} onChange={e => setFormData({...formData, details: e.target.value})} /></div>
+                            <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">金额 (¥)</label><input type="number" step="0.01" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-black text-lg md:text-xl bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" placeholder="0.00" value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} /></div>
+                                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">结算账户</label><input className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.account} onChange={e => setFormData({...formData, account: e.target.value})} /></div>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">凭证上传 (可选)</label>
+                                <label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">凭证 (可选)</label>
                                 <div className="relative group">
                                     <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={e => { const f = e.target.files?.[0]; if(f) { const r = new FileReader(); r.onloadend = () => setFormData({...formData, attachment: r.result as string}); r.readAsDataURL(f); }}} />
-                                    <div className="p-6 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-white group-hover:border-bvb-yellow transition-colors">
-                                        {formData.attachment ? <img src={formData.attachment} className="h-20 object-contain rounded" /> : <><ImageIcon className="w-6 h-6 text-gray-300 mb-2" /><span className="text-xs font-bold text-gray-400">点击或拖拽上传原始凭证</span></>}
+                                    <div className="p-4 md:p-6 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center bg-white group-hover:border-bvb-yellow transition-colors">
+                                        {formData.attachment ? <img src={formData.attachment} className="h-16 md:h-20 object-contain rounded" /> : <><ImageIcon className="w-5 h-5 text-gray-300 mb-1" /><span className="text-[10px] font-bold text-gray-400">点击上传凭证</span></>}
                                     </div>
                                 </div>
                             </div>
-                            <button type="submit" className={`w-full py-4 ${activeType === 'income' ? 'bg-green-600' : 'bg-red-600'} text-white font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all text-lg flex items-center justify-center gap-2`}><CheckSquare className="w-6 h-6" /> 确认入账 Confirm Entry</button>
+                            <button type="submit" className={`w-full py-3.5 md:py-4 ${activeType === 'income' ? 'bg-green-600' : 'bg-red-600'} text-white font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all text-sm md:text-lg flex items-center justify-center gap-2`}><CheckSquare className="w-5 h-5 md:w-6 md:h-6" /> 确认入账</button>
                         </form>
                     </div>
                 </div>
@@ -957,25 +952,25 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             {importSummary && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="bg-bvb-black p-8 flex justify-between items-center text-white">
-                            <div><h3 className="font-black text-2xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-6 h-6 mr-3 text-bvb-yellow" /> 导入数据确认</h3></div>
+                        <div className="bg-bvb-black p-6 md:p-8 flex justify-between items-center text-white">
+                            <div><h3 className="font-black text-xl md:text-2xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> 导入数据确认</h3></div>
                             <button onClick={() => setImportSummary(null)}><X className="w-6 h-6" /></button>
                         </div>
-                        <div className="p-10 space-y-8 bg-gray-50/50">
-                            <p className="text-gray-500 font-bold text-center">系统检测到 CSV 文件中包含以下汇总数据：</p>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
-                                    <p className="text-[10px] font-black text-green-600 uppercase mb-2">收入笔数: {importSummary.tempTxs.filter(t=>t.income>0).length}</p>
-                                    <h4 className="text-2xl font-black text-green-800">¥{importSummary.income.toLocaleString()}</h4>
+                        <div className="p-6 md:p-10 space-y-6 md:space-y-8 bg-gray-50/50 text-center">
+                            <p className="text-gray-500 font-bold text-sm md:text-base">解析成功！请确认汇总金额：</p>
+                            <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-green-100">
+                                    <p className="text-[9px] md:text-[10px] font-black text-green-600 uppercase mb-2">收入 ({importSummary.tempTxs.filter(t=>t.income>0).length}笔)</p>
+                                    <h4 className="text-lg md:text-2xl font-black text-green-800 leading-none">¥{importSummary.income.toLocaleString()}</h4>
                                 </div>
-                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-red-100">
-                                    <p className="text-[10px] font-black text-red-600 uppercase mb-2">支出笔数: {importSummary.tempTxs.filter(t=>t.expense>0).length}</p>
-                                    <h4 className="text-2xl font-black text-red-800">¥{importSummary.expense.toLocaleString()}</h4>
+                                <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-red-100">
+                                    <p className="text-[9px] md:text-[10px] font-black text-red-600 uppercase mb-2">支出 ({importSummary.tempTxs.filter(t=>t.expense>0).length}笔)</p>
+                                    <h4 className="text-lg md:text-2xl font-black text-red-800 leading-none">¥{importSummary.expense.toLocaleString()}</h4>
                                 </div>
                             </div>
-                            <div className="flex gap-4 pt-4">
-                                <button onClick={() => setImportSummary(null)} className="flex-1 py-4 bg-gray-200 text-gray-600 font-black rounded-2xl transition-colors hover:bg-gray-300">放弃导入</button>
-                                <button onClick={() => { onBulkAddTransactions(importSummary.tempTxs); setImportSummary(null); }} className="flex-[2] py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-lg hover:brightness-105 active:scale-95 transition-all">全部确认入账</button>
+                            <div className="flex gap-3 md:gap-4 pt-2">
+                                <button onClick={() => setImportSummary(null)} className="flex-1 py-3 md:py-4 bg-gray-200 text-gray-600 font-black rounded-2xl transition-colors text-xs md:text-base">取消</button>
+                                <button onClick={() => { onBulkAddTransactions(importSummary.tempTxs); setImportSummary(null); }} className="flex-[2] py-3 md:py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-lg hover:brightness-105 text-xs md:text-base">全部入账</button>
                             </div>
                         </div>
                     </div>
@@ -986,23 +981,23 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             {showImportModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
                     <div className="bg-white rounded-[32px] shadow-2xl w-full max-md overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                            <h3 className="font-black text-xl flex items-center uppercase italic tracking-tighter"><FileSpreadsheet className="w-6 h-6 mr-3 text-bvb-yellow" /> 批量导入流水</h3>
+                        <div className="bg-bvb-black p-5 md:p-6 flex justify-between items-center text-white shrink-0">
+                            <h3 className="font-black text-lg md:text-xl flex items-center uppercase italic tracking-tighter"><FileSpreadsheet className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> 批量导入流水</h3>
                             <button onClick={() => setShowImportModal(false)} className="p-1 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                         </div>
-                        <div className="p-8 space-y-6 bg-gray-50/50">
-                            <div className="bg-white p-6 rounded-2xl border border-gray-100 text-center">
-                                <FileDown className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                                <h4 className="font-bold text-gray-800 mb-1">第一步：准备文件</h4>
-                                <p className="text-xs text-gray-400 mb-4">请下载 CSV 模板并按要求填写账务数据</p>
-                                <button onClick={handleDownloadTemplate} className="w-full py-3 bg-gray-100 text-gray-600 font-black rounded-xl hover:bg-gray-200 transition-all text-xs uppercase tracking-widest">下载 CSV 业务模板</button>
+                        <div className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50">
+                            <div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 text-center">
+                                <FileDown className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-3" />
+                                <h4 className="font-bold text-gray-800 mb-1 text-sm md:text-base">1. 准备 CSV 模版</h4>
+                                <p className="text-[10px] md:text-xs text-gray-400 mb-4">下载标准格式模板并按要求填写</p>
+                                <button onClick={handleDownloadTemplate} className="w-full py-2.5 md:py-3 bg-gray-100 text-gray-600 font-black rounded-xl hover:bg-gray-200 transition-all text-[10px] md:text-xs uppercase tracking-widest">下载模板</button>
                             </div>
                             <div className="relative group">
                                 <input type="file" accept=".csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleImportCSV} />
-                                <div className="bg-bvb-yellow p-8 rounded-3xl border-4 border-dashed border-bvb-black/20 flex flex-col items-center justify-center text-bvb-black group-hover:scale-105 transition-all">
-                                    <Upload className="w-12 h-12 mb-3" />
-                                    <h4 className="font-black uppercase italic text-lg">第二步：上传解析</h4>
-                                    <p className="text-[10px] font-bold opacity-60 mt-1">支持标准 CSV 格式流水文件</p>
+                                <div className="bg-bvb-yellow p-6 md:p-8 rounded-3xl border-4 border-dashed border-bvb-black/20 flex flex-col items-center justify-center text-bvb-black group-hover:scale-[1.02] transition-all">
+                                    <Upload className="w-10 h-10 md:w-12 md:h-12 mb-2 md:mb-3" />
+                                    <h4 className="font-black uppercase italic text-base md:text-lg">2. 点击上传</h4>
+                                    <p className="text-[9px] md:text-[10px] font-bold opacity-60 mt-1 uppercase">Process Batch Data</p>
                                 </div>
                             </div>
                         </div>
