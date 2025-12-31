@@ -415,6 +415,48 @@ const Dashboard: React.FC<DashboardProps> = ({
            <Trophy className="absolute -right-6 -bottom-6 w-32 h-32 md:w-48 md:h-48 text-white/20 rotate-12 pointer-events-none" />
         </div>
 
+        {/* Club Announcements Section - Promoted to Top */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            <div className="p-3 md:p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 className="font-bold text-gray-800 flex items-center text-sm md:text-base"><Megaphone className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
+                {isDirector && (
+                    <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold">
+                        {showAnnounceForm ? <X className="w-3 h-3 mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
+                        {showAnnounceForm ? '取消' : '发布'}
+                    </button>
+                )}
+            </div>
+            {showAnnounceForm && (
+                <div className="p-3 md:p-4 bg-yellow-50 border-b border-yellow-100 animate-in slide-in-from-top-2">
+                    <form onSubmit={handleAddAnnouncementSubmit} className="space-y-3">
+                        <div className="flex gap-2 md:gap-3">
+                            <input placeholder="标题..." className="flex-1 p-2 border rounded-lg text-[11px] md:text-sm" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} required />
+                            <select className="p-2 border rounded-lg text-[11px] md:text-sm bg-white" value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as any})}>
+                                <option value="info">通知</option>
+                                <option value="urgent">紧急</option>
+                            </select>
+                        </div>
+                        <textarea placeholder="内容..." rows={2} className="w-full p-2 border rounded-lg text-[11px] md:text-sm" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} required />
+                        <div className="flex justify-end"><button type="submit" className="px-3 md:px-4 py-1.5 bg-bvb-black text-white text-[11px] md:text-xs font-bold rounded">发布公告</button></div>
+                    </form>
+                </div>
+            )}
+            <div className="flex-1 overflow-y-auto max-h-[200px] md:max-h-[250px] p-3 md:p-4 space-y-2.5 md:space-y-3 custom-scrollbar">
+                {announcements.length > 0 ? announcements.map(item => (
+                    <div key={item.id} className="relative group border border-gray-100 rounded-lg p-2.5 md:p-3 bg-white hover:border-bvb-yellow/30 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                            <h4 className={`font-bold text-[11px] md:text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>{item.title}</h4>
+                            <span className="text-[8px] md:text-[10px] text-gray-400 font-mono shrink-0 ml-2">{item.date}</span>
+                        </div>
+                        <p className="text-[10px] md:text-sm text-gray-600 leading-relaxed">{item.content}</p>
+                        {isDirector && (
+                            <button onClick={() => onDeleteAnnouncement?.(item.id)} className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
+                        )}
+                    </div>
+                )) : <div className="text-center py-10 text-gray-400 text-[11px] md:text-sm italic">暂无公告</div>}
+            </div>
+        </div>
+
         {/* Club Status Summary */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             {isDirector && (
@@ -471,124 +513,89 @@ const Dashboard: React.FC<DashboardProps> = ({
             ) : null}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
-            <div className="space-y-4">
-                <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
-                    <h3 className="font-bold flex items-center text-gray-800 mb-3 text-sm md:text-base"><Shirt className="w-5 h-5 mr-2 text-indigo-500" /> 梯队人数统计</h3>
-                    <div className="space-y-1.5 md:space-y-2">
-                        {stats.teamCounts.map(t => (
-                            <div key={t.id} onClick={() => onNavigate?.('players', t.id)} className="flex justify-between items-center bg-indigo-50 p-2 rounded text-[11px] md:text-sm group cursor-pointer hover:bg-indigo-100 transition-all">
-                                <span className="font-bold text-gray-700 group-hover:text-indigo-800 truncate max-w-[120px] md:max-w-none">{t.name}</span>
-                                <span className="font-mono font-black text-indigo-600 shrink-0">{t.count} 人</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-                {isDirector && (
-                    <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-bold flex items-center text-gray-800 text-sm md:text-base">
-                                <AlertTriangle className={`w-4 h-4 md:w-5 md:h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 课时余额预警
-                            </h3>
-                            <div className="flex items-center gap-1.5 md:gap-2">
-                                <select 
-                                    value={creditAlertTeamId} 
-                                    onChange={(e) => setCreditAlertTeamId(e.target.value)}
-                                    className="text-[9px] md:text-[10px] bg-gray-100 border-none rounded px-1.5 py-0.5 font-bold outline-none focus:ring-1 focus:ring-bvb-yellow"
-                                >
-                                    <option value="all">全部</option>
-                                    {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
-                                </select>
-                                <button 
-                                    onClick={handleExportCreditsPDF} 
-                                    disabled={isExportingCredits || stats.lowCreditPlayers.length === 0}
-                                    className="p-1 text-gray-400 hover:text-bvb-black disabled:opacity-30"
-                                    title="导出预警名单"
-                                >
-                                    {isExportingCredits ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                                </button>
-                            </div>
+        {/* Detailed Stats Grid - Optimized to 3 Columns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
+                <h3 className="font-bold flex items-center text-gray-800 mb-3 text-sm md:text-base"><Shirt className="w-5 h-5 mr-2 text-indigo-500" /> 梯队人数统计</h3>
+                <div className="space-y-1.5 md:space-y-2">
+                    {stats.teamCounts.map(t => (
+                        <div key={t.id} onClick={() => onNavigate?.('players', t.id)} className="flex justify-between items-center bg-indigo-50 p-2 rounded text-[11px] md:text-sm group cursor-pointer hover:bg-indigo-100 transition-all">
+                            <span className="font-bold text-gray-700 group-hover:text-indigo-800 truncate max-w-[120px] md:max-w-none">{t.name}</span>
+                            <span className="font-mono font-black text-indigo-600 shrink-0">{t.count} 人</span>
                         </div>
-                        <div className="space-y-1.5 md:space-y-2 max-h-[160px] md:max-h-[180px] overflow-y-auto custom-scrollbar">
-                            {stats.lowCreditPlayers.map(p => {
-                                const team = teams.find(t => t.id === p.teamId);
-                                return (
-                                    <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded text-[11px] md:text-sm cursor-pointer hover:bg-red-100 transition-colors group">
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="font-bold text-gray-700 truncate">{p.name}</span>
-                                            <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase truncate">{team?.name || '未知梯队'}</span>
-                                        </div>
-                                        <span className="font-mono font-black text-red-600 shrink-0 ml-2">{p.credits} 节</span>
-                                    </div>
-                                );
-                            })}
-                            {stats.lowCreditPlayers.length === 0 && (
-                                <p className="text-center py-4 text-[10px] md:text-xs text-gray-400 italic">当前暂无预警人员</p>
-                            )}
-                        </div>
-                    </div>
-                )}
-                <div className="bg-white rounded-xl shadow-sm border-l-4 border-pink-500 p-4">
-                    <h3 className="font-bold flex items-center text-gray-800 mb-3 text-sm md:text-base"><Cake className="w-5 h-5 mr-2 text-pink-500" /> 近期生日</h3>
-                    {stats.upcomingBirthdays.length > 0 ? (
-                        <div className="space-y-2">
-                            <p className="text-[9px] md:text-[10px] text-gray-400 font-bold uppercase mb-2 tracking-tighter md:tracking-normal">点击名字生成专属生日贺卡</p>
-                            <div className="flex flex-wrap gap-1.5 md:gap-2">
-                                {stats.upcomingBirthdays.map(p => (
-                                    <button 
-                                        key={p.id} 
-                                        onClick={() => setSelectedBirthdayPlayer(p)}
-                                        className="bg-pink-50 text-pink-700 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold border border-pink-100 hover:bg-pink-100 transition-all flex items-center group shadow-sm active:scale-95"
-                                    >
-                                        <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        {p.name} [{p.monthDay}]
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    ) : <p className="text-[10px] md:text-xs text-gray-400 text-center py-4">近期无生日</p>}
+                    ))}
                 </div>
             </div>
 
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                <div className="p-3 md:p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-gray-800 flex items-center text-sm md:text-base"><Megaphone className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
-                    {isDirector && (
-                        <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold">
-                            {showAnnounceForm ? <X className="w-3 h-3 mr-1" /> : <Plus className="w-3 h-3 mr-1" />}
-                            {showAnnounceForm ? '取消' : '发布'}
-                        </button>
-                    )}
-                </div>
-                {showAnnounceForm && (
-                    <div className="p-3 md:p-4 bg-yellow-50 border-b border-yellow-100 animate-in slide-in-from-top-2">
-                        <form onSubmit={handleAddAnnouncementSubmit} className="space-y-3">
-                            <div className="flex gap-2 md:gap-3">
-                                <input placeholder="标题..." className="flex-1 p-2 border rounded-lg text-[11px] md:text-sm" value={newAnnouncement.title} onChange={e => setNewAnnouncement({...newAnnouncement, title: e.target.value})} required />
-                                <select className="p-2 border rounded-lg text-[11px] md:text-sm bg-white" value={newAnnouncement.type} onChange={e => setNewAnnouncement({...newAnnouncement, type: e.target.value as any})}>
-                                    <option value="info">通知</option>
-                                    <option value="urgent">紧急</option>
-                                </select>
-                            </div>
-                            <textarea placeholder="内容..." rows={2} className="w-full p-2 border rounded-lg text-[11px] md:text-sm" value={newAnnouncement.content} onChange={e => setNewAnnouncement({...newAnnouncement, content: e.target.value})} required />
-                            <div className="flex justify-end"><button type="submit" className="px-3 md:px-4 py-1.5 bg-bvb-black text-white text-[11px] md:text-xs font-bold rounded">发布公告</button></div>
-                        </form>
-                    </div>
-                )}
-                <div className="flex-1 overflow-y-auto max-h-[250px] md:max-h-[300px] p-3 md:p-4 space-y-2.5 md:space-y-3 custom-scrollbar">
-                    {announcements.length > 0 ? announcements.map(item => (
-                        <div key={item.id} className="relative group border border-gray-100 rounded-lg p-2.5 md:p-3 bg-white hover:border-bvb-yellow/30 transition-colors">
-                            <div className="flex justify-between items-start mb-1">
-                                <h4 className={`font-bold text-[11px] md:text-sm ${item.type === 'urgent' ? 'text-red-600' : 'text-gray-800'}`}>{item.title}</h4>
-                                <span className="text-[8px] md:text-[10px] text-gray-400 font-mono shrink-0 ml-2">{item.date}</span>
-                            </div>
-                            <p className="text-[10px] md:text-sm text-gray-600 leading-relaxed">{item.content}</p>
-                            {isDirector && (
-                                <button onClick={() => onDeleteAnnouncement?.(item.id)} className="absolute top-2 right-2 p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5" /></button>
-                            )}
+            {isDirector ? (
+                <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="font-bold flex items-center text-gray-800 text-sm md:text-base">
+                            <AlertTriangle className={`w-4 h-4 md:w-5 md:h-5 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 课时余额预警
+                        </h3>
+                        <div className="flex items-center gap-1.5 md:gap-2">
+                            <select 
+                                value={creditAlertTeamId} 
+                                onChange={(e) => setCreditAlertTeamId(e.target.value)}
+                                className="text-[9px] md:text-[10px] bg-gray-100 border-none rounded px-1.5 py-0.5 font-bold outline-none focus:ring-1 focus:ring-bvb-yellow"
+                            >
+                                <option value="all">全部</option>
+                                {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                            </select>
+                            <button 
+                                onClick={handleExportCreditsPDF} 
+                                disabled={isExportingCredits || stats.lowCreditPlayers.length === 0}
+                                className="p-1 text-gray-400 hover:text-bvb-black disabled:opacity-30"
+                                title="导出预警名单"
+                            >
+                                {isExportingCredits ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                            </button>
                         </div>
-                    )) : <div className="text-center py-10 text-gray-400 text-[11px] md:text-sm italic">暂无公告</div>}
+                    </div>
+                    <div className="space-y-1.5 md:space-y-2 max-h-[160px] md:max-h-[180px] overflow-y-auto custom-scrollbar">
+                        {stats.lowCreditPlayers.map(p => {
+                            const team = teams.find(t => t.id === p.teamId);
+                            return (
+                                <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded text-[11px] md:text-sm cursor-pointer hover:bg-red-100 transition-colors group">
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="font-bold text-gray-700 truncate">{p.name}</span>
+                                        <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase truncate">{team?.name || '未知梯队'}</span>
+                                    </div>
+                                    <span className="font-mono font-black text-red-600 shrink-0 ml-2">{p.credits} 节</span>
+                                </div>
+                            );
+                        })}
+                        {stats.lowCreditPlayers.length === 0 && (
+                            <p className="text-center py-4 text-[10px] md:text-xs text-gray-400 italic">当前暂无预警人员</p>
+                        )}
+                    </div>
                 </div>
+            ) : (
+                <div className="bg-gray-50/50 rounded-xl border-2 border-dashed border-gray-200 p-4 flex flex-col items-center justify-center text-center">
+                    <Activity className="w-8 h-8 text-gray-300 mb-2" />
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">请关注本队出勤详情</p>
+                </div>
+            )}
+
+            <div className="bg-white rounded-xl shadow-sm border-l-4 border-pink-500 p-4">
+                <h3 className="font-bold flex items-center text-gray-800 mb-3 text-sm md:text-base"><Cake className="w-5 h-5 mr-2 text-pink-500" /> 近期生日</h3>
+                {stats.upcomingBirthdays.length > 0 ? (
+                    <div className="space-y-2">
+                        <p className="text-[9px] md:text-[10px] text-gray-400 font-bold uppercase mb-2 tracking-tighter md:tracking-normal">点击名字生成专属生日贺卡</p>
+                        <div className="flex flex-wrap gap-1.5 md:gap-2">
+                            {stats.upcomingBirthdays.map(p => (
+                                <button 
+                                    key={p.id} 
+                                    onClick={() => setSelectedBirthdayPlayer(p)}
+                                    className="bg-pink-50 text-pink-700 px-2 py-1 md:px-3 md:py-1.5 rounded-lg text-[10px] md:text-xs font-bold border border-pink-100 hover:bg-pink-100 transition-all flex items-center group shadow-sm active:scale-95"
+                                >
+                                    <Sparkles className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    {p.name} [{p.monthDay}]
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                ) : <p className="text-[10px] md:text-xs text-gray-400 text-center py-4">近期无生日</p>}
             </div>
         </div>
         
