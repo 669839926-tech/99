@@ -24,6 +24,13 @@ interface DashboardProps {
 type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
 type AnalysisView = 'player' | 'session';
 
+// 辅助函数：修复 JS new Date(str) 在不同浏览器和时区下的解析偏差
+const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
     announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement, appLogo
@@ -31,6 +38,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
   const [attendanceYear, setAttendanceYear] = useState<number>(new Date().getFullYear());
+  
+  // 具体的月/季选择状态
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedQuarter, setSelectedQuarter] = useState<number>(Math.floor(new Date().getMonth() / 3));
+
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
       const d = new Date();
       d.setDate(1); 
@@ -48,15 +60,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Credit Alert Filter
   const [creditAlertTeamId, setCreditAlertTeamId] = useState<string>('all');
   
-  // Birthday Card State
-  const [selectedBirthdayPlayer, setSelectedBirthdayPlayer] = useState<any>(null);
-  const [birthdayMessage, setBirthdayMessage] = useState('');
-  const [isCapturingCard, setIsCapturingCard] = useState(false);
-  const birthdayCardRef = useRef<HTMLDivElement>(null);
-
   // Permission check
   const isDirector = currentUser?.role === 'director';
-  const isCoach = currentUser?.role === 'coach';
 
   // --- Filter Data for Coaches ---
   const managedTeamIds = useMemo(() => {
@@ -80,40 +85,27 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [trainings, isDirector, managedTeamIds]);
 
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
-  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
 
-  // Handle Preset Range Changes
-  const handleRangeChange = (range: TimeRange, year: number = attendanceYear) => {
-      setAttendanceRange(range);
-      const start = new Date(year, 0, 1);
-      const end = new Date(year, 11, 31);
-      const now = new Date();
-      
-      if (range === 'month') {
-          const targetMonth = (year === now.getFullYear()) ? now.getMonth() : 0;
-          start.setMonth(targetMonth);
-          start.setDate(1);
-          end.setFullYear(year, targetMonth + 1, 0);
-      } else if (range === 'quarter') {
-          const targetMonth = (year === now.getFullYear()) ? Math.floor(now.getMonth() / 3) * 3 : 0;
-          start.setMonth(targetMonth);
-          start.setDate(1);
-          end.setFullYear(year, targetMonth + 3, 0);
-      } else if (range === 'year') {
-          start.setMonth(0);
-          start.setDate(1);
-          end.setFullYear(year, 11, 31);
-          if (year === now.getFullYear()) {
-              end.setMonth(now.getMonth(), now.getDate());
-          }
-      }
+  // 核心日期范围计算逻辑
+  const dateRange = useMemo(() => {
+    let start = new Date(attendanceYear, 0, 1);
+    let end = new Date(attendanceYear, 11, 31, 23, 59, 59);
 
-      if (range !== 'custom') {
-          setCustomStartDate(start.toISOString().split('T')[0]);
-          setCustomEndDate(end.toISOString().split('T')[0]);
-      }
-  };
+    if (attendanceRange === 'month') {
+        start = new Date(attendanceYear, selectedMonth, 1);
+        end = new Date(attendanceYear, selectedMonth + 1, 0, 23, 59, 59);
+    } else if (attendanceRange === 'quarter') {
+        start = new Date(attendanceYear, selectedQuarter * 3, 1);
+        end = new Date(attendanceYear, (selectedQuarter * 3) + 3, 0, 23, 59, 59);
+    } else if (attendanceRange === 'custom') {
+        start = parseLocalDate(customStartDate);
+        end = parseLocalDate(customEndDate);
+        end.setHours(23, 59, 59, 999);
+    }
+
+    return { start, end };
+  }, [attendanceRange, attendanceYear, selectedMonth, selectedQuarter, customStartDate, customEndDate]);
 
   // Quick Action: Jump to individual report from credit alert
   const handleLowCreditPlayerClick = (player: Player) => {
@@ -140,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
       setAttendancePlayerId('all');
       setSelectedSessionId(null);
-  }, [attendanceTeamId, attendanceRange]);
+  }, [attendanceTeamId, attendanceRange, selectedMonth, selectedQuarter, attendanceYear]);
 
   // Director Pending Tasks Logic
   const pendingTasks = useMemo(() => {
@@ -193,14 +185,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         const d = new Date(t.date);
         let year = isNaN(d.getTime()) ? -1 : d.getFullYear();
         let month = isNaN(d.getTime()) ? -1 : d.getMonth();
-        if (year === -1) {
-            const yMatch = t.date.match(/^(\d{4})/);
-            if (yMatch) year = parseInt(yMatch[1]);
-        }
-        if (month === -1) {
-            const mMatch = t.date.match(/年(\d{1,2})月/) || t.date.match(/-(\d{1,2})-/);
-            if (mMatch) month = parseInt(mMatch[1]) - 1;
-        }
         return month === currentMonth && year === currentYear;
     });
     const monthlyIncome = monthlyTransactions.reduce((s, t) => s + (Number(t.income) || 0), 0);
@@ -217,11 +201,11 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [displayPlayers, displayTeams, transactions, matches, isDirector, creditAlertTeamId]);
 
   const { chartData, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
-    const start = new Date(customStartDate);
-    const end = new Date(customEndDate);
-    end.setHours(23, 59, 59, 999);
+    const start = dateRange.start;
+    const end = dateRange.end;
+
     const filteredSessions = (displayTrainings || []).filter(s => {
-        const d = new Date(s.date);
+        const d = parseLocalDate(s.date);
         const matchDate = d >= start && d <= end;
         const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId;
         return matchDate && matchTeam;
@@ -241,13 +225,13 @@ const Dashboard: React.FC<DashboardProps> = ({
              const rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
              grandTotalRate += rate;
              grandTotalCount++;
-             const d = new Date(s.date);
+             const d = parseLocalDate(s.date);
              return { name: `${d.getMonth() + 1}/${d.getDate()}`, rate, fullDate: s.date, title: s.title, id: s.id };
         });
     } else {
         const groupedData: Record<string, { totalRate: number; count: number }> = {};
         filteredSessions.forEach(session => {
-            const date = new Date(session.date);
+            const date = parseLocalDate(session.date);
             let key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
             const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
             const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
@@ -286,7 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
 
     return { chartData: data, averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0, exportPlayersData: exportList, exportSessionsData: exportSessions, teamPlayersList: teamPlayers };
-  }, [displayTrainings, displayPlayers, attendanceRange, attendanceTeamId, customStartDate, customEndDate, analysisView, teams]);
+  }, [displayTrainings, displayPlayers, dateRange, attendanceRange, attendanceTeamId, analysisView, teams]);
 
   const renderSessionDetail = () => {
     if (!selectedSessionId) return null;
@@ -336,11 +320,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (attendancePlayerId === 'all') return null;
       const player = displayPlayers.find(p => p.id === attendancePlayerId);
       if (!player) return null;
-      const start = new Date(customStartDate);
-      const end = new Date(customEndDate);
-      end.setHours(23, 59, 59, 999);
+      const start = dateRange.start;
+      const end = dateRange.end;
       const sessionRecords = displayTrainings.filter(s => {
-          const d = new Date(s.date);
+          const d = parseLocalDate(s.date);
           return d >= start && d <= end && s.teamId === player.teamId;
       }).map(s => {
           const record = s.attendance?.find(r => r.playerId === player.id);
@@ -348,7 +331,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       });
       const present = sessionRecords.filter(r => r.status === 'Present').length;
       return { player, sessions: sessionRecords, stats: { total: sessionRecords.length, present, rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 } };
-  }, [attendancePlayerId, displayTrainings, displayPlayers, customStartDate, customEndDate]);
+  }, [attendancePlayerId, displayTrainings, displayPlayers, dateRange]);
 
   const handleExportPDF = async () => {
     setIsExporting(true);
@@ -372,11 +355,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newAnnouncement.title && newAnnouncement.content) {
-        if (editingAnnouncementId && onUpdateAnnouncement) {
-             const original = announcements.find(a => a.id === editingAnnouncementId);
-             onUpdateAnnouncement({ id: editingAnnouncementId, title: newAnnouncement.title, content: newAnnouncement.content, type: newAnnouncement.type, date: original?.date || new Date().toISOString().split('T')[0], author: original?.author || currentUser?.name || '管理员' });
-             setEditingAnnouncementId(null);
-        } else if (onAddAnnouncement) {
+        if (onAddAnnouncement) {
             onAddAnnouncement({ id: Date.now().toString(), title: newAnnouncement.title, content: newAnnouncement.content, date: new Date().toISOString().split('T')[0], type: newAnnouncement.type, author: currentUser?.name || '管理员' });
         }
         setNewAnnouncement({ title: '', content: '', type: 'info' });
@@ -515,9 +494,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     </div>
                                 );
                             })}
-                            {stats.lowCreditPlayers.length === 0 && (
-                                <p className="text-center py-4 text-[11px] text-gray-400 italic">暂无低额度预警</p>
-                            )}
                         </div>
                     </div>
                 )}
@@ -528,14 +504,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <p className="text-[9px] text-gray-400 font-black uppercase mb-2">本周生日球员 (共{stats.upcomingBirthdays.length}人)</p>
                             <div className="flex flex-wrap gap-1.5 md:gap-2">
                                 {stats.upcomingBirthdays.map(p => (
-                                    <button 
+                                    <div 
                                         key={p.id} 
-                                        onClick={() => setSelectedBirthdayPlayer(p)}
-                                        className="bg-pink-50 text-pink-700 px-2.5 py-1 rounded-lg text-[11px] font-black border border-pink-100 hover:bg-pink-100 transition-all flex items-center group shadow-sm active:scale-95 whitespace-nowrap"
+                                        className="bg-pink-50 text-pink-700 px-2.5 py-1 rounded-lg text-[11px] font-black border border-pink-100 flex items-center group shadow-sm"
                                     >
-                                        <Sparkles className="w-3 h-3 mr-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Sparkles className="w-3 h-3 mr-1" />
                                         {p.name} [{p.monthDay}]
-                                    </button>
+                                    </div>
                                 ))}
                             </div>
                         </div>
@@ -604,29 +579,79 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <Calendar className="w-3 h-3 text-gray-400" />
                             <select 
                                 value={attendanceYear} 
-                                onChange={(e) => {
-                                    const y = parseInt(e.target.value);
-                                    setAttendanceYear(y);
-                                    handleRangeChange(attendanceRange, y);
-                                }}
+                                onChange={(e) => setAttendanceYear(parseInt(e.target.value))}
                                 className="bg-transparent text-[10px] md:text-xs font-black text-gray-600 outline-none focus:ring-0 cursor-pointer"
                             >
                                 {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
                             </select>
                         </div>
-                        {['month', 'quarter', 'year', 'custom'].map(r => <button key={r} onClick={() => handleRangeChange(r as any)} className={`px-2 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all whitespace-nowrap ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>{r === 'month' ? '本月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自选'}</button>)}
+                        {['month', 'quarter', 'year', 'custom'].map(r => (
+                            <button 
+                                key={r} 
+                                onClick={() => setAttendanceRange(r as any)} 
+                                className={`px-2 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all whitespace-nowrap ${attendanceRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}
+                            >
+                                {r === 'month' ? '按月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自选'}
+                            </button>
+                        ))}
                     </div>
-                    
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="flex-1 sm:flex-none text-[10px] md:text-xs p-2 bg-gray-100 rounded-xl border-none outline-none font-black text-gray-600 focus:ring-2 focus:ring-bvb-yellow shadow-inner">
+
+                    {/* 细分的月/季/自定义选择器 */}
+                    <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-1.5 rounded-xl border border-gray-100">
+                        {attendanceRange === 'month' && (
+                            <select 
+                                value={selectedMonth} 
+                                onChange={e => setSelectedMonth(parseInt(e.target.value))}
+                                className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black"
+                            >
+                                {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月</option>)}
+                            </select>
+                        )}
+                        {attendanceRange === 'quarter' && (
+                            <select 
+                                value={selectedQuarter} 
+                                onChange={e => setSelectedQuarter(parseInt(e.target.value))}
+                                className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black"
+                            >
+                                <option value={0}>第一季度 (Q1)</option>
+                                <option value={1}>第二季度 (Q2)</option>
+                                <option value={2}>第三季度 (Q3)</option>
+                                <option value={3}>第四季度 (Q4)</option>
+                            </select>
+                        )}
+                        {attendanceRange === 'custom' && (
+                            <div className="flex items-center gap-1">
+                                <input 
+                                    type="date" 
+                                    className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black" 
+                                    value={customStartDate} 
+                                    onChange={e => setCustomStartDate(e.target.value)} 
+                                />
+                                <span className="text-gray-400">至</span>
+                                <input 
+                                    type="date" 
+                                    className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black" 
+                                    value={customEndDate} 
+                                    onChange={e => setCustomEndDate(e.target.value)} 
+                                />
+                            </div>
+                        )}
+                        
+                        <div className="h-4 w-px bg-gray-200 mx-1"></div>
+
+                        <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black">
                             <option value="all">所有梯队</option>
                             {displayTeams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
                         </select>
-                        <select value={attendancePlayerId} onChange={e => setAttendancePlayerId(e.target.value)} className="flex-1 sm:flex-none text-[10px] md:text-xs p-2 bg-gray-100 rounded-xl border-none outline-none font-black text-gray-600 focus:ring-2 focus:ring-bvb-yellow max-w-[150px] shadow-inner">
+                        
+                        <select value={attendancePlayerId} onChange={e => setAttendancePlayerId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black max-w-[120px]">
                             <option value="all">全体球员</option>
                             {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
-                        <button onClick={handleExportPDF} disabled={isExporting} className="p-2 md:p-2.5 bg-bvb-black text-bvb-yellow rounded-xl shadow-lg hover:brightness-110 transition-all disabled:opacity-50 shrink-0">{isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4"/>}</button>
+
+                        <button onClick={handleExportPDF} disabled={isExporting} className="p-1.5 md:p-2 bg-bvb-black text-bvb-yellow rounded-lg shadow-lg hover:brightness-110 disabled:opacity-50">
+                            {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Download className="w-3.5 h-3.5"/>}
+                        </button>
                     </div>
                 </div>
             </div>
