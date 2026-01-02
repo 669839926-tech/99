@@ -206,6 +206,7 @@ export interface TrainingSession {
   aiGenerated?: boolean;
   attendance: AttendanceRecord[];
   submissionStatus?: 'Planned' | 'Submitted' | 'Reviewed';
+  isReviewRead?: boolean;
   coachFeedback?: string;
   directorReview?: string;
   linkedDesignId?: string;

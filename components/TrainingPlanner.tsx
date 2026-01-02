@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -53,6 +54,13 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
         }, 1500);
         return () => clearTimeout(timer);
     }, [localSession]);
+
+    // 教练端自动标记已读逻辑
+    useEffect(() => {
+        if (activeTab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
+            setLocalSession(prev => ({ ...prev, isReviewRead: true }));
+        }
+    }, [activeTab]);
 
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
@@ -125,7 +133,10 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                 <div className="flex border-b border-gray-200 shrink-0 sticky top-0 bg-white z-10 overflow-x-auto no-scrollbar">
                     <button onClick={() => setActiveTab('info')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'info' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><Settings2 className="w-4 h-4 mr-2" /> 计划内容</button>
                     <button onClick={() => setActiveTab('attendance')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><UserCheck className="w-4 h-4 mr-2" /> 考勤管理</button>
-                    <button onClick={() => setActiveTab('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><FileText className="w-4 h-4 mr-2" /> 训练日志</button>
+                    <button onClick={() => setActiveTab('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors relative ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}>
+                        <FileText className="w-4 h-4 mr-2" /> 训练日志
+                        {isCoach && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead && <span className="absolute top-2 right-4 w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>}
+                    </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
                     {activeTab === 'info' && (
@@ -269,19 +280,40 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
                                 <div className="relative">
                                     <textarea disabled={!canEdit || localSession.submissionStatus === 'Reviewed'} className="w-full h-40 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100" placeholder="请描述球队整体训练状态，以及教案实际执行效果..." value={localSession.coachFeedback || ''} onChange={e => setLocalSession({...localSession, coachFeedback: e.target.value})} />
                                     {canEdit && localSession.submissionStatus !== 'Reviewed' && (
-                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Submitted'})} disabled={!(localSession.coachFeedback || '').trim()} className="bg-bvb-black text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 flex items-center disabled:opacity-50"><Send className="w-3 h-3 mr-1" /> 提交</button></div>
+                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Submitted', isReviewRead: false})} disabled={!(localSession.coachFeedback || '').trim()} className="bg-bvb-black text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 flex items-center disabled:opacity-50"><Send className="w-3 h-3 mr-1" /> 提交</button></div>
                                     )}
                                 </div>
                             </div>
                             <div className="space-y-3 pt-4 border-t border-gray-100">
-                                <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 总监审核 (Director)</h4>
+                                <div className="flex justify-between items-center">
+                                    <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 总监审核 (Director)</h4>
+                                    {localSession.submissionStatus === 'Reviewed' && <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm"><CheckCircle className="w-2.5 h-2.5"/> 已阅准</span>}
+                                </div>
                                 {isDirector ? (
                                     <div className="relative">
                                         <textarea className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors" placeholder="请对本次训练及教练反馈进行点评..." value={localSession.directorReview || ''} onChange={e => setLocalSession({...localSession, directorReview: e.target.value})} />
-                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Reviewed'})} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-green-700 flex items-center disabled:opacity-50 disabled:bg-gray-400"><CheckCircle className="w-3 h-3 mr-1" /> {localSession.submissionStatus === 'Reviewed' ? '已审核' : '确认审核'}</button></div>
+                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Reviewed', isReviewRead: false})} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-green-700 flex items-center disabled:opacity-50 disabled:bg-gray-400"><CheckCircle className="w-3 h-3 mr-1" /> {localSession.submissionStatus === 'Reviewed' ? '已审核' : '确认审核'}</button></div>
                                     </div>
                                 ) : (
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 min-h-[80px] text-sm text-gray-600 italic">{localSession.directorReview || "暂无总监点评..."}</div>
+                                    <div className={`p-4 md:p-6 rounded-2xl border-2 transition-all ${localSession.directorReview ? 'bg-yellow-50/50 border-bvb-yellow/30 shadow-sm' : 'bg-gray-50 border-gray-100'}`}>
+                                        {localSession.directorReview ? (
+                                            <div className="relative">
+                                                <Quote className="absolute -top-2 -left-2 w-8 h-8 text-bvb-yellow/20" />
+                                                <div className="text-sm text-gray-700 leading-relaxed font-bold italic relative z-10">
+                                                    {localSession.directorReview}
+                                                </div>
+                                                <div className="mt-4 flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-t border-bvb-yellow/10 pt-2">
+                                                    <ShieldCheck className="w-3 h-3 text-bvb-yellow" /> 
+                                                    WSZG DIRECTOR VERIFIED
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-400 italic text-center py-4 flex flex-col items-center gap-2">
+                                                <RefreshCw className="w-6 h-6 opacity-20" />
+                                                等待总监审阅反馈...
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -368,6 +400,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setSelectedDate(firstPending.date);
             setTimeScope('month');
         }
+    } else if (initialFilter === 'unread_reviews') {
+        const firstUnread = userManagedSessions.find(t => t.submissionStatus === 'Reviewed' && !t.isReviewRead);
+        if (firstUnread) {
+            const date = new Date(firstUnread.date);
+            setCurrentDate(date);
+            setSelectedDate(firstUnread.date);
+            setTimeScope('month');
+        }
     }
   }, [initialFilter, userManagedSessions]);
 
@@ -452,14 +492,15 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           
           const sessionsOnDay = userManagedSessions.filter(t => t.date === dateStr);
           const hasPending = sessionsOnDay.some(s => s.submissionStatus === 'Submitted');
+          const hasUnreadReview = sessionsOnDay.some(s => s.submissionStatus === 'Reviewed' && !s.isReviewRead);
 
           if (isCompact) {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-8 border-r border-b border-gray-200 relative cursor-pointer hover:bg-yellow-50 transition-colors flex items-center justify-center ${isSelected ? 'bg-yellow-100' : 'bg-white'}`}>{sessionsOnDay.length > 0 ? (<div className={`w-3 h-3 rounded-full ${sessionsOnDay[0].intensity === 'High' ? 'bg-red-500' : sessionsOnDay[0].intensity === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'} ${hasPending ? 'ring-2 ring-blue-400' : ''}`} title={`${sessionsOnDay.length} 节训练`}></div>) : (<span className={`text-[10px] ${isToday ? 'font-black text-bvb-black' : 'text-gray-300'}`}>{d}</span>)}</div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-8 border-r border-b border-gray-200 relative cursor-pointer hover:bg-yellow-50 transition-colors flex items-center justify-center ${isSelected ? 'bg-yellow-100' : 'bg-white'}`}>{sessionsOnDay.length > 0 ? (<div className={`w-3 h-3 rounded-full relative ${sessionsOnDay[0].intensity === 'High' ? 'bg-red-500' : sessionsOnDay[0].intensity === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'} ${hasPending ? 'ring-2 ring-blue-400' : ''}`} title={`${sessionsOnDay.length} 节训练`}>{hasUnreadReview && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>}</div>) : (<span className={`text-[10px] ${isToday ? 'font-black text-bvb-black' : 'text-gray-300'}`}>{d}</span>)}</div>
               );
           } else {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-700' : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}</div>); })}</div></div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}{hasUnreadReview && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 shadow-sm" title="有新审核建议"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Reviewed' ? (s.isReviewRead ? 'bg-green-50 border-green-500 text-green-700' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm') : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}</div>); })}</div></div>
               );
           }
       }
@@ -489,17 +530,23 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         {filteredSessions.length > 0 ? (
                             filteredSessions.map(s => {
                                 const team = teams.find(t => t.id === s.teamId);
+                                const isUnread = currentUser?.role === 'coach' && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
                                 return (
                                     <tr 
                                         key={s.id} 
                                         onClick={() => setSelectedSession(s)}
-                                        className="hover:bg-yellow-50/50 cursor-pointer transition-colors group"
+                                        className={`hover:bg-yellow-50/50 cursor-pointer transition-colors group ${isUnread ? 'bg-blue-50/30' : ''}`}
                                     >
-                                        <td className="px-3 md:px-6 py-4 font-mono text-xs md:text-sm text-gray-500 whitespace-nowrap">{s.date}</td>
+                                        <td className="px-3 md:px-6 py-4 font-mono text-xs md:text-sm text-gray-500 whitespace-nowrap">
+                                            <div className="flex items-center gap-2">
+                                                {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-sm"></span>}
+                                                {s.date}
+                                            </div>
+                                        </td>
                                         <td className="px-3 md:px-6 py-4 font-bold text-xs md:text-sm text-gray-700">{team?.level || '-'}</td>
                                         <td className="px-3 md:px-6 py-4">
                                             <div className="flex items-center gap-1.5 md:gap-2">
-                                                <span className="font-bold text-xs md:text-sm text-bvb-black group-hover:underline truncate max-w-[100px] md:max-w-none">{s.title}</span>
+                                                <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread ? 'text-blue-700' : 'text-bvb-black'}`}>{s.title}</span>
                                                 {s.linkedDesignId && <PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" title="关联教案" />}
                                             </div>
                                         </td>
@@ -519,7 +566,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         <td className="px-3 md:px-6 py-4 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end">
                                                 {s.submissionStatus === 'Reviewed' ? (
-                                                    <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-black text-green-600 uppercase"><ShieldCheck className="w-3 h-3" /> <span className="hidden sm:inline">已审核</span></span>
+                                                    <span className={`flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase ${isUnread ? 'text-blue-600' : 'text-green-600'}`} title={isUnread ? '新反馈待阅' : '已查看总监评价'}>
+                                                        {isUnread ? <Bell className="w-3 h-3 animate-bounce" /> : <ShieldCheck className="w-3 h-3" />}
+                                                        <span className="hidden sm:inline">{isUnread ? '反馈待阅' : '已审核'}</span>
+                                                    </span>
                                                 ) : s.submissionStatus === 'Submitted' ? (
                                                     <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-black text-blue-600 uppercase"><RefreshCw className="w-3 h-3 animate-spin" /> <span className="hidden sm:inline">待审核</span></span>
                                                 ) : (
@@ -613,7 +663,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                  if (plan.title) finalTitle = plan.title;
             }
             if (!finalTitle) finalTitle = `${formData.focus} 训练`;
-            const newSession: TrainingSession = { id: Date.now().toString(), teamId: formData.teamId, title: finalTitle, date: formData.date, focus: formData.focus === 'Custom' ? formData.focusCustom : formData.focus, duration: formData.duration, intensity: formData.intensity as any, drills: finalDrills, aiGenerated: isAiMode, attendance: [], submissionStatus: 'Planned', linkedDesignId: formData.linkedDesignId };
+            const newSession: TrainingSession = { id: Date.now().toString(), teamId: formData.teamId, title: finalTitle, date: formData.date, focus: formData.focus === 'Custom' ? formData.focusCustom : formData.focus, duration: formData.duration, intensity: formData.intensity as any, drills: finalDrills, aiGenerated: isAiMode, attendance: [], submissionStatus: 'Planned', isReviewRead: true, linkedDesignId: formData.linkedDesignId };
             onAddTraining(newSession);
             setShowAddModal(false);
             setFormData({ teamId: availableTeams[0]?.id || '', title: '', focus: trainingFoci[0] || '传接球', focusCustom: '', duration: 90, intensity: 'Medium', date: new Date().toISOString().split('T')[0], drills: [], linkedDesignId: undefined });
@@ -623,7 +673,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const handleDuplicateConfirm = () => {
       if (!sessionToDuplicate) return;
-      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', attendance: [], coachFeedback: '', directorReview: '' };
+      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', isReviewRead: true, attendance: [], coachFeedback: '', directorReview: '' };
       onAddTraining(copy);
       setSessionToDuplicate(null);
       alert('已成功复制训练计划到 ' + duplicateDate);
@@ -653,10 +703,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 </div>
             </div>
             <div className="flex items-center gap-2 w-full md:w-auto">
-                <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0 flex-1 md:flex-none">
-                    <button onClick={handlePrevPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400"/></button>
+                <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0 flex-1 md:flex-none justify-between">
+                    <button onClick={handlePrevPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400" /></button>
                     <span className="px-2 font-black text-xs md:text-sm flex-1 md:min-w-[110px] text-center whitespace-nowrap">{dateLabel}</span>
-                    <button onClick={handleNextPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400"/></button>
+                    <button onClick={handleNextPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400" /></button>
                 </div>
                 <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出计划表 (PDF)">
                     {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
@@ -684,19 +734,22 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         {userManagedSessions.filter(t => t.date === selectedDate).length > 0 ? (
                             userManagedSessions.filter(t => t.date === selectedDate).map(s => {
                                 const team = teams.find(t => t.id === s.teamId);
+                                const isUnread = currentUser?.role === 'coach' && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
                                 return (
-                                    <div key={s.id} onClick={() => setSelectedSession(s)} className="p-4 bg-gray-50 border border-gray-100 rounded-2xl cursor-pointer hover:bg-yellow-50 hover:border-bvb-yellow/30 transition-all group relative">
+                                    <div key={s.id} onClick={() => setSelectedSession(s)} className={`p-4 border rounded-2xl cursor-pointer transition-all group relative ${isUnread ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:bg-yellow-50 hover:border-bvb-yellow/30 shadow-none'}`}>
+                                        {isUnread && <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white animate-pulse"></span>}
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{team?.name}</span>
                                             <div className="flex items-center gap-1.5">
                                                 {s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500" />}
                                                 {s.submissionStatus === 'Submitted' && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>}
+                                                {s.submissionStatus === 'Reviewed' && <ShieldCheck className={`w-3 h-3 ${isUnread ? 'text-blue-600' : 'text-green-600'}`} />}
                                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
                                                     s.intensity === 'High' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'
                                                 }`}>{s.intensity}</span>
                                             </div>
                                         </div>
-                                        <h5 className="font-black text-gray-800 group-hover:text-bvb-black leading-tight">{s.title}</h5>
+                                        <h5 className={`font-black group-hover:text-bvb-black leading-tight ${isUnread ? 'text-blue-900' : 'text-gray-800'}`}>{s.title}</h5>
                                         <div className="flex items-center gap-3 text-[10px] text-gray-400 font-bold mt-4 uppercase">
                                             <div className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {s.duration} MIN</div>
                                             <div className="flex items-center"><Target className="w-3 h-3 mr-1" /> {s.focus}</div>
@@ -765,7 +818,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                     </div>
 
                                     <div className="grid grid-cols-12 gap-8 px-2">
-                                        <div className="col-span-5 space-y-4">
+                                        <div className="col-span-4 space-y-4">
                                             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
                                                 <List className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练项目清单
                                             </h4>
@@ -779,33 +832,36 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             </ul>
                                         </div>
 
-                                        <div className="col-span-7 space-y-6">
+                                        <div className="col-span-8 space-y-6">
                                             <div className="bg-gray-50 rounded-2xl p-6 border-l-4 border-bvb-black">
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <h4 className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center">
-                                                        <FileText className="w-3.5 h-3.5 mr-1.5" /> 实际执行日志
-                                                    </h4>
-                                                </div>
+                                                <h4 className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center mb-4">
+                                                    <FileText className="w-3.5 h-3.5 mr-1.5" /> 实际执行日志
+                                                </h4>
                                                 <div className="text-sm text-gray-700 leading-relaxed italic whitespace-pre-wrap">
                                                     {s.coachFeedback || "-- 暂无教练员训练日志记录 --"}
                                                 </div>
                                             </div>
 
-                                            <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                                                        <UserCheck className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 球员考勤明细
+                                            {s.directorReview && (
+                                                <div className="bg-yellow-50/50 rounded-2xl p-6 border-l-4 border-bvb-yellow">
+                                                    <h4 className="text-[10px] font-black text-yellow-700 uppercase tracking-widest flex items-center mb-4">
+                                                        <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> 总监评审意见
                                                     </h4>
-                                                </div>
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <p className="text-[9px] font-black text-gray-400 uppercase mb-2">正常参训名单:</p>
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            {presentPlayers.map(p => (
-                                                                <span key={p.id} className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded text-[10px] font-bold">#{p.number} {p.name}</span>
-                                                            ))}
-                                                        </div>
+                                                    <div className="text-sm text-gray-800 leading-relaxed font-bold italic whitespace-pre-wrap">
+                                                        {s.directorReview}
                                                     </div>
+                                                </div>
+                                            )}
+
+                                            <div className="bg-white border border-gray-100 rounded-2xl p-5">
+                                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center mb-4">
+                                                    <UserCheck className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 正常参训人员 ({presentPlayers.length})
+                                                </h4>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {presentPlayers.map(p => (
+                                                        <span key={p.id} className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded text-[10px] font-bold">#{p.number} {p.name}</span>
+                                                    ))}
+                                                    {presentPlayers.length === 0 && <span className="text-[10px] text-gray-300 italic">暂无实到人员记录</span>}
                                                 </div>
                                             </div>
                                         </div>

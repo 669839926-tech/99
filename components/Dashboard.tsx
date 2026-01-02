@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -63,6 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   // Permission check
   const isDirector = currentUser?.role === 'director';
+  const isCoach = currentUser?.role === 'coach';
 
   // --- Filter Data for Coaches ---
   const managedTeamIds = useMemo(() => {
@@ -88,7 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
 
-  // Comment: Calculate pending tasks for director approval
+  // Calculate pending tasks for director approval
   const pendingTasks = useMemo(() => {
     const reviews = displayPlayers.reduce((acc, p) => acc + (p.reviews?.filter(r => r.status === 'Submitted').length || 0), 0);
     const stats = displayPlayers.filter(p => p.statsStatus === 'Submitted').length;
@@ -100,6 +101,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       total: reviews + stats + logs
     };
   }, [displayPlayers, displayTrainings]);
+
+  // 教练端：计算待阅读的审核意见
+  const unreadReviews = useMemo(() => {
+    if (isDirector) return [];
+    return displayTrainings.filter(t => t.submissionStatus === 'Reviewed' && !t.isReviewRead);
+  }, [displayTrainings, isDirector]);
 
   // 核心日期范围计算逻辑
   const dateRange = useMemo(() => {
@@ -458,6 +465,35 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 </div>
             )}
+            
+            {/* 教练端：待阅提醒卡片 */}
+            {isCoach && unreadReviews.length > 0 && (
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6 animate-in slide-in-from-right-4">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="font-black text-sm md:text-lg text-gray-800 flex items-center">
+                            <Quote className="w-4 h-4 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 总监反馈待阅
+                        </h3>
+                        <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{unreadReviews.length} 条新反馈</span>
+                    </div>
+                    <div className="space-y-2 max-h-[120px] overflow-y-auto custom-scrollbar">
+                        {unreadReviews.map(t => (
+                            <div 
+                                key={t.id} 
+                                onClick={() => onNavigate?.('training', 'unread_reviews')} 
+                                className="flex items-center justify-between p-3 bg-yellow-50/50 hover:bg-yellow-50 rounded-xl border border-yellow-100 cursor-pointer group transition-all"
+                            >
+                                <div className="flex items-center gap-2">
+                                    <ShieldCheck className="w-4 h-4 text-bvb-yellow" />
+                                    <span className="text-xs font-bold text-gray-700">{t.title}</span>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-bvb-black transition-colors" />
+                            </div>
+                        ))}
+                    </div>
+                    <p className="mt-3 text-[10px] text-gray-400 font-bold uppercase">点击卡片前往训练计划模块查看详细建议</p>
+                </div>
+            )}
+
             {isDirector && pendingTasks.total > 0 ? (
                 <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6">
                     <div className="flex justify-between items-center mb-4">
@@ -734,12 +770,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         <td className="px-3 py-3 md:px-4 font-black text-gray-700 text-[11px] md:text-sm truncate max-w-[100px] md:max-w-none">{s.title}</td>
                                         <td className="px-3 py-3 md:px-4 text-[10px] text-gray-500">{s.teamName}</td>
                                         <td className="px-3 py-3 md:px-4 text-center whitespace-nowrap">
-                                            <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] md:text-[10px] font-black uppercase border tracking-tighter ${
-                                                s.status === 'Present' ? 'bg-green-50 text-green-700 border-green-100' : 
-                                                s.status === 'Leave' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
-                                                s.status === 'Injury' ? 'bg-red-50 text-red-700 border-red-100' :
-                                                'bg-gray-100 text-gray-400 border-gray-200'
-                                            }`}>
+                                            <span className="px-1.5 py-0.5 rounded-[4px] text-[9px] md:text-[10px] font-black uppercase border tracking-tighter" style={{ 
+                                                backgroundColor: s.status === 'Present' ? '#f0fdf4' : s.status === 'Leave' ? '#fffbeb' : s.status === 'Injury' ? '#fef2f2' : '#f9fafb',
+                                                color: s.status === 'Present' ? '#15803d' : s.status === 'Leave' ? '#b45309' : s.status === 'Injury' ? '#b91c1c' : '#9ca3af',
+                                                borderColor: s.status === 'Present' ? '#dcfce7' : s.status === 'Leave' ? '#fef3c7' : s.status === 'Injury' ? '#fee2e2' : '#e5e7eb'
+                                            }}>
                                                 {s.status === 'Present' ? '实到' : s.status === 'Leave' ? '请假' : s.status === 'Injury' ? '伤停' : '缺席'}
                                             </span>
                                         </td>
@@ -834,7 +869,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 <td className="px-2 py-3 text-center font-black text-red-600 tabular-nums">{p.injury}</td>
                                                 <td className="px-2 py-3 text-center font-black text-gray-300 tabular-nums">{p.absent}</td>
                                                 {isDirector && (
-                                                    <td className={`px-3 py-3 md:px-4 text-right font-black tabular-nums ${p.credits <= 2 ? 'text-red-500' : 'text-gray-800'}`}>
+                                                    <td className="px-3 py-3 md:px-4 text-right font-black tabular-nums" style={{ color: p.credits <= 2 ? '#ef4444' : '#1f2937' }}>
                                                         {p.credits}
                                                     </td>
                                                 )}
