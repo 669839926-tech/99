@@ -276,11 +276,47 @@ const Dashboard: React.FC<DashboardProps> = ({
          const absentRecords = s.attendance?.filter(r => r.status === 'Absent').length || 0;
          const noRecords = total - (present + leave + injury + absentRecords);
 
-         return { id: s.id, date: s.date, title: s.title, focus: s.focus, teamName: teams.find(t => t.id === s.teamId)?.name || '未知', total, present, leave, injury, absent: absentRecords + noRecords, rate: total > 0 ? Math.round((present / total) * 100) : 0 };
+         // 获取具体的人员名单字符串
+         const getPlayerNamesByStatus = (status: string) => {
+             if (status === 'Absent') {
+                 // 包含显式标记缺席和未在名单中出现的
+                 const explicitAbsentIds = s.attendance?.filter(r => r.status === 'Absent').map(r => r.playerId) || [];
+                 const recordedPlayerIds = s.attendance?.map(r => r.playerId) || [];
+                 const unrecordedIds = sTeamPlayers.filter(p => !recordedPlayerIds.includes(p.id)).map(p => p.id);
+                 const combined = [...explicitAbsentIds, ...unrecordedIds];
+                 return combined.map(id => {
+                     const p = players.find(p => p.id === id);
+                     return p ? p.name : '未知';
+                 }).join('、') || '--';
+             }
+             return s.attendance?.filter(r => r.status === status).map(r => {
+                 const p = players.find(p => p.id === r.playerId);
+                 return p ? `${p.name}` : '未知';
+             }).join('、') || '--';
+         };
+
+         return { 
+             id: s.id, 
+             date: s.date, 
+             title: s.title, 
+             focus: s.focus, 
+             teamName: teams.find(t => t.id === s.teamId)?.name || '未知', 
+             total, 
+             present, 
+             leave, 
+             injury, 
+             absent: absentRecords + noRecords, 
+             rate: total > 0 ? Math.round((present / total) * 100) : 0,
+             // 详细名单字段，用于 PDF 导出和 Excel 导出
+             presentNames: getPlayerNamesByStatus('Present'),
+             leaveNames: getPlayerNamesByStatus('Leave'),
+             injuryNames: getPlayerNamesByStatus('Injury'),
+             absentNames: getPlayerNamesByStatus('Absent')
+         };
     });
 
     return { chartData: data, averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0, exportPlayersData: exportList, exportSessionsData: exportSessions, teamPlayersList: teamPlayers };
-  }, [displayTrainings, displayPlayers, dateRange, attendanceRange, attendanceTeamId, analysisView, teams]);
+  }, [displayTrainings, displayPlayers, dateRange, attendanceRange, attendanceTeamId, analysisView, teams, players]);
 
   const individualReport = useMemo(() => {
       if (attendancePlayerId === 'all') return null;
@@ -333,9 +369,10 @@ const Dashboard: React.FC<DashboardProps> = ({
               }).join('\n');
               fileName = `全员出勤统计_${attendanceYear}.csv`;
           } else {
-              headers = "日期,训练主题,所属梯队,应到人数,实到人数,请假人数,伤停人数,旷课人数,到课率(%)\n";
+              // 增加了名单明细列
+              headers = "日期,训练主题,所属梯队,应到人数,实到人数,请假人数,伤停人数,旷课人数,到课率(%),实到名单,请假名单,伤停名单,缺席名单\n";
               rows = exportSessionsData.map(s => {
-                  return `${s.date},"${s.title.replace(/"/g, '""')}",${s.teamName},${s.total},${s.present},${s.leave},${s.injury},${s.absent},${s.rate}`;
+                  return `${s.date},"${s.title.replace(/"/g, '""')}",${s.teamName},${s.total},${s.present},${s.leave},${s.injury},${s.absent},${s.rate},"${s.presentNames.replace(/"/g, '""')}","${s.leaveNames.replace(/"/g, '""')}","${s.injuryNames.replace(/"/g, '""')}","${s.absentNames.replace(/"/g, '""')}"`;
               }).join('\n');
               fileName = `训练场次分析_${attendanceYear}.csv`;
           }
@@ -829,6 +866,37 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         ))}
                                     </tbody>
                                 </table>
+                            </div>
+                            
+                            {/* --- PDF 导出专用：详细名单明细 --- */}
+                            <div className="mt-8 space-y-6 hidden md:block">
+                                <h4 className="font-black text-xs md:text-sm text-gray-500 uppercase tracking-widest border-b pb-2">课次考勤名单明细 (详细报表)</h4>
+                                <div className="space-y-4">
+                                    {exportSessionsData.map(s => (
+                                        <div key={s.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <span className="font-black text-xs md:text-sm text-gray-800">{s.date} - {s.title}</span>
+                                                <span className="text-[10px] font-bold text-gray-400">{s.teamName}</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-black text-green-600 uppercase">实到球员 ({s.present})</p>
+                                                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold">{s.presentNames}</p>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] font-black text-yellow-600 uppercase">请假/伤停球员 ({s.leave + s.injury})</p>
+                                                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold">
+                                                        请假：{s.leaveNames} | 伤停：{s.injuryNames}
+                                                    </p>
+                                                </div>
+                                                <div className="col-span-1 md:col-span-2 space-y-1 border-t border-gray-200/50 pt-2">
+                                                    <p className="text-[9px] font-black text-gray-400 uppercase">缺席/未记球员 ({s.absent})</p>
+                                                    <p className="text-[10px] text-gray-400 italic leading-relaxed">{s.absentNames}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                         )
