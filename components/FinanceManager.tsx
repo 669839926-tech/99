@@ -740,7 +740,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 gap-6">
-                        <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-gray-200 h-[300px] md:h-[400px]">
+                        <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-gray-200 min-h-[400px] md:min-h-[500px] flex flex-col">
                             <div className="flex justify-between items-start mb-4 md:mb-8">
                                 <h4 className="text-[10px] md:text-sm font-black text-gray-400 uppercase tracking-widest leading-none">年度收支对比 ({selectedYear})</h4>
                                 <div className="flex gap-4 md:gap-6">
@@ -754,17 +754,37 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     </div>
                                 </div>
                             </div>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={monthlySummaryData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
-                                    <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '8px', border: 'none', fontSize: '10px' }} />
-                                    <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{fontSize: '10px', fontWeight: 'bold', paddingTop: '10px'}} />
-                                    <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} />
-                                    <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            <div className="flex-1 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={monthlySummaryData} margin={{ top: 10, right: 0, left: -20, bottom: 20 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
+                                        <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} />
+                                        <Legend 
+                                            iconType="circle" 
+                                            align="center" 
+                                            verticalAlign="bottom" 
+                                            wrapperStyle={{ paddingBottom: '10px' }}
+                                            formatter={(value) => <span className="text-[11px] font-black uppercase tracking-wider text-gray-600 mr-4 ml-1">{value}</span>}
+                                        />
+                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} />
+                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            {/* 优化图例底部栏位，增加间距和描述文字 */}
+                            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col items-center gap-1">
+                                <div className="flex items-center gap-2 text-gray-400">
+                                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">支出</span>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-200 mx-3 md:mx-6"></div>
+                                    <span className="text-[10px] md:text-xs font-black text-bvb-black italic tracking-tighter uppercase whitespace-nowrap">年度收支汇总深度分析报告 (ANNUAL ANALYTICS)</span>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-gray-200 mx-3 md:mx-6"></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest">收入</span>
+                                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
