@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -55,6 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [analysisView, setAnalysisView] = useState<AnalysisView>('player');
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingCredits, setIsExportingCredits] = useState(false);
   
   // Credit Alert Filter
@@ -87,6 +88,19 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [showAnnounceForm, setShowAnnounceForm] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', type: 'info' as 'info' | 'urgent' });
 
+  // Comment: Calculate pending tasks for director approval
+  const pendingTasks = useMemo(() => {
+    const reviews = displayPlayers.reduce((acc, p) => acc + (p.reviews?.filter(r => r.status === 'Submitted').length || 0), 0);
+    const stats = displayPlayers.filter(p => p.statsStatus === 'Submitted').length;
+    const logs = displayTrainings.filter(t => t.submissionStatus === 'Submitted').length;
+    return {
+      reviews,
+      stats,
+      logs,
+      total: reviews + stats + logs
+    };
+  }, [displayPlayers, displayTrainings]);
+
   // 核心日期范围计算逻辑
   const dateRange = useMemo(() => {
     let start = new Date(attendanceYear, 0, 1);
@@ -106,6 +120,12 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return { start, end };
   }, [attendanceRange, attendanceYear, selectedMonth, selectedQuarter, customStartDate, customEndDate]);
+
+  // Reset selections when filter changes
+  useEffect(() => {
+      setAttendancePlayerId('all');
+      setSelectedSessionId(null);
+  }, [attendanceTeamId, attendanceRange, selectedMonth, selectedQuarter, attendanceYear]);
 
   // Quick Action: Jump to individual report from credit alert
   const handleLowCreditPlayerClick = (player: Player) => {
@@ -127,23 +147,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       setAttendanceRange('custom');
       document.getElementById('attendance-analysis-section')?.scrollIntoView({ behavior: 'smooth' });
   };
-
-  // Reset selections when filter changes
-  useEffect(() => {
-      setAttendancePlayerId('all');
-      setSelectedSessionId(null);
-  }, [attendanceTeamId, attendanceRange, selectedMonth, selectedQuarter, attendanceYear]);
-
-  // Director Pending Tasks Logic
-  const pendingTasks = useMemo(() => {
-      if (!isDirector) return { reviews: 0, stats: 0, logs: 0, total: 0 };
-      const pendingReviews = players.reduce((acc, p) => {
-          return acc + (p.reviews?.filter(r => r.status === 'Submitted').length || 0);
-      }, 0);
-      const pendingStats = players.filter(p => p.statsStatus === 'Submitted').length;
-      const pendingLogs = trainings.filter(t => t.submissionStatus === 'Submitted').length;
-      return { reviews: pendingReviews, stats: pendingStats, logs: pendingLogs, total: pendingReviews + pendingStats + pendingLogs };
-  }, [players, trainings, isDirector]);
 
   const stats = useMemo(() => {
     const today = new Date();
@@ -272,6 +275,95 @@ const Dashboard: React.FC<DashboardProps> = ({
     return { chartData: data, averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0, exportPlayersData: exportList, exportSessionsData: exportSessions, teamPlayersList: teamPlayers };
   }, [displayTrainings, displayPlayers, dateRange, attendanceRange, attendanceTeamId, analysisView, teams]);
 
+  const individualReport = useMemo(() => {
+      if (attendancePlayerId === 'all') return null;
+      const player = displayPlayers.find(p => p.id === attendancePlayerId);
+      if (!player) return null;
+      const start = dateRange.start;
+      const end = dateRange.end;
+      const sessionRecords = displayTrainings.filter(s => {
+          const d = parseLocalDate(s.date);
+          return d >= start && d <= end && s.teamId === player.teamId;
+      }).map(s => {
+          const record = s.attendance?.find(r => r.playerId === player.id);
+          const teamName = teams.find(t => t.id === s.teamId)?.name || '';
+          return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', teamName };
+      });
+      const present = sessionRecords.filter(r => r.status === 'Present').length;
+      return { player, sessions: sessionRecords, stats: { total: sessionRecords.length, present, rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 } };
+  }, [attendancePlayerId, displayTrainings, displayPlayers, dateRange, teams]);
+
+  const handleExportPDF = async () => {
+    setIsExporting(true);
+    try {
+        if (attendancePlayerId !== 'all' && individualReport) {
+            await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}_${attendanceYear}`);
+        } else {
+            await exportToPDF('attendance-report-export', `训练出勤分析报告_${attendanceYear}`);
+        }
+    } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
+  };
+
+  const handleExportExcel = () => {
+      setIsExportingExcel(true);
+      try {
+          let headers = "";
+          let rows = "";
+          let fileName = "";
+
+          if (attendancePlayerId !== 'all' && individualReport) {
+              headers = "日期,训练主题,所属梯队,训练重点,出勤状态\n";
+              rows = individualReport.sessions.map(s => {
+                  const statusMap = { 'Present': '实到', 'Leave': '请假', 'Injury': '伤停', 'Absent': '缺席' };
+                  return `${s.date},"${s.title.replace(/"/g, '""')}",${s.teamName},${s.focus},${statusMap[s.status] || '缺席'}`;
+              }).join('\n');
+              fileName = `个人出勤明细_${individualReport.player.name}_${attendanceYear}.csv`;
+          } else if (analysisView === 'player') {
+              headers = "姓名,球衣号码,所属梯队,总训练场次,实到场次,请假场次,伤停场次,缺席场次,出勤率(%),当前课时余额\n";
+              rows = exportPlayersData.map(p => {
+                  const teamName = teams.find(t => t.id === p.teamId)?.name || '未知';
+                  return `${p.name},${p.number},${teamName},${p.total},${p.present},${p.leave},${p.injury},${p.absent},${p.rate},${p.credits}`;
+              }).join('\n');
+              fileName = `全员出勤统计_${attendanceYear}.csv`;
+          } else {
+              headers = "日期,训练主题,所属梯队,应到人数,实到人数,请假人数,伤停人数,旷课人数,到课率(%)\n";
+              rows = exportSessionsData.map(s => {
+                  return `${s.date},"${s.title.replace(/"/g, '""')}",${s.teamName},${s.total},${s.present},${s.leave},${s.injury},${s.absent},${s.rate}`;
+              }).join('\n');
+              fileName = `训练场次分析_${attendanceYear}.csv`;
+          }
+
+          const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(blob);
+          link.download = fileName;
+          link.click();
+      } catch (e) {
+          alert('Excel 导出失败');
+      } finally {
+          setIsExportingExcel(false);
+      }
+  };
+
+  const handleExportCreditsPDF = async () => {
+    setIsExportingCredits(true);
+    const teamLabel = creditAlertTeamId === 'all' ? '全部梯队' : teams.find(t => t.id === creditAlertTeamId)?.name || '未知梯队';
+    try {
+        await exportToPDF('low-credits-export', `课时余额预警名单_${teamLabel}`);
+    } catch (e) { alert('导出失败'); } finally { setIsExportingCredits(false); }
+  };
+
+  const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newAnnouncement.title && newAnnouncement.content) {
+        if (onAddAnnouncement) {
+            onAddAnnouncement({ id: Date.now().toString(), title: newAnnouncement.title, content: newAnnouncement.content, date: new Date().toISOString().split('T')[0], type: newAnnouncement.type, author: currentUser?.name || '管理员' });
+        }
+        setNewAnnouncement({ title: '', content: '', type: 'info' });
+        setShowAnnounceForm(false);
+    }
+  };
+
   const renderSessionDetail = () => {
     if (!selectedSessionId) return null;
     const session = trainings.find(t => t.id === selectedSessionId);
@@ -314,53 +406,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
         </div>
     );
-  };
-
-  const individualReport = useMemo(() => {
-      if (attendancePlayerId === 'all') return null;
-      const player = displayPlayers.find(p => p.id === attendancePlayerId);
-      if (!player) return null;
-      const start = dateRange.start;
-      const end = dateRange.end;
-      const sessionRecords = displayTrainings.filter(s => {
-          const d = parseLocalDate(s.date);
-          return d >= start && d <= end && s.teamId === player.teamId;
-      }).map(s => {
-          const record = s.attendance?.find(r => r.playerId === player.id);
-          return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', creditChange: (record?.status === 'Present') ? -1 : 0 };
-      });
-      const present = sessionRecords.filter(r => r.status === 'Present').length;
-      return { player, sessions: sessionRecords, stats: { total: sessionRecords.length, present, rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 } };
-  }, [attendancePlayerId, displayTrainings, displayPlayers, dateRange]);
-
-  const handleExportPDF = async () => {
-    setIsExporting(true);
-    try {
-        if (attendancePlayerId !== 'all' && individualReport) {
-            await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}`);
-        } else {
-            await exportToPDF('attendance-report-export', `训练出勤分析报告_${attendanceYear}年`);
-        }
-    } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
-  };
-
-  const handleExportCreditsPDF = async () => {
-    setIsExportingCredits(true);
-    const teamLabel = creditAlertTeamId === 'all' ? '全部梯队' : teams.find(t => t.id === creditAlertTeamId)?.name || '未知梯队';
-    try {
-        await exportToPDF('low-credits-export', `课时余额预警名单_${teamLabel}`);
-    } catch (e) { alert('导出失败'); } finally { setIsExportingCredits(false); }
-  };
-
-  const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newAnnouncement.title && newAnnouncement.content) {
-        if (onAddAnnouncement) {
-            onAddAnnouncement({ id: Date.now().toString(), title: newAnnouncement.title, content: newAnnouncement.content, date: new Date().toISOString().split('T')[0], type: newAnnouncement.type, author: currentUser?.name || '管理员' });
-        }
-        setNewAnnouncement({ title: '', content: '', type: 'info' });
-        setShowAnnounceForm(false);
-    }
   };
 
   return (
@@ -596,7 +641,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         ))}
                     </div>
 
-                    {/* 细分的月/季/自定义选择器 */}
                     <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-1.5 rounded-xl border border-gray-100">
                         {attendanceRange === 'month' && (
                             <select 
@@ -649,9 +693,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                             {teamPlayersList.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
 
-                        <button onClick={handleExportPDF} disabled={isExporting} className="p-1.5 md:p-2 bg-bvb-black text-bvb-yellow rounded-lg shadow-lg hover:brightness-110 disabled:opacity-50">
-                            {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Download className="w-3.5 h-3.5"/>}
-                        </button>
+                        <div className="flex gap-1">
+                            <button onClick={handleExportExcel} disabled={isExportingExcel} className="p-1.5 md:p-2 bg-green-600 text-white rounded-lg shadow-lg hover:brightness-110 disabled:opacity-50" title="导出 Excel">
+                                {isExportingExcel ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <FileSpreadsheet className="w-3.5 h-3.5"/>}
+                            </button>
+                            <button onClick={handleExportPDF} disabled={isExporting} className="p-1.5 md:p-2 bg-bvb-black text-bvb-yellow rounded-lg shadow-lg hover:brightness-110 disabled:opacity-50" title="导出 PDF">
+                                {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Download className="w-3.5 h-3.5"/>}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -674,6 +723,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <tr>
                                     <th className="px-3 py-3 md:px-4">日期</th>
                                     <th className="px-3 py-3 md:px-4">训练主题</th>
+                                    <th className="px-3 py-3 md:px-4">所属梯队</th>
                                     <th className="px-3 py-3 md:px-4 text-center">状态</th>
                                 </tr>
                             </thead>
@@ -682,6 +732,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <tr key={s.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-3 py-3 md:px-4 font-mono text-[9px] md:text-xs text-gray-400 whitespace-nowrap">{s.date}</td>
                                         <td className="px-3 py-3 md:px-4 font-black text-gray-700 text-[11px] md:text-sm truncate max-w-[100px] md:max-w-none">{s.title}</td>
+                                        <td className="px-3 py-3 md:px-4 text-[10px] text-gray-500">{s.teamName}</td>
                                         <td className="px-3 py-3 md:px-4 text-center whitespace-nowrap">
                                             <span className={`px-1.5 py-0.5 rounded-[4px] text-[9px] md:text-[10px] font-black uppercase border tracking-tighter ${
                                                 s.status === 'Present' ? 'bg-green-50 text-green-700 border-green-100' : 
@@ -712,10 +763,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         <tr>
                                             <th className="px-3 py-3 md:px-4">日期/梯队</th>
                                             <th className="px-3 py-3 md:px-4">训练主题</th>
-                                            <th className="px-3 py-3 md:px-4">实到率</th>
-                                            <th className="px-2 py-3 text-center text-green-600">到</th>
+                                            <th className="px-3 py-3 md:px-4">应到/实到</th>
+                                            <th className="px-3 py-3 md:px-4">到课率</th>
                                             <th className="px-2 py-3 text-center text-yellow-600">假</th>
                                             <th className="px-2 py-3 text-center text-red-600">伤</th>
+                                            <th className="px-2 py-3 text-center text-gray-400">缺</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -726,6 +778,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                     <div className="font-black text-gray-600 text-[10px] mt-1 uppercase tracking-tighter">{s.teamName}</div>
                                                 </td>
                                                 <td className="px-3 py-3 md:px-4 font-bold text-gray-800 truncate max-w-[80px] md:max-w-none">{s.title}</td>
+                                                <td className="px-3 py-3 md:px-4 font-mono text-[10px] text-gray-500">{s.total} / <span className="font-black text-green-600">{s.present}</span></td>
                                                 <td className="px-3 py-3 md:px-4">
                                                     <div className="flex items-center gap-1.5 md:gap-2">
                                                         <div className="w-8 md:w-16 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -734,9 +787,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                         <span className="text-[10px] font-black tabular-nums">{s.rate}%</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-3 text-center font-black text-green-600 tabular-nums">{s.present}</td>
                                                 <td className="px-2 py-3 text-center font-black text-yellow-600 tabular-nums">{s.leave}</td>
                                                 <td className="px-2 py-3 text-center font-black text-red-600 tabular-nums">{s.injury}</td>
+                                                <td className="px-2 py-3 text-center font-black text-gray-400 tabular-nums">{s.absent}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -754,6 +807,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 sticky top-0 z-10 border-b">
                                         <tr>
                                             <th className="px-3 py-3 md:px-4">球员</th>
+                                            <th className="px-3 py-3 md:px-4">总场次</th>
                                             <th className="px-3 py-3 md:px-4">参训率</th>
                                             <th className="px-2 py-3 text-center text-green-600">到</th>
                                             <th className="px-2 py-3 text-center text-yellow-600">假</th>
@@ -766,6 +820,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         {exportPlayersData.map(p => (
                                             <tr key={p.id} className="hover:bg-gray-50/50 transition-colors text-[11px] md:text-sm">
                                                 <td className="px-3 py-3 md:px-4 font-black text-gray-800 truncate max-w-[60px] md:max-w-none">{p.name}</td>
+                                                <td className="px-3 py-3 md:px-4 font-mono text-[10px] text-gray-500">{p.total}</td>
                                                 <td className="px-3 py-3 md:px-4">
                                                     <div className="flex items-center gap-1.5 md:gap-2">
                                                         <div className="flex-1 min-w-[30px] md:min-w-[80px] h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
