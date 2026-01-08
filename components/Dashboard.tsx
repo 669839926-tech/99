@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle, Pencil } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -974,191 +974,164 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Birthday Card Customizer Modal - Optimized for Mobile */}
+      {/* Birthday Card Customizer Modal - Optimized Size and Focus */}
       {selectedBirthdayPlayer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-white md:rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-full md:h-[650px]">
+            <div className="bg-white md:rounded-3xl shadow-2xl w-full md:max-w-5xl overflow-hidden flex flex-col md:flex-row h-full md:h-[500px]">
                 
-                {/* Left: Card Preview Container (Scrollable on mobile) */}
+                {/* Left: Card Preview Container - Landscape Layout */}
                 <div className="flex-1 bg-[#1a1a1a] p-4 md:p-8 flex items-center justify-center overflow-hidden relative shrink-0">
                     <div 
                         ref={cardRef}
-                        className="w-[300px] h-[440px] md:w-[380px] md:h-[530px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white shrink-0"
+                        className="w-[420px] h-[280px] md:w-[580px] md:h-[360px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-row p-0 text-white shrink-0"
                         style={{ border: '10px solid #FDE100', backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(253, 225, 0, 0.05) 1px, transparent 0)', backgroundSize: '24px 24px' }}
                     >
                         {/* Festive Elements: Confetti Dots */}
                         <div className="absolute top-10 left-10 w-2 h-2 rounded-full bg-pink-500 animate-pulse"></div>
-                        <div className="absolute top-40 right-12 w-3 h-1 bg-blue-400 rotate-45"></div>
-                        <div className="absolute bottom-20 left-14 w-2 h-2 rounded-full bg-yellow-400"></div>
-                        <div className="absolute top-24 left-1/4 w-1.5 h-1.5 rounded-full bg-green-400"></div>
-                        <div className="absolute top-1/2 right-6 w-2 h-2 bg-purple-500 rounded-sm rotate-12"></div>
+                        <div className="absolute top-30 right-12 w-3 h-1 bg-blue-400 rotate-45"></div>
+                        <div className="absolute bottom-10 left-1/2 w-2 h-2 rounded-full bg-yellow-400"></div>
                         
                         {/* Balloons/Poppers */}
-                        <div className="absolute -top-4 -left-2 text-bvb-yellow/40">
+                        <div className="absolute top-0 left-0 text-bvb-yellow/20">
                             <PartyPopper className="w-16 h-16 rotate-[-15deg]" />
                         </div>
-                        <div className="absolute -top-4 -right-2 text-bvb-yellow/40">
-                            <PartyPopper className="w-16 h-16 rotate-[15deg] scale-x-[-1]" />
+                        <div className="absolute bottom-0 right-0 text-bvb-yellow/20">
+                            <PartyPopper className="w-16 h-16 rotate-[165deg]" />
                         </div>
 
-                        {/* Club Identity */}
-                        <div className="absolute top-4 left-6 flex items-center gap-2 z-20">
-                             <div className="bg-white p-1 rounded-lg">
-                                <img src={appLogo} className="w-6 h-6 object-contain" crossOrigin="anonymous" />
-                             </div>
-                             <div className="flex flex-col">
-                                <span className="font-black text-[10px] text-bvb-yellow leading-none tracking-tighter uppercase">WSZG CLUB</span>
-                                <div className="flex items-center gap-1">
-                                    <Gift className="w-2 h-2 text-white/50" />
-                                    <span className="text-[7px] text-white/40 uppercase font-black tracking-widest">Birthday Edition</span>
+                        {/* Left Content Side: Visuals (42%) */}
+                        <div className="w-[42%] flex flex-col items-center justify-center border-r border-white/10 p-4 relative z-10">
+                            {/* Club Identity */}
+                            <div className="absolute top-3 left-4 flex items-center gap-2">
+                                <div className="bg-white p-0.5 rounded shadow-sm">
+                                    <img src={appLogo} className="w-5 h-5 object-contain" crossOrigin="anonymous" />
                                 </div>
-                             </div>
-                        </div>
-                        
-                        {/* Birthday Title */}
-                        <div className="mt-12 mb-4 text-center z-10">
-                            <div className="flex justify-center gap-2 mb-1">
-                                <Star className="w-3 h-3 text-bvb-yellow fill-current" />
-                                <Star className="w-4 h-4 text-bvb-yellow fill-current" />
-                                <Star className="w-3 h-3 text-bvb-yellow fill-current" />
+                                <span className="font-black text-[8px] text-bvb-yellow tracking-tighter uppercase">WSZG ACADEMY</span>
                             </div>
-                            <h3 className="text-4xl md:text-5xl font-black italic text-bvb-yellow tracking-tighter uppercase leading-none drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">HAPPY</h3>
-                            <h3 className="text-2xl md:text-3xl font-black italic text-white tracking-[0.2em] uppercase mt-1 drop-shadow-md">BIRTHDAY</h3>
-                        </div>
 
-                        {/* Player Photo with Hat */}
-                        <div className="relative mb-4 z-10 flex justify-center items-center">
-                            {/* Birthday Hat Element */}
-                            <div className="absolute -top-6 -left-2 z-30 transform -rotate-12">
-                                <div className="relative">
-                                    <Triangle className="w-12 h-12 md:w-14 md:h-14 text-bvb-yellow fill-current stroke-bvb-black stroke-[2px]" />
+                            {/* Birthday Title */}
+                            <div className="text-center mb-4">
+                                <div className="flex justify-center gap-1.5 mb-0.5">
+                                    <Star className="w-2.5 h-2.5 text-bvb-yellow fill-current" />
+                                    <Star className="w-2.5 h-2.5 text-bvb-yellow fill-current" />
+                                </div>
+                                <h3 className="text-4xl md:text-5xl font-black italic text-bvb-yellow tracking-tighter uppercase leading-none drop-shadow-lg">HAPPY</h3>
+                                <h3 className="text-xl md:text-2xl font-black italic text-white tracking-[0.25em] uppercase mt-0.5 drop-shadow-md">BIRTHDAY</h3>
+                            </div>
+
+                            {/* Player Photo with Hat */}
+                            <div className="relative">
+                                {/* Birthday Hat Element */}
+                                <div className="absolute -top-6 -left-1 z-30 transform -rotate-12 scale-75">
+                                    <Triangle className="w-12 h-12 text-bvb-yellow fill-current stroke-bvb-black stroke-[2px]" />
                                     <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full border border-bvb-black shadow-sm"></div>
-                                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-full h-1 bg-bvb-black/20 rounded-full blur-[1px]"></div>
+                                </div>
+
+                                <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-[0_0_25px_rgba(253,225,0,0.3)] relative bg-gray-800 ring-2 ring-bvb-yellow">
+                                    <img src={selectedBirthdayPlayer.image} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Content Side: Message & Info (58%) */}
+                        <div className="w-[58%] flex flex-col justify-center p-6 md:p-8 relative z-10 bg-gradient-to-br from-transparent to-white/5">
+                            {/* Player Name Pill */}
+                            <div className="mb-4 flex justify-start">
+                                <div className="bg-bvb-yellow px-4 py-1.5 rounded-full shadow-lg flex items-center gap-3 border-2 border-bvb-black transform -rotate-1">
+                                    <span className="text-sm md:text-lg font-black text-bvb-black uppercase tracking-tight">{selectedBirthdayPlayer.name}</span>
+                                    <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
+                                    <span className="text-xs md:text-base font-black text-bvb-black">{selectedBirthdayPlayer.turningAge}岁</span>
                                 </div>
                             </div>
 
-                            <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-[0_0_25px_rgba(253,225,0,0.3)] relative bg-gray-800 ring-4 ring-bvb-yellow">
-                                <img src={selectedBirthdayPlayer.image} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                            {/* Main Message Box */}
+                            <div className="relative flex-1 flex flex-col justify-center px-1">
+                                <Quote className="absolute -top-4 -left-3 w-8 h-8 text-bvb-yellow/10" />
+                                <Sparkles className="absolute top-0 right-0 w-4 h-4 text-bvb-yellow/20 animate-pulse" />
+                                <p className="text-lg md:text-2xl font-black italic text-bvb-yellow leading-relaxed drop-shadow-sm">
+                                    "{birthdayMessage}"
+                                </p>
                             </div>
-                        </div>
 
-                        {/* Player Name & Birthday Info Pill */}
-                        <div className="text-center z-10 relative mb-4">
-                            <div className="bg-bvb-yellow px-4 py-1.5 rounded-full shadow-lg flex items-center gap-3 border-2 border-bvb-black">
-                                <span className="text-sm md:text-base font-black text-bvb-black uppercase">{selectedBirthdayPlayer.name}</span>
-                                <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
-                                <span className="text-xs md:text-sm font-black text-bvb-black/80 font-mono tracking-tighter">{selectedBirthdayPlayer.monthDay}</span>
-                                <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
-                                <span className="text-xs md:text-sm font-black text-bvb-black">{selectedBirthdayPlayer.turningAge}岁</span>
+                            {/* Bottom Info */}
+                            <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                                <div className="flex items-center gap-2">
+                                    <Cake className="w-4 h-4 text-bvb-yellow" />
+                                    <span className="text-[10px] font-black text-white font-mono">{selectedBirthdayPlayer.monthDay}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-white/5 rounded-full border border-white/10">
+                                    <Star className="w-1.5 h-1.5 text-bvb-yellow fill-current" />
+                                    <span className="text-[7px] font-black text-white/40 uppercase tracking-widest leading-none">WSZG Official Card</span>
+                                </div>
                             </div>
-                        </div>
-
-                        {/* Cake Element */}
-                        <div className="z-10 mb-4 animate-bounce duration-1000 hidden md:block">
-                             <div className="bg-white/10 p-2 rounded-2xl backdrop-blur-sm border border-white/5 shadow-inner">
-                                <Cake className="w-8 h-8 md:w-10 md:h-10 text-bvb-yellow drop-shadow-[0_0_8px_rgba(253,225,0,0.6)]" />
-                             </div>
-                        </div>
-
-                        {/* Message Box - Optimized Text Size for Image Capture */}
-                        <div className="mt-2 px-4 text-center z-10 w-full relative flex-1 flex flex-col justify-center">
-                            <Sparkles className="absolute -top-4 left-4 w-4 h-4 text-bvb-yellow/40" />
-                            <Sparkles className="absolute -bottom-2 right-4 w-5 h-5 text-bvb-yellow/40 scale-x-[-1]" />
-                            <div className="h-0.5 w-16 bg-bvb-yellow mx-auto mb-3 opacity-50"></div>
-                            {/* 此处字号针对图片导出进行了放大优化 */}
-                            <p className="text-base md:text-xl font-bold italic text-bvb-yellow leading-relaxed drop-shadow-sm line-clamp-3 px-2">
-                                "{birthdayMessage}"
-                            </p>
-                        </div>
-
-                        {/* Footer Branding */}
-                        <div className="mt-auto pt-4 flex flex-col items-center gap-1.5 z-10">
-                             <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-                                <Star className="w-2 h-2 text-bvb-yellow fill-current" />
-                                <span className="text-[7px] font-black text-white/50 uppercase tracking-[0.2em]">WSZG Academy Official Card</span>
-                                <Star className="w-2 h-2 text-bvb-yellow fill-current" />
-                             </div>
                         </div>
                     </div>
-                    {/* Background decoration for preview area */}
-                    <div className="absolute top-4 left-4 text-white/10 flex items-center gap-2 pointer-events-none md:hidden">
+
+                    {/* Preview Indicator */}
+                    <div className="absolute top-4 left-6 text-white/20 flex items-center gap-2 pointer-events-none uppercase italic">
                         <Camera className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Preview Mode</span>
+                        <span className="text-[10px] font-black tracking-widest">Real-time Preview</span>
                     </div>
                 </div>
 
-                {/* Right: Controls Panel (White background, scrollable) */}
-                <div className="w-full md:w-96 p-6 md:p-8 flex flex-col bg-white shrink-0 border-l border-gray-100 flex-1 overflow-y-auto">
-                    <div className="flex justify-between items-center mb-6 md:mb-8">
-                        <div className="flex flex-col">
-                            <h3 className="text-xl font-black text-gray-800 flex items-center gap-2 italic uppercase tracking-tighter">
-                                <Cake className="w-6 h-6 text-bvb-yellow" />
+                {/* Right: Controls Panel - Re-designed for focus */}
+                <div className="w-full md:w-80 p-6 flex flex-col bg-white shrink-0 border-l border-gray-100 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="text-lg font-black text-gray-800 flex items-center gap-2 uppercase tracking-tighter">
+                                <Edit2 className="w-4 h-4 text-bvb-yellow" />
                                 贺卡定制
                             </h3>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Birthday Card Editor</p>
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Card Customizer</p>
                         </div>
-                        <button onClick={() => setSelectedBirthdayPlayer(null)} className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X className="w-6 h-6" /></button>
+                        <button onClick={() => setSelectedBirthdayPlayer(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X className="w-5 h-5" /></button>
                     </div>
 
-                    <div className="flex-1 space-y-6">
-                        <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <Edit2 className="w-3 h-3" />
-                                定制专属祝福语
+                    <div className="flex-1 space-y-5">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <Pencil className="w-3 h-3" /> 编辑祝福语
                             </label>
                             <textarea 
-                                className="w-full h-28 md:h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed shadow-inner"
-                                placeholder="输入生日祝福文字..."
+                                className="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed"
+                                placeholder="在这里输入您的祝福..."
                                 value={birthdayMessage}
                                 onChange={e => setBirthdayMessage(e.target.value)}
                             />
-                            
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-6 mb-3">快捷模板选择</p>
-                            <div className="grid grid-cols-1 gap-2">
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <LayoutList className="w-3 h-3" /> 推荐模板
+                            </label>
+                            <div className="space-y-1.5">
                                 {[
-                                    { label: '常规祝福', text: '祝你生日快乐！在绿茵场上继续追逐梦想，勇敢闪耀！' },
-                                    { label: '核心鼓励', text: '今天你就是全场核心！愿新的一岁进球不断，助攻拉满，生日快乐！' },
-                                    { label: '奋斗精神', text: '小球星，生日快乐！愿你保持热爱，勤于训练，成为最棒的球员！' }
+                                    { label: '温情鼓励', text: '祝你生日快乐！在绿茵场上继续追逐梦想，勇敢闪耀！' },
+                                    { label: '竞技核心', text: '新的一岁，愿你带球如风，射门如箭！生日快乐，场上MVP！' },
+                                    { label: '成长愿景', text: '愿你保持对足球的热爱，勤奋训练，成为更好的自己。生日快乐！' }
                                 ].map((tpl, i) => (
                                     <button 
                                         key={i}
                                         onClick={() => setBirthdayMessage(tpl.text)} 
-                                        className={`text-[11px] p-3 text-left rounded-xl font-bold transition-all border ${birthdayMessage === tpl.text ? 'bg-yellow-50 border-bvb-yellow text-bvb-black shadow-sm' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
+                                        className={`w-full text-left p-2.5 rounded-lg border text-[10px] font-bold transition-all ${birthdayMessage === tpl.text ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
                                     >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="uppercase text-[9px] opacity-60">Template {i+1}</span>
-                                            {birthdayMessage === tpl.text && <CheckCircle className="w-3 h-3 text-bvb-black" />}
-                                        </div>
                                         {tpl.label}
                                     </button>
                                 ))}
                             </div>
                         </div>
-
-                        <div className="p-4 bg-bvb-black rounded-2xl border border-bvb-black shadow-lg">
-                             <div className="flex items-start gap-3">
-                                <div className="p-1.5 bg-bvb-yellow rounded-lg shrink-0 shadow-sm">
-                                    <Sparkles className="w-4 h-4 text-bvb-black" />
-                                </div>
-                                <div>
-                                    <p className="text-[11px] text-white font-black uppercase tracking-tighter">导出优化已就绪</p>
-                                    <p className="text-[10px] text-white/50 font-bold leading-tight mt-1">
-                                        系统已自动将祝福语字号放大至最佳浏览尺寸。点击下方按钮下载 3K 高清贺卡图。
-                                    </p>
-                                </div>
-                             </div>
-                        </div>
                     </div>
 
-                    <div className="pt-6 border-t border-gray-100 mt-6 sticky bottom-0 bg-white md:relative">
+                    <div className="pt-5 mt-5 border-t border-gray-100">
                         <button 
                             onClick={handleDownloadBirthdayCard}
                             disabled={isCapturingCard}
-                            className="w-full py-4 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 uppercase italic tracking-widest group active:scale-95 disabled:opacity-50"
+                            className="w-full py-3.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 uppercase italic text-xs tracking-widest disabled:opacity-50"
                         >
-                            {isCapturingCard ? <Loader2 className="w-5 h-5 animate-spin text-bvb-yellow" /> : <Download className="w-5 h-5 text-bvb-yellow group-hover:translate-y-1 transition-transform" />}
-                            生成并下载贺卡
+                            {isCapturingCard ? <Loader2 className="w-4 h-4 animate-spin text-bvb-yellow" /> : <Download className="w-4 h-4 text-bvb-yellow" />}
+                            生成并下载
                         </button>
+                        <p className="text-[8px] text-center text-gray-400 mt-2 font-bold uppercase tracking-wider">High Quality Export Enabled</p>
                     </div>
                 </div>
             </div>
