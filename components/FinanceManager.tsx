@@ -1,4 +1,5 @@
 
+// Comment: Added missing React and hook imports
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord } from '../types';
 import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -216,10 +217,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     }, [transactions, selectedYear, selectedMonth, financeCategories]);
 
     const coachSalaries = useMemo(() => {
-        const coaches = users.filter(u => u.role === 'coach' && (filterCoachId === 'all' || u.id === filterCoachId));
+        // 修改点：同时包含主教练(coach)和助教(assistant_coach)
+        const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
 
-        return coaches.map(coach => {
+        return staff.map(coach => {
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
             const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
             const coachTeams = coach.teamIds || [];
@@ -289,6 +291,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             return {
                 coachId: coach.id,
                 coachName: coach.name,
+                role: coach.role, // 添加角色信息以便 UI 区分
                 level: levelConfig.label,
                 baseSalary,
                 sessionFees,
@@ -387,7 +390,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const transaction: FinanceTransaction = {
             id: `disburse-${Date.now()}-${coachId}`,
             date: new Date().toISOString().split('T')[0],
-            details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} 薪资发放入账`,
+            details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`,
             category: salaryExpenseCategory?.id || 'cat-4',
             income: 0,
             expense: row.totalSalary,
@@ -536,7 +539,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             {viewMode === 'salary' ? (
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
                     <div className="flex flex-col lg:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
-                        <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center shrink-0 uppercase italic tracking-tighter"><Calculator className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 教练员薪酬核算表</h3>
+                        <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center shrink-0 uppercase italic tracking-tighter"><Calculator className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 教练组薪酬核算表</h3>
                         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end">
                             <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
                                 <UserCheck className="w-3.5 h-3.5 text-gray-400" />
@@ -545,9 +548,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     onChange={e => setFilterCoachId(e.target.value)}
                                     className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer"
                                 >
-                                    <option value="all">全部教练</option>
-                                    {users.filter(u => u.role === 'coach').map(c => (
-                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    <option value="all">全部人员 (主/助教)</option>
+                                    {users.filter(u => u.role === 'coach' || u.role === 'assistant_coach').map(c => (
+                                        <option key={c.id} value={c.id}>{c.name} ({c.role === 'coach' ? '主' : '助'})</option>
                                     ))}
                                 </select>
                             </div>
@@ -575,7 +578,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <table className="w-full text-xs text-left border-collapse">
                                 <thead className="bg-gray-50 text-gray-500 font-black uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest border-b">
                                     <tr>
-                                        <th className="px-2 py-3 md:px-4 md:py-4">教练信息</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4">职员信息</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">底薪</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">课时费</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">参训奖</th>
@@ -597,7 +600,12 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                 <span className="font-black text-gray-800 text-[11px] md:text-sm">{sal.coachName}</span>
                                                                 {sal.isDisbursed && <span className="text-[7px] md:text-[8px] bg-green-500 text-white px-1 rounded font-black uppercase">已发</span>}
                                                             </div>
-                                                            <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span>
+                                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                                <span className={`text-[8px] font-black uppercase px-1 rounded border leading-tight ${sal.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                                                                    {sal.role === 'coach' ? '主教练' : '助教'}
+                                                                </span>
+                                                                <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span>
+                                                            </div>
                                                         </div>
                                                     </td>
                                                     <td className="px-2 py-3 md:px-4 md:py-4 text-right">
@@ -773,7 +781,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
-                            {/* 优化图例底部栏位，增加间距和描述文字 */}
                             <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col items-center gap-1">
                                 <div className="flex items-center gap-2 text-gray-400">
                                     <div className="w-2 h-2 rounded-full bg-red-500"></div>
