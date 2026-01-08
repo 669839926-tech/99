@@ -1,7 +1,6 @@
 
-// Comment: Added missing React and hook imports
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord } from '../types';
+import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord, RoleSalarySettings } from '../types';
 import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area, Cell, PieChart, Pie } from 'recharts';
 
@@ -217,14 +216,18 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     }, [transactions, selectedYear, selectedMonth, financeCategories]);
 
     const coachSalaries = useMemo(() => {
-        // 修改点：同时包含主教练(coach)和助教(assistant_coach)
         const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
 
-        return staff.map(coach => {
-            const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
-            const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
-            const coachTeams = coach.teamIds || [];
+        return staff.map(staffMember => {
+            const savedRecord = staffMember.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
+            
+            // 根据角色选择配置逻辑
+            const isAsst = staffMember.role === 'assistant_coach';
+            const roleConfig: RoleSalarySettings = isAsst ? salarySettings.assistant_coach : salarySettings.coach;
+            
+            const levelConfig = roleConfig.levels.find(l => l.level === staffMember.level) || roleConfig.levels[0];
+            const coachTeams = staffMember.teamIds || [];
             
             let calcSessionFees = 0;
             let calcAttendanceReward = 0;
@@ -233,8 +236,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const teamBreakdown = coachTeams.map(teamId => {
                 const teamPlayers = players.filter(p => p.teamId === teamId);
                 const teamSize = teamPlayers.length;
-                const effectiveTeamSize = Math.max(salarySettings.minPlayersForCalculation, teamSize);
-                const sessionFeePerSession = levelConfig.sessionBaseFee + (effectiveTeamSize - salarySettings.minPlayersForCalculation) * salarySettings.incrementalPlayerFee;
+                const effectiveTeamSize = Math.max(roleConfig.minPlayersForCalculation, teamSize);
+                const sessionFeePerSession = levelConfig.sessionBaseFee + (effectiveTeamSize - roleConfig.minPlayersForCalculation) * roleConfig.incrementalPlayerFee;
                 
                 const monthlySessions = trainings.filter(t => {
                     const { year, month } = parseDateInfo(t.date);
@@ -248,7 +251,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     const totalPossible = monthlySessions.length * teamSize;
                     const totalPresent = monthlySessions.reduce((sum, s) => sum + (s.attendance?.filter(r => r.status === 'Present').length || 0), 0);
                     monthlyAttendanceRate = totalPossible > 0 ? (totalPresent / totalPossible) * 100 : 0;
-                    attendanceReward = salarySettings.monthlyAttendanceRewards
+                    attendanceReward = roleConfig.monthlyAttendanceRewards
                         .sort((a,b) => b.threshold - a.threshold)
                         .find(r => monthlyAttendanceRate >= r.threshold)?.amount || 0;
                 }
@@ -265,7 +268,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         return rechargedInQ || joinedInQ;
                     }).length;
                     renewalRate = teamSize > 0 ? (renewedCount / teamSize) * 100 : 0;
-                    renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? salarySettings.quarterlyRenewalReward.amount : 0;
+                    renewalReward = renewalRate >= roleConfig.quarterlyRenewalReward.threshold ? roleConfig.quarterlyRenewalReward.amount : 0;
                 }
 
                 return { teamId, teamSize, sessionCount: monthlySessions.length, monthlySessionFee, monthlyAttendanceRate, attendanceReward, renewalRate, renewalReward };
@@ -275,10 +278,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             calcAttendanceReward = teamBreakdown.reduce((sum, b) => sum + b.attendanceReward, 0);
             calcRenewalReward = teamBreakdown.reduce((sum, b) => sum + b.renewalReward, 0);
 
-            const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
-            const calcPerformanceReward = salarySettings.monthlyPerformanceRewards.find(r => evaluation && evaluation.score >= r.minScore && evaluation.score <= r.maxScore)?.amount || 0;
+            const evaluation = staffMember.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
+            const calcPerformanceReward = roleConfig.monthlyPerformanceRewards.find(r => evaluation && evaluation.score >= r.minScore && evaluation.score <= r.maxScore)?.amount || 0;
 
-            const currentEdit = editPayroll[coach.id] || {};
+            const currentEdit = editPayroll[staffMember.id] || {};
             
             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : levelConfig.baseSalary);
             const sessionFees = currentEdit.sessionFees !== undefined ? currentEdit.sessionFees : (savedRecord ? savedRecord.sessionFees : calcSessionFees);
@@ -289,9 +292,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward;
 
             return {
-                coachId: coach.id,
-                coachName: coach.name,
-                role: coach.role, // 添加角色信息以便 UI 区分
+                coachId: staffMember.id,
+                coachName: staffMember.name,
+                role: staffMember.role, 
                 level: levelConfig.label,
                 baseSalary,
                 sessionFees,

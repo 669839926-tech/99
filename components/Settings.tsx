@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
+import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel, RoleSalarySettings } from '../types';
 import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Activity, Brain, Dumbbell, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, EyeOff, Wallet, ArrowUpRight, ArrowDownRight, Zap, TrendingUp, Calculator, ShieldCheck, Star, Shirt, Square } from 'lucide-react';
 
 interface SettingsProps {
@@ -66,6 +66,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
+  // 薪酬设置专用状态
+  const [activeSalaryRole, setActiveSalaryRole] = useState<'coach' | 'assistant_coach'>('coach');
+
   const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior' });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
@@ -94,7 +97,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleSaveSalarySettings = () => {
       onUpdateSalarySettings(localSalarySettings);
-      alert('薪酬计算规则已更新！');
+      alert('两类职位的薪酬计算规则已成功更新！');
   };
 
   const handleAddAttribute = () => {
@@ -380,9 +383,9 @@ const Settings: React.FC<SettingsProps> = ({
                                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                                 </select>
                             </div>
-                            {newUser.role === 'coach' && (
+                            {(newUser.role === 'coach' || newUser.role === 'assistant_coach') && (
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">教练等级</label>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">等级/头衔</label>
                                     <select className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.level} onChange={e => setNewUser({...newUser, level: e.target.value as CoachLevel})}>
                                         {COACH_LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
                                     </select>
@@ -390,7 +393,7 @@ const Settings: React.FC<SettingsProps> = ({
                             )}
                         </div>
 
-                        {/* Team Selection Section (Crucial Fix) */}
+                        {/* Team Selection Section */}
                         {(newUser.role === 'coach' || newUser.role === 'assistant_coach') && (
                             <div className="animate-in slide-in-from-top-2 duration-300">
                                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 tracking-widest flex items-center gap-2">
@@ -439,8 +442,8 @@ const Settings: React.FC<SettingsProps> = ({
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
                                             <span className="font-black text-gray-800 text-lg leading-none">{u.name}</span>
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-tighter ${u.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : u.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-gray-50 text-gray-500'}`}>{u.role}</span>
-                                            {u.role === 'coach' && <span className="text-[9px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{u.level || 'Junior'}</span>}
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-tighter ${u.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : u.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : u.role === 'assistant_coach' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-gray-50 text-gray-500'}`}>{u.role}</span>
+                                            {(u.role === 'coach' || u.role === 'assistant_coach') && <span className="text-[9px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{u.level || 'Junior'}</span>}
                                         </div>
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 font-bold">
                                             <span className="flex items-center gap-1 font-mono">ID: {u.username}</span>
@@ -475,21 +478,36 @@ const Settings: React.FC<SettingsProps> = ({
 
         {activeTab === 'salary' && isDirector && (
             <div className="flex-1 p-6 space-y-8">
-                <div className="flex justify-between items-end">
+                <div className="flex flex-col md:flex-row justify-between items-end gap-4">
                     <div>
                         <h3 className="text-xl font-bold text-gray-800 flex items-center"><Calculator className="w-5 h-5 mr-2 text-bvb-yellow" /> 教职薪酬核算规则设置</h3>
-                        <p className="text-sm text-gray-500 mt-1">配置教练等级、底薪、课酬标准及绩效奖金。</p>
+                        <p className="text-sm text-gray-500 mt-1">分别为 **主教练** 和 **助理教练** 配置独立的底薪、课酬递增及奖金逻辑。</p>
+                    </div>
+                    {/* 角色切换 Segmented Control */}
+                    <div className="flex bg-gray-100 p-1 rounded-2xl border shadow-inner">
+                        <button 
+                            onClick={() => setActiveSalaryRole('coach')}
+                            className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${activeSalaryRole === 'coach' ? 'bg-bvb-black text-bvb-yellow shadow-md scale-105' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            主教练配置
+                        </button>
+                        <button 
+                            onClick={() => setActiveSalaryRole('assistant_coach')}
+                            className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${activeSalaryRole === 'assistant_coach' ? 'bg-bvb-black text-bvb-yellow shadow-md scale-105' : 'text-gray-400 hover:text-gray-600'}`}
+                        >
+                            助教配置
+                        </button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in slide-in-from-right-4 duration-300">
                     {/* Level Bases */}
                     <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                        <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><Star className="w-4 h-4 mr-2" /> 等级基础薪资与课酬</h4>
+                        <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><Star className="w-4 h-4 mr-2" /> {activeSalaryRole === 'coach' ? '主教练' : '助教'}：等级基础薪资</h4>
                         <div className="space-y-4">
-                            {localSalarySettings.levels.map((l, idx) => (
+                            {localSalarySettings[activeSalaryRole].levels.map((l, idx) => (
                                 <div key={l.level} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                                    <p className="font-black text-xs text-bvb-black mb-3 border-b pb-2">{l.label} 教练</p>
+                                    <p className="font-black text-xs text-bvb-black mb-3 border-b pb-2">{l.label} ({l.level})</p>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-[10px] font-bold text-gray-400 uppercase">基础底薪 (¥)</label>
@@ -498,19 +516,19 @@ const Settings: React.FC<SettingsProps> = ({
                                                 value={l.baseSalary}
                                                 onChange={e => {
                                                     const next = { ...localSalarySettings };
-                                                    next.levels[idx].baseSalary = parseInt(e.target.value) || 0;
+                                                    next[activeSalaryRole].levels[idx].baseSalary = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }}
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] font-bold text-gray-400 uppercase">基础课酬 (¥)</label>
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase">基础单场课酬 (¥)</label>
                                             <input 
                                                 type="number" className="w-full p-2 border rounded font-black text-sm"
                                                 value={l.sessionBaseFee}
                                                 onChange={e => {
                                                     const next = { ...localSalarySettings };
-                                                    next.levels[idx].sessionBaseFee = parseInt(e.target.value) || 0;
+                                                    next[activeSalaryRole].levels[idx].sessionBaseFee = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }}
                                             />
@@ -524,51 +542,109 @@ const Settings: React.FC<SettingsProps> = ({
                     {/* Incremental & Performance */}
                     <div className="space-y-6">
                         <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                            <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><TrendingUp className="w-4 h-4 mr-2" /> 课时费人数递增规则</h4>
+                            <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><TrendingUp className="w-4 h-4 mr-2" /> 课时费阶梯规则</h4>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase">起算基准人数</label>
-                                    <input type="number" className="w-full p-2 border rounded font-black text-sm bg-white" value={localSalarySettings.minPlayersForCalculation} onChange={e => setLocalSalarySettings({...localSalarySettings, minPlayersForCalculation: parseInt(e.target.value) || 0})} />
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase">人数起算基准 (人)</label>
+                                    <input type="number" className="w-full p-2 border rounded font-black text-sm bg-white" value={localSalarySettings[activeSalaryRole].minPlayersForCalculation} onChange={e => {
+                                        const next = { ...localSalarySettings };
+                                        next[activeSalaryRole].minPlayersForCalculation = parseInt(e.target.value) || 0;
+                                        setLocalSalarySettings(next);
+                                    }} />
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase">每超1人增加 (¥)</label>
-                                    <input type="number" className="w-full p-2 border rounded font-black text-sm bg-white" value={localSalarySettings.incrementalPlayerFee} onChange={e => setLocalSalarySettings({...localSalarySettings, incrementalPlayerFee: parseInt(e.target.value) || 0})} />
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase">单人溢价 (¥/人/场)</label>
+                                    <input type="number" className="w-full p-2 border rounded font-black text-sm bg-white" value={localSalarySettings[activeSalaryRole].incrementalPlayerFee} onChange={e => {
+                                        const next = { ...localSalarySettings };
+                                        next[activeSalaryRole].incrementalPlayerFee = parseInt(e.target.value) || 0;
+                                        setLocalSalarySettings(next);
+                                    }} />
                                 </div>
                             </div>
+                            <p className="text-[10px] text-gray-400 mt-3 italic">注：单场课酬 = 基础课酬 + (实到人数 - 基准人数) * 单人溢价</p>
                         </div>
 
                         <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                            <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> 绩效奖励阈值设置</h4>
+                            <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> 激励与绩效阈值</h4>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">月度参训率奖励 (≥ X% 奖 Y元)</label>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">月度参训率奖励阈值 (≥%)</label>
                                     <div className="space-y-2">
-                                        {localSalarySettings.monthlyAttendanceRewards.map((r, i) => (
+                                        {localSalarySettings[activeSalaryRole].monthlyAttendanceRewards.map((r, i) => (
                                             <div key={i} className="flex gap-2 items-center">
                                                 <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={r.threshold} onChange={e => {
                                                     const next = { ...localSalarySettings };
-                                                    next.monthlyAttendanceRewards[i].threshold = parseInt(e.target.value) || 0;
+                                                    next[activeSalaryRole].monthlyAttendanceRewards[i].threshold = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }} />
                                                 <span className="text-xs font-bold text-gray-400">%</span>
                                                 <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={r.amount} onChange={e => {
                                                     const next = { ...localSalarySettings };
-                                                    next.monthlyAttendanceRewards[i].amount = parseInt(e.target.value) || 0;
+                                                    next[activeSalaryRole].monthlyAttendanceRewards[i].amount = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }} />
                                                 <span className="text-xs font-bold text-gray-400">元</span>
+                                                <button onClick={() => {
+                                                    const next = { ...localSalarySettings };
+                                                    next[activeSalaryRole].monthlyAttendanceRewards.splice(i, 1);
+                                                    setLocalSalarySettings(next);
+                                                }} className="p-1 text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5"/></button>
                                             </div>
                                         ))}
+                                        <button onClick={() => {
+                                            const next = { ...localSalarySettings };
+                                            next[activeSalaryRole].monthlyAttendanceRewards.push({ threshold: 80, amount: 50 });
+                                            setLocalSalarySettings(next);
+                                        }} className="text-[9px] font-black text-blue-500 uppercase flex items-center gap-1 hover:underline"><Plus className="w-3 h-3"/> 添加阶梯</button>
                                     </div>
                                 </div>
                                 <div className="pt-2 border-t border-gray-200">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度续费率奖励 (≥ X% 奖 Y元)</label>
-                                    <p className="text-[9px] text-blue-500 font-bold mb-2">注：按季度统计，仅在季末月份(3/6/9/12)发放。</p>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度续费激励 (季末发放)</label>
                                     <div className="flex gap-2 items-center">
-                                        <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.threshold} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, threshold: parseInt(e.target.value) || 0}})} />
+                                        <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={localSalarySettings[activeSalaryRole].quarterlyRenewalReward.threshold} onChange={e => {
+                                            const next = { ...localSalarySettings };
+                                            next[activeSalaryRole].quarterlyRenewalReward.threshold = parseInt(e.target.value) || 0;
+                                            setLocalSalarySettings(next);
+                                        }} />
                                         <span className="text-xs font-bold text-gray-400">%</span>
-                                        <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.amount} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, amount: parseInt(e.target.value) || 0}})} />
+                                        <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={localSalarySettings[activeSalaryRole].quarterlyRenewalReward.amount} onChange={e => {
+                                            const next = { ...localSalarySettings };
+                                            next[activeSalaryRole].quarterlyRenewalReward.amount = parseInt(e.target.value) || 0;
+                                            setLocalSalarySettings(next);
+                                        }} />
                                         <span className="text-xs font-bold text-gray-400">元</span>
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-gray-200">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">月度综合评分绩效奖金</label>
+                                    <div className="space-y-2">
+                                        {localSalarySettings[activeSalaryRole].monthlyPerformanceRewards.map((r, i) => (
+                                            <div key={i} className="flex gap-2 items-center">
+                                                <input type="number" step="0.1" className="w-14 p-2 border rounded font-black text-xs" value={r.minScore} onChange={e => {
+                                                    const next = { ...localSalarySettings };
+                                                    next[activeSalaryRole].monthlyPerformanceRewards[i].minScore = parseFloat(e.target.value) || 0;
+                                                    setLocalSalarySettings(next);
+                                                }} />
+                                                <span className="text-[8px] text-gray-400">至</span>
+                                                <input type="number" step="0.1" className="w-14 p-2 border rounded font-black text-xs" value={r.maxScore} onChange={e => {
+                                                    const next = { ...localSalarySettings };
+                                                    next[activeSalaryRole].monthlyPerformanceRewards[i].maxScore = parseFloat(e.target.value) || 0;
+                                                    setLocalSalarySettings(next);
+                                                }} />
+                                                <span className="text-xs font-bold text-gray-400">分</span>
+                                                <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={r.amount} onChange={e => {
+                                                    const next = { ...localSalarySettings };
+                                                    next[activeSalaryRole].monthlyPerformanceRewards[i].amount = parseInt(e.target.value) || 0;
+                                                    setLocalSalarySettings(next);
+                                                }} />
+                                                <span className="text-xs font-bold text-gray-400">元</span>
+                                                <button onClick={() => {
+                                                    const next = { ...localSalarySettings };
+                                                    next[activeSalaryRole].monthlyPerformanceRewards.splice(i, 1);
+                                                    setLocalSalarySettings(next);
+                                                }} className="p-1 text-gray-300 hover:text-red-500"><X className="w-3.5 h-3.5"/></button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
