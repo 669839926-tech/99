@@ -415,7 +415,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     try {
         const canvas = await html2canvas(cardRef.current, {
             useCORS: true,
-            scale: 2,
+            scale: 3, // 提升图片清晰度
             backgroundColor: '#000000'
         });
         const link = document.createElement('a');
@@ -974,16 +974,16 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Birthday Card Customizer Modal */}
+      {/* Birthday Card Customizer Modal - Optimized for Mobile */}
       {selectedBirthdayPlayer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[650px]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white md:rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-full md:h-[650px]">
                 
-                {/* Left: Card Preview */}
-                <div className="flex-1 bg-gray-900 p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
+                {/* Left: Card Preview Container (Scrollable on mobile) */}
+                <div className="flex-1 bg-[#1a1a1a] p-4 md:p-8 flex items-center justify-center overflow-hidden relative shrink-0">
                     <div 
                         ref={cardRef}
-                        className="w-[320px] h-[450px] md:w-[380px] md:h-[530px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white"
+                        className="w-[300px] h-[440px] md:w-[380px] md:h-[530px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white shrink-0"
                         style={{ border: '10px solid #FDE100', backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(253, 225, 0, 0.05) 1px, transparent 0)', backgroundSize: '24px 24px' }}
                     >
                         {/* Festive Elements: Confetti Dots */}
@@ -1037,13 +1037,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </div>
                             </div>
 
-                            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-[0_0_25px_rgba(253,225,0,0.3)] relative bg-gray-800 ring-4 ring-bvb-yellow">
+                            <div className="w-28 h-28 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-[0_0_25px_rgba(253,225,0,0.3)] relative bg-gray-800 ring-4 ring-bvb-yellow">
                                 <img src={selectedBirthdayPlayer.image} className="w-full h-full object-cover" crossOrigin="anonymous" />
                             </div>
                         </div>
 
-                        {/* Player Name & Birthday & Age Info Pill */}
-                        <div className="text-center z-10 relative mb-6">
+                        {/* Player Name & Birthday Info Pill */}
+                        <div className="text-center z-10 relative mb-4">
                             <div className="bg-bvb-yellow px-4 py-1.5 rounded-full shadow-lg flex items-center gap-3 border-2 border-bvb-black">
                                 <span className="text-sm md:text-base font-black text-bvb-black uppercase">{selectedBirthdayPlayer.name}</span>
                                 <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
@@ -1054,18 +1054,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
 
                         {/* Cake Element */}
-                        <div className="z-10 mb-4 animate-bounce duration-1000">
+                        <div className="z-10 mb-4 animate-bounce duration-1000 hidden md:block">
                              <div className="bg-white/10 p-2 rounded-2xl backdrop-blur-sm border border-white/5 shadow-inner">
                                 <Cake className="w-8 h-8 md:w-10 md:h-10 text-bvb-yellow drop-shadow-[0_0_8px_rgba(253,225,0,0.6)]" />
                              </div>
                         </div>
 
-                        {/* Message Box */}
-                        <div className="mt-2 px-4 text-center z-10 w-full relative">
+                        {/* Message Box - Optimized Text Size for Image Capture */}
+                        <div className="mt-2 px-4 text-center z-10 w-full relative flex-1 flex flex-col justify-center">
                             <Sparkles className="absolute -top-4 left-4 w-4 h-4 text-bvb-yellow/40" />
                             <Sparkles className="absolute -bottom-2 right-4 w-5 h-5 text-bvb-yellow/40 scale-x-[-1]" />
                             <div className="h-0.5 w-16 bg-bvb-yellow mx-auto mb-3 opacity-50"></div>
-                            <p className="text-xs md:text-sm font-bold italic text-bvb-yellow leading-relaxed drop-shadow-sm min-h-[40px] line-clamp-3 px-2">
+                            {/* 此处字号针对图片导出进行了放大优化 */}
+                            <p className="text-base md:text-xl font-bold italic text-bvb-yellow leading-relaxed drop-shadow-sm line-clamp-3 px-2">
                                 "{birthdayMessage}"
                             </p>
                         </div>
@@ -1079,34 +1080,58 @@ const Dashboard: React.FC<DashboardProps> = ({
                              </div>
                         </div>
                     </div>
+                    {/* Background decoration for preview area */}
+                    <div className="absolute top-4 left-4 text-white/10 flex items-center gap-2 pointer-events-none md:hidden">
+                        <Camera className="w-4 h-4" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Preview Mode</span>
+                    </div>
                 </div>
 
-                {/* Right: Controls */}
-                <div className="w-full md:w-80 p-8 flex flex-col bg-white shrink-0 border-l border-gray-100">
-                    <div className="flex justify-between items-center mb-8">
+                {/* Right: Controls Panel (White background, scrollable) */}
+                <div className="w-full md:w-96 p-6 md:p-8 flex flex-col bg-white shrink-0 border-l border-gray-100 flex-1 overflow-y-auto">
+                    <div className="flex justify-between items-center mb-6 md:mb-8">
                         <div className="flex flex-col">
                             <h3 className="text-xl font-black text-gray-800 flex items-center gap-2 italic uppercase tracking-tighter">
                                 <Cake className="w-6 h-6 text-bvb-yellow" />
-                                贺卡定制中心
+                                贺卡定制
                             </h3>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Birthday Card Editor</p>
                         </div>
-                        <button onClick={() => setSelectedBirthdayPlayer(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X className="w-5 h-5" /></button>
+                        <button onClick={() => setSelectedBirthdayPlayer(null)} className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X className="w-6 h-6" /></button>
                     </div>
 
-                    <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-1">
+                    <div className="flex-1 space-y-6">
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">定制专属祝福语</label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                <Edit2 className="w-3 h-3" />
+                                定制专属祝福语
+                            </label>
                             <textarea 
-                                className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed"
+                                className="w-full h-28 md:h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed shadow-inner"
                                 placeholder="输入生日祝福文字..."
                                 value={birthdayMessage}
                                 onChange={e => setBirthdayMessage(e.target.value)}
                             />
-                            <div className="flex flex-wrap gap-2 mt-3">
-                                <button onClick={() => setBirthdayMessage('祝你生日快乐！在绿茵场上继续追逐梦想，勇敢闪耀！')} className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-yellow-50 rounded font-bold text-gray-500">常规版</button>
-                                <button onClick={() => setBirthdayMessage('今天你就是全场核心！愿新的一岁进球不断，助攻拉满，生日快乐！')} className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-yellow-50 rounded font-bold text-gray-500">鼓励版</button>
-                                <button onClick={() => setBirthdayMessage('小球星，生日快乐！愿你保持热爱，勤于训练，成为最棒的球员！')} className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-yellow-50 rounded font-bold text-gray-500">奋斗版</button>
+                            
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-6 mb-3">快捷模板选择</p>
+                            <div className="grid grid-cols-1 gap-2">
+                                {[
+                                    { label: '常规祝福', text: '祝你生日快乐！在绿茵场上继续追逐梦想，勇敢闪耀！' },
+                                    { label: '核心鼓励', text: '今天你就是全场核心！愿新的一岁进球不断，助攻拉满，生日快乐！' },
+                                    { label: '奋斗精神', text: '小球星，生日快乐！愿你保持热爱，勤于训练，成为最棒的球员！' }
+                                ].map((tpl, i) => (
+                                    <button 
+                                        key={i}
+                                        onClick={() => setBirthdayMessage(tpl.text)} 
+                                        className={`text-[11px] p-3 text-left rounded-xl font-bold transition-all border ${birthdayMessage === tpl.text ? 'bg-yellow-50 border-bvb-yellow text-bvb-black shadow-sm' : 'bg-white border-gray-100 text-gray-500 hover:border-gray-200'}`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="uppercase text-[9px] opacity-60">Template {i+1}</span>
+                                            {birthdayMessage === tpl.text && <CheckCircle className="w-3 h-3 text-bvb-black" />}
+                                        </div>
+                                        {tpl.label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -1116,20 +1141,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <Sparkles className="w-4 h-4 text-bvb-black" />
                                 </div>
                                 <div>
-                                    <p className="text-[11px] text-white font-black uppercase tracking-tighter">预览已就绪</p>
+                                    <p className="text-[11px] text-white font-black uppercase tracking-tighter">导出优化已就绪</p>
                                     <p className="text-[10px] text-white/50 font-bold leading-tight mt-1">
-                                        贺卡已包含生日帽、蛋糕、庆典纸屑及球员的具体年龄信息。点击下方按钮下载分享。
+                                        系统已自动将祝福语字号放大至最佳浏览尺寸。点击下方按钮下载 3K 高清贺卡图。
                                     </p>
                                 </div>
                              </div>
                         </div>
                     </div>
 
-                    <div className="pt-6 border-t border-gray-100 mt-6">
+                    <div className="pt-6 border-t border-gray-100 mt-6 sticky bottom-0 bg-white md:relative">
                         <button 
                             onClick={handleDownloadBirthdayCard}
                             disabled={isCapturingCard}
-                            className="w-full py-4 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 uppercase italic tracking-widest group"
+                            className="w-full py-4 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 uppercase italic tracking-widest group active:scale-95 disabled:opacity-50"
                         >
                             {isCapturingCard ? <Loader2 className="w-5 h-5 animate-spin text-bvb-yellow" /> : <Download className="w-5 h-5 text-bvb-yellow group-hover:translate-y-1 transition-transform" />}
                             生成并下载贺卡
