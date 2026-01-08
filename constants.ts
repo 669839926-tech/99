@@ -1,7 +1,7 @@
 
 import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions, FinanceCategoryDefinition, SalarySettings } from './types';
 
-// ... (CHINA_GEO_DATA 省略)
+// ... CHINA_GEO_DATA保持原样
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
     "北京市": {
         "北京市": ["东城区", "西城区", "朝阳区", "丰台区", "石景山区", "海淀区", "门头沟区", "房山区", "通州区", "顺义区", "昌平区", "大兴区", "怀柔区", "平谷区", "密云区", "延庆区"]
@@ -89,41 +89,22 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
 };
 
 export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
-    coach: {
-        levels: [
-            { level: 'Junior', label: '初级', baseSalary: 3000, sessionBaseFee: 60 },
-            { level: 'Intermediate', label: '中级', baseSalary: 4500, sessionBaseFee: 70 },
-            { level: 'Senior', label: '高级', baseSalary: 6000, sessionBaseFee: 90 },
-        ],
-        incrementalPlayerFee: 5,
-        minPlayersForCalculation: 6,
-        monthlyAttendanceRewards: [
-            { threshold: 80, amount: 100 },
-            { threshold: 90, amount: 200 },
-        ],
-        quarterlyRenewalReward: { threshold: 80, amount: 300 },
-        monthlyPerformanceRewards: [
-            { minScore: 8, maxScore: 8.9, amount: 100 },
-            { minScore: 9, maxScore: 10, amount: 200 },
-        ],
-    },
-    assistant_coach: {
-        levels: [
-            { level: 'Junior', label: '助理初级', baseSalary: 1500, sessionBaseFee: 30 },
-            { level: 'Intermediate', label: '助理中级', baseSalary: 2200, sessionBaseFee: 40 },
-            { level: 'Senior', label: '助理高级', baseSalary: 3000, sessionBaseFee: 50 },
-        ],
-        incrementalPlayerFee: 3,
-        minPlayersForCalculation: 4,
-        monthlyAttendanceRewards: [
-            { threshold: 85, amount: 50 },
-        ],
-        quarterlyRenewalReward: { threshold: 80, amount: 150 },
-        monthlyPerformanceRewards: [
-            { minScore: 8, maxScore: 8.9, amount: 50 },
-            { minScore: 9, maxScore: 10, amount: 100 },
-        ],
-    }
+    levels: [
+        { level: 'Junior', label: '初级', baseSalary: 3000, sessionBaseFee: 60 },
+        { level: 'Intermediate', label: '中级', baseSalary: 4500, sessionBaseFee: 70 },
+        { level: 'Senior', label: '高级', baseSalary: 6000, sessionBaseFee: 90 },
+    ],
+    incrementalPlayerFee: 5,
+    minPlayersForCalculation: 6,
+    monthlyAttendanceRewards: [
+        { threshold: 80, amount: 100 },
+        { threshold: 90, amount: 200 },
+    ],
+    quarterlyRenewalReward: { threshold: 80, amount: 300 },
+    monthlyPerformanceRewards: [
+        { minScore: 8, maxScore: 8.9, amount: 100 },
+        { minScore: 9, maxScore: 10, amount: 200 },
+    ],
 };
 
 export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [
@@ -146,7 +127,6 @@ export const MOCK_USERS: User[] = [
   { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamIds: ['t1'], level: 'Intermediate' },
   { id: 'u3', username: 'coach_u17', password: '123', name: 'U17 主教练', role: 'coach', teamIds: ['t2'], level: 'Junior' },
   { id: 'u4', username: 'head_coach', password: '123', name: '梯队总教头', role: 'coach', teamIds: ['t1', 't2'], level: 'Senior' },
-  { id: 'u5', username: 'asst_1', password: '123', name: '王助教', role: 'assistant_coach', teamIds: ['t1'], level: 'Junior' },
 ];
 
 export const MOCK_ANNOUNCEMENTS: Announcement[] = [

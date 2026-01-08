@@ -298,19 +298,13 @@ export interface CoachLevelSetting {
     sessionBaseFee: number;
 }
 
-// 角色独立配置接口
-export interface RoleSalarySettings {
-    levels: CoachLevelSetting[];
-    incrementalPlayerFee: number;
-    minPlayersForCalculation: number;
-    monthlyAttendanceRewards: { threshold: number; amount: number }[];
-    quarterlyRenewalReward: { threshold: number; amount: number };
-    monthlyPerformanceRewards: { minScore: number; maxScore: number; amount: number }[];
-}
-
 export interface SalarySettings {
-    coach: RoleSalarySettings;
-    assistant_coach: RoleSalarySettings;
+    levels: CoachLevelSetting[];
+    incrementalPlayerFee: number; // 5
+    minPlayersForCalculation: number; // 6
+    monthlyAttendanceRewards: { threshold: number; amount: number }[]; // 参训率改为月度
+    quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，但仅季末发放
+    monthlyPerformanceRewards: { minScore: number; maxScore: number; amount: number }[]; // [{8, 8.9, 100}, {9, 10, 200}]
 }
 
 export interface MonthlyEvaluation {
