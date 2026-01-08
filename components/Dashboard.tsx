@@ -1,7 +1,6 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -58,6 +57,12 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingCredits, setIsExportingCredits] = useState(false);
   
+  // Birthday Card State
+  const [selectedBirthdayPlayer, setSelectedBirthdayPlayer] = useState<any | null>(null);
+  const [birthdayMessage, setBirthdayMessage] = useState('祝你生日快乐！在绿茵场上继续追逐梦想，勇敢闪耀！');
+  const [isCapturingCard, setIsCapturingCard] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
   // Credit Alert Filter
   const [creditAlertTeamId, setCreditAlertTeamId] = useState<string>('all');
   
@@ -276,10 +281,8 @@ const Dashboard: React.FC<DashboardProps> = ({
          const absentRecords = s.attendance?.filter(r => r.status === 'Absent').length || 0;
          const noRecords = total - (present + leave + injury + absentRecords);
 
-         // 获取具体的人员名单字符串
          const getPlayerNamesByStatus = (status: string) => {
              if (status === 'Absent') {
-                 // 包含显式标记缺席和未在名单中出现的
                  const explicitAbsentIds = s.attendance?.filter(r => r.status === 'Absent').map(r => r.playerId) || [];
                  const recordedPlayerIds = s.attendance?.map(r => r.playerId) || [];
                  const unrecordedIds = sTeamPlayers.filter(p => !recordedPlayerIds.includes(p.id)).map(p => p.id);
@@ -307,7 +310,6 @@ const Dashboard: React.FC<DashboardProps> = ({
              injury, 
              absent: absentRecords + noRecords, 
              rate: total > 0 ? Math.round((present / total) * 100) : 0,
-             // 详细名单字段，用于 PDF 导出和 Excel 导出
              presentNames: getPlayerNamesByStatus('Present'),
              leaveNames: getPlayerNamesByStatus('Leave'),
              injuryNames: getPlayerNamesByStatus('Injury'),
@@ -369,7 +371,6 @@ const Dashboard: React.FC<DashboardProps> = ({
               }).join('\n');
               fileName = `全员出勤统计_${attendanceYear}.csv`;
           } else {
-              // 增加了名单明细列
               headers = "日期,训练主题,所属梯队,应到人数,实到人数,请假人数,伤停人数,旷课人数,到课率(%),实到名单,请假名单,伤停名单,缺席名单\n";
               rows = exportSessionsData.map(s => {
                   return `${s.date},"${s.title.replace(/"/g, '""')}",${s.teamName},${s.total},${s.present},${s.leave},${s.injury},${s.absent},${s.rate},"${s.presentNames.replace(/"/g, '""')}","${s.leaveNames.replace(/"/g, '""')}","${s.injuryNames.replace(/"/g, '""')}","${s.absentNames.replace(/"/g, '""')}"`;
@@ -405,6 +406,26 @@ const Dashboard: React.FC<DashboardProps> = ({
         }
         setNewAnnouncement({ title: '', content: '', type: 'info' });
         setShowAnnounceForm(false);
+    }
+  };
+
+  const handleDownloadBirthdayCard = async () => {
+    if (!cardRef.current) return;
+    setIsCapturingCard(true);
+    try {
+        const canvas = await html2canvas(cardRef.current, {
+            useCORS: true,
+            scale: 2,
+            backgroundColor: '#000000'
+        });
+        const link = document.createElement('a');
+        link.download = `顽石之光生日贺卡_${selectedBirthdayPlayer.name}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch (e) {
+        alert('贺卡生成失败，请稍后重试');
+    } finally {
+        setIsCapturingCard(false);
     }
   };
 
@@ -503,7 +524,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             )}
             
-            {/* 教练端：待阅提醒卡片 */}
             {isCoach && unreadReviews.length > 0 && (
                 <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6 animate-in slide-in-from-right-4">
                     <div className="flex justify-between items-center mb-4">
@@ -624,7 +644,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {stats.upcomingBirthdays.map(p => (
                                     <div 
                                         key={p.id} 
-                                        className="bg-pink-50 text-pink-700 px-2.5 py-1 rounded-lg text-[11px] font-black border border-pink-100 flex items-center group shadow-sm"
+                                        onClick={() => setSelectedBirthdayPlayer(p)}
+                                        className="bg-pink-50 text-pink-700 px-2.5 py-1 rounded-lg text-[11px] font-black border border-pink-100 flex items-center group shadow-sm cursor-pointer hover:bg-pink-100 transition-colors"
+                                        title="点击制作生日贺卡"
                                     >
                                         <Sparkles className="w-3 h-3 mr-1" />
                                         {p.name} [{p.monthDay}]
@@ -868,7 +890,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </table>
                             </div>
                             
-                            {/* --- PDF 导出专用：详细名单明细 --- */}
                             <div className="mt-8 space-y-6 hidden md:block">
                                 <h4 className="font-black text-xs md:text-sm text-gray-500 uppercase tracking-widest border-b pb-2">课次考勤名单明细 (详细报表)</h4>
                                 <div className="space-y-4">
@@ -921,7 +942,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportPlayersData.map(p => (
-                                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors text-[11px] md:text-sm">
+                                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors text-[11px] md:sm">
                                                 <td className="px-3 py-3 md:px-4 font-black text-gray-800 truncate max-w-[60px] md:max-w-none">{p.name}</td>
                                                 <td className="px-3 py-3 md:px-4 font-mono text-[10px] text-gray-500">{p.total}</td>
                                                 <td className="px-3 py-3 md:px-4">
@@ -952,6 +973,172 @@ const Dashboard: React.FC<DashboardProps> = ({
             )}
         </div>
       </div>
+
+      {/* Birthday Card Customizer Modal */}
+      {selectedBirthdayPlayer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[650px]">
+                
+                {/* Left: Card Preview */}
+                <div className="flex-1 bg-gray-900 p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
+                    <div 
+                        ref={cardRef}
+                        className="w-[320px] h-[450px] md:w-[380px] md:h-[530px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white"
+                        style={{ border: '10px solid #FDE100', backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(253, 225, 0, 0.05) 1px, transparent 0)', backgroundSize: '24px 24px' }}
+                    >
+                        {/* Festive Elements: Confetti Dots */}
+                        <div className="absolute top-10 left-10 w-2 h-2 rounded-full bg-pink-500 animate-pulse"></div>
+                        <div className="absolute top-40 right-12 w-3 h-1 bg-blue-400 rotate-45"></div>
+                        <div className="absolute bottom-20 left-14 w-2 h-2 rounded-full bg-yellow-400"></div>
+                        <div className="absolute top-24 left-1/4 w-1.5 h-1.5 rounded-full bg-green-400"></div>
+                        <div className="absolute top-1/2 right-6 w-2 h-2 bg-purple-500 rounded-sm rotate-12"></div>
+                        
+                        {/* Balloons/Poppers */}
+                        <div className="absolute -top-4 -left-2 text-bvb-yellow/40">
+                            <PartyPopper className="w-16 h-16 rotate-[-15deg]" />
+                        </div>
+                        <div className="absolute -top-4 -right-2 text-bvb-yellow/40">
+                            <PartyPopper className="w-16 h-16 rotate-[15deg] scale-x-[-1]" />
+                        </div>
+
+                        {/* Club Identity */}
+                        <div className="absolute top-4 left-6 flex items-center gap-2 z-20">
+                             <div className="bg-white p-1 rounded-lg">
+                                <img src={appLogo} className="w-6 h-6 object-contain" crossOrigin="anonymous" />
+                             </div>
+                             <div className="flex flex-col">
+                                <span className="font-black text-[10px] text-bvb-yellow leading-none tracking-tighter uppercase">WSZG CLUB</span>
+                                <div className="flex items-center gap-1">
+                                    <Gift className="w-2 h-2 text-white/50" />
+                                    <span className="text-[7px] text-white/40 uppercase font-black tracking-widest">Birthday Edition</span>
+                                </div>
+                             </div>
+                        </div>
+                        
+                        {/* Birthday Title */}
+                        <div className="mt-12 mb-4 text-center z-10">
+                            <div className="flex justify-center gap-2 mb-1">
+                                <Star className="w-3 h-3 text-bvb-yellow fill-current" />
+                                <Star className="w-4 h-4 text-bvb-yellow fill-current" />
+                                <Star className="w-3 h-3 text-bvb-yellow fill-current" />
+                            </div>
+                            <h3 className="text-4xl md:text-5xl font-black italic text-bvb-yellow tracking-tighter uppercase leading-none drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">HAPPY</h3>
+                            <h3 className="text-2xl md:text-3xl font-black italic text-white tracking-[0.2em] uppercase mt-1 drop-shadow-md">BIRTHDAY</h3>
+                        </div>
+
+                        {/* Player Photo with Hat */}
+                        <div className="relative mb-4 z-10 flex justify-center items-center">
+                            {/* Birthday Hat Element */}
+                            <div className="absolute -top-6 -left-2 z-30 transform -rotate-12">
+                                <div className="relative">
+                                    <Triangle className="w-12 h-12 md:w-14 md:h-14 text-bvb-yellow fill-current stroke-bvb-black stroke-[2px]" />
+                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full border border-bvb-black shadow-sm"></div>
+                                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-full h-1 bg-bvb-black/20 rounded-full blur-[1px]"></div>
+                                </div>
+                            </div>
+
+                            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-[0_0_25px_rgba(253,225,0,0.3)] relative bg-gray-800 ring-4 ring-bvb-yellow">
+                                <img src={selectedBirthdayPlayer.image} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                            </div>
+                        </div>
+
+                        {/* Player Name & Birthday & Age Info Pill */}
+                        <div className="text-center z-10 relative mb-6">
+                            <div className="bg-bvb-yellow px-4 py-1.5 rounded-full shadow-lg flex items-center gap-3 border-2 border-bvb-black">
+                                <span className="text-sm md:text-base font-black text-bvb-black uppercase">{selectedBirthdayPlayer.name}</span>
+                                <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
+                                <span className="text-xs md:text-sm font-black text-bvb-black/80 font-mono tracking-tighter">{selectedBirthdayPlayer.monthDay}</span>
+                                <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
+                                <span className="text-xs md:text-sm font-black text-bvb-black">{selectedBirthdayPlayer.turningAge}岁</span>
+                            </div>
+                        </div>
+
+                        {/* Cake Element */}
+                        <div className="z-10 mb-4 animate-bounce duration-1000">
+                             <div className="bg-white/10 p-2 rounded-2xl backdrop-blur-sm border border-white/5 shadow-inner">
+                                <Cake className="w-8 h-8 md:w-10 md:h-10 text-bvb-yellow drop-shadow-[0_0_8px_rgba(253,225,0,0.6)]" />
+                             </div>
+                        </div>
+
+                        {/* Message Box */}
+                        <div className="mt-2 px-4 text-center z-10 w-full relative">
+                            <Sparkles className="absolute -top-4 left-4 w-4 h-4 text-bvb-yellow/40" />
+                            <Sparkles className="absolute -bottom-2 right-4 w-5 h-5 text-bvb-yellow/40 scale-x-[-1]" />
+                            <div className="h-0.5 w-16 bg-bvb-yellow mx-auto mb-3 opacity-50"></div>
+                            <p className="text-xs md:text-sm font-bold italic text-bvb-yellow leading-relaxed drop-shadow-sm min-h-[40px] line-clamp-3 px-2">
+                                "{birthdayMessage}"
+                            </p>
+                        </div>
+
+                        {/* Footer Branding */}
+                        <div className="mt-auto pt-4 flex flex-col items-center gap-1.5 z-10">
+                             <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                                <Star className="w-2 h-2 text-bvb-yellow fill-current" />
+                                <span className="text-[7px] font-black text-white/50 uppercase tracking-[0.2em]">WSZG Academy Official Card</span>
+                                <Star className="w-2 h-2 text-bvb-yellow fill-current" />
+                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: Controls */}
+                <div className="w-full md:w-80 p-8 flex flex-col bg-white shrink-0 border-l border-gray-100">
+                    <div className="flex justify-between items-center mb-8">
+                        <div className="flex flex-col">
+                            <h3 className="text-xl font-black text-gray-800 flex items-center gap-2 italic uppercase tracking-tighter">
+                                <Cake className="w-6 h-6 text-bvb-yellow" />
+                                贺卡定制中心
+                            </h3>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Birthday Card Editor</p>
+                        </div>
+                        <button onClick={() => setSelectedBirthdayPlayer(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400"><X className="w-5 h-5" /></button>
+                    </div>
+
+                    <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-1">
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">定制专属祝福语</label>
+                            <textarea 
+                                className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed"
+                                placeholder="输入生日祝福文字..."
+                                value={birthdayMessage}
+                                onChange={e => setBirthdayMessage(e.target.value)}
+                            />
+                            <div className="flex flex-wrap gap-2 mt-3">
+                                <button onClick={() => setBirthdayMessage('祝你生日快乐！在绿茵场上继续追逐梦想，勇敢闪耀！')} className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-yellow-50 rounded font-bold text-gray-500">常规版</button>
+                                <button onClick={() => setBirthdayMessage('今天你就是全场核心！愿新的一岁进球不断，助攻拉满，生日快乐！')} className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-yellow-50 rounded font-bold text-gray-500">鼓励版</button>
+                                <button onClick={() => setBirthdayMessage('小球星，生日快乐！愿你保持热爱，勤于训练，成为最棒的球员！')} className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-yellow-50 rounded font-bold text-gray-500">奋斗版</button>
+                            </div>
+                        </div>
+
+                        <div className="p-4 bg-bvb-black rounded-2xl border border-bvb-black shadow-lg">
+                             <div className="flex items-start gap-3">
+                                <div className="p-1.5 bg-bvb-yellow rounded-lg shrink-0 shadow-sm">
+                                    <Sparkles className="w-4 h-4 text-bvb-black" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] text-white font-black uppercase tracking-tighter">预览已就绪</p>
+                                    <p className="text-[10px] text-white/50 font-bold leading-tight mt-1">
+                                        贺卡已包含生日帽、蛋糕、庆典纸屑及球员的具体年龄信息。点击下方按钮下载分享。
+                                    </p>
+                                </div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-100 mt-6">
+                        <button 
+                            onClick={handleDownloadBirthdayCard}
+                            disabled={isCapturingCard}
+                            className="w-full py-4 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 uppercase italic tracking-widest group"
+                        >
+                            {isCapturingCard ? <Loader2 className="w-5 h-5 animate-spin text-bvb-yellow" /> : <Download className="w-5 h-5 text-bvb-yellow group-hover:translate-y-1 transition-transform" />}
+                            生成并下载贺卡
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
