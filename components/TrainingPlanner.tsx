@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell } from 'lucide-react';
+import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -19,25 +19,117 @@ interface TrainingPlannerProps {
   onDeleteTraining: (id: string) => void;
   initialFilter?: string;
   appLogo?: string;
+  periodizationPlans?: PeriodizationPlan[];
+  onUpdatePeriodization?: (plan: PeriodizationPlan) => void;
 }
 
 type TimeScope = 'month' | 'quarter' | 'year';
-type ViewType = 'calendar' | 'list';
+type ViewType = 'calendar' | 'list' | 'periodization';
 
-interface SessionDetailModalProps {
-    session: TrainingSession;
-    teams: Team[];
-    players: Player[];
-    drillLibrary: string[];
-    trainingFoci: string[];
-    currentUser: User | null;
-    onUpdate: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
-    onDuplicate: (session: TrainingSession) => void;
-    onDelete: (id: string) => void;
+interface WeeklyPlanEditorProps {
+    week: WeeklyPlan;
+    onSave: (week: WeeklyPlan) => void;
     onClose: () => void;
+    clipboard?: WeeklyPlan | null;
+    onCopy?: (week: WeeklyPlan) => void;
 }
 
-const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams, players, drillLibrary, trainingFoci, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy }) => {
+    const [localWeek, setLocalWeek] = useState<WeeklyPlan>({ ...week });
+
+    const handlePaste = () => {
+        if (clipboard) {
+            setLocalWeek({
+                ...localWeek,
+                physicalTheme: clipboard.physicalTheme,
+                trainingTheme: clipboard.trainingTheme,
+                trainingContent: clipboard.trainingContent,
+                oppositionContent: clipboard.oppositionContent,
+                trainingGoals: clipboard.trainingGoals,
+                matchPlan: clipboard.matchPlan,
+                remarks: clipboard.remarks
+            });
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                    <h3 className="font-bold flex items-center gap-2"><Edit2 className="w-4 h-4 text-bvb-yellow" /> 编辑第 {week.weekInMonth} 周计划</h3>
+                    <div className="flex items-center gap-2">
+                        {onCopy && (
+                            <button 
+                                onClick={() => onCopy(localWeek)}
+                                className="p-1.5 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                                title="复制当前内容"
+                            >
+                                <ClipboardCopy className="w-4 h-4" />
+                            </button>
+                        )}
+                        <button onClick={onClose}><X className="w-6 h-6" /></button>
+                    </div>
+                </div>
+                <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+                    <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
+                        <div className="flex gap-4">
+                            <div>
+                                <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">月份</label>
+                                <div className="font-bold text-gray-700">{week.month}月</div>
+                            </div>
+                            <div>
+                                <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest mb-0.5">周次</label>
+                                <div className="font-bold text-gray-700">第 {week.weekInMonth} 周</div>
+                            </div>
+                        </div>
+                        {clipboard && (
+                            <button 
+                                onClick={handlePaste}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-bvb-yellow text-bvb-black text-[10px] font-black rounded-lg hover:brightness-105 shadow-sm transition-all animate-pulse"
+                            >
+                                <ClipboardPaste className="w-3 h-3" /> 粘贴已复制内容
+                            </button>
+                        )}
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">体能主题</label>
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.physicalTheme} onChange={e => setLocalWeek({...localWeek, physicalTheme: e.target.value})} placeholder="如：速度、敏捷" />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.trainingTheme} onChange={e => setLocalWeek({...localWeek, trainingTheme: e.target.value})} placeholder="如：运控球" />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练内容</label>
+                        <textarea rows={2} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingContent} onChange={e => setLocalWeek({...localWeek, trainingContent: e.target.value})} placeholder="核心训练细节..." />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">情景对抗内容</label>
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.oppositionContent} onChange={e => setLocalWeek({...localWeek, oppositionContent: e.target.value})} placeholder="如：1v1、2v2" />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练目标 (当月共享)</label>
+                        <textarea rows={3} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingGoals} onChange={e => setLocalWeek({...localWeek, trainingGoals: e.target.value})} placeholder="1. 强化基础... 2. 提高..." />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">赛事计划</label>
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.matchPlan} onChange={e => setLocalWeek({...localWeek, matchPlan: e.target.value})} placeholder="本周比赛安排..." />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">备注</label>
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.remarks} onChange={e => setLocalWeek({...localWeek, remarks: e.target.value})} placeholder="如：春节假期" />
+                    </div>
+                </div>
+                <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
+                    <button onClick={onClose} className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-200 rounded-lg transition-all">取消</button>
+                    <button onClick={() => onSave(localWeek)} className="px-6 py-2 bg-bvb-black text-bvb-yellow font-black rounded-lg shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"><Save className="w-4 h-4" /> 保存更新</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -336,7 +428,7 @@ const SessionDetailModal: React.FC<SessionDetailModalProps> = ({ session, teams,
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo 
+    trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScope, setTimeScope] = useState<TimeScope>('month');
@@ -349,6 +441,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statsTeamFilter, setStatsTeamFilter] = useState<string>('all');
+  const [activeWeekPlan, setActiveWeekPlan] = useState<WeeklyPlan | null>(null);
+  const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
 
   const userManagedSessions = useMemo(() => {
       if (currentUser?.role === 'director') return trainings;
@@ -391,26 +485,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const [drillInput, setDrillInput] = useState('');
 
-  useEffect(() => {
-    if (initialFilter === 'pending_logs') {
-        const firstPending = userManagedSessions.find(t => t.submissionStatus === 'Submitted');
-        if (firstPending) {
-            const date = new Date(firstPending.date);
-            setCurrentDate(date);
-            setSelectedDate(firstPending.date);
-            setTimeScope('month');
-        }
-    } else if (initialFilter === 'unread_reviews') {
-        const firstUnread = userManagedSessions.find(t => t.submissionStatus === 'Reviewed' && !t.isReviewRead);
-        if (firstUnread) {
-            const date = new Date(firstUnread.date);
-            setCurrentDate(date);
-            setSelectedDate(firstUnread.date);
-            setTimeScope('month');
-        }
-    }
-  }, [initialFilter, userManagedSessions]);
-
   const { filteredSessions, dateLabel, statsData } = useMemo(() => {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
@@ -450,6 +524,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       }));
       return { filteredSessions: sessions, dateLabel: label, statsData: chartData };
   }, [currentDate, timeScope, userManagedSessions, statsTeamFilter]);
+
+  // 获取当前梯队在该年度的周期计划
+  const currentPeriodization = useMemo(() => {
+      const teamId = statsTeamFilter === 'all' ? availableTeams[0]?.id : statsTeamFilter;
+      const year = currentDate.getFullYear();
+      return periodizationPlans.find(p => p.teamId === teamId && p.year === year) || { id: `p-${teamId}-${year}`, teamId, year, weeks: [] };
+  }, [periodizationPlans, statsTeamFilter, availableTeams, currentDate]);
 
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
@@ -508,6 +589,134 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       return (
           <div className={`flex flex-col border-gray-200 overflow-hidden ${isCompact ? 'border rounded-lg' : 'border rounded-lg'}`}>{isCompact && <div className="text-center text-xs font-bold bg-gray-100 py-1 text-gray-600 border-b border-gray-200">{month + 1}月</div>}<div className="grid grid-cols-7 gap-px bg-gray-200">{weekDays.map((day, i) => (<div key={i} className={`bg-gray-100 text-center font-bold text-gray-500 uppercase ${isCompact ? 'text-[8px] py-0.5' : 'text-[10px] md:text-xs p-1 md:p-2'}`}>{day}</div>))}{days}</div></div>
       );
+  };
+
+  const renderPeriodizationView = () => {
+    const year = currentDate.getFullYear();
+    const months = timeScope === 'year' ? Array.from({length: 12}, (_, i) => i + 1) : 
+                   timeScope === 'quarter' ? Array.from({length: 3}, (_, i) => Math.floor(currentDate.getMonth() / 3) * 3 + i + 1) :
+                   [currentDate.getMonth() + 1];
+
+    const handleSaveWeek = (updatedWeek: WeeklyPlan) => {
+        const nextWeeks = [...currentPeriodization.weeks];
+        const idx = nextWeeks.findIndex(w => w.month === updatedWeek.month && w.weekInMonth === updatedWeek.weekInMonth);
+        if (idx >= 0) nextWeeks[idx] = updatedWeek;
+        else nextWeeks.push(updatedWeek);
+        onUpdatePeriodization?.({ ...currentPeriodization, weeks: nextWeeks });
+        setActiveWeekPlan(null);
+    };
+
+    const handleCopyWeek = (week: WeeklyPlan) => {
+        setPeriodizationClipboard(week);
+        alert(`已复制 ${week.month}月 第${week.weekInMonth}周 计划到剪贴板`);
+    };
+
+    const handlePasteToWeek = (month: number, weekNum: number) => {
+        if (!periodizationClipboard) return;
+        const targetWeek = {
+            ...periodizationClipboard,
+            id: `w-${month}-${weekNum}`,
+            month,
+            weekInMonth: weekNum,
+            year
+        };
+        const nextWeeks = [...currentPeriodization.weeks];
+        const idx = nextWeeks.findIndex(w => w.month === month && w.weekInMonth === weekNum);
+        if (idx >= 0) nextWeeks[idx] = targetWeek;
+        else nextWeeks.push(targetWeek);
+        onUpdatePeriodization?.({ ...currentPeriodization, weeks: nextWeeks });
+        alert(`内容已成功粘贴到 ${month}月 第${weekNum}周`);
+    };
+
+    return (
+        <div id="periodization-plan-export" className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-in fade-in duration-300">
+            <div className="overflow-x-auto relative no-scrollbar">
+                <table className="w-full text-center border-collapse table-fixed min-w-[850px] md:min-w-[1200px]">
+                    <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[8px] md:text-[10px] tracking-widest border-b">
+                        <tr>
+                            <th className="px-2 md:px-4 py-3 border-r w-12 md:w-16 sticky left-0 z-30 bg-gray-100">月份</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-14 md:w-20 sticky left-12 md:left-16 z-30 bg-gray-100">周期</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-20 md:w-24">体能主题</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-20 md:w-24">训练主题</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-40 md:w-48 text-left">训练内容</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-24 md:w-32">情景对抗</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-40 md:w-48">训练目标</th>
+                            <th className="px-2 md:px-4 py-3 border-r w-24 md:w-32">赛事计划</th>
+                            <th className="px-2 md:px-4 py-3 w-20 md:w-24">备注</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        {months.map(month => {
+                            const monthWeeks = Array.from({length: 4}, (_, i) => i + 1);
+                            return monthWeeks.map((weekNum, idx) => {
+                                const weekPlan = currentPeriodization.weeks.find(w => w.month === month && w.weekInMonth === weekNum) || {
+                                    id: `w-${month}-${weekNum}`,
+                                    year, month, weekInMonth: weekNum,
+                                    physicalTheme: '', trainingTheme: '', trainingContent: '', oppositionContent: '', trainingGoals: '', matchPlan: '', remarks: ''
+                                };
+                                const isClipboardSource = periodizationClipboard?.id === weekPlan.id;
+                                
+                                return (
+                                    <tr key={`${month}-${weekNum}`} className={`hover:bg-yellow-50/30 transition-colors group cursor-pointer ${isClipboardSource ? 'bg-yellow-50' : ''}`} onClick={() => setActiveWeekPlan(weekPlan)}>
+                                        {idx === 0 && (
+                                            <td rowSpan={4} className="border-r font-black text-sm md:text-lg bg-gray-50/80 backdrop-blur-sm sticky left-0 z-20">
+                                                {month}月
+                                            </td>
+                                        )}
+                                        <td className="px-1 md:px-2 py-3 md:py-4 border-r font-bold text-[9px] md:text-xs text-gray-500 bg-gray-50/40 sticky left-12 md:left-16 z-20">
+                                            <div className="flex flex-col items-center gap-1">
+                                                <span>第{weekNum}周</span>
+                                                <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={(e) => { e.stopPropagation(); handleCopyWeek(weekPlan); }}
+                                                        className="p-1 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow shadow-sm"
+                                                        title="复制此周"
+                                                    >
+                                                        <ClipboardCopy className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                                    </button>
+                                                    {periodizationClipboard && !isClipboardSource && (
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); handlePasteToWeek(month, weekNum); }}
+                                                            className="p-1 bg-bvb-yellow border border-bvb-yellow rounded text-bvb-black shadow-sm"
+                                                            title="粘贴到此周"
+                                                        >
+                                                            <ClipboardPaste className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-bold text-gray-700">{weekPlan.physicalTheme || '-'}</td>
+                                        <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-black text-bvb-black bg-yellow-50/20">{weekPlan.trainingTheme || '-'}</td>
+                                        <td className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-gray-600 text-left leading-snug md:leading-relaxed">
+                                            {weekPlan.trainingContent || '-'}
+                                        </td>
+                                        <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-black text-blue-600">{weekPlan.oppositionContent || '-'}</td>
+                                        {idx === 0 && (
+                                            <td rowSpan={4} className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-red-600 font-bold text-left align-top leading-snug md:leading-relaxed whitespace-pre-wrap">
+                                                {weekPlan.trainingGoals || '-'}
+                                            </td>
+                                        )}
+                                        <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-bold text-gray-800">{weekPlan.matchPlan || '-'}</td>
+                                        <td className="px-1 md:px-2 py-3 md:py-4 text-[8px] md:text-[10px] text-gray-400 italic">{weekPlan.remarks || '-'}</td>
+                                    </tr>
+                                );
+                            });
+                        })}
+                    </tbody>
+                </table>
+            </div>
+            {activeWeekPlan && (
+                <WeeklyPlanEditor 
+                    week={activeWeekPlan} 
+                    onSave={handleSaveWeek} 
+                    onClose={() => setActiveWeekPlan(null)} 
+                    clipboard={periodizationClipboard}
+                    onCopy={handleCopyWeek}
+                />
+            )}
+        </div>
+    );
   };
 
   const renderListView = () => {
@@ -643,7 +852,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const handleExportPDF = async () => {
         setIsExporting(true);
         try { 
-            await exportToPDF('training-plan-list-pdf', `训练计划业务详细报表_${dateLabel}`); 
+            if (viewType === 'periodization') {
+                await exportToPDF('periodization-plan-export', `周期性训练大纲排版_${dateLabel}`); 
+            } else {
+                await exportToPDF('training-plan-list-pdf', `训练计划业务详细报表_${dateLabel}`); 
+            }
         } catch (e) { 
             alert('导出失败'); 
         } finally { 
@@ -695,6 +908,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         <button onClick={() => setViewType('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
                             <LayoutList className="w-3 h-3 md:w-3.5 md:h-3.5" /> 列表
                         </button>
+                        <button onClick={() => setViewType('periodization')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'periodization' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                            <TableProperties className="w-3 h-3 md:w-3.5 md:h-3.5" /> 周期排版
+                        </button>
                     </div>
                     <div className="h-4 w-px bg-gray-300 mx-1"></div>
                     <button onClick={() => setTimeScope('month')} className={`text-[10px] font-black uppercase px-2 py-1 rounded transition-colors ${timeScope === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>月</button>
@@ -708,21 +924,24 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <span className="px-2 font-black text-xs md:text-sm flex-1 md:min-w-[110px] text-center whitespace-nowrap">{dateLabel}</span>
                     <button onClick={handleNextPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400" /></button>
                 </div>
-                <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出计划表 (PDF)">
+                <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出 (PDF)">
                     {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
                 </button>
                 <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
-                    <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建计划</span>
+                    <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建课次</span>
                 </button>
             </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
              <div className="flex-1 p-1">
-                 {viewType === 'calendar' ? renderCalendarView() : renderListView()}
+                 {viewType === 'calendar' ? renderCalendarView() : 
+                  viewType === 'list' ? renderListView() : 
+                  renderPeriodizationView()}
              </div>
              
              {/* Right Sidebar: Stats & Selected Day Summary */}
+             {viewType !== 'periodization' && (
              <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
                  {renderStats()}
                  <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-h-[300px]">
@@ -767,6 +986,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </div>
                  </div>
              </div>
+             )}
         </div>
 
         {/* --- EXPORT TEMPLATE --- */}

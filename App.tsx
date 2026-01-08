@@ -12,7 +12,7 @@ import SessionDesigner from './components/SessionDesigner';
 import FinanceManager from './components/FinanceManager';
 import TechnicalGrowth from './components/TechnicalGrowth';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings } from './types';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, WeeklyPlan } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -36,6 +36,7 @@ function App() {
   const [financeCategories, setFinanceCategories] = useState<FinanceCategoryDefinition[]>(DEFAULT_FINANCE_CATEGORIES);
   const [techTests, setTechTests] = useState<TechTestDefinition[]>([]);
   const [salarySettings, setSalarySettings] = useState<SalarySettings>(DEFAULT_SALARY_SETTINGS);
+  const [periodizationPlans, setPeriodizationPlans] = useState<PeriodizationPlan[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -74,6 +75,7 @@ function App() {
             if (cloudData.financeCategories) setFinanceCategories(cloudData.financeCategories);
             if (cloudData.techTests) setTechTests(cloudData.techTests);
             if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
+            if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
         }
         setIsInitializing(false);
     };
@@ -105,7 +107,8 @@ function App() {
                 permissions,
                 financeCategories,
                 techTests,
-                salarySettings
+                salarySettings,
+                periodizationPlans
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -115,7 +118,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -198,6 +201,18 @@ function App() {
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => setTrainings(prev => prev.map(t => t.id === session.id ? { ...session, attendance: newAttendance } : t));
   const handleUpdateAttributeConfig = (newConfig: AttributeConfig) => setAttributeConfig(newConfig);
 
+  const handleUpdatePeriodization = (plan: PeriodizationPlan) => {
+      setPeriodizationPlans(prev => {
+          const idx = prev.findIndex(p => p.teamId === plan.teamId && p.year === plan.year);
+          if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = plan;
+              return next;
+          }
+          return [...prev, plan];
+      });
+  };
+
   if (isInitializing) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -225,12 +240,11 @@ function App() {
       case 'growth':
         return <TechnicalGrowth players={derivedPlayers} teams={teams} currentUser={currentUser} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} onUpdateTechTests={setTechTests} />;
       case 'finance':
-        // Comment: Passed 'teams' prop to FinanceManager
         return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} onBulkDeleteTransactions={handleBulkDeleteTransactions} users={users} players={derivedPlayers} teams={teams} trainings={trainings} salarySettings={salarySettings} onUpdateUser={handleUpdateUser} />;
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
-        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} />;
+        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':

@@ -14,6 +14,8 @@ export interface AppData {
     financeCategories?: any[]; // New: Finance Categories
     techTests?: any[];
     salarySettings?: any;
+    // Comment: Added periodizationPlans to AppData interface to fix build errors in App.tsx
+    periodizationPlans?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

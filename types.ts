@@ -212,6 +212,28 @@ export interface TrainingSession {
   linkedDesignId?: string;
 }
 
+// --- Periodization Plan Types ---
+export interface WeeklyPlan {
+    id: string;
+    year: number;
+    month: number;
+    weekInMonth: number;
+    physicalTheme: string;
+    trainingTheme: string;
+    trainingContent: string;
+    oppositionContent: string;
+    trainingGoals: string;
+    matchPlan: string;
+    remarks: string;
+}
+
+export interface PeriodizationPlan {
+    id: string;
+    teamId: string;
+    year: number;
+    weeks: WeeklyPlan[];
+}
+
 export interface FinanceCategoryDefinition {
     id: string;
     label: string;
