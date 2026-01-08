@@ -983,14 +983,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex-1 bg-gray-900 p-4 md:p-8 flex items-center justify-center overflow-hidden relative">
                     <div 
                         ref={cardRef}
-                        className="w-[320px] h-[450px] md:w-[380px] md:h-[530px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-col items-center justify-center p-6 text-white"
+                        className="w-[320px] h-[450px] md:w-[380px] md:h-[530px] bg-bvb-black relative overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white"
                         style={{ border: '10px solid #FDE100', backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(253, 225, 0, 0.05) 1px, transparent 0)', backgroundSize: '24px 24px' }}
                     >
-                        {/* Club Logo Watermark Background */}
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-                            <img src={appLogo} className="w-64 h-64 object-contain filter grayscale invert" crossOrigin="anonymous" />
-                        </div>
-
                         {/* Festive Elements: Confetti Dots */}
                         <div className="absolute top-10 left-10 w-2 h-2 rounded-full bg-pink-500 animate-pulse"></div>
                         <div className="absolute top-40 right-12 w-3 h-1 bg-blue-400 rotate-45"></div>
@@ -1006,12 +1001,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <PartyPopper className="w-16 h-16 rotate-[15deg] scale-x-[-1]" />
                         </div>
 
-                        {/* Club Identity Header */}
+                        {/* Club Identity */}
                         <div className="absolute top-4 left-6 flex items-center gap-2 z-20">
                              <div className="bg-white p-1 rounded-lg">
                                 <img src={appLogo} className="w-6 h-6 object-contain" crossOrigin="anonymous" />
                              </div>
-                             <div className="flex flex-col text-left">
+                             <div className="flex flex-col">
                                 <span className="font-black text-[10px] text-bvb-yellow leading-none tracking-tighter uppercase">WSZG CLUB</span>
                                 <div className="flex items-center gap-1">
                                     <Gift className="w-2 h-2 text-white/50" />
@@ -1020,9 +1015,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                              </div>
                         </div>
                         
-                        {/* Birthday Title - Large & Centered */}
-                        <div className="mb-6 text-center z-10 w-full animate-in slide-in-from-top-4 duration-700">
-                            <div className="flex justify-center gap-2 mb-2">
+                        {/* Birthday Title */}
+                        <div className="mt-12 mb-4 text-center z-10">
+                            <div className="flex justify-center gap-2 mb-1">
                                 <Star className="w-3 h-3 text-bvb-yellow fill-current" />
                                 <Star className="w-4 h-4 text-bvb-yellow fill-current" />
                                 <Star className="w-3 h-3 text-bvb-yellow fill-current" />
@@ -1031,54 +1026,55 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <h3 className="text-2xl md:text-3xl font-black italic text-white tracking-[0.2em] uppercase mt-1 drop-shadow-md">BIRTHDAY</h3>
                         </div>
 
-                        {/* Player Photo Section - Centered with Hat */}
-                        <div className="relative mb-6 z-10 flex flex-col items-center">
+                        {/* Player Photo with Hat */}
+                        <div className="relative mb-4 z-10 flex justify-center items-center">
                             {/* Birthday Hat Element */}
-                            <div className="absolute -top-8 -left-4 z-30 transform -rotate-12 animate-in slide-in-from-top-2 duration-1000">
+                            <div className="absolute -top-6 -left-2 z-30 transform -rotate-12">
                                 <div className="relative">
-                                    <Triangle className="w-12 h-12 md:w-16 md:h-16 text-bvb-yellow fill-current stroke-bvb-black stroke-[2px]" />
-                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-4 h-4 bg-white rounded-full border-2 border-bvb-black shadow-sm"></div>
-                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[80%] h-1 bg-bvb-black/30 rounded-full blur-[2px]"></div>
+                                    <Triangle className="w-12 h-12 md:w-14 md:h-14 text-bvb-yellow fill-current stroke-bvb-black stroke-[2px]" />
+                                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full border border-bvb-black shadow-sm"></div>
+                                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-full h-1 bg-bvb-black/20 rounded-full blur-[1px]"></div>
                                 </div>
                             </div>
 
-                            {/* Avatar */}
-                            <div className="w-36 h-36 md:w-44 md:h-44 rounded-full overflow-hidden border-[6px] border-white shadow-[0_0_40px_rgba(253,225,0,0.4)] relative bg-gray-800 ring-4 ring-bvb-yellow">
+                            <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden border-4 border-white shadow-[0_0_25px_rgba(253,225,0,0.3)] relative bg-gray-800 ring-4 ring-bvb-yellow">
                                 <img src={selectedBirthdayPlayer.image} className="w-full h-full object-cover" crossOrigin="anonymous" />
                             </div>
+                        </div>
 
-                            {/* Info Pill Below Avatar */}
-                            <div className="mt-6 bg-bvb-yellow px-5 py-2 rounded-full shadow-xl flex items-center gap-3 border-2 border-bvb-black transform -rotate-1">
-                                <span className="text-base md:text-lg font-black text-bvb-black uppercase">{selectedBirthdayPlayer.name}</span>
-                                <div className="w-1 h-4 bg-bvb-black/20 rounded-full"></div>
+                        {/* Player Name & Birthday & Age Info Pill */}
+                        <div className="text-center z-10 relative mb-6">
+                            <div className="bg-bvb-yellow px-4 py-1.5 rounded-full shadow-lg flex items-center gap-3 border-2 border-bvb-black">
+                                <span className="text-sm md:text-base font-black text-bvb-black uppercase">{selectedBirthdayPlayer.name}</span>
+                                <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
                                 <span className="text-xs md:text-sm font-black text-bvb-black/80 font-mono tracking-tighter">{selectedBirthdayPlayer.monthDay}</span>
-                                <div className="w-1 h-4 bg-bvb-black/20 rounded-full"></div>
+                                <div className="w-1 h-3 bg-bvb-black/20 rounded-full"></div>
                                 <span className="text-xs md:text-sm font-black text-bvb-black">{selectedBirthdayPlayer.turningAge}岁</span>
                             </div>
                         </div>
 
-                        {/* Cake Element - Floating below avatar */}
-                        <div className="z-10 mb-6 flex flex-col items-center animate-bounce duration-1000">
-                             <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10 shadow-inner flex items-center justify-center">
-                                <Cake className="w-10 h-10 md:w-12 md:h-12 text-bvb-yellow drop-shadow-[0_0_12px_rgba(253,225,0,0.8)]" />
+                        {/* Cake Element */}
+                        <div className="z-10 mb-4 animate-bounce duration-1000">
+                             <div className="bg-white/10 p-2 rounded-2xl backdrop-blur-sm border border-white/5 shadow-inner">
+                                <Cake className="w-8 h-8 md:w-10 md:h-10 text-bvb-yellow drop-shadow-[0_0_8px_rgba(253,225,0,0.6)]" />
                              </div>
                         </div>
 
-                        {/* Message Box - Centered & Focused */}
-                        <div className="px-6 text-center z-10 w-full relative max-w-[300px]">
-                            <Sparkles className="absolute -top-4 left-0 w-4 h-4 text-bvb-yellow/40" />
-                            <Sparkles className="absolute -bottom-2 right-0 w-5 h-5 text-bvb-yellow/40 scale-x-[-1]" />
-                            <div className="h-0.5 w-16 bg-bvb-yellow mx-auto mb-4 opacity-50"></div>
-                            <p className="text-xs md:text-sm font-black italic text-bvb-yellow leading-relaxed drop-shadow-sm line-clamp-3">
+                        {/* Message Box */}
+                        <div className="mt-2 px-4 text-center z-10 w-full relative">
+                            <Sparkles className="absolute -top-4 left-4 w-4 h-4 text-bvb-yellow/40" />
+                            <Sparkles className="absolute -bottom-2 right-4 w-5 h-5 text-bvb-yellow/40 scale-x-[-1]" />
+                            <div className="h-0.5 w-16 bg-bvb-yellow mx-auto mb-3 opacity-50"></div>
+                            <p className="text-xs md:text-sm font-bold italic text-bvb-yellow leading-relaxed drop-shadow-sm min-h-[40px] line-clamp-3 px-2">
                                 "{birthdayMessage}"
                             </p>
                         </div>
 
                         {/* Footer Branding */}
                         <div className="mt-auto pt-4 flex flex-col items-center gap-1.5 z-10">
-                             <div className="flex items-center gap-2 px-4 py-1.5 bg-white/5 rounded-full border border-white/10 backdrop-blur-sm">
+                             <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
                                 <Star className="w-2 h-2 text-bvb-yellow fill-current" />
-                                <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.25em]">WSZG Academy Official Gift Card</span>
+                                <span className="text-[7px] font-black text-white/50 uppercase tracking-[0.2em]">WSZG Academy Official Card</span>
                                 <Star className="w-2 h-2 text-bvb-yellow fill-current" />
                              </div>
                         </div>
@@ -1088,7 +1084,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {/* Right: Controls */}
                 <div className="w-full md:w-80 p-8 flex flex-col bg-white shrink-0 border-l border-gray-100">
                     <div className="flex justify-between items-center mb-8">
-                        <div className="flex flex-col text-left">
+                        <div className="flex flex-col">
                             <h3 className="text-xl font-black text-gray-800 flex items-center gap-2 italic uppercase tracking-tighter">
                                 <Cake className="w-6 h-6 text-bvb-yellow" />
                                 贺卡定制中心
@@ -1099,10 +1095,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-1">
-                        <div className="text-left">
+                        <div>
                             <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">定制专属祝福语</label>
                             <textarea 
-                                className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed shadow-inner"
+                                className="w-full h-32 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow focus:bg-white outline-none transition-all leading-relaxed"
                                 placeholder="输入生日祝福文字..."
                                 value={birthdayMessage}
                                 onChange={e => setBirthdayMessage(e.target.value)}
@@ -1114,19 +1110,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
                         </div>
 
-                        <div className="p-5 bg-bvb-black rounded-3xl border border-bvb-black shadow-2xl relative overflow-hidden group">
-                             <div className="relative z-10 flex items-start gap-3 text-left">
-                                <div className="p-2 bg-bvb-yellow rounded-xl shrink-0 shadow-sm group-hover:rotate-12 transition-transform">
+                        <div className="p-4 bg-bvb-black rounded-2xl border border-bvb-black shadow-lg">
+                             <div className="flex items-start gap-3">
+                                <div className="p-1.5 bg-bvb-yellow rounded-lg shrink-0 shadow-sm">
                                     <Sparkles className="w-4 h-4 text-bvb-black" />
                                 </div>
                                 <div>
-                                    <p className="text-[11px] text-white font-black uppercase tracking-tighter">全景视觉优化</p>
+                                    <p className="text-[11px] text-white font-black uppercase tracking-tighter">预览已就绪</p>
                                     <p className="text-[10px] text-white/50 font-bold leading-tight mt-1">
-                                        贺卡已采用黄金分割比例剧中，加入水印 LOGO 底纹、生日帽及发光蛋糕。
+                                        贺卡已包含生日帽、蛋糕、庆典纸屑及球员的具体年龄信息。点击下方按钮下载分享。
                                     </p>
                                 </div>
                              </div>
-                             <Star className="absolute -right-4 -bottom-4 w-16 h-16 text-white/5 rotate-12" />
                         </div>
                     </div>
 
@@ -1134,12 +1129,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <button 
                             onClick={handleDownloadBirthdayCard}
                             disabled={isCapturingCard}
-                            className="w-full py-4 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 uppercase italic tracking-widest group active:scale-95"
+                            className="w-full py-4 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-3 uppercase italic tracking-widest group"
                         >
                             {isCapturingCard ? <Loader2 className="w-5 h-5 animate-spin text-bvb-yellow" /> : <Download className="w-5 h-5 text-bvb-yellow group-hover:translate-y-1 transition-transform" />}
-                            生成并下载高清海报
+                            生成并下载贺卡
                         </button>
-                        <p className="text-[9px] text-gray-400 font-bold mt-4 uppercase tracking-widest text-center opacity-60 italic">Generated by WSZG Performance Lab</p>
                     </div>
                 </div>
             </div>
