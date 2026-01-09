@@ -38,17 +38,17 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
 
     const handleAddHomeLog = () => {
         if (homeTitle.trim()) {
-            // 检查重复打卡
+            // 每日打卡限制核心逻辑
             const alreadyDone = (player.homeTrainingLogs || []).some(l => l.date === homeDate);
             if (alreadyDone) {
-                alert('该日期已完成打卡，请勿重复提交。');
+                alert(`当日（${homeDate}）已完成打卡记录。球员每日仅限打卡一次，请保持规律训练！`);
                 return;
             }
             const log: HomeTrainingLog = { id: `home-${Date.now()}`, playerId: player.id, date: homeDate, title: homeTitle, duration: 0 };
             const updated = { ...player, homeTrainingLogs: [...(player.homeTrainingLogs || []), log] };
             onUpdatePlayer(updated);
             setHomeTitle('居家练习');
-            alert('居家训练确认完成！计入一次有效频次。');
+            alert('打卡成功！计入一次有效频次。');
         }
     };
 
@@ -119,13 +119,30 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
                                         <input className="w-full p-3 border rounded-xl outline-none focus:ring-2 focus:ring-bvb-yellow font-bold text-sm bg-gray-50" placeholder="简单描述内容（如：传球练习）" value={homeTitle} onChange={e => setHomeTitle(e.target.value)} />
                                         <button onClick={handleAddHomeLog} className="w-full bg-bvb-yellow text-bvb-black font-black py-3 rounded-xl flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"><CheckCircle className="w-4 h-4"/> 确认今日练习完成</button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400 font-bold mt-3 text-center italic">确认打卡后，系统将为您增加一次成长计次</p>
+                                    <p className="text-[10px] text-gray-400 font-bold mt-3 text-center italic">球员每日仅可打卡一次，保持科学训练频次</p>
                                 </div>
                             </div>
                         </div>
                     )}
                     
-                    {/* ... 其他 Tab 保持一致 ... */}
+                    {activeTab === 'overview' && (
+                        /* ... 档案概览保持原样 ... */
+                        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 animate-in slide-in-from-right-4">
+                            <div className="flex flex-col md:flex-row gap-6 items-center">
+                                <img src={player.image} className="w-32 h-32 rounded-full border-4 border-bvb-yellow shadow-lg object-cover" />
+                                <div className="text-center md:text-left flex-1">
+                                    <h2 className="text-3xl font-black text-gray-800">{player.name} <span className="text-sm font-bold text-gray-400 font-mono">#{player.number}</span></h2>
+                                    <p className="text-gray-500 font-bold uppercase tracking-wider">{player.position} • {team?.name}</p>
+                                    <div className="mt-4 flex flex-wrap justify-center md:justify-start gap-4">
+                                        <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100"><p className="text-[9px] text-gray-400 font-black uppercase">本季进球</p><p className="text-xl font-black text-gray-800">{player.goals}</p></div>
+                                        <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100"><p className="text-[9px] text-gray-400 font-black uppercase">本季助攻</p><p className="text-xl font-black text-gray-800">{player.assists}</p></div>
+                                        <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100"><p className="text-[9px] text-gray-400 font-black uppercase">剩余课时</p><p className="text-xl font-black text-orange-600">{player.credits}</p></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'history' && (
                          <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 animate-in slide-in-from-right-4">
                             <h3 className="font-bold text-gray-800 mb-4 flex items-center uppercase tracking-widest text-xs"><Activity className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练计次详情</h3>
