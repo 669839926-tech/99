@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
-import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload } from 'lucide-react';
+import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -15,14 +15,22 @@ interface TechnicalGrowthProps {
     appLogo?: string;
 }
 
+// 辅助函数：获取本周周一的日期字符串
+const getMondayOfCurrentWeek = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = today.getDate() - day + (day === 0 ? -6 : 1); // 调整为周一为起始
+    const monday = new Date(today.setDate(diff));
+    monday.setHours(0, 0, 0, 0);
+    return monday.toISOString().split('T')[0];
+};
+
 const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({ 
     players, teams, currentUser, techTests = [], onUpdatePlayer, onUpdateTechTests, appLogo 
 }) => {
-    // 权限判断
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
     
-    // 计算当前用户可管理的梯队
     const managedTeams = useMemo(() => {
         if (isDirector) return teams;
         return teams.filter(t => currentUser?.teamIds?.includes(t.id));
@@ -30,7 +38,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
     const [activeTab, setActiveTab] = useState<'juggling' | 'home' | 'tests'>('juggling');
     
-    // 初始化选中的梯队
     const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
         if (isCoach && managedTeams.length > 0) return managedTeams[0].id;
         return 'all';
@@ -42,29 +49,24 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     }, [managedTeams, selectedTeamId]);
     
-    // 状态
     const [isExporting, setIsExporting] = useState(false);
     const [isExportingHome, setIsExportingHome] = useState(false);
     const [isExportingIndividualTech, setIsExportingIndividualTech] = useState(false);
 
-    // 颠球录入状态
     const [jugglingPlayerId, setJugglingPlayerId] = useState<string>('');
     const [jugglingDate, setJugglingDate] = useState(new Date().toISOString().split('T')[0]);
     const [jugglingCount, setJugglingCount] = useState<string>('');
     const [jugglingSearch, setJugglingSearch] = useState('');
 
-    // 统计视图状态
     const [statPeriod, setStatPeriod] = useState<'month' | 'quarter' | 'year'>('month');
     const [viewYear, setViewYear] = useState(new Date().getFullYear());
     const [viewMonth, setViewMonth] = useState(new Date().getMonth());
 
-    // 居家打卡状态
     const [homeDate, setHomeDate] = useState(new Date().toISOString().split('T')[0]);
     const [homeTitle, setHomeTitle] = useState('居家练习');
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
     const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
 
-    // 技术测试状态
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [newTestDef, setNewTestDef] = useState({ name: '', unit: '', description: '' });
     const [selectedTestId, setSelectedTestId] = useState<string>('');
@@ -73,13 +75,118 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [isSavingTests, setIsSavingTests] = useState(false);
     const [isExportingTech, setIsExportingTech] = useState(false);
     const [showTestHistoryPlayerId, setShowTestHistoryPlayerId] = useState<string | null>(null);
-    const [isImportingResults, setIsImportingResults] = useState(false);
+
     const resultsFileInputRef = useRef<HTMLInputElement>(null);
 
+    const getPlayerLatestResult = (player: Player, testId: string) => {
+        if (!player.testResults) return null;
+        return [...player.testResults]
+            .filter(r => r.testId === testId)
+            .sort((a, b) => b.date.localeCompare(a.date))[0];
+    };
+
     const isLowerBetter = (unit?: string) => {
-        if (!unit) return false;
-        const u = unit.toLowerCase();
-        return u.includes('秒') || u.includes('s') || u.includes('分') || u.includes('min');
+        return unit === '秒' || unit === 's';
+    };
+
+    const handleExportExcel = () => {
+        const test = techTests.find(t => t.id === selectedTestId);
+        if (!test) return;
+        const headers = "球衣,姓名,身份证号,成绩(" + test.unit + ")\n";
+        const rows = displayPlayers.map(p => `${p.number},${p.name},'${p.idCard},`).join('\n');
+        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${test.name}_成绩录入表.csv`;
+        link.click();
+    };
+
+    const handleImportResultsCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            // Comment: Explicitly type-checked result to ensure it is a string before processing
+            const text = evt.target?.result;
+            if (typeof text !== 'string') return;
+            const lines = text.split('\n');
+            const newScores: Record<string, string> = { ...testScores };
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                if (cols.length >= 4) {
+                    const idCard = cols[2].replace(/'/g, '');
+                    const score = cols[3];
+                    const player = displayPlayers.find(p => p.idCard === idCard);
+                    if (player && score) {
+                        newScores[player.id] = score;
+                    }
+                }
+            }
+            setTestScores(newScores);
+        };
+        reader.readAsText(file);
+        if (resultsFileInputRef.current) resultsFileInputRef.current.value = '';
+    };
+
+    const handleExportTechPDF = async () => {
+        setIsExportingTech(true);
+        try {
+            await exportToPDF('tech-test-report-pdf', `技术测评报告_${techTests.find(t=>t.id===selectedTestId)?.name}`);
+        } catch (e) { 
+            // Comment: Cast error to any for compatibility with string-expecting functions like alert if necessary
+            alert('导出失败'); 
+        } finally { setIsExportingTech(false); }
+    };
+
+    const handleSaveBatchTests = async () => {
+        setIsSavingTests(true);
+        try {
+            Object.entries(testScores).forEach(([playerId, score]) => {
+                const val = parseFloat(score);
+                if (isNaN(val)) return;
+                const player = players.find(p => p.id === playerId);
+                if (player) {
+                    const newResult: TechTestResult = {
+                        id: `res-${Date.now()}-${playerId}`,
+                        testId: selectedTestId,
+                        playerId,
+                        date: testEntryDate,
+                        value: val,
+                        coachId: currentUser?.id
+                    };
+                    onUpdatePlayer({
+                        ...player,
+                        testResults: [...(player.testResults || []), newResult]
+                    });
+                }
+            });
+            setTestScores({});
+            alert('所有成绩已保存！');
+        } catch (e) {
+            console.error(e);
+            alert('保存失败');
+        } finally {
+            setIsSavingTests(false);
+        }
+    };
+
+    const handleAddTestDef = () => {
+        if (newTestDef.name && newTestDef.unit && onUpdateTechTests) {
+            const test: TechTestDefinition = {
+                id: `test-${Date.now()}`,
+                ...newTestDef
+            };
+            onUpdateTechTests([...techTests, test]);
+            setNewTestDef({ name: '', unit: '', description: '' });
+        }
+    };
+
+    const handleDeleteTestDef = (id: string) => {
+        if (confirm('确定要删除这项测试定义吗？') && onUpdateTechTests) {
+            onUpdateTechTests(techTests.filter(t => t.id !== id));
+        }
     };
 
     const displayPlayers = useMemo(() => {
@@ -89,216 +196,110 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         return basePlayers.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
     }, [players, selectedTeamId, currentUser, isDirector]);
 
-    const focusedPlayer = useMemo(() => {
-        return displayPlayers.find(p => p.id === jugglingPlayerId) || null;
-    }, [displayPlayers, jugglingPlayerId]);
-
-    const getHonorBadge = (max: number) => {
-        if (max >= 100) return { label: '五星传奇', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' };
-        if (max >= 50) return { label: '四星大师', color: 'bg-purple-100 text-purple-700 border-purple-200' };
-        if (max >= 20) return { label: '三星高手', color: 'bg-red-100 text-red-700 border-red-200' };
-        if (max >= 10) return { label: '二星达人', color: 'bg-blue-100 text-blue-700 border-blue-200' };
-        if (max >= 5) return { label: '一星小将', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' };
-        if (max >= 3) return { label: '入门学徒', color: 'bg-green-100 text-green-700 border-green-200' };
-        return { label: '待挑战', color: 'bg-gray-50 text-gray-400 border-gray-100' };
-    };
-
     const getHomeStats = (player: Player) => {
         const history = player.homeTrainingLogs || [];
+        const monday = getMondayOfCurrentWeek();
+        const weekCount = history.filter(h => h.date >= monday).length;
         const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
         const monthCount = history.filter(h => h.date.startsWith(mKey)).length;
         const yearCount = history.filter(h => h.date.startsWith(String(viewYear))).length;
-        return { monthCount, yearCount };
+        return { weekCount, monthCount, yearCount };
     };
 
-    const handleAddJuggling = () => {
+    const handleDeleteHomeLog = (playerId: string, logId: string) => {
+        if (!confirm('确定要删除这条打卡记录吗？')) return;
+        const player = players.find(p => p.id === playerId);
+        if (player) {
+            const updated = {
+                ...player,
+                homeTrainingLogs: (player.homeTrainingLogs || []).filter(l => l.id !== logId)
+            };
+            onUpdatePlayer(updated);
+        }
+    };
+
+    const HomeLogDetailModal = () => {
+        if (!detailPlayerId) return null;
+        const player = players.find(p => p.id === detailPlayerId);
+        if (!player) return null;
+        const sortedLogs = [...(player.homeTrainingLogs || [])].sort((a,b) => b.date.localeCompare(a.date));
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                    <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                        <div className="flex items-center gap-3">
+                            <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow" />
+                            <div>
+                                <h3 className="font-bold text-lg">{player.name} 打卡档案</h3>
+                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Training History Records</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-gray-800 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                    </div>
+                    <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3 custom-scrollbar">
+                        {sortedLogs.length > 0 ? sortedLogs.map(log => (
+                            <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl group hover:bg-white hover:border-bvb-yellow/30 transition-all">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm shrink-0 border border-gray-100">
+                                        <History className="w-5 h-5 text-bvb-yellow" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-gray-800 text-sm leading-none mb-1">{log.title || '居家练习'}</p>
+                                        <p className="text-[10px] text-gray-400 font-mono flex items-center"><Clock className="w-2.5 h-2.5 mr-1" /> {log.date}</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => handleDeleteHomeLog(player.id, log.id)}
+                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                    title="删除此记录"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )) : (
+                            <div className="py-20 text-center text-gray-300 italic font-black uppercase text-xs tracking-widest">No records found</div>
+                        )}
+                    </div>
+                    <div className="bg-gray-50 p-4 border-t flex justify-end">
+                        <button onClick={() => setDetailPlayerId(null)} className="px-6 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">关闭窗口</button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const jugglingLeaderboard = useMemo(() => {
+        return displayPlayers.map(p => {
+            const history = p.jugglingHistory || [];
+            let filtered = history;
+            if (statPeriod === 'month') {
+                const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
+                filtered = history.filter(h => h.date.startsWith(mKey));
+            } else if (statPeriod === 'quarter') {
+                const qStartMonth = Math.floor(viewMonth / 3) * 3 + 1;
+                filtered = history.filter(h => {
+                    const d = new Date(h.date);
+                    return d.getFullYear() === viewYear && (d.getMonth() + 1) >= qStartMonth && (d.getMonth() + 1) < qStartMonth + 3;
+                });
+            } else {
+                filtered = history.filter(h => h.date.startsWith(String(viewYear)));
+            }
+            const counts = filtered.map(h => h.count);
+            const stats = { max: counts.length ? Math.max(...counts) : 0, avg: counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : 0, count: filtered.length };
+            return { ...p, stats };
+        }).sort((a, b) => b.stats.max - a.stats.max);
+    }, [displayPlayers, statPeriod, viewYear, viewMonth]);
+
+    const handleAddJugglingSubmit = () => {
         const count = parseInt(jugglingCount);
         if (!jugglingPlayerId || isNaN(count)) return;
-        const player = displayPlayers.find(p => p.id === jugglingPlayerId);
+        const player = players.find(p => p.id === jugglingPlayerId);
         if (player) {
             const newRecord: JugglingRecord = { id: `jug-${Date.now()}`, playerId: jugglingPlayerId, date: jugglingDate, count };
             onUpdatePlayer({ ...player, jugglingHistory: [...(player.jugglingHistory || []), newRecord] });
             setJugglingCount('');
             alert(`${player.name} 的成绩已保存！`);
-        }
-    };
-
-    const getJugglingStats = (player: Player) => {
-        const history = player.jugglingHistory || [];
-        let filtered = history;
-        if (statPeriod === 'month') {
-            const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
-            filtered = history.filter(h => h.date.startsWith(mKey));
-        } else if (statPeriod === 'quarter') {
-            const qStartMonth = Math.floor(viewMonth / 3) * 3 + 1;
-            filtered = history.filter(h => {
-                const d = new Date(h.date);
-                return d.getFullYear() === viewYear && (d.getMonth() + 1) >= qStartMonth && (d.getMonth() + 1) < qStartMonth + 3;
-            });
-        } else {
-            filtered = history.filter(h => h.date.startsWith(String(viewYear)));
-        }
-        const counts = filtered.map(h => h.count);
-        return { max: counts.length ? Math.max(...counts) : 0, avg: counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : 0, count: filtered.length, records: filtered.sort((a, b) => b.date.localeCompare(a.date)) };
-    };
-
-    const jugglingLeaderboard = useMemo(() => {
-        return displayPlayers.map(p => ({ ...p, stats: getJugglingStats(p) })).sort((a, b) => b.stats.max - a.stats.max);
-    }, [displayPlayers, statPeriod, viewYear, viewMonth]);
-
-    const jugglingTrendData = useMemo(() => {
-        if (!focusedPlayer || !focusedPlayer.jugglingHistory) return [];
-        return [...focusedPlayer.jugglingHistory].sort((a, b) => a.date.localeCompare(b.date)).map(h => ({ date: h.date, displayDate: h.date.substring(5), count: h.count }));
-    }, [focusedPlayer]);
-
-    const handleAddTestDef = () => {
-        if (!newTestDef.name || !newTestDef.unit || !onUpdateTechTests) return;
-        const test: TechTestDefinition = { id: `test-${Date.now()}`, ...newTestDef };
-        onUpdateTechTests([...techTests, test]);
-        setNewTestDef({ name: '', unit: '', description: '' });
-    };
-
-    const handleDeleteTestDef = (id: string) => {
-        if (!confirm('确定删除该测试项定义吗？这不会删除已录入的成绩，但该测试项将不再可选。') || !onUpdateTechTests) return;
-        onUpdateTechTests(techTests.filter(t => t.id !== id));
-    };
-
-    const handleSaveBatchTests = async () => {
-        if (!selectedTestId || !selectedTeamId || selectedTeamId === 'all') {
-            alert('请先选择具体的梯队和测试项目');
-            return;
-        }
-        setIsSavingTests(true);
-        try {
-            const playersToUpdate = displayPlayers.filter(p => testScores[p.id]);
-            for (const p of playersToUpdate) {
-                const newResult: TechTestResult = {
-                    id: `res-${Date.now()}-${p.id}`,
-                    testId: selectedTestId,
-                    playerId: p.id,
-                    date: testEntryDate,
-                    value: parseFloat(testScores[p.id]),
-                    coachId: currentUser?.id
-                };
-                onUpdatePlayer({ ...p, testResults: [...(p.testResults || []), newResult] });
-            }
-            setTestScores({});
-            alert('成绩批量保存成功！');
-        } catch (e) {
-            alert('保存失败');
-        } finally {
-            setIsSavingTests(false);
-        }
-    };
-
-    const getPlayerLatestResult = (player: Player, testId: string) => {
-        const results = (player.testResults || []).filter(r => r.testId === testId);
-        if (results.length === 0) return null;
-        return results.sort((a, b) => b.date.localeCompare(a.date))[0];
-    };
-
-    const handleExportTechPDF = async () => {
-        if (!selectedTestId || selectedTeamId === 'all') {
-            alert('请先选择测试项目和梯队');
-            return;
-        }
-        setIsExportingTech(true);
-        const testName = techTests.find(t => t.id === selectedTestId)?.name || '技术测试';
-        const teamName = teams.find(t => t.id === selectedTeamId)?.name || '全部梯队';
-        try {
-            await exportToPDF('tech-test-report-pdf', `技术测评报告_${testName}_${teamName}_${new Date().toLocaleDateString()}`);
-        } catch (e) {
-            alert('导出失败');
-        } finally {
-            setIsExportingTech(false);
-        }
-    };
-
-    const handleExportIndividualTechPDF = async () => {
-        if (!showTestHistoryPlayerId || !selectedTestId) return;
-        setIsExportingIndividualTech(true);
-        const p = players.find(p => p.id === showTestHistoryPlayerId);
-        const t = techTests.find(t => t.id === selectedTestId);
-        try {
-            await exportToPDF('individual-tech-test-pdf', `专项测评报告_${p?.name}_${t?.name}`);
-        } catch (error) {
-            alert('导出失败');
-        } finally {
-            setIsExportingIndividualTech(false);
-        }
-    };
-
-    const handleExportExcel = () => {
-        if (!selectedTestId || selectedTeamId === 'all') {
-            alert('请先选择测试项目和梯队以生成对应的记录表');
-            return;
-        }
-        const test = techTests.find(t => t.id === selectedTestId);
-        const team = teams.find(t => t.id === selectedTeamId);
-        const headers = "球员姓名,球衣号码,测试项目,单位,测试日期,成绩(请在此列录入)\n";
-        const rows = displayPlayers.map(p => {
-            return `${p.name},${p.number},${test?.name},${test?.unit},${testEntryDate},""`;
-        }).join('\n');
-        
-        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `测评记录表_${team?.name}_${test?.name}_${testEntryDate}.csv`;
-        link.click();
-    };
-
-    const handleImportResultsCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setIsImportingResults(true);
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            const text = evt.target?.result as string;
-            const lines = text.split('\n');
-            let successCount = 0;
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-                if (cols.length >= 6) {
-                    const name = cols[0];
-                    const number = parseInt(cols[1]);
-                    const testName = cols[2];
-                    const testDate = cols[4];
-                    const score = parseFloat(cols[5]);
-                    if (isNaN(score)) continue;
-                    const player = players.find(p => p.name === name && p.number === number);
-                    const testDef = techTests.find(t => t.name === testName);
-                    if (player && testDef) {
-                        const newResult: TechTestResult = {
-                            id: `res-imp-${Date.now()}-${player.id}-${Math.random().toString(36).substr(2,4)}`,
-                            testId: testDef.id,
-                            playerId: player.id,
-                            date: testDate || new Date().toISOString().split('T')[0],
-                            value: score,
-                            coachId: currentUser?.id
-                        };
-                        onUpdatePlayer({ ...player, testResults: [...(player.testResults || []), newResult] });
-                        successCount++;
-                    }
-                }
-            }
-            alert(`成功导入 ${successCount} 条测评成绩！`);
-            setIsImportingResults(false);
-        };
-        reader.readAsText(file);
-        if (resultsFileInputRef.current) resultsFileInputRef.current.value = '';
-    };
-
-    const handleExportHomeTeamPDF = async () => {
-        setIsExportingHome(true);
-        const teamName = teams.find(t => t.id === selectedTeamId)?.name || '全部梯队';
-        try {
-            await exportToPDF('home-training-team-pdf', `居家训练梯队报告_${teamName}_${viewYear}年${viewMonth + 1}月`);
-        } catch (e) {
-            alert('导出失败');
-        } finally {
-            setIsExportingHome(false);
         }
     };
 
@@ -329,12 +330,11 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
             {/* Main Tabs */}
             <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto no-scrollbar shrink-0">
-                <button onClick={() => setActiveTab('juggling')} className={`flex-1 min-w-[90px] md:min-w-[120px] py-2.5 md:py-3 rounded-xl text-[12px] md:text-sm font-black flex items-center justify-center gap-1.5 md:gap-2 transition-all ${activeTab === 'juggling' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Medal className="w-3.5 h-3.5 md:w-4 md:h-4" /> 颠球</button>
-                <button onClick={() => setActiveTab('home')} className={`flex-1 min-w-[90px] md:min-w-[120px] py-2.5 md:py-3 rounded-xl text-[12px] md:text-sm font-black flex items-center justify-center gap-1.5 md:gap-2 transition-all ${activeTab === 'home' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4" /> 打卡</button>
-                <button onClick={() => setActiveTab('tests')} className={`flex-1 min-w-[90px] md:min-w-[120px] py-2.5 md:py-3 rounded-xl text-[12px] md:text-sm font-black flex items-center justify-center gap-1.5 md:gap-2 transition-all ${activeTab === 'tests' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Target className="w-3.5 h-3.5 md:w-4 md:h-4" /> 测评</button>
+                <button onClick={() => setActiveTab('juggling')} className={`flex-1 min-w-[90px] md:min-w-[120px] py-2.5 md:py-3 rounded-xl text-[12px] md:text-sm font-black flex items-center justify-center gap-1.5 md:gap-2 transition-all ${activeTab === 'juggling' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Medal className="w-3.5 h-3.5 md:w-4 md:h-4" /> 颠球挑战</button>
+                <button onClick={() => setActiveTab('home')} className={`flex-1 min-w-[90px] md:min-w-[120px] py-2.5 md:py-3 rounded-xl text-[12px] md:text-sm font-black flex items-center justify-center gap-1.5 md:gap-2 transition-all ${activeTab === 'home' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4" /> 居家打卡</button>
+                <button onClick={() => setActiveTab('tests')} className={`flex-1 min-w-[90px] md:min-w-[120px] py-2.5 md:py-3 rounded-xl text-[12px] md:text-sm font-black flex items-center justify-center gap-1.5 md:gap-2 transition-all ${activeTab === 'tests' ? 'bg-bvb-yellow text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}><Target className="w-3.5 h-3.5 md:w-4 md:h-4" /> 技术测评</button>
             </div>
 
-            {/* TAB: Juggling Challenge */}
             {activeTab === 'juggling' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-4">
                     <div className="lg:col-span-4 space-y-6">
@@ -357,32 +357,9 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">挑战日期</label><input type="date" className="w-full p-2 md:p-3 border rounded-xl font-bold bg-gray-50 text-[12px] md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none" value={jugglingDate} onChange={e => setJugglingDate(e.target.value)} /></div>
                                     <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">完成个数</label><input type="number" className="w-full p-2 md:p-3 border rounded-xl font-black bg-gray-50 text-center text-base md:text-lg focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="0" value={jugglingCount} onChange={e => setJugglingCount(e.target.value)} /></div>
                                 </div>
-                                <button onClick={handleAddJuggling} disabled={!jugglingPlayerId || !jugglingCount} className="w-full py-3 md:py-4 bg-bvb-black text-bvb-yellow font-black rounded-xl md:rounded-2xl shadow-xl disabled:opacity-30 hover:brightness-110 active:scale-95 transition-all uppercase italic text-xs md:text-sm">保存记录 Record Result</button>
+                                <button onClick={handleAddJugglingSubmit} disabled={!jugglingPlayerId || !jugglingCount} className="w-full py-3 md:py-4 bg-bvb-black text-bvb-yellow font-black rounded-xl md:rounded-2xl shadow-xl disabled:opacity-30 hover:brightness-110 active:scale-95 transition-all uppercase italic text-xs md:text-sm">保存记录 Record Result</button>
                             </div>
                         </div>
-                        {focusedPlayer && (
-                            <div id="juggling-report-pdf" className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-gray-200 animate-in fade-in duration-500 space-y-4 md:space-y-6 overflow-hidden relative">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex items-center gap-2 md:gap-3">
-                                        <img src={focusedPlayer.image} className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-bvb-yellow" />
-                                        <div><h3 className="font-black text-gray-800 text-sm md:text-lg leading-tight">{focusedPlayer.name}</h3><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">#{focusedPlayer.number} • 个人成长档案</p></div>
-                                    </div>
-                                    <button onClick={async () => { setIsExporting(true); try { await exportToPDF('juggling-report-pdf', `颠球挑战档案_${focusedPlayer.name}`); } catch (e) { alert('导出失败'); } finally { setIsExporting(false); } }} disabled={isExporting} className="p-1.5 md:p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-bvb-black hover:text-bvb-yellow transition-all">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}</button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2 md:gap-3">
-                                    <div className="bg-gray-50 p-2 md:p-3 rounded-xl md:rounded-2xl border border-gray-100"><p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase mb-1">本周最高</p><p className="text-xl md:text-2xl font-black text-bvb-black">{getJugglingStats(focusedPlayer).max}</p></div>
-                                    <div className="bg-gray-50 p-2 md:p-3 rounded-xl md:rounded-2xl border border-gray-100"><p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase mb-1">荣誉等级</p><span className={`text-[9px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 rounded-full border leading-tight ${getHonorBadge(getJugglingStats(focusedPlayer).max).color}`}>{getHonorBadge(getJugglingStats(focusedPlayer).max).label}</span></div>
-                                </div>
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center"><h4 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-[10px] md:text-xs"><TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 text-bvb-yellow" /> 进步曲线</h4></div>
-                                    <div className="h-32 md:h-40 w-full"><ResponsiveContainer width="100%" height="100%"><AreaChart data={jugglingTrendData}><defs><linearGradient id="colorJugReport" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#FDE100" stopOpacity={0.4}/><stop offset="95%" stopColor="#FDE100" stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" /><XAxis dataKey="displayDate" axisLine={false} tickLine={false} tick={{ fontSize: 8, fontWeight: 'bold' }} /><YAxis hide /><Tooltip contentStyle={{ borderRadius: '12px', border: 'none' }} /><Area type="monotone" dataKey="count" stroke="#FDE100" strokeWidth={2} fillOpacity={1} fill="url(#colorJugReport)" /></AreaChart></ResponsiveContainer></div>
-                                </div>
-                                <div className="space-y-2 pt-3 border-t border-gray-100">
-                                    <h4 className="font-black text-gray-800 flex items-center uppercase tracking-tighter text-[10px] md:text-xs"><LayoutList className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 text-bvb-yellow" /> 详细挑战清单</h4>
-                                    <div className="max-h-48 md:max-h-60 overflow-y-auto custom-scrollbar pr-1"><table className="w-full text-left text-[10px] md:text-[11px]"><thead className="bg-gray-50 text-gray-400 font-black uppercase sticky top-0"><tr><th className="p-1.5 md:p-2 border-b">日期</th><th className="p-1.5 md:p-2 border-b text-right">成绩</th></tr></thead><tbody className="divide-y divide-gray-50">{(focusedPlayer.jugglingHistory || []).sort((a,b) => b.date.localeCompare(a.date)).map(h => (<tr key={h.id} className="hover:bg-gray-50 transition-colors"><td className="p-1.5 md:p-2 font-mono text-gray-500">{h.date}</td><td className="p-1.5 md:p-2 text-right font-black text-bvb-black">{h.count} 个</td></tr>))}</tbody></table></div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                     <div className="lg:col-span-8 space-y-6">
                         <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
@@ -390,15 +367,13 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <div className="flex items-center gap-3 md:gap-4"><h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><Trophy className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 挑战光荣榜</h3>
                                     <div className="flex bg-white p-1 rounded-xl border shadow-sm"><button onClick={() => setStatPeriod('month')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>月</button><button onClick={() => setStatPeriod('quarter')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'quarter' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>季</button><button onClick={() => setStatPeriod('year')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>年</button></div>
                                 </div>
-                                <div className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-100">{statPeriod === 'month' ? `${viewYear}-${viewMonth + 1}` : statPeriod === 'quarter' ? `${viewYear} Q${Math.floor(viewMonth / 3) + 1}` : `${viewYear} 全年`}</div>
                             </div>
-                            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest border-b"><tr><th className="px-2 py-3 md:px-6 md:py-4">排名</th><th className="px-2 py-3 md:px-6 md:py-4">球员姓名</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">最高</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">平均</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">次数</th><th className="px-2 py-3 md:px-6 md:py-4 text-right">荣耀等级</th></tr></thead><tbody className="divide-y divide-gray-100">{jugglingLeaderboard.map((p, idx) => { const badge = getHonorBadge(p.stats.max); return (<tr key={p.id} className={`hover:bg-yellow-50/30 transition-colors cursor-pointer group ${jugglingPlayerId === p.id ? 'bg-yellow-50/50' : ''}`} onClick={() => setJugglingPlayerId(p.id)}><td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td><td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 md:h-10 rounded-full object-cover border-2 border-white shadow-sm transition-transform group-hover:scale-110" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm transition-all truncate max-w-[50px] md:max-w-none">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td><td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-sm md:text-xl font-black text-bvb-black">{p.stats.max}</span><span className="text-[8px] md:text-[10px] text-gray-400 ml-0.5 font-bold">个</span></td><td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-500 text-[10px] md:text-sm tabular-nums">{p.stats.avg}</td><td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{p.stats.count}</td><td className="px-2 py-3 md:px-6 md:py-4 text-right"><span className={`text-[8px] md:text-[10px] font-black px-1 md:px-2.5 py-0.5 md:py-1 rounded-full border shadow-sm flex items-center justify-center gap-0.5 min-w-[50px] md:min-w-[80px] uppercase whitespace-nowrap leading-tight ${badge.color}`}>{p.stats.max >= 100 && <Star className="w-2 md:w-2.5 h-2 md:h-2.5 fill-current" />}{badge.label}</span></td></tr>); })}</tbody></table></div>
+                            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest border-b"><tr><th className="px-2 py-3 md:px-6 md:py-4">排名</th><th className="px-2 py-3 md:px-6 md:py-4">球员姓名</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">最高</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">平均</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">次数</th></tr></thead><tbody className="divide-y divide-gray-100">{jugglingLeaderboard.map((p, idx) => (<tr key={p.id} className="hover:bg-yellow-50/30 transition-colors"><td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td><td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 md:h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[50px] md:max-w-none">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td><td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-sm md:text-xl font-black text-bvb-black">{p.stats.max}</span><span className="text-[8px] md:text-[10px] text-gray-400 ml-0.5 font-bold">个</span></td><td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-500 text-[10px] md:text-sm">{p.stats.avg}</td><td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{p.stats.count}</td></tr>))}</tbody></table></div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* TAB: Home Training */}
             {activeTab === 'home' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-4">
                     <div className="lg:col-span-4 space-y-6">
@@ -418,23 +393,117 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练计次榜</h3>
                                 <div className="flex gap-2">
-                                    <button 
-                                        onClick={handleExportHomeTeamPDF}
-                                        disabled={isExportingHome}
-                                        className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 md:py-1.5 rounded-full border border-gray-200 flex items-center gap-1 md:gap-2 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                                    >
-                                        {isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />}
-                                        <span className="hidden sm:inline">导出报告</span>
-                                    </button>
-                                    <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest bg-white px-2 md:px-3 py-1 md:py-1.5 rounded-full border border-gray-200">点击查看详情</span>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练报告_${viewYear}年${viewMonth+1}月`); } catch (e) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200">点击球员查看记录</span>
                                 </div>
                             </div>
-                            <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-widest border-b"><tr><th className="px-3 py-3 md:px-6 md:py-4">排名</th><th className="px-3 py-3 md:px-6 md:py-4">球员</th><th className="px-3 py-3 md:px-6 md:py-4 text-center">本月</th><th className="px-3 py-3 md:px-6 md:py-4 text-center">年度</th><th className="px-3 py-3 md:px-6 md:py-4">状态</th></tr></thead><tbody className="divide-y divide-gray-100">{displayPlayers.map((p, idx) => { const stats = getHomeStats(p); return (<tr key={p.id} onClick={() => setDetailPlayerId(p.id)} className="hover:bg-yellow-50/50 transition-colors cursor-pointer group"><td className="px-3 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center font-black text-[10px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td><td className="px-3 py-3 md:px-6 md:py-4"><div className="flex items-center gap-2 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover border border-gray-100" /><span className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[50px] md:max-w-none">{p.name}</span></div></td><td className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-sm md:text-lg text-bvb-black">{stats.monthCount}</td><td className="px-3 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{stats.yearCount}</td><td className="px-3 py-3 md:px-6 md:py-4"><div className="flex">{stats.monthCount >= 15 ? (<span className="bg-green-100 text-green-700 text-[8px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-green-200 uppercase whitespace-nowrap">勤奋标兵</span>) : stats.monthCount > 0 ? (<span className="bg-blue-50 text-blue-600 text-[8px] md:text-[10px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-blue-100 uppercase whitespace-nowrap">表现良好</span>) : <span className="text-gray-300 text-[8px] md:text-[10px] font-black uppercase whitespace-nowrap">未开启</span>}</div></td></tr>); })}</tbody></table></div>
+                            <div className="overflow-x-auto" id="home-training-team-pdf">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-widest border-b">
+                                        <tr>
+                                            <th className="px-3 py-3 md:px-6 md:py-4">排名</th>
+                                            <th className="px-3 py-3 md:px-6 md:py-4">球员姓名</th>
+                                            <th className="px-3 py-3 md:px-6 md:py-4 text-center">本周次数</th>
+                                            <th className="px-3 py-3 md:px-6 md:py-4 text-center">本月</th>
+                                            <th className="px-3 py-3 md:px-6 md:py-4 text-center">年度</th>
+                                            <th className="px-3 py-3 md:px-6 md:py-4">成长状态</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {displayPlayers.map((p, idx) => { 
+                                            const stats = getHomeStats(p); 
+                                            return (
+                                                <tr key={p.id} onClick={() => setDetailPlayerId(p.id)} className="hover:bg-yellow-50/50 transition-colors cursor-pointer group animate-in fade-in duration-300">
+                                                    <td className="px-3 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center font-black text-[10px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4"><div className="flex items-center gap-2 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover border border-gray-100 group-hover:scale-110 transition-transform" /><span className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[50px] md:max-w-none group-hover:text-bvb-black">{p.name}</span></div></td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4 text-center"><div className="flex flex-col items-center"><span className={`text-sm md:text-xl font-black ${stats.weekCount >= 3 ? 'text-green-600' : 'text-bvb-black'}`}>{stats.weekCount}</span>{stats.weekCount >= 3 && <span className="text-[7px] md:text-[8px] bg-green-100 text-green-700 px-1 rounded uppercase font-black">目标达成</span>}</div></td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4 text-center font-black text-[11px] md:text-sm text-gray-500 tabular-nums">{stats.monthCount}</td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4 text-center font-bold text-gray-300 text-[10px] md:text-sm">{stats.yearCount}</td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4">
+                                                        <div className="flex">
+                                                            {stats.monthCount >= 15 ? (<span className="bg-green-100 text-green-700 text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-green-200 uppercase whitespace-nowrap">勤奋标兵</span>) : stats.monthCount > 0 ? (<span className="bg-blue-50 text-blue-600 text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-blue-100 uppercase whitespace-nowrap">表现良好</span>) : <span className="text-gray-300 text-[8px] md:text-[9px] font-black uppercase whitespace-nowrap">未开启</span>}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ); 
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            {activeTab === 'tests' && (
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
+                        <div className="flex items-center gap-3"><h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><Gauge className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 技术测评录入</h3>
+                            <select value={selectedTestId} onChange={e => setSelectedTestId(e.target.value)} className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none">{techTests.length === 0 ? <option value="">请先配置测试项</option> : <><option value="">-- 选择测试项目 --</option>{techTests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.unit})</option>)}</>}</select>
+                        </div>
+                        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
+                            <input type="date" className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" value={testEntryDate} onChange={e => setTestEntryDate(e.target.value)} />
+                            <button onClick={() => setShowConfigModal(true)} className="p-1.5 md:p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all" title="配置测试项目"><Settings className="w-4 h-4 md:w-5 md:h-5" /></button>
+                        </div>
+                    </div>
+                    {selectedTestId && selectedTeamId !== 'all' ? (
+                        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                            <div className="p-4 md:p-6 border-b flex justify-between items-center bg-gray-50/50">
+                                <div><h4 className="font-black text-gray-800 text-sm md:text-base uppercase tracking-tight">批量成绩录入 - {techTests.find(t=>t.id===selectedTestId)?.name}</h4><p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Input scores for {managedTeams.find(t=>t.id===selectedTeamId)?.name}</p></div>
+                                <div className="flex gap-2">
+                                    <button onClick={handleExportExcel} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-xl text-[11px] font-black hover:bg-green-100 transition-all uppercase"><FileSpreadsheet className="w-3.5 h-3.5" /> 下载登记表</button>
+                                    <button onClick={() => resultsFileInputRef.current?.click()} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-[11px] font-black hover:bg-blue-100 transition-all uppercase"><Upload className="w-3.5 h-3.5" /> 导入成绩</button>
+                                    <input type="file" ref={resultsFileInputRef} className="hidden" accept=".csv" onChange={handleImportResultsCSV} />
+                                    <button onClick={handleExportTechPDF} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 rounded-xl text-[11px] font-black hover:bg-gray-50 transition-all uppercase"><Download className="w-3.5 h-3.5" /> 导出报告</button>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto" id="tech-test-report-pdf">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-widest border-b"><tr><th className="px-4 py-4">球衣</th><th className="px-4 py-4">球员姓名</th><th className="px-4 py-4">上次成绩</th><th className="px-4 py-4 text-center">本次成绩 ({techTests.find(t=>t.id===selectedTestId)?.unit})</th><th className="px-4 py-4 text-right">进步幅度</th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {displayPlayers.map(p => {
+                                            const latest = getPlayerLatestResult(p, selectedTestId);
+                                            const testUnit = techTests.find(t=>t.id===selectedTestId)?.unit;
+                                            const lowerBetter = isLowerBetter(testUnit);
+                                            const currentVal = parseFloat(testScores[p.id] || '');
+                                            let progress = null;
+                                            if (latest && !isNaN(currentVal)) {
+                                                const diff = currentVal - latest.value;
+                                                progress = lowerBetter ? -diff : diff;
+                                            }
+                                            return (
+                                                <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <td className="px-4 py-4 font-mono font-bold text-gray-400">#{p.number}</td>
+                                                    <td className="px-4 py-4"><div className="flex items-center gap-2"><img src={p.image} className="w-8 h-8 rounded-full object-cover" /><span className="font-bold text-gray-800">{p.name}</span><button onClick={() => setShowTestHistoryPlayerId(p.id)} className="p-1 text-gray-300 hover:text-bvb-black"><ArrowRight className="w-3.5 h-3.5" /></button></div></td>
+                                                    <td className="px-4 py-4"><div className="flex flex-col"><span className="text-xs font-bold text-gray-500">{latest ? `${latest.value} ${testUnit}` : '无记录'}</span>{latest && <span className="text-[9px] text-gray-300 font-mono">{latest.date}</span>}</div></td>
+                                                    <td className="px-4 py-4 text-center"><input type="number" step="0.01" className="w-24 p-2 text-center border rounded-xl font-black text-sm bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" placeholder="录入分数" value={testScores[p.id] || ''} onChange={e => setTestScores({...testScores, [p.id]: e.target.value})} /></td>
+                                                    <td className="px-4 py-4 text-right">{progress !== null && progress !== 0 ? (<span className={`text-[10px] font-black flex items-center justify-end gap-0.5 ${progress > 0 ? 'text-green-600' : 'text-red-500'}`}>{progress > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}{Math.abs(progress).toFixed(2)}</span>) : <span className="text-[10px] text-gray-300">-</span>}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="p-6 bg-gray-50 border-t flex justify-end shrink-0"><button onClick={handleSaveBatchTests} disabled={isSavingTests || Object.keys(testScores).length === 0} className="px-10 py-3 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 uppercase italic text-sm">{isSavingTests ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Save Results</button></div>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-3xl p-12 md:p-20 text-center border border-gray-100 shadow-sm flex flex-col items-center">
+                            <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6"><Target className="w-10 h-10 md:w-12 md:h-12 text-gray-200" /></div>
+                            <h4 className="text-xl md:text-2xl font-black text-gray-800 uppercase italic tracking-tighter mb-2">Ready to Assess?</h4>
+                            <p className="text-gray-400 font-bold max-sm">请先在顶部菜单中选定一个具体的 <span className="text-bvb-black underline">测试项目</span> 以及 <span className="text-bvb-black underline">梯队分组</span> 开始录入。</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Modals & Sub-elements */}
+            <HomeLogDetailModal />
+
+            {showConfigModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white rounded-[32px] shadow-2xl w-full max-md overflow-hidden animate-in zoom-in-95 duration-200"><div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-xl flex items-center uppercase italic"><Settings className="w-6 h-6 mr-3 text-bvb-yellow" /> 技术测试项设置</h3><button onClick={() => setShowConfigModal(false)}><X className="w-6 h-6" /></button></div><div className="p-8 space-y-8 overflow-y-auto max-h-[70vh] custom-scrollbar"><div className="space-y-4"><div><label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">测试名称</label><input className="w-full p-3 border rounded-2xl font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow" placeholder="如：30米直线运球" value={newTestDef.name} onChange={e => setNewTestDef({...newTestDef, name: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">计量单位</label><input className="w-full p-3 border rounded-2xl font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow" placeholder="如：秒, 个, 次" value={newTestDef.unit} onChange={e => setNewTestDef({...newTestDef, unit: e.target.value})} /></div><div className="flex items-end"><button onClick={handleAddTestDef} className="w-full h-[54px] bg-bvb-black text-white font-black rounded-2xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/10"><Plus className="w-4 h-4 text-bvb-yellow" /> 添加项目</button></div></div></div><div className="space-y-3">{(techTests || []).map(t => (<div key={t.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 group transition-all hover:bg-white hover:shadow-md"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm font-black text-xs">{t.unit}</div><span className="font-black text-gray-800">{t.name}</span></div><button onClick={() => handleDeleteTestDef(t.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button></div>))}</div></div></div></div>
+            )}
         </div>
     );
 };
+
 export default TechnicalGrowth;
