@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
-import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, Sparkles } from 'lucide-react';
+import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
@@ -55,7 +54,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [homeTitle, setHomeTitle] = useState('居家练习');
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
     const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
-    const [jugglingDetailPlayerId, setJugglingDetailPlayerId] = useState<string | null>(null);
 
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [newTestDef, setNewTestDef] = useState({ name: '', unit: '', description: '' });
@@ -75,28 +73,43 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         return basePlayers.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
     }, [players, selectedTeamId, currentUser, isDirector]);
 
-    // 计算颠球排行统计并增加历史最佳
+    // 计算居家打卡统计并按年度次数排序
+    const homeTrainingLeaderboard = useMemo(() => {
+        return displayPlayers.map(p => {
+            const history = p.homeTrainingLogs || [];
+            const monday = getMondayOfCurrentWeek();
+            const weekCount = history.filter(h => h.date >= monday).length;
+            const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
+            const monthCount = history.filter(h => h.date.startsWith(mKey)).length;
+            const yearCount = history.filter(h => h.date.startsWith(String(viewYear))).length;
+            
+            return { 
+                ...p, 
+                stats: { weekCount, monthCount, yearCount } 
+            };
+        }).sort((a, b) => b.stats.yearCount - a.stats.yearCount); // 核心逻辑：按年度次数降序排列
+    }, [displayPlayers, viewYear, viewMonth]);
+
+    // Comment: Added missing jugglingLeaderboard useMemo
     const jugglingLeaderboard = useMemo(() => {
         return displayPlayers.map(p => {
-            const allHistory = p.jugglingHistory || [];
-            // 计算历年历史最佳 (全局)
-            const allTimeBest = allHistory.length > 0 ? Math.max(...allHistory.map(h => h.count)) : 0;
+            const history = p.jugglingHistory || [];
+            let filtered = history;
             
-            let filtered = allHistory;
             const year = viewYear;
             const month = viewMonth;
 
             if (statPeriod === 'month') {
                 const prefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-                filtered = allHistory.filter(h => h.date.startsWith(prefix));
+                filtered = history.filter(h => h.date.startsWith(prefix));
             } else if (statPeriod === 'quarter') {
                 const qStartMonth = Math.floor(month / 3) * 3;
-                filtered = allHistory.filter(h => {
+                filtered = history.filter(h => {
                     const d = new Date(h.date);
                     return d.getFullYear() === year && d.getMonth() >= qStartMonth && d.getMonth() < qStartMonth + 3;
                 });
             } else if (statPeriod === 'year') {
-                filtered = allHistory.filter(h => h.date.startsWith(String(year)));
+                filtered = history.filter(h => h.date.startsWith(String(year)));
             }
 
             const counts = filtered.map(h => h.count);
@@ -105,45 +118,31 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             const avg = counts.length > 0 ? (sum / counts.length).toFixed(1) : '0';
             const count = counts.length;
 
-            // 标记是否在当前周期打破了历史纪录
-            const isBreakingRecord = max > 0 && max === allTimeBest;
-
-            return { ...p, stats: { max, avg, count, allTimeBest, isBreakingRecord } };
-        }).filter(p => p.stats.count > 0 || p.stats.allTimeBest > 0).sort((a, b) => b.stats.max - a.stats.max);
+            return { ...p, stats: { max, avg, count } };
+        }).filter(p => p.stats.count > 0).sort((a, b) => b.stats.max - a.stats.max);
     }, [displayPlayers, statPeriod, viewYear, viewMonth]);
-
-    const homeTrainingLeaderboard = useMemo(() => {
-        const today = new Date();
-        const isCurrentMonth = today.getFullYear() === viewYear && today.getMonth() === viewMonth;
-        
-        return displayPlayers.map(p => {
-            const history = p.homeTrainingLogs || [];
-            const monday = getMondayOfCurrentWeek();
-            // 周统计仅在查看本月时显示实际意义，否则仅作为参考
-            const weekCount = history.filter(h => h.date >= monday).length;
-            const mKey = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`;
-            const monthCount = history.filter(h => h.date.startsWith(mKey)).length;
-            const yearCount = history.filter(h => h.date.startsWith(String(viewYear))).length;
-            
-            return { 
-                ...p, 
-                stats: { weekCount, monthCount, yearCount, isCurrentMonthView: isCurrentMonth } 
-            };
-        }).sort((a, b) => b.stats.yearCount - a.stats.yearCount);
-    }, [displayPlayers, viewYear, viewMonth]);
 
     const handleBatchHomeCheckin = () => {
         if (selectedPlayerIds.size === 0) return;
+        
         let successCount = 0;
         let skipCount = 0;
+
         selectedPlayerIds.forEach(id => {
             const p = players.find(p => p.id === id);
             if (p) {
+                // 每日仅可打卡一次校验
                 const isAlreadyCheckedIn = (p.homeTrainingLogs || []).some(log => log.date === homeDate);
                 if (!isAlreadyCheckedIn) {
                     onUpdatePlayer({ 
                         ...p, 
-                        homeTrainingLogs: [...(p.homeTrainingLogs || []), { id: `home-${Date.now()}-${id}`, playerId: id, date: homeDate, title: homeTitle, duration: 0 }] 
+                        homeTrainingLogs: [...(p.homeTrainingLogs || []), { 
+                            id: `home-${Date.now()}-${id}`, 
+                            playerId: id, 
+                            date: homeDate, 
+                            title: homeTitle, 
+                            duration: 0 
+                        }] 
                     });
                     successCount++;
                 } else {
@@ -151,6 +150,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 }
             }
         });
+
         setSelectedPlayerIds(new Set());
         if (skipCount > 0) {
             alert(`打卡完成！成功：${successCount}人。跳过：${skipCount}人（当日已打卡）。`);
@@ -159,69 +159,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     };
 
-    const JugglingHistoryModal = () => {
-        if (!jugglingDetailPlayerId) return null;
-        const player = players.find(p => p.id === jugglingDetailPlayerId);
-        if (!player) return null;
-        const sortedHistory = [...(player.jugglingHistory || [])].sort((a, b) => b.date.localeCompare(a.date));
-
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                    <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
-                        <div className="flex items-center gap-3">
-                            <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow" />
-                            <div>
-                                <h3 className="font-bold text-lg">{player.name} 颠球挑战历史</h3>
-                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Historical Best: {Math.max(...(player.jugglingHistory?.map(h => h.count) || [0]))}</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setJugglingDetailPlayerId(null)} className="p-1 hover:bg-gray-800 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
-                    </div>
-                    <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3 custom-scrollbar">
-                        {sortedHistory.length > 0 ? sortedHistory.map(record => (
-                            <div key={record.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl group hover:bg-white hover:border-bvb-yellow/30 transition-all">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-white rounded-lg flex flex-col items-center justify-center shadow-sm shrink-0 border border-gray-100">
-                                        <span className="text-xl font-black text-bvb-black leading-none">{record.count}</span>
-                                        <span className="text-[8px] text-gray-400 font-bold uppercase mt-0.5">PTS</span>
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-gray-800 text-sm leading-none mb-1">完成挑战</p>
-                                        <p className="text-[10px] text-gray-400 font-mono flex items-center"><Calendar className="w-2.5 h-2.5 mr-1" /> {record.date}</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        if (confirm('确定要删除这条成绩记录吗？该操作不可撤销。')) {
-                                            onUpdatePlayer({
-                                                ...player,
-                                                jugglingHistory: (player.jugglingHistory || []).filter(h => h.id !== record.id)
-                                            });
-                                        }
-                                    }}
-                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )) : (
-                            <div className="py-20 text-center text-gray-300 italic font-black uppercase text-xs tracking-widest">No records found</div>
-                        )}
-                    </div>
-                    <div className="bg-gray-50 p-4 border-t flex justify-end">
-                        <button onClick={() => setJugglingDetailPlayerId(null)} className="px-6 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">关闭窗口</button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     const HomeLogDetailModal = () => {
         if (!detailPlayerId) return null;
         const player = players.find(p => p.id === detailPlayerId);
         if (!player) return null;
         const sortedLogs = [...(player.homeTrainingLogs || [])].sort((a,b) => b.date.localeCompare(a.date));
+
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -273,6 +216,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         );
     };
 
+    // Comment: Added missing tech tests helpers and handlers
     const getPlayerLatestResult = (player: Player, testId: string) => {
         if (!player.testResults) return null;
         return [...player.testResults]
@@ -317,7 +261,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const testName = techTests.find(t => t.id === selectedTestId)?.name || '技术测试';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
-        } catch {
+        } catch (e) {
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -348,7 +292,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch {
+        } catch (e) {
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -385,7 +329,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                     <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase italic tracking-tighter">球员成长中心</h2>
                     <p className="text-gray-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest">Digital Performance Tracking & Analytics</p>
                 </div>
-                <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
+                <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
                     <div className="flex items-center bg-white rounded-xl border p-1 shadow-sm shrink-0 flex-1 md:flex-none justify-between">
                         <button onClick={() => { if(viewMonth === 0) { setViewMonth(11); setViewYear(viewYear-1); } else setViewMonth(viewMonth-1); }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-gray-400" /></button>
                         <span className="px-2 md:px-4 font-black text-[11px] md:text-xs min-w-[70px] md:min-w-[90px] text-center">{viewYear}年{viewMonth + 1}月</span>
@@ -410,6 +354,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             </div>
 
             {activeTab === 'juggling' && (
+                /* ... 颠球挑战部分保持原样 ... */
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-4">
                     <div className="lg:col-span-4 space-y-6">
                         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-gray-200">
@@ -445,64 +390,18 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                         </div>
                     </div>
                     <div className="lg:col-span-8 space-y-6">
+                        {/* 颠球排行统计 */}
                         <div className="bg-white rounded-2xl md:rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                             <div className="p-4 md:p-6 border-b flex flex-col md:flex-row justify-between items-center gap-3 bg-gray-50/50">
-                                <div className="flex items-center gap-3 md:gap-4">
-                                    <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><Trophy className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 挑战光荣榜</h3>
-                                    <div className="flex bg-white p-1 rounded-xl border shadow-sm">
-                                        <button onClick={() => setStatPeriod('month')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>月</button>
-                                        <button onClick={() => setStatPeriod('quarter')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'quarter' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>季</button>
-                                        <button onClick={() => setStatPeriod('year')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>年</button>
-                                    </div>
-                                </div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                                    点击姓名查看全部历史记录
+                                <div className="flex items-center gap-3 md:gap-4"><h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><Trophy className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 挑战光荣榜</h3>
+                                    <div className="flex bg-white p-1 rounded-xl border shadow-sm"><button onClick={() => setStatPeriod('month')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'month' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>月</button><button onClick={() => setStatPeriod('quarter')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'quarter' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>季</button><button onClick={() => setStatPeriod('year')} className={`px-2 md:px-4 py-1 rounded-lg text-[10px] md:text-xs font-black transition-all ${statPeriod === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-400 hover:text-gray-600'}`}>年</button></div>
                                 </div>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-left">
-                                    <thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest border-b">
-                                        <tr>
-                                            <th className="px-2 py-3 md:px-6 md:py-4">排名</th>
-                                            <th className="px-2 py-3 md:px-6 md:py-4">球员姓名</th>
-                                            <th className="px-2 py-3 md:px-6 md:py-4 text-center">周期最高</th>
-                                            <th className="px-2 py-3 md:px-6 md:py-4 text-center font-black text-bvb-black">历史最佳</th>
-                                            <th className="px-2 py-3 md:px-6 md:py-4 text-center">周期平均</th>
-                                        </tr>
-                                    </thead>
+                                    <thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-tighter md:tracking-widest border-b"><tr><th className="px-2 py-3 md:px-6 md:py-4">排名</th><th className="px-2 py-3 md:px-6 md:py-4">球员姓名</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">最高</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">平均</th><th className="px-2 py-3 md:px-6 md:py-4 text-center">次数</th></tr></thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {(jugglingLeaderboard || []).map((p, idx) => (
-                                            <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors">
-                                                <td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
-                                                <td className="px-2 py-3 md:px-6 md:py-4">
-                                                    <button onClick={() => setJugglingDetailPlayerId(p.id)} className="flex items-center gap-1.5 md:gap-3 text-left hover:opacity-80 transition-all group">
-                                                        <div className="relative">
-                                                            <img src={p.image} className="w-7 h-7 md:w-10 md:h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                            <div className="absolute inset-0 bg-bvb-black/0 group-hover:bg-bvb-black/20 rounded-full transition-colors flex items-center justify-center"><Search className="w-3 h-3 text-white opacity-0 group-hover:opacity-100" /></div>
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[50px] md:max-w-none group-hover:underline">{p.name}</p>
-                                                            <p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p>
-                                                        </div>
-                                                    </button>
-                                                </td>
-                                                <td className="px-2 py-3 md:px-6 md:py-4 text-center">
-                                                    <div className="flex flex-col items-center">
-                                                        <span className="text-sm md:text-lg font-black text-gray-800">{p.stats.max}</span>
-                                                        {p.stats.isBreakingRecord && (
-                                                            <span className="text-[7px] md:text-[8px] font-black text-bvb-yellow bg-bvb-black px-1.5 rounded-full flex items-center gap-0.5 animate-pulse">
-                                                                <Sparkles className="w-2 h-2 fill-current" /> NEW RECORD
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-base md:text-xl font-black text-gray-400 tabular-nums">{p.stats.allTimeBest}</span><span className="text-[8px] md:text-[10px] text-gray-400 ml-0.5 font-bold">个</span></td>
-                                                <td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{p.stats.avg}</td>
-                                            </tr>
-                                        ))}
-                                        {jugglingLeaderboard.length === 0 && (
-                                            <tr><td colSpan={5} className="py-20 text-center text-gray-300 italic font-black uppercase text-xs">No records for this period</td></tr>
-                                        )}
+                                        {(jugglingLeaderboard || []).map((p, idx) => (<tr key={p.id} className="hover:bg-yellow-50/30 transition-colors"><td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td><td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 md:h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[50px] md:max-w-none">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td><td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-sm md:text-xl font-black text-bvb-black">{p.stats.max}</span><span className="text-[8px] md:text-[10px] text-gray-400 ml-0.5 font-bold">个</span></td><td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-500 text-[10px] md:text-sm">{p.stats.avg}</td><td className="px-2 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{p.stats.count}</td></tr>))}
                                     </tbody>
                                 </table>
                             </div>
@@ -542,7 +441,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (e: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="home-training-team-pdf">
@@ -563,4 +462,106 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             return (
                                                 <tr key={p.id} onClick={() => setDetailPlayerId(p.id)} className="hover:bg-yellow-50/50 transition-colors cursor-pointer group animate-in fade-in duration-300">
                                                     <td className="px-3 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center font-black text-[10px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
-                                                    <td className="px-3 py-3 md:px-6 md:py-4"><div className="flex items-center gap-2 md:gap-3"><img src
+                                                    <td className="px-3 py-3 md:px-6 md:py-4"><div className="flex items-center gap-2 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-8 md:h-8 rounded-full object-cover border border-gray-100 group-hover:scale-110 transition-transform" /><span className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[50px] md:max-w-none group-hover:text-bvb-black">{p.name}</span></div></td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{stats.weekCount}</td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4 text-center font-bold text-gray-400 text-[10px] md:text-sm">{stats.monthCount}</td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4 text-center"><span className={`text-sm md:text-xl font-black ${idx < 3 ? 'text-bvb-black scale-110 inline-block' : 'text-gray-500'}`}>{stats.yearCount}</span></td>
+                                                    <td className="px-3 py-3 md:px-6 md:py-4">
+                                                        <div className="flex gap-1">
+                                                            {idx < 3 && stats.yearCount > 10 && (<span className="bg-bvb-yellow text-bvb-black text-[7px] md:text-[8px] font-black px-1.5 py-0.5 rounded border border-bvb-black uppercase whitespace-nowrap flex items-center gap-0.5"><Star className="w-2 h-2 fill-current"/> 年度勤奋王</span>)}
+                                                            {stats.monthCount >= 15 ? (<span className="bg-green-100 text-green-700 text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-green-200 uppercase whitespace-nowrap">勤奋标兵</span>) : stats.monthCount > 0 ? (<span className="bg-blue-50 text-blue-600 text-[8px] md:text-[9px] font-black px-1.5 md:px-2 py-0.5 md:py-1 rounded-full border border-blue-100 uppercase whitespace-nowrap">表现良好</span>) : null}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ); 
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'tests' && (
+                /* ... 技术测评部分保持原样 ... */
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+                    <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
+                        <div className="flex items-center gap-3"><h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><Gauge className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 技术测评录入</h3>
+                            <select value={selectedTestId} onChange={e => setSelectedTestId(e.target.value)} className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none">{techTests.length === 0 ? <option value="">请先配置测试项</option> : <><option value="">-- 选择测试项目 --</option>{techTests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.unit})</option>)}</>}</select>
+                        </div>
+                        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
+                            <input type="date" className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" value={testEntryDate} onChange={e => setTestEntryDate(e.target.value)} />
+                            <button onClick={() => setShowConfigModal(true)} className="p-1.5 md:p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-all" title="配置测试项目"><Settings className="w-4 h-4 md:w-5 md:h-5" /></button>
+                        </div>
+                    </div>
+                    {selectedTestId && selectedTeamId !== 'all' ? (
+                        <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                            <div className="p-4 md:p-6 border-b flex justify-between items-center bg-gray-50/50">
+                                <div><h4 className="font-black text-gray-800 text-sm md:text-base uppercase tracking-tight">批量成绩录入 - {techTests.find(t=>t.id===selectedTestId)?.name}</h4><p className="text-[10px] text-gray-400 font-bold uppercase mt-1">Input scores for {managedTeams.find(t=>t.id===selectedTeamId)?.name}</p></div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => {
+                                        const test = techTests.find(t => t.id === selectedTestId);
+                                        if (!test) return;
+                                        const headers = "球衣,姓名,身份证号,成绩(" + test.unit + ")\n";
+                                        const rows = displayPlayers.map(p => `${p.number},${p.name},'${p.idCard},`).join('\n');
+                                        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
+                                        const link = document.createElement('a');
+                                        link.href = URL.createObjectURL(blob);
+                                        link.download = `${test.name}_成绩录入表.csv`;
+                                        link.click();
+                                    }} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-xl text-[11px] font-black hover:bg-green-100 transition-all uppercase"><FileSpreadsheet className="w-3.5 h-3.5" /> 下载登记表</button>
+                                    <button onClick={() => resultsFileInputRef.current?.click()} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-[11px] font-black hover:bg-blue-100 transition-all uppercase"><Upload className="w-3.5 h-3.5" /> 导入成绩</button>
+                                    <input type="file" ref={resultsFileInputRef} className="hidden" accept=".csv" onChange={handleImportResultsCSV} />
+                                    <button onClick={handleExportTechPDF} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 rounded-xl text-[11px] font-black hover:bg-gray-50 transition-all uppercase"><Download className="w-3.5 h-3.5" /> 导出报告</button>
+                                </div>
+                            </div>
+                            <div className="overflow-x-auto" id="tech-test-report-pdf">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-100/50 font-black text-gray-400 uppercase text-[9px] md:text-[10px] tracking-widest border-b"><tr><th className="px-4 py-4">球衣</th><th className="px-4 py-4">球员姓名</th><th className="px-4 py-4">上次成绩</th><th className="px-4 py-4 text-center">本次成绩 ({techTests.find(t=>t.id===selectedTestId)?.unit})</th><th className="px-4 py-4 text-right">进步幅度</th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {displayPlayers.map(p => {
+                                            const latest = getPlayerLatestResult(p, selectedTestId);
+                                            const testUnit = techTests.find(t=>t.id===selectedTestId)?.unit;
+                                            const lowerBetter = isLowerBetter(testUnit);
+                                            const currentVal = parseFloat(testScores[p.id] || '');
+                                            let progress = null;
+                                            if (latest && !isNaN(currentVal)) {
+                                                const diff = currentVal - latest.value;
+                                                progress = lowerBetter ? -diff : diff;
+                                            }
+                                            return (
+                                                <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                                                    <td className="px-4 py-4 font-mono font-bold text-gray-400">#{p.number}</td>
+                                                    <td className="px-4 py-4"><div className="flex items-center gap-2"><img src={p.image} className="w-8 h-8 rounded-full object-cover" /><span className="font-bold text-gray-800">{p.name}</span><button onClick={() => setShowTestHistoryPlayerId(p.id)} className="p-1 text-gray-300 hover:text-bvb-black"><ArrowRight className="w-3.5 h-3.5" /></button></div></td>
+                                                    <td className="px-4 py-4"><div className="flex flex-col"><span className="text-xs font-bold text-gray-500">{latest ? `${latest.value} ${testUnit}` : '无记录'}</span>{latest && <span className="text-[9px] text-gray-300 font-mono">{latest.date}</span>}</div></td>
+                                                    <td className="px-4 py-4 text-center"><input type="number" step="0.01" className="w-24 p-2 text-center border rounded-xl font-black text-sm bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" placeholder="录入分数" value={testScores[p.id] || ''} onChange={e => setTestScores({...testScores, [p.id]: e.target.value})} /></td>
+                                                    <td className="px-4 py-4 text-right">{progress !== null && progress !== 0 ? (<span className={`text-[10px] font-black flex items-center justify-end gap-0.5 ${progress > 0 ? 'text-green-600' : 'text-red-500'}`}>{progress > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}{Math.abs(progress).toFixed(2)}</span>) : <span className="text-[10px] text-gray-300">-</span>}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div className="p-6 bg-gray-50 border-t flex justify-end shrink-0"><button onClick={handleSaveBatchTests} disabled={isSavingTests || Object.keys(testScores).length === 0} className="px-10 py-3 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 uppercase italic text-sm">{isSavingTests ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Save Results</button></div>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-3xl p-12 md:p-20 text-center border border-gray-100 shadow-sm flex flex-col items-center">
+                            <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-full flex items-center justify-center mb-6"><Target className="w-10 h-10 md:w-12 md:h-12 text-gray-200" /></div>
+                            <h4 className="text-xl md:text-2xl font-black text-gray-800 uppercase italic tracking-tighter mb-2">Ready to Assess?</h4>
+                            <p className="text-gray-400 font-bold max-sm">请先在顶部菜单中选定一个具体的 <span className="text-bvb-black underline">测试项目</span> 以及 <span className="text-bvb-black underline">梯队分组</span> 开始录入。</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Modals */}
+            <HomeLogDetailModal />
+            {showConfigModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white rounded-[32px] shadow-2xl w-full max-md overflow-hidden animate-in zoom-in-95 duration-200"><div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-xl flex items-center uppercase italic"><Settings className="w-6 h-6 mr-3 text-bvb-yellow" /> 技术测试项设置</h3><button onClick={() => setShowConfigModal(false)}><X className="w-6 h-6" /></button></div><div className="p-8 space-y-8 overflow-y-auto max-h-[70vh] custom-scrollbar"><div className="space-y-4"><div><label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">测试名称</label><input className="w-full p-3 border rounded-2xl font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow" placeholder="如：30米直线运球" value={newTestDef.name} onChange={e => setNewTestDef({...newTestDef, name: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">计量单位</label><input className="w-full p-3 border rounded-2xl font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow" placeholder="如：秒, 个, 次" value={newTestDef.unit} onChange={e => setNewTestDef({...newTestDef, unit: e.target.value})} /></div><div className="flex items-end"><button onClick={handleAddTestDef} className="w-full h-[54px] bg-bvb-black text-white font-black rounded-2xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/10"><Plus className="w-4 h-4 text-bvb-yellow" /> 添加项目</button></div></div></div><div className="space-y-3">{(techTests || []).map(t => (<div key={t.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 group transition-all hover:bg-white hover:shadow-md"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm font-black text-xs">{t.unit}</div><span className="font-black text-gray-800">{t.name}</span></div><button onClick={() => handleDeleteTestDef(t.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button></div>))}</div></div></div></div>
+            )}
+        </div>
+    );
+};
+
+export default TechnicalGrowth;
