@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock } from 'lucide-react';
@@ -133,9 +132,13 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
         try {
-            await exportToPDF('tech-test-report-pdf', `技术测评报告_${techTests.find(t=>t.id===selectedTestId)?.name}`);
-        } catch (e) { 
-            // Comment: Cast error to any for compatibility with string-expecting functions like alert if necessary
+            // Comment: Safely get the current test name and ensure the PDF filename is built from a string
+            const foundTest = (techTests || []).find(t => t.id === selectedTestId);
+            const fileName = foundTest ? `技术测评报告_${foundTest.name}` : '技术测评报告';
+            await exportToPDF('tech-test-report-pdf', fileName);
+        } catch (e: any) { 
+            // Comment: Cast catch error to any to resolve "unknown" type incompatibility with string parameters
+            console.error(e);
             alert('导出失败'); 
         } finally { setIsExportingTech(false); }
     };
@@ -164,7 +167,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             });
             setTestScores({});
             alert('所有成绩已保存！');
-        } catch (e) {
+        } catch (e: any) {
+            // Comment: Cast catch error to any to avoid "unknown" type issues
             console.error(e);
             alert('保存失败');
         } finally {
@@ -393,7 +397,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练计次榜</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练报告_${viewYear}年${viewMonth+1}月`); } catch (e) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练报告_${viewYear}年${viewMonth+1}月`); } catch (e: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                     <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200">点击球员查看记录</span>
                                 </div>
                             </div>

@@ -430,7 +430,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
     trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
 }) => {
-  // Comment: Defined isDirector and isCoach in component scope to ensure availability in all render functions
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
 
@@ -444,11 +443,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  
+  // 梯队过滤器状态，默认选中该教练的第一个队或全部
   const [statsTeamFilter, setStatsTeamFilter] = useState<string>(() => {
-    // 默认选中教练管辖的第一个梯队，如果是总监则默认 all
     if (isCoach && currentUser?.teamIds?.length) return currentUser.teamIds[0];
     return 'all';
   });
+
   const [activeWeekPlan, setActiveWeekPlan] = useState<WeeklyPlan | null>(null);
   const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
 
@@ -533,9 +534,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       return { filteredSessions: sessions, dateLabel: label, statsData: chartData };
   }, [currentDate, timeScope, userManagedSessions, statsTeamFilter]);
 
-  // 获取当前梯队在该年度的周期计划
   const currentPeriodization = useMemo(() => {
-      // 周期计划必须针对具体梯队，如果 statsTeamFilter 为 all，取第一个可用梯队
       const teamId = statsTeamFilter === 'all' ? (availableTeams[0]?.id || '') : statsTeamFilter;
       const year = currentDate.getFullYear();
       return periodizationPlans.find(p => p.teamId === teamId && p.year === year) || { id: `p-${teamId}-${year}`, teamId, year, weeks: [] };
@@ -580,7 +579,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           const isToday = dateStr === new Date().toISOString().split('T')[0];
           const isSelected = dateStr === selectedDate;
           
-          const sessionsOnDay = userManagedSessions.filter(t => t.date === dateStr);
+          const sessionsOnDay = filteredSessions.filter(t => t.date === dateStr);
           const hasPending = sessionsOnDay.some(s => s.submissionStatus === 'Submitted');
           const hasUnreadReview = sessionsOnDay.some(s => s.submissionStatus === 'Reviewed' && !s.isReviewRead);
 
@@ -641,31 +640,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
-            {/* 梯队选择器 */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-bvb-black rounded-lg text-bvb-yellow">
-                        <Shield className="w-5 h-5" />
-                    </div>
-                    <div>
-                        <h4 className="font-black text-gray-800 text-sm md:text-base uppercase tracking-tight">周期计划排版管理</h4>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Periodization Outline for {selectedTeamName}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">切换梯队:</label>
-                    <select 
-                        value={statsTeamFilter} 
-                        onChange={e => setStatsTeamFilter(e.target.value)}
-                        className="flex-1 md:flex-none p-2 md:p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-black text-gray-700 focus:ring-2 focus:ring-bvb-yellow outline-none transition-all cursor-pointer"
-                    >
-                        {isDirector && <option value="all">-- 请选择一个梯队 --</option>}
-                        {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name} ({t.level})</option>)}
-                    </select>
-                </div>
-            </div>
-
-            <div id="periodization-plan-export" className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto relative no-scrollbar">
                     <table className="w-full text-center border-collapse table-fixed min-w-[850px] md:min-w-[1200px]">
                         <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[8px] md:text-[10px] tracking-widest border-b">
@@ -792,7 +767,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         <td className="px-3 md:px-6 py-4 font-bold text-xs md:text-sm text-gray-700">{team?.level || '-'}</td>
                                         <td className="px-3 md:px-6 py-4">
                                             <div className="flex items-center gap-1.5 md:gap-2">
-                                                <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread ? text-blue-700 : 'text-bvb-black'}`}>{s.title}</span>
+                                                <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread ? 'text-blue-700' : 'text-bvb-black'}`}>{s.title}</span>
                                                 {s.linkedDesignId && <PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" title="关联教案" />}
                                             </div>
                                         </td>
@@ -812,7 +787,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         <td className="px-3 md:px-6 py-4 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end">
                                                 {s.submissionStatus === 'Reviewed' ? (
-                                                    <span className={`flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase ${isUnread ? text-blue-600 : 'text-green-600'}`} title={isUnread ? '新反馈待阅' : '已查看总监评价'}>
+                                                    <span className={`flex items-center gap-1 text-[9px] md:text-[10px] font-black uppercase ${isUnread ? 'text-blue-600' : 'text-green-600'}`} title={isUnread ? '新反馈待阅' : '已查看总监评价'}>
                                                         {isUnread ? <Bell className="w-3 h-3 animate-bounce" /> : <ShieldCheck className="w-3 h-3" />}
                                                         <span className="hidden sm:inline">{isUnread ? '反馈待阅' : '已审核'}</span>
                                                     </span>
@@ -829,7 +804,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         ) : (
                             <tr>
                                 <td colSpan={7} className="px-6 py-20 text-center text-gray-400 italic font-bold">
-                                    -- 本月暂无训练计划安排 --
+                                    -- 选定范围内暂无训练计划安排 --
                                 </td>
                             </tr>
                         )}
@@ -856,21 +831,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <h4 className="font-bold text-gray-800 text-xs uppercase flex items-center">
                 <PieChartIcon className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练重点分布
             </h4>
-            <div className="relative group">
-                <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-hover:text-bvb-black transition-colors">
-                    <Filter className="w-3 h-3" />
-                </div>
-                <select 
-                    value={statsTeamFilter} 
-                    onChange={e => setStatsTeamFilter(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-black uppercase text-gray-600 outline-none focus:ring-2 focus:ring-bvb-yellow focus:bg-white transition-all cursor-pointer"
-                >
-                    <option value="all">全部管理梯队</option>
-                    {availableTeams.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                </select>
-            </div>
+            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Focus Area Distribution</p>
         </div>
         <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -936,9 +897,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   return (
     <div className="space-y-6 flex flex-col h-auto pb-20 md:pb-0">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shrink-0">
-            <div>
+            <div className="flex flex-col gap-2">
                 <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase">训练计划</h2>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2">
                     <div className="flex bg-gray-100 p-1 rounded-lg">
                         <button onClick={() => setViewType('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'calendar' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
                             <CalendarIcon className="w-3 h-3 md:w-3.5 md:h-3.5" /> 日历
@@ -956,18 +917,37 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <button onClick={() => setTimeScope('year')} className={`text-[10px] font-black uppercase px-2 py-1 rounded transition-colors ${timeScope === 'year' ? 'bg-bvb-black text-bvb-yellow' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>年</button>
                 </div>
             </div>
-            <div className="flex items-center gap-2 w-full md:w-auto">
+            
+            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                {/* 梯队全局筛选器 - 放置在核心操作区 */}
+                <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1.5 shadow-sm shrink-0 flex-1 md:flex-none">
+                    <Users className="w-4 h-4 text-gray-400 ml-1" />
+                    <select 
+                        value={statsTeamFilter} 
+                        onChange={e => setStatsTeamFilter(e.target.value)}
+                        className="bg-transparent text-[11px] md:text-xs font-black uppercase text-gray-700 outline-none focus:ring-0 cursor-pointer min-w-[80px] md:min-w-[120px]"
+                    >
+                        {isDirector && <option value="all">全部管理梯队</option>}
+                        {availableTeams.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </select>
+                </div>
+
                 <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm shrink-0 flex-1 md:flex-none justify-between">
                     <button onClick={handlePrevPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-5 h-5 text-gray-400" /></button>
                     <span className="px-2 font-black text-xs md:text-sm flex-1 md:min-w-[110px] text-center whitespace-nowrap">{dateLabel}</span>
                     <button onClick={handleNextPeriod} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"><ChevronRight className="w-5 h-5 text-gray-400" /></button>
                 </div>
-                <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出 (PDF)">
-                    {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
-                </button>
-                <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
-                    <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建课次</span>
-                </button>
+
+                <div className="flex gap-2">
+                    <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出 (PDF)">
+                        {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
+                    </button>
+                    <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
+                        <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建课次</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -988,8 +968,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         {selectedDate === new Date().toISOString().split('T')[0] && <span className="text-[10px] bg-bvb-black px-2 py-0.5 rounded-full text-bvb-yellow font-black">TODAY</span>}
                     </h4>
                     <div className="space-y-4">
-                        {userManagedSessions.filter(t => t.date === selectedDate).length > 0 ? (
-                            userManagedSessions.filter(t => t.date === selectedDate).map(s => {
+                        {filteredSessions.filter(t => t.date === selectedDate).length > 0 ? (
+                            filteredSessions.filter(t => t.date === selectedDate).map(s => {
                                 const team = teams.find(t => t.id === s.teamId);
                                 const isUnread = isCoach && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
                                 return (
