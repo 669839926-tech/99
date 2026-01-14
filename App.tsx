@@ -82,7 +82,7 @@ function App() {
     init();
   }, []);
 
-  // Auto-Save with improved trigger for large assets
+  // Auto-Save on Change
   useEffect(() => {
     if (isInitializing) return;
     if (isFirstRun.current) {
@@ -113,9 +113,9 @@ function App() {
         } catch (e) {
             console.error("Auto-save failed", e);
         } finally {
-            setTimeout(() => setIsSyncing(false), 500);
+            setIsSyncing(false);
         }
-    }, 1500); // 略微缩短同步延迟
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, isInitializing]);
@@ -151,9 +151,7 @@ function App() {
   const handleUpdateTeam = (updatedTeam: Team) => setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
   const handleAddPlayer = (player: Player) => setPlayers(prev => [...prev, player]);
   const handleBulkAddPlayers = (newPlayers: Player[]) => setPlayers(prev => [...prev, ...newPlayers]);
-  const handleUpdatePlayer = (updatedPlayer: Player) => {
-      setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
-  };
+  const handleUpdatePlayer = (updatedPlayer: Player) => setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
   const handleDeletePlayer = (playerId: string) => { if(confirm('确定要删除这名球员吗？')) setPlayers(prev => prev.filter(p => p.id !== playerId)); };
   const handleBulkDeletePlayers = (playerIds: string[]) => setPlayers(prev => prev.filter(p => !playerIds.includes(p.id)));
   const handleTransferPlayers = (playerIds: string[], targetTeamId: string) => setPlayers(prev => prev.map(p => playerIds.includes(p.id) ? { ...p, teamId: targetTeamId } : p));

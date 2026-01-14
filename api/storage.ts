@@ -1,8 +1,8 @@
 
 import { put, list } from '@vercel/blob';
 
-// Vercel Serverless Functions have a default 4.5MB limit on request body size.
-// For youth clubs, this single-file approach works until dozens of high-res base64 images are added.
+// Removing "runtime: 'edge'" defaults this function to standard Node.js Serverless Function
+// which supports the necessary modules (stream, net, etc.) that were causing the build error.
 
 const DB_FILENAME = 'football_manager_db.json';
 
@@ -19,6 +19,7 @@ export default async function handler(request, response) {
       }
 
       const jsonUrl = blobs[0].url;
+      // Using global fetch (available in Node.js 18+)
       const res = await fetch(jsonUrl, { cache: 'no-store' });
       const data = await res.json();
       
@@ -28,29 +29,22 @@ export default async function handler(request, response) {
 
     // POST Request: Save data
     if (request.method === 'POST') {
+      // In Vercel Node.js functions, request.body is automatically parsed if content-type is json
       const body = request.body;
       
-      if (!body) {
-        return response.status(400).json({ error: 'Empty request body' });
-      }
-
-      // Check approximate size (Base64 data is large)
-      const bodySize = JSON.stringify(body).length;
-      console.log(`Syncing database to cloud. Total size: ${(bodySize / 1024).toFixed(2)} KB`);
-
       const { url } = await put(DB_FILENAME, JSON.stringify(body), {
         access: 'public',
-        addRandomSuffix: false,
-        allowOverwrite: true,
+        addRandomSuffix: false, // Keep file name constant
+        allowOverwrite: true,   // Explicitly allow overwriting existing file
         token,
       });
 
-      return response.status(200).json({ success: true, url, size: bodySize });
+      return response.status(200).json({ success: true, url });
     }
 
     return response.status(405).send('Method not allowed');
   } catch (error) {
-    console.error('Storage API Critical Error:', error);
-    return response.status(500).json({ error: 'Cloud synchronization failed', details: error.message });
+    console.error('Storage API Error:', error);
+    return response.status(500).json({ error: 'Internal Server Error' });
   }
 }
