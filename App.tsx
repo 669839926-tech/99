@@ -82,7 +82,7 @@ function App() {
     init();
   }, []);
 
-  // Auto-Save on Change - Reduced debounce to 1s for better reliability with base64 images
+  // Auto-Save on Change
   useEffect(() => {
     if (isInitializing) return;
     if (isFirstRun.current) {
@@ -115,7 +115,7 @@ function App() {
         } finally {
             setIsSyncing(false);
         }
-    }, 1000); // 缩短同步延迟，确保存储更及时
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, isInitializing]);
