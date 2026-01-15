@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -331,11 +330,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
-        const testName = techTests.find(t => t.id === selectedTestId)?.name || '技术测试';
+        // Comment: Added optional chaining to techTests to avoid potential type issues
+        const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测试';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
-        } catch (error: unknown) {
-            // Comment: Fixed catch block to explicitly handle error as unknown and provide consistent alert message
+        } catch (error: any) {
+            // Comment: Changed catch block error type from unknown to any to fix potential string assignment error
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -366,8 +366,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch (error: unknown) {
-            // Comment: Fixed catch block to explicitly handle error as unknown and provide consistent alert message
+        } catch (error: any) {
+            // Comment: Fixed catch block to explicitly handle error as any and provide consistent alert message
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -486,7 +486,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                         {(jugglingLeaderboard || []).map((p, idx) => (
                                             <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors group cursor-pointer" onClick={() => setViewingJugglingPlayerId(p.id)}>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
-                                                <td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 md:h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[80px] md:max-w-none group-hover:underline">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td>
+                                                <td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[80px] md:max-w-none group-hover:underline">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-xs md:text-lg font-bold text-gray-400">{p.stats.max}</span></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><div className="flex flex-col items-center"><span className={`text-sm md:text-xl font-black ${idx < 3 ? 'text-bvb-black' : 'text-gray-700'}`}>{p.stats.lifetimeMax}</span><div className="h-0.5 w-4 bg-bvb-yellow rounded-full"></div></div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><div className="flex flex-col text-[10px] md:text-xs font-bold text-gray-400"><span>Avg: {p.stats.avg}</span><span>Cnt: {p.stats.count}</span></div></td>
@@ -509,8 +509,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-gray-200">
                             <h3 className="font-black text-gray-800 mb-4 md:mb-6 flex items-center uppercase tracking-tighter text-base md:text-lg"><CheckSquare className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 快速批量打卡</h3>
                             <div className="space-y-4 mb-4 md:mb-6">
-                                <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">选择日期</label><input type="date" className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-[12px] md:text-sm" value={homeDate} onChange={e => setHomeDate(e.target.value)} /></div>
-                                <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">训练主题</label><input className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-[12px] md:text-sm" placeholder="如：触球练习" value={homeTitle} onChange={e => setHomeTitle(e.target.value)} /></div>
+                                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">选择日期</label><input type="date" className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-[12px] md:text-sm" value={homeDate} onChange={e => setHomeDate(e.target.value)} /></div>
+                                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">训练主题</label><input className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-[12px] md:text-sm" placeholder="如：触球练习" value={homeTitle} onChange={e => setHomeTitle(e.target.value)} /></div>
                             </div>
                             <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 md:mb-3 flex justify-between"><span>待选球员 ({displayPlayers.length})</span><button onClick={() => setSelectedPlayerIds(selectedPlayerIds.size === displayPlayers.length ? new Set() : new Set(displayPlayers.map(p => p.id)))} className="text-bvb-black hover:underline">全选</button></p>
                             <div className="grid grid-cols-2 gap-2 max-h-[200px] md:max-h-[300px] overflow-y-auto pr-1 custom-scrollbar mb-4 md:mb-6">{displayPlayers.map(p => {
@@ -534,7 +534,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: unknown) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="home-training-team-pdf">
