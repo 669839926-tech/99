@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files } from 'lucide-react';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -281,7 +281,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
         const newPlayers: Player[] = parsedPlayers.map(p => ({
-            ...p, id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, teamId: selectedTeamId, isCaptain: false, goals: 0, assists: 0, appearances: 0, image: `https://picsum.photos/200/200?random=${Math.random()}`, stats: defaultStats, statsStatus: 'Published', lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), reviews: [], credits: 0, validUntil: nextYear.toISOString().split('T')[0], leaveQuota: 0, leavesUsed: 0, rechargeHistory: [], gallery: [], preferredFoot: p.preferredFoot || '右'
+            ...p, id: `imported-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`, teamId: selectedTeamId, isCaptain: false, goals: 0, assists: 0, appearances: 0, image: `https://picsum.photos/200/200?random=${Math.random()}`, stats: defaultStats, statsStatus: 'Published', lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), reviews: [], credits: 0, validUntil: nextYear.toISOString().split('T')[0], leaveQuota: 0, leavesUsed: 0, remainingLeaveQuota: 0, rechargeHistory: [], gallery: [], preferredFoot: p.preferredFoot || '右'
         } as Player));
         onImport(newPlayers); onClose();
     };
@@ -683,14 +683,127 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     };
 
     const renderRecords = () => {
-        type Event = { id: string; originalId?: string; date: string; type: 'recharge' | 'training'; status?: string; amount: number; desc: string; balanceAfter?: number; quotaAdded?: number; };
-        const events: Event[] = []; (editedPlayer.rechargeHistory || []).forEach(r => events.push({ id: `rech-${r.id}`, originalId: r.id, date: r.date, type: 'recharge', amount: r.amount, desc: `充值 ${r.amount} 课时 (含请假额度 ${r.quotaAdded}次)`, quotaAdded: r.quotaAdded }));
-        trainings.forEach(t => { const record = t.attendance?.find(r => r.playerId === editedPlayer.id); if (record && record.status !== 'Absent') { let amount = 0; let desc = ''; if (record.status === 'Present') { amount = -1; desc = `参加训练: ${t.title}`; } else if (record.status === 'Leave') { amount = 0; desc = `请假: ${t.title}`; } else if (record.status === 'Injury') { amount = 0; desc = `伤停: ${t.title}`; } events.push({ id: `train-${t.id}`, date: t.date, type: 'training', status: record.status, amount, desc }); } });
-        events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        let balance = 0; const historyWithBalance = events.map(e => { if (e.type === 'recharge') { balance += e.amount; } else if (e.type === 'training') { if (e.status === 'Present') { balance -= 1; e.amount = -1; } else if (e.status === 'Leave') { e.amount = 0; e.desc += ' (消耗额度)'; } } return { ...e, balanceAfter: balance }; });
-        const displayList = [...historyWithBalance].reverse();
+        type Event = { 
+            id: string; 
+            originalId?: string; 
+            date: string; 
+            type: 'recharge' | 'training'; 
+            status?: string; 
+            amount: number; 
+            desc: string; 
+            balanceAfter?: number; 
+            quotaAfter?: number; // 剩余赠予额度
+            note?: string; 
+        };
+        
+        const events: Event[] = []; 
+        (editedPlayer.rechargeHistory || []).forEach(r => events.push({ 
+            id: `rech-${r.id}`, 
+            originalId: r.id, 
+            date: r.date, 
+            type: 'recharge', 
+            amount: r.amount, 
+            desc: `充值 ${r.amount} 课时`, 
+            note: `赠予请假 ${r.quotaAdded}次` 
+        }));
+        
+        trainings.forEach(t => { 
+            const record = t.attendance?.find(r => r.playerId === editedPlayer.id); 
+            if (record && record.status !== 'Absent') { 
+                events.push({ 
+                    id: `train-${t.id}`, 
+                    date: t.date, 
+                    type: 'training', 
+                    status: record.status, 
+                    amount: 0, // 初始设为0，后续逻辑计算
+                    desc: `参加训练: ${t.title}` 
+                }); 
+            } 
+        });
+
+        // 核心扣费逻辑：按时间正序计算
+        events.sort((a, b) => a.date.localeCompare(b.date));
+        
+        let currentBalance = 0; 
+        let currentQuota = 0;
+        
+        const historyWithContext = events.map(e => { 
+            if (e.type === 'recharge') { 
+                currentBalance += e.amount;
+                // 查找该充值记录对应的赠予额度
+                const recharge = (editedPlayer.rechargeHistory || []).find(r => `rech-${r.id}` === e.id);
+                if (recharge) currentQuota += recharge.quotaAdded;
+            } else if (e.type === 'training') { 
+                if (e.status === 'Present') { 
+                    currentBalance -= 1; 
+                    e.amount = -1; 
+                    e.note = '扣除 1 课时';
+                } else if (e.status === 'Leave') { 
+                    if (currentQuota > 0) {
+                        currentQuota -= 1;
+                        e.amount = 0;
+                        e.note = '消耗赠予额度 (不计费)';
+                    } else {
+                        currentBalance -= 1;
+                        e.amount = -1;
+                        e.note = '额度已用尽，扣除 1 课时';
+                    }
+                } else {
+                    e.amount = 0;
+                    e.note = e.status === 'Injury' ? '伤停 (不计费)' : '';
+                }
+            } 
+            return { ...e, balanceAfter: currentBalance, quotaAfter: currentQuota }; 
+        });
+
+        const displayList = [...historyWithContext].reverse();
+        
         return (
-            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-20 md:pb-0"><div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10"><tr><th className="px-4 py-3">日期</th><th className="px-4 py-3">类型</th><th className="px-4 py-3">详情</th><th className="px-4 py-3 text-right">变动</th><th className="px-4 py-3 text-right">结余</th><th className="px-4 py-3 w-10"></th></tr></thead><tbody className="divide-y divide-gray-100">{displayList.map((item) => (<tr key={item.id} className="hover:bg-gray-50 group"><td className="px-4 py-3 whitespace-nowrap text-gray-600 font-mono text-xs">{item.date}</td><td className="px-4 py-3">{item.type === 'recharge' ? '充值' : item.status}</td><td className="px-4 py-3 text-gray-700">{item.desc}</td><td className={`px-4 py-3 text-right font-bold ${item.amount > 0 ? 'text-green-600' : item.amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>{item.amount > 0 ? `+${item.amount}` : item.amount}</td><td className="px-4 py-3 text-right font-mono font-bold text-gray-800">{item.balanceAfter}</td><td className="px-4 py-3 text-right">{item.type === 'recharge' && isDirector && (<button onClick={(e) => { e.stopPropagation(); if(item.originalId) handleDeleteRechargeAction(item.originalId); }} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1" title="删除记录"><Trash2 className="w-4 h-4" /></button>)}</td></tr>))}</tbody></table></div></div>
+            <div className="animate-in slide-in-from-right-4 duration-300 h-full flex flex-col pb-20 md:pb-0">
+                <div className="flex-1 overflow-y-auto custom-scrollbar border rounded-xl">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-gray-500 font-bold sticky top-0 z-10">
+                            <tr>
+                                <th className="px-4 py-3">日期</th>
+                                <th className="px-4 py-3">项目</th>
+                                <th className="px-4 py-3">扣费说明</th>
+                                <th className="px-4 py-3 text-right">课时变动</th>
+                                <th className="px-4 py-3 text-right">剩余课时</th>
+                                <th className="px-4 py-3 text-right">剩余额度</th>
+                                <th className="px-4 py-3 w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {displayList.map((item) => (
+                                <tr key={item.id} className="hover:bg-gray-50 group text-xs">
+                                    <td className="px-4 py-3 whitespace-nowrap text-gray-500 font-mono">{item.date}</td>
+                                    <td className="px-4 py-3">
+                                        <div className="font-bold text-gray-700">{item.type === 'recharge' ? '账户充值' : item.status === 'Present' ? '出勤' : item.status === 'Leave' ? '请假' : '伤停'}</div>
+                                        <div className="text-[10px] text-gray-400 truncate max-w-[150px]">{item.desc}</div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.type === 'recharge' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'}`}>
+                                            {item.note}
+                                        </span>
+                                    </td>
+                                    <td className={`px-4 py-3 text-right font-black ${item.amount > 0 ? 'text-green-600' : item.amount < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                                        {item.amount > 0 ? `+${item.amount}` : item.amount === 0 ? '-' : item.amount}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-mono font-black text-gray-800">{item.balanceAfter}</td>
+                                    <td className="px-4 py-3 text-right font-mono font-bold text-blue-600">{item.quotaAfter}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        {item.type === 'recharge' && isDirector && (
+                                            <button onClick={(e) => { e.stopPropagation(); if(item.originalId) handleDeleteRechargeAction(item.originalId); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         );
     };
 
@@ -770,7 +883,33 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
           </div>
           <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'overview', label: '概览', icon: Activity }, { id: 'technical', label: '技术', icon: Target }, { id: 'tactical', label: '战术', icon: Brain }, { id: 'physical', label: '身体', icon: Dumbbell }, { id: 'mental', label: '心理', icon: CheckSquare }, { id: 'reviews', label: '点评', icon: FileText }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
-             {activeTab === 'overview' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span><span className="font-bold">{editedPlayer.gender}</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{editedPlayer.age} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => setEditedPlayer({...editedPlayer, birthDate: e.target.value})} /> : <span className="font-bold font-mono">{editedPlayer.birthDate || '未录入'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">惯用脚</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.preferredFoot} onChange={e => setEditedPlayer({...editedPlayer, preferredFoot: e.target.value as any})}><option value="右">右脚</option><option value="左">左脚</option></select> : <span className="font-bold">{editedPlayer.preferredFoot}脚</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">昵称</span>{isEditing ? <input className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.nickname || ''} onChange={e => setEditedPlayer({...editedPlayer, nickname: e.target.value})} placeholder="选填" /> : <span className="font-bold">{editedPlayer.nickname || '-'}</span>}</div></div><div className="bg-gray-50 rounded-xl p-4 space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">体格信息</h4><div className="grid grid-cols-2 gap-4"><div className="flex items-center gap-3"><div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Ruler className="w-4 h-4" /></div><div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold">身高 (cm)</span>{isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.height || ''} onChange={e => setEditedPlayer({...editedPlayer, height: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.height || '-'}</span>}</div></div><div className="flex items-center gap-3"><div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Weight className="w-4 h-4" /></div><div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold">体重 (kg)</span>{isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.weight || ''} onChange={e => setEditedPlayer({...editedPlayer, weight: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.weight || '-'}</span>}</div></div></div></div><div className="bg-gray-50 rounded-xl p-4 space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">详细资料</h4><div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm"><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><CalendarDays className="w-3 h-3 mr-1"/> 入队时间</span>{isEditing ? <input type="date" className="p-1 border rounded text-xs bg-white" value={editedPlayer.joinDate || ''} onChange={e => setEditedPlayer({...editedPlayer, joinDate: e.target.value})} /> : (<div><span className="font-bold">{editedPlayer.joinDate || '-'}</span>{editedPlayer.joinDate && calculateTenure(editedPlayer.joinDate) && (<div className="text-[10px] text-bvb-black bg-bvb-yellow px-1.5 py-0.5 rounded w-max mt-1 font-bold">球龄: {calculateTenure(editedPlayer.joinDate)}</div>)}</div>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><School className="w-3 h-3 mr-1"/> 就读学校</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="学校名称" value={editedPlayer.school || ''} onChange={e => setEditedPlayer({...editedPlayer, school: e.target.value})} /> : <span className="font-bold truncate">{editedPlayer.school || '-'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><UserIcon className="w-3 h-3 mr-1"/> 家长姓名</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="姓名" value={editedPlayer.parentName || ''} onChange={e => setEditedPlayer({...editedPlayer, parentName: e.target.value})} /> : <span className="font-bold">{editedPlayer.parentName || '-'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><Phone className="w-3 h-3 mr-1"/> 联系方式</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="电话号码" value={editedPlayer.parentPhone || ''} onChange={e => setEditedPlayer({...editedPlayer, parentPhone: e.target.value})} /> : <span className="font-bold font-mono">{editedPlayer.parentPhone || '-'}</span>}</div></div></div></div><div className="w-full md:w-2/3 flex flex-col space-y-4"><div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-xl p-4 shadow-md flex justify-between items-center relative overflow-hidden"><div className="relative z-10"><p className="text-gray-400 text-xs uppercase font-bold mb-1">剩余课时 (Credits)</p><div className="flex items-baseline space-x-2"><h2 className={`text-4xl font-black ${editedPlayer.credits <= 5 ? 'text-red-400' : 'text-bvb-yellow'}`}>{editedPlayer.credits}</h2><span className="text-sm text-gray-400">节</span></div><div className="mt-2 flex items-center text-xs text-gray-400"><Clock className="w-3 h-3 mr-1" /> 有效期至: {editedPlayer.validUntil || 'N/A'}{isExpired(editedPlayer.validUntil) && <span className="text-red-400 font-bold ml-2">(已过期)</span>}</div></div></div><div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2"><h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name="能力" dataKey="A" stroke="#000000" strokeWidth={3} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div></div></div>)}
+             {activeTab === 'overview' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span><span className="font-bold">{editedPlayer.gender}</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{editedPlayer.age} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => setEditedPlayer({...editedPlayer, birthDate: e.target.value})} /> : <span className="font-bold font-mono">{editedPlayer.birthDate || '未录入'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">惯用脚</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.preferredFoot} onChange={e => setEditedPlayer({...editedPlayer, preferredFoot: e.target.value as any})}><option value="右">右脚</option><option value="左">左脚</option></select> : <span className="font-bold">{editedPlayer.preferredFoot}脚</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">昵称</span>{isEditing ? <input className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.nickname || ''} onChange={e => setEditedPlayer({...editedPlayer, nickname: e.target.value})} placeholder="选填" /> : <span className="font-bold">{editedPlayer.nickname || '-'}</span>}</div></div><div className="bg-gray-50 rounded-xl p-4 space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">体格信息</h4><div className="grid grid-cols-2 gap-4"><div className="flex items-center gap-3"><div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Ruler className="w-4 h-4" /></div><div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold">身高 (cm)</span>{isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.height || ''} onChange={e => setEditedPlayer({...editedPlayer, height: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.height || '-'}</span>}</div></div><div className="flex items-center gap-3"><div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Weight className="w-4 h-4" /></div><div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold">体重 (kg)</span>{isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.weight || ''} onChange={e => setEditedPlayer({...editedPlayer, weight: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.weight || '-'}</span>}</div></div></div></div><div className="bg-gray-50 rounded-xl p-4 space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">详细资料</h4><div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm"><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><CalendarDays className="w-3 h-3 mr-1"/> 入队时间</span>{isEditing ? <input type="date" className="p-1 border rounded text-xs bg-white" value={editedPlayer.joinDate || ''} onChange={e => setEditedPlayer({...editedPlayer, joinDate: e.target.value})} /> : (<div><span className="font-bold">{editedPlayer.joinDate || '-'}</span>{editedPlayer.joinDate && calculateTenure(editedPlayer.joinDate) && (<div className="text-[10px] text-bvb-black bg-bvb-yellow px-1.5 py-0.5 rounded w-max mt-1 font-bold">球龄: {calculateTenure(editedPlayer.joinDate)}</div>)}</div>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><School className="w-3 h-3 mr-1"/> 就读学校</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="学校名称" value={editedPlayer.school || ''} onChange={e => setEditedPlayer({...editedPlayer, school: e.target.value})} /> : <span className="font-bold truncate">{editedPlayer.school || '-'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><UserIcon className="w-3 h-3 mr-1"/> 家长姓名</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="姓名" value={editedPlayer.parentName || ''} onChange={e => setEditedPlayer({...editedPlayer, parentName: e.target.value})} /> : <span className="font-bold">{editedPlayer.parentName || '-'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><Phone className="w-3 h-3 mr-1"/> 联系方式</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="电话号码" value={editedPlayer.parentPhone || ''} onChange={e => setEditedPlayer({...editedPlayer, parentPhone: e.target.value})} /> : <span className="font-bold font-mono">{editedPlayer.parentPhone || '-'}</span>}</div></div></div></div><div className="w-full md:w-2/3 flex flex-col space-y-4">
+               {/* 课时余额卡片优化 */}
+               <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between gap-6 relative overflow-hidden">
+                  <div className="relative z-10 space-y-4">
+                      <div>
+                        <p className="text-gray-400 text-[10px] uppercase font-black tracking-widest mb-1">可用总课时 (Credits Balance)</p>
+                        <div className="flex items-baseline space-x-2">
+                            <h2 className={`text-5xl font-black ${editedPlayer.credits <= 5 ? 'text-red-400 animate-pulse' : 'text-bvb-yellow'}`}>{editedPlayer.credits}</h2>
+                            <span className="text-sm text-gray-400 font-bold">节</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center text-xs text-gray-400 gap-4">
+                          <span className="flex items-center"><Clock className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 有效期至: {editedPlayer.validUntil || 'N/A'}{isExpired(editedPlayer.validUntil) && <span className="text-red-400 font-bold ml-2">(已过期)</span>}</span>
+                      </div>
+                  </div>
+                  <div className="h-px md:h-20 md:w-px bg-white/10 shrink-0"></div>
+                  <div className="relative z-10 flex flex-col justify-center">
+                        <p className="text-gray-400 text-[10px] uppercase font-black tracking-widest mb-1">剩余赠予请假额度</p>
+                        <div className="flex items-baseline space-x-2">
+                            <h2 className={`text-4xl font-black ${editedPlayer.remainingLeaveQuota === 0 ? 'text-gray-500' : 'text-blue-400'}`}>{editedPlayer.remainingLeaveQuota}</h2>
+                            <span className="text-sm text-gray-400 font-bold">次</span>
+                        </div>
+                        <p className="text-[9px] text-gray-500 mt-2 italic">* 请假时优先扣除此额度，额度耗尽后扣除正常课时</p>
+                  </div>
+                  <Tag className="absolute -right-6 -bottom-6 w-32 h-32 text-white/5 rotate-12" />
+               </div>
+               <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2"><h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name="能力" dataKey="A" stroke="#000000" strokeWidth={3} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div></div></div>)}
              {activeTab === 'technical' && renderCategoryContent('technical')}
              {activeTab === 'tactical' && renderCategoryContent('tactical')}
              {activeTab === 'physical' && renderCategoryContent('physical')}
@@ -925,12 +1064,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const handleExportPlayerExcel = () => {
     setIsExportingExcel(true);
     try {
-        const headers = "姓名,号码,梯队,主位置,副位置,性别,身份证号,出生日期,年龄,入队时间,就读学校,家长姓名,家长电话,惯用脚,身高(cm),体重(kg),综合评分,出勤率(%),课时余额\n";
+        const headers = "姓名,号码,梯队,主位置,副位置,性别,身份证号,出生日期,年龄,入队时间,就读学校,家长姓名,家长电话,惯用脚,身高(cm),体重(kg),综合评分,出勤率(%),课时余额,剩余请假额度\n";
         const rows = filteredPlayers.map(p => {
             const teamName = teams.find(t => t.id === p.teamId)?.name || '待分配';
             const attRate = calculateAttendanceRate(p, trainings, 'year');
             const rating = getOverallRating(p);
-            return `"${p.name}",${p.number},"${teamName}","${p.position}","${p.secondaryPosition || '-'}","${p.gender}","'${p.idCard}",${p.birthDate || '-'},${p.age},${p.joinDate || '-'},"${p.school || '-'}","${p.parentName || '-'}","'${p.parentPhone || '-'}","${p.preferredFoot}脚",${p.height || '-'},${p.weight || '-'},${rating},${attRate},${p.credits}`;
+            return `"${p.name}",${p.number},"${teamName}","${p.position}","${p.secondaryPosition || '-'}","${p.gender}","'${p.idCard}",${p.birthDate || '-'},${p.age},${p.joinDate || '-'},"${p.school || '-'}","${p.parentName || '-'}","'${p.parentPhone || '-'}","${p.preferredFoot}脚",${p.height || '-'},${p.weight || '-'},${rating},${attRate},${p.credits},${p.remainingLeaveQuota}`;
         }).join('\n');
 
         const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -1007,6 +1146,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             validUntil: nextYear.toISOString().split('T')[0], 
             leaveQuota: 0, 
             leavesUsed: 0, 
+            remainingLeaveQuota: 0,
             rechargeHistory: [], 
             joinDate: newPlayer.joinDate || new Date().toISOString().split('T')[0], 
             school: newPlayer.school || '', 

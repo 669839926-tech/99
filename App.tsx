@@ -43,16 +43,39 @@ function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const isFirstRun = useRef(true);
 
-  // Derived Players: Calculate Credits on the fly
+  // Derived Players: 按时间轴模拟扣费逻辑
   const derivedPlayers = useMemo(() => {
       return players.map(p => {
-          let balance = 0;
-          if (p.rechargeHistory) balance += p.rechargeHistory.reduce((sum, r) => sum + r.amount, 0);
-          trainings.forEach(t => {
+          let runningCredits = (p.rechargeHistory || []).reduce((sum, r) => sum + r.amount, 0);
+          let runningLeaveQuota = (p.rechargeHistory || []).reduce((sum, r) => sum + (r.quotaAdded || 0), 0);
+          let usedLeaveQuota = 0;
+
+          // 按日期从早到晚排序训练记录
+          const chronoTrainings = [...trainings].sort((a, b) => a.date.localeCompare(b.date));
+
+          chronoTrainings.forEach(t => {
               const record = t.attendance?.find(r => r.playerId === p.id);
-              if (record && record.status === 'Present') balance -= 1;
+              if (record) {
+                  if (record.status === 'Present') {
+                      runningCredits -= 1;
+                  } else if (record.status === 'Leave') {
+                      if (runningLeaveQuota > 0) {
+                          runningLeaveQuota -= 1;
+                          usedLeaveQuota += 1;
+                      } else {
+                          runningCredits -= 1;
+                      }
+                  }
+                  // Injury 通常不扣费，维持现状
+              }
           });
-          return { ...p, credits: balance };
+
+          return { 
+              ...p, 
+              credits: runningCredits, 
+              remainingLeaveQuota: runningLeaveQuota,
+              leavesUsed: usedLeaveQuota
+          };
       });
   }, [players, trainings]);
 

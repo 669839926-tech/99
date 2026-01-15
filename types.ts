@@ -146,6 +146,7 @@ export interface Player {
   validUntil: string;
   leaveQuota: number;
   leavesUsed: number;
+  remainingLeaveQuota: number; // 剩余赠予请假额度
   rechargeHistory: RechargeRecord[];
   gallery?: PlayerPhoto[];
   // Growth Data

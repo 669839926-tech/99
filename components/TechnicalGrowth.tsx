@@ -404,7 +404,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                     <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase italic tracking-tighter">球员成长中心</h2>
                     <p className="text-gray-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest">Digital Performance Tracking & Analytics</p>
                 </div>
-                <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+                <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
                     <div className="flex items-center bg-white rounded-xl border p-1 shadow-sm shrink-0 flex-1 md:flex-none justify-between">
                         <button onClick={() => { if(viewMonth === 0) { setViewMonth(11); setViewYear(viewYear-1); } else setViewMonth(viewMonth-1); }} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><ChevronLeft className="w-4 h-4 md:w-5 md:h-5 text-gray-400" /></button>
                         <span className="px-2 md:px-4 font-black text-[11px] md:text-xs min-w-[70px] md:min-w-[90px] text-center">{viewYear}年{viewMonth + 1}月</span>
@@ -442,7 +442,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </div>
                                     <div className="mt-2 grid grid-cols-2 gap-2 max-h-[120px] md:max-h-[160px] overflow-y-auto custom-scrollbar p-1">
                                         {displayPlayers.filter(p => p.name.includes(jugglingSearch)).map(p => (
-                                            <button key={p.id} onClick={() => setJugglingPlayerId(p.id)} className={`p-1.5 md:p-2 rounded-xl border text-[10px] md:text-xs font-bold transition-all text-left truncate flex items-center gap-1.5 md:gap-2 ${jugglingPlayerId === p.id ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-lg' : 'bg-white text-gray-600 hover:border-bvb-yellow'}`}><img src={p.image} className="w-4 h-4 md:w-5 md:h-5 rounded-full object-cover" /><span className="truncate">{p.name}</span></button>
+                                            <button key={p.id} onClick={() => setJugglingPlayerId(p.id)} className={`p-1.5 md:p-2 rounded-xl border text-[10px] md:text-xs font-bold transition-all text-left truncate flex items-center gap-1.5 md:gap-2 ${jugglingPlayerId === p.id ? 'bg-bvb-black text-bvb-yellow text-bvb-black border-bvb-black shadow-lg' : 'bg-white text-gray-600 hover:border-bvb-yellow'}`}><img src={p.image} className="w-4 h-4 md:w-5 md:h-5 rounded-full object-cover" /><span className="truncate">{p.name}</span></button>
                                         ))}
                                     </div>
                                 </div>

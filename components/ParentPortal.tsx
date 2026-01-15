@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Player, Team, AttributeConfig, AttributeCategory, TrainingSession, TechTestDefinition, JugglingRecord, HomeTrainingLog } from '../types';
-import { User, LogOut, Activity, Calendar, Trophy, History, Clock, TrendingUp, Medal, Plus, Send, Target, ChevronLeft, ChevronRight, CheckCircle } from 'lucide-react';
+import { User, LogOut, Activity, Calendar, Trophy, History, Clock, TrendingUp, Medal, Plus, Send, Target, ChevronLeft, ChevronRight, CheckCircle, Tag } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 interface ParentPortalProps {
@@ -126,17 +126,16 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
                     )}
                     
                     {activeTab === 'overview' && (
-                        /* ... 档案概览保持原样 ... */
                         <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 animate-in slide-in-from-right-4">
                             <div className="flex flex-col md:flex-row gap-6 items-center">
                                 <img src={player.image} className="w-32 h-32 rounded-full border-4 border-bvb-yellow shadow-lg object-cover" />
                                 <div className="text-center md:text-left flex-1">
                                     <h2 className="text-3xl font-black text-gray-800">{player.name} <span className="text-sm font-bold text-gray-400 font-mono">#{player.number}</span></h2>
                                     <p className="text-gray-500 font-bold uppercase tracking-wider">{player.position} • {team?.name}</p>
-                                    <div className="mt-4 flex flex-wrap justify-center md:justify-start gap-4">
-                                        <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100"><p className="text-[9px] text-gray-400 font-black uppercase">本季进球</p><p className="text-xl font-black text-gray-800">{player.goals}</p></div>
-                                        <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100"><p className="text-[9px] text-gray-400 font-black uppercase">本季助攻</p><p className="text-xl font-black text-gray-800">{player.assists}</p></div>
-                                        <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100"><p className="text-[9px] text-gray-400 font-black uppercase">剩余课时</p><p className="text-xl font-black text-orange-600">{player.credits}</p></div>
+                                    <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-4">
+                                        <div className="bg-gray-50 px-5 py-3 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">可用课时</p><p className="text-2xl font-black text-bvb-black">{player.credits}</p></div>
+                                        <div className="bg-blue-50 px-5 py-3 rounded-2xl border border-blue-100 shadow-sm"><p className="text-[9px] text-blue-400 font-black uppercase tracking-widest mb-1">赠予请假额度</p><p className="text-2xl font-black text-blue-600">{player.remainingLeaveQuota}</p></div>
+                                        <div className="bg-gray-50 px-5 py-3 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">本季进球</p><p className="text-2xl font-black text-gray-800">{player.goals}</p></div>
                                     </div>
                                 </div>
                             </div>
