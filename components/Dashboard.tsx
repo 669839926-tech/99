@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
 import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle, Pencil } from 'lucide-react';
@@ -207,7 +208,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return { 
         nextMatch: matches.find(m => m.status === 'Upcoming'), 
-        totalPlayers: displayPlayers.length, 
+        // 核心更新：总计人数过滤掉待分配球员 (teamId === 'unassigned')
+        totalPlayers: displayPlayers.filter(p => p.teamId !== 'unassigned').length, 
         upcomingBirthdays, 
         lowCreditPlayers, 
         teamCounts, 

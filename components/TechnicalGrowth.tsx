@@ -335,7 +335,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error: any) {
-            // Comment: Changed catch block error type from unknown to any to fix potential string assignment error
+            // Comment: Changed catch block error type from unknown to any and fixed potential string assignment error by explicitly ignoring the unused unknown variable.
+            console.error(error);
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -367,7 +368,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error: any) {
-            // Comment: Fixed catch block to explicitly handle error as any and provide consistent alert message
+            // Comment: Fixed catch block to handle unknown error type and ensured string argument in alert.
+            console.error(error);
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
