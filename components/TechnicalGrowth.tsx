@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -334,8 +333,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const testName = techTests.find(t => t.id === selectedTestId)?.name || '技术测试';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
-        } catch (error: unknown) {
-            // Comment: Fixed catch block to explicitly handle error as unknown and provide consistent alert message
+        } catch (error: any) {
+            // Comment: Fixed catch block to use 'any' to ensure 'alert' can be called without type casting issues on 'unknown' error objects.
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -366,8 +365,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch (error: unknown) {
-            // Comment: Fixed catch block to explicitly handle error as unknown and provide consistent alert message
+        } catch (error: any) {
+            // Comment: Fixed catch block to use 'any' to ensure 'alert' can be called without type casting issues on 'unknown' error objects.
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -534,7 +533,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: unknown) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="home-training-team-pdf">
