@@ -444,10 +444,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (groups[status]) groups[status].push(p);
         else groups['Absent'].push(p);
     });
+
+    const detailedRecord = exportSessionsData.find(s => s.id === selectedSessionId);
+
     return (
         <div className="space-y-4 md:space-y-6 animate-in slide-in-from-right-4">
             <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                <button onClick={() => setSelectedSessionId(null)} className="p-1.5 hover:bg-gray-100 rounded-full flex items-center justify-center"><ChevronDown className="w-5 h-5 text-gray-500 rotate-90" /></button>
+                <button onClick={() => setSelectedSessionId(null)} className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"><ChevronDown className="w-5 h-5 text-gray-600 rotate-90" /></button>
                 <div>
                     <h3 className="text-base md:text-lg font-black text-gray-800 leading-tight">{session.title}</h3>
                     <div className="flex flex-wrap items-center text-[10px] text-gray-500 gap-2 mt-1">
@@ -457,6 +460,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* 统计指标卡片 */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 {Object.entries(groups).map(([status, members]) => (
                     <div key={status} className="bg-white rounded-xl p-3 md:p-4 border border-gray-100 flex flex-col shadow-sm">
@@ -465,12 +470,39 @@ const Dashboard: React.FC<DashboardProps> = ({
                              {status === 'Present' ? '实到' : status === 'Leave' ? '请假' : status === 'Injury' ? '伤停' : '缺席'} ({members.length})
                         </span>
                         <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[150px] md:max-h-[200px] custom-scrollbar">
-                            {members.map(p => <div key={p.id} className="text-[10px] md:text-xs font-bold text-gray-600 bg-gray-50 p-1.5 rounded truncate">{p.name}</div>)}
-                            {members.length === 0 && <div className="text-[9px] text-gray-300 italic">无人员</div>}
+                            {members.map(p => <div key={p.id} className="text-[10px] md:text-[11px] font-bold text-gray-600 bg-gray-50 p-2 rounded truncate border border-transparent hover:border-gray-200 transition-colors">#{p.number} {p.name}</div>)}
+                            {members.length === 0 && <div className="text-[9px] text-gray-300 italic py-2">无人员记录</div>}
                         </div>
                     </div>
                 ))}
             </div>
+
+            {/* 详细文字报表区 (增强移动端展示) */}
+            {detailedRecord && (
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-4 shadow-inner">
+                    <h4 className="font-black text-xs md:text-sm text-gray-500 uppercase tracking-widest border-b border-gray-200 pb-2">本场名单详细报表 (Detailed Report)</h4>
+                    <div className="space-y-3">
+                        <div>
+                            <p className="text-[9px] font-black text-green-600 uppercase mb-1 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 实到球员名单</p>
+                            <p className="text-[10px] md:text-xs text-gray-700 leading-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.presentNames}</p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <p className="text-[9px] font-black text-yellow-600 uppercase mb-1 flex items-center"><Clock className="w-3 h-3 mr-1"/> 请假名单</p>
+                                <p className="text-[10px] md:text-xs text-gray-700 leading-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.leaveNames}</p>
+                            </div>
+                            <div>
+                                <p className="text-[9px] font-black text-red-600 uppercase mb-1 flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> 伤停名单</p>
+                                <p className="text-[10px] md:text-xs text-gray-700导致-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.injuryNames}</p>
+                            </div>
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1 flex items-center"><Ban className="w-3 h-3 mr-1"/> 缺席/未登记名单</p>
+                            <p className="text-[10px] md:text-xs text-gray-400 italic leading-relaxed bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.absentNames}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
   };
@@ -568,7 +600,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">数据更新</span>
-                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.stats}</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600导致-none">{pendingTasks.stats}</span>
                         </div>
                         <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志</span>
@@ -661,7 +693,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
-                <div className="p-3 md:p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <div className="p-3 md:p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
                     <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center italic uppercase tracking-tighter"><Megaphone className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
                     {isDirector && (
                         <button onClick={() => setShowAnnounceForm(!showAnnounceForm)} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 md:px-3 py-1.5 rounded-lg font-black transition-all hover:bg-gray-100 active:scale-95 shadow-sm">
@@ -857,10 +889,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <table className="w-full text-left">
                                     <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 border-b">
                                         <tr>
-                                            <th className="px-3 py-3 md:px-4">日期/梯队</th>
-                                            <th className="px-3 py-3 md:px-4">训练主题</th>
-                                            <th className="px-3 py-3 md:px-4">应到/实到</th>
-                                            <th className="px-3 py-3 md:px-4">到课率</th>
+                                            <th className="px-2 py-3 md:px-4">日期/梯队</th>
+                                            <th className="px-2 py-3 md:px-4">训练主题</th>
+                                            <th className="px-2 py-3 md:px-4">应到/实到</th>
+                                            <th className="px-2 py-3 md:px-4">到课率</th>
                                             <th className="px-2 py-3 text-center text-yellow-600">假</th>
                                             <th className="px-2 py-3 text-center text-red-600">伤</th>
                                             <th className="px-2 py-3 text-center text-gray-400">缺</th>
@@ -868,19 +900,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportSessionsData.map(s => (
-                                            <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50/30 cursor-pointer transition-colors text-[11px] md:text-sm">
-                                                <td className="px-3 py-3 md:px-4">
-                                                    <div className="font-mono text-[9px] text-gray-400 leading-none">{s.date}</div>
-                                                    <div className="font-black text-gray-600 text-[10px] mt-1 uppercase tracking-tighter">{s.teamName}</div>
+                                            <tr key={s.id} onClick={() => setSelectedSessionId(s.id)} className="hover:bg-yellow-50/30 cursor-pointer transition-colors text-[10px] md:text-sm">
+                                                <td className="px-2 py-3 md:px-4">
+                                                    <div className="font-mono text-[8px] md:text-[9px] text-gray-400 leading-none">{s.date}</div>
+                                                    <div className="font-black text-gray-600 text-[9px] md:text-[10px] mt-1 uppercase tracking-tighter">{s.teamName}</div>
                                                 </td>
-                                                <td className="px-3 py-3 md:px-4 font-bold text-gray-800 truncate max-w-[80px] md:max-w-none">{s.title}</td>
-                                                <td className="px-3 py-3 md:px-4 font-mono text-[10px] text-gray-500">{s.total} / <span className="font-black text-green-600">{s.present}</span></td>
-                                                <td className="px-3 py-3 md:px-4">
-                                                    <div className="flex items-center gap-1.5 md:gap-2">
-                                                        <div className="w-8 md:w-16 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                <td className="px-2 py-3 md:px-4 font-bold text-gray-800 truncate max-w-[70px] md:max-w-none">{s.title}</td>
+                                                <td className="px-2 py-3 md:px-4 font-mono text-[9px] md:text-[10px] text-gray-500 whitespace-nowrap">{s.total}/<span className="font-black text-green-600">{s.present}</span></td>
+                                                <td className="px-2 py-3 md:px-4">
+                                                    <div className="flex items-center gap-1 md:gap-2">
+                                                        <div className="w-6 md:w-16 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
                                                             <div className="h-full bg-bvb-black rounded-full" style={{ width: `${s.rate}%` }}></div>
                                                         </div>
-                                                        <span className="text-[10px] font-black tabular-nums">{s.rate}%</span>
+                                                        <span className="text-[9px] md:text-[10px] font-black tabular-nums">{s.rate}%</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-3 text-center font-black text-yellow-600 tabular-nums">{s.leave}</td>
@@ -892,29 +924,37 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </table>
                             </div>
                             
-                            <div className="mt-8 space-y-6 hidden md:block">
-                                <h4 className="font-black text-xs md:text-sm text-gray-500 uppercase tracking-widest border-b pb-2">课次考勤名单明细 (详细报表)</h4>
+                            {/* 详细文字报表区 (移动端同步可见) */}
+                            <div className="mt-8 space-y-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <h4 className="font-black text-xs md:text-sm text-gray-500 uppercase tracking-widest">课次考勤名单明细 (详细报表)</h4>
+                                    <div className="h-px flex-1 bg-gray-100"></div>
+                                </div>
                                 <div className="space-y-4">
                                     {exportSessionsData.map(s => (
-                                        <div key={s.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                        <div key={s.id} onClick={() => setSelectedSessionId(s.id)} className={`p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md ${selectedSessionId === s.id ? 'bg-yellow-50 border-bvb-yellow' : 'bg-gray-50 border-gray-100'}`}>
                                             <div className="flex justify-between items-center mb-3">
-                                                <span className="font-black text-xs md:text-sm text-gray-800">{s.date} - {s.title}</span>
-                                                <span className="text-[10px] font-bold text-gray-400">{s.teamName}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <div className={`w-2 h-2 rounded-full ${s.rate >= 90 ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
+                                                    <span className="font-black text-xs md:text-sm text-gray-800">{s.date} - {s.title}</span>
+                                                </div>
+                                                <span className="text-[9px] md:text-[10px] font-bold text-gray-400 uppercase">{s.teamName}</span>
                                             </div>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div className="space-y-1">
-                                                    <p className="text-[9px] font-black text-green-600 uppercase">实到球员 ({s.present})</p>
-                                                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold">{s.presentNames}</p>
+                                                    <p className="text-[8px] md:text-[9px] font-black text-green-600 uppercase flex items-center"><CheckCircle className="w-2.5 h-2.5 mr-1"/> 实到球员 ({s.present})</p>
+                                                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold bg-white/50 p-2 rounded border border-gray-100/50">{s.presentNames}</p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <p className="text-[9px] font-black text-yellow-600 uppercase">请假/伤停球员 ({s.leave + s.injury})</p>
-                                                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold">
+                                                    <p className="text-[8px] md:text-[9px] font-black text-yellow-600 uppercase flex items-center"><Clock className="w-2.5 h-2.5 mr-1"/> 请假/伤停 ({s.leave + s.injury})</p>
+                                                    <p className="text-[10px] text-gray-600 leading-relaxed font-bold bg-white/50 p-2 rounded border border-gray-100/50">
+                                                        {/* Comment: Use loop variable 's' directly as 'detailedRecord' is out of scope here */}
                                                         请假：{s.leaveNames} | 伤停：{s.injuryNames}
                                                     </p>
                                                 </div>
                                                 <div className="col-span-1 md:col-span-2 space-y-1 border-t border-gray-200/50 pt-2">
-                                                    <p className="text-[9px] font-black text-gray-400 uppercase">缺席/未记球员 ({s.absent})</p>
-                                                    <p className="text-[10px] text-gray-400 italic leading-relaxed">{s.absentNames}</p>
+                                                    <p className="text-[8px] md:text-[9px] font-black text-gray-400 uppercase flex items-center"><Ban className="w-2.5 h-2.5 mr-1"/> 缺席/未记人员 ({s.absent})</p>
+                                                    <p className="text-[10px] text-gray-400 italic leading-relaxed px-2">{s.absentNames}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -932,35 +972,35 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <table className="w-full text-left border-collapse">
                                     <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 sticky top-0 z-10 border-b">
                                         <tr>
-                                            <th className="px-3 py-3 md:px-4">球员</th>
-                                            <th className="px-3 py-3 md:px-4">总场次</th>
-                                            <th className="px-3 py-3 md:px-4">参训率</th>
-                                            <th className="px-2 py-3 text-center text-green-600">到</th>
-                                            <th className="px-2 py-3 text-center text-yellow-600">假</th>
-                                            <th className="px-2 py-3 text-center text-red-600">伤</th>
-                                            <th className="px-2 py-3 text-center text-gray-400">缺</th>
-                                            {isDirector && <th className="px-3 py-3 md:px-4 text-right">余额</th>}
+                                            <th className="px-2 py-3 md:px-4">球员</th>
+                                            <th className="px-1 py-3 md:px-4">总场</th>
+                                            <th className="px-2 py-3 md:px-4">参训率</th>
+                                            <th className="px-1 py-3 text-center text-green-600">到</th>
+                                            <th className="px-1 py-3 text-center text-yellow-600">假</th>
+                                            <th className="px-1 py-3 text-center text-red-600">伤</th>
+                                            <th className="px-1 py-3 text-center text-gray-400">缺</th>
+                                            {isDirector && <th className="px-2 py-3 md:px-4 text-right">余额</th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {exportPlayersData.map(p => (
-                                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors text-[11px] md:sm">
-                                                <td className="px-3 py-3 md:px-4 font-black text-gray-800 truncate max-w-[60px] md:max-w-none">{p.name}</td>
-                                                <td className="px-3 py-3 md:px-4 font-mono text-[10px] text-gray-500">{p.total}</td>
-                                                <td className="px-3 py-3 md:px-4">
-                                                    <div className="flex items-center gap-1.5 md:gap-2">
-                                                        <div className="flex-1 min-w-[30px] md:min-w-[80px] h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors text-[10px] md:text-sm">
+                                                <td className="px-2 py-3 md:px-4 font-black text-gray-800 truncate max-w-[60px] md:max-w-none">{p.name}</td>
+                                                <td className="px-1 py-3 md:px-4 font-mono text-[9px] md:text-[10px] text-gray-500">{p.total}</td>
+                                                <td className="px-2 py-3 md:px-4">
+                                                    <div className="flex items-center gap-1 md:gap-2">
+                                                        <div className="flex-1 min-w-[25px] md:min-w-[80px] h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                                             <div className="h-full bg-bvb-black rounded-full" style={{ width: `${p.rate}%` }}></div>
                                                         </div>
-                                                        <span className="text-[10px] font-black tabular-nums">{p.rate}%</span>
+                                                        <span className="text-[9px] md:text-[10px] font-black tabular-nums">{p.rate}%</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-3 text-center font-black text-green-600 tabular-nums">{p.present}</td>
-                                                <td className="px-2 py-3 text-center font-black text-yellow-600 tabular-nums">{p.leave}</td>
-                                                <td className="px-2 py-3 text-center font-black text-red-600 tabular-nums">{p.injury}</td>
-                                                <td className="px-2 py-3 text-center font-black text-gray-300 tabular-nums">{p.absent}</td>
+                                                <td className="px-1 py-3 text-center font-black text-green-600 tabular-nums">{p.present}</td>
+                                                <td className="px-1 py-3 text-center font-black text-yellow-600 tabular-nums">{p.leave}</td>
+                                                <td className="px-1 py-3 text-center font-black text-red-600 tabular-nums">{p.injury}</td>
+                                                <td className="px-1 py-3 text-center font-black text-gray-300 tabular-nums">{p.absent}</td>
                                                 {isDirector && (
-                                                    <td className="px-3 py-3 md:px-4 text-right font-black tabular-nums" style={{ color: p.credits <= 2 ? '#ef4444' : '#1f2937' }}>
+                                                    <td className="px-2 py-3 md:px-4 text-right font-black tabular-nums" style={{ color: p.credits <= 2 ? '#ef4444' : '#1f2937' }}>
                                                         {p.credits}
                                                     </td>
                                                 )}

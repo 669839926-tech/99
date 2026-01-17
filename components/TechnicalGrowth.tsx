@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -333,7 +334,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         // Comment: Added optional chaining to techTests to avoid potential type issues
         const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测试';
         try {
-            await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
+            // Comment: Cast testName and testEntryDate to string explicitly to resolve "unknown" type error in construction of template literal.
+            await exportToPDF('tech-test-report-pdf', `${String(testName)}_测评报告_${String(testEntryDate)}`);
         } catch (error: any) {
             // Comment: Changed catch block error type from unknown to any and fixed potential string assignment error by explicitly ignoring the unused unknown variable.
             console.error(error);
