@@ -60,12 +60,8 @@ function App() {
               }
           });
 
-          // 核心优化：按日期从早到晚排序。若日期相同，充值排在训练之前，确保当天充值的额度能立刻生效
-          events.sort((a, b) => {
-              const dateCompare = a.date.localeCompare(b.date);
-              if (dateCompare !== 0) return dateCompare;
-              return a.type === 'recharge' ? -1 : 1;
-          });
+          // 按日期从早到晚排序
+          events.sort((a, b) => a.date.localeCompare(b.date));
 
           let runningCredits = 0;
           let runningLeaveQuota = 0;
@@ -74,7 +70,7 @@ function App() {
           events.forEach(e => {
               if (e.type === 'recharge') {
                   runningCredits += e.amount || 0;
-                  // 规则实现：请假次数不累计，直接更新为最新一次充值的额度（覆盖旧值）
+                  // 核心更新：请假次数不累计，而是更新为最新一次充值的额度
                   runningLeaveQuota = e.quota || 0;
               } else if (e.type === 'training') {
                   if (e.status === 'Present') {
