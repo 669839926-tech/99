@@ -38,7 +38,6 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
 
     const handleAddHomeLog = () => {
         if (homeTitle.trim()) {
-            // 每日打卡限制核心逻辑
             const alreadyDone = (player.homeTrainingLogs || []).some(l => l.date === homeDate);
             if (alreadyDone) {
                 alert(`当日（${homeDate}）已完成打卡记录。球员每日仅限打卡一次，请保持规律训练！`);
@@ -82,8 +81,6 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
                 <div className="max-w-5xl mx-auto space-y-6">
                     {activeTab === 'growth' && (
                         <div className="space-y-6 animate-in slide-in-from-right-4">
-                            
-                            {/* Monthly Count Card */}
                             <div className="bg-bvb-black text-white p-6 rounded-3xl shadow-xl flex items-center justify-between overflow-hidden relative">
                                 <div>
                                     <p className="text-bvb-yellow text-[10px] font-black uppercase tracking-widest mb-1">本月居家达标</p>
@@ -99,7 +96,6 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Juggling Entry */}
                                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
                                     <h3 className="font-bold text-gray-800 mb-4 flex items-center uppercase tracking-widest text-xs"><Medal className="w-5 h-5 mr-2 text-bvb-yellow" /> 颠球挑战录入</h3>
                                     <div className="space-y-3">
@@ -111,7 +107,6 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
                                     </div>
                                 </div>
 
-                                {/* Home Training Entry (Simplified) */}
                                 <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
                                     <h3 className="font-bold text-gray-800 mb-4 flex items-center uppercase tracking-widest text-xs"><Activity className="w-5 h-5 mr-2 text-bvb-yellow" /> 居家训练打卡</h3>
                                     <div className="space-y-3">
@@ -134,7 +129,11 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConf
                                     <p className="text-gray-500 font-bold uppercase tracking-wider">{player.position} • {team?.name}</p>
                                     <div className="mt-6 flex flex-wrap justify-center md:justify-start gap-4">
                                         <div className="bg-gray-50 px-5 py-3 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">可用课时</p><p className="text-2xl font-black text-bvb-black">{player.credits}</p></div>
-                                        <div className="bg-blue-50 px-5 py-3 rounded-2xl border border-blue-100 shadow-sm"><p className="text-[9px] text-blue-400 font-black uppercase tracking-widest mb-1">赠予请假额度</p><p className="text-2xl font-black text-blue-600">{player.remainingLeaveQuota}</p></div>
+                                        <div className="bg-blue-50 px-5 py-3 rounded-2xl border border-blue-100 shadow-sm">
+                                            <p className="text-[9px] text-blue-400 font-black uppercase tracking-widest mb-1">最新赠予请假额度</p>
+                                            <p className="text-2xl font-black text-blue-600">{player.remainingLeaveQuota}</p>
+                                            <p className="text-[7px] text-blue-400/60 mt-1 font-bold">* 充值后额度将更新重置</p>
+                                        </div>
                                         <div className="bg-gray-50 px-5 py-3 rounded-2xl border border-gray-100 shadow-sm"><p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mb-1">本季进球</p><p className="text-2xl font-black text-gray-800">{player.goals}</p></div>
                                     </div>
                                 </div>

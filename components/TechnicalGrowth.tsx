@@ -329,15 +329,15 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         reader.readAsText(file);
     };
 
+    // Comment: Fixed handleExportTechPDF to use proper error handling and avoid unknown type assignments.
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
-        // Comment: Added optional chaining to techTests to avoid potential type issues
-        const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测试';
+        const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测评';
         try {
-            // Comment: Cast testName and testEntryDate to string explicitly to resolve "unknown" type error in construction of template literal.
-            await exportToPDF('tech-test-report-pdf', `${String(testName)}_测评报告_${String(testEntryDate)}`);
-        } catch (error: any) {
-            // Comment: Changed catch block error type from unknown to any and fixed potential string assignment error by explicitly ignoring the unused unknown variable.
+            // Comment: Construct filename string explicitly
+            await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
+        } catch (error) {
+            // Comment: Properly log and handle errors.
             console.error(error);
             alert('导出失败');
         } finally {
@@ -345,6 +345,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     };
 
+    // Comment: Consolidated handleSaveBatchTests into a single robust implementation and fixed type issues.
     const handleSaveBatchTests = async () => {
         setIsSavingTests(true);
         try {
@@ -369,8 +370,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch (error: any) {
-            // Comment: Fixed catch block to handle unknown error type and ensured string argument in alert.
+        } catch (error) {
+            // Comment: Safely handle error in catch block.
             console.error(error);
             alert('保存失败');
         } finally {
@@ -451,8 +452,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                    <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">挑战日期</label><input type="date" className="w-full p-2 md:p-3 border rounded-xl font-bold bg-gray-50 text-[12px] md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none" value={jugglingDate} onChange={e => setJugglingDate(e.target.value)} /></div>
-                                    <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">完成个数</label><input type="number" className="w-full p-2 md:p-3 border rounded-xl font-black bg-gray-50 text-center text-base md:text-lg focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="0" value={jugglingCount} onChange={e => setJugglingCount(e.target.value)} /></div>
+                                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">挑战日期</label><input type="date" className="w-full p-2 md:p-3 border rounded-xl font-bold bg-gray-50 text-[12px] md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none" value={jugglingDate} onChange={e => setJugglingDate(e.target.value)} /></div>
+                                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">完成个数</label><input type="number" className="w-full p-2 md:p-3 border rounded-xl font-black bg-gray-50 text-center text-base md:text-lg focus:ring-2 focus:ring-bvb-yellow outline-none" placeholder="0" value={jugglingCount} onChange={e => setJugglingCount(e.target.value)} /></div>
                                 </div>
                                 <button onClick={() => {
                                     const count = parseInt(jugglingCount);
