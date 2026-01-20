@@ -43,22 +43,43 @@ function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const isFirstRun = useRef(true);
 
-  // Derived Players: 按时间轴模拟扣费逻辑
+  // Derived Players: 按时间轴模拟扣费逻辑，请假额度在充值时更新而非累加
   const derivedPlayers = useMemo(() => {
       return players.map(p => {
-          let runningCredits = (p.rechargeHistory || []).reduce((sum, r) => sum + r.amount, 0);
-          let runningLeaveQuota = (p.rechargeHistory || []).reduce((sum, r) => sum + (r.quotaAdded || 0), 0);
+          // 构建该球员的所有财务/考勤事件流
+          const events: { type: 'recharge' | 'training', date: string, amount?: number, quota?: number, status?: string }[] = [];
+          
+          (p.rechargeHistory || []).forEach(r => {
+              events.push({ type: 'recharge', date: r.date, amount: r.amount, quota: r.quotaAdded });
+          });
+
+          trainings.forEach(t => {
+              const record = t.attendance?.find(att => att.playerId === p.id);
+              if (record && record.status !== 'Absent') {
+                  events.push({ type: 'training', date: t.date, status: record.status });
+              }
+          });
+
+          // 核心优化：按日期从早到晚排序。若日期相同，充值排在训练之前，确保当天充值的额度能立刻生效
+          events.sort((a, b) => {
+              const dateCompare = a.date.localeCompare(b.date);
+              if (dateCompare !== 0) return dateCompare;
+              return a.type === 'recharge' ? -1 : 1;
+          });
+
+          let runningCredits = 0;
+          let runningLeaveQuota = 0;
           let usedLeaveQuota = 0;
 
-          // 按日期从早到晚排序训练记录
-          const chronoTrainings = [...trainings].sort((a, b) => a.date.localeCompare(b.date));
-
-          chronoTrainings.forEach(t => {
-              const record = t.attendance?.find(r => r.playerId === p.id);
-              if (record) {
-                  if (record.status === 'Present') {
+          events.forEach(e => {
+              if (e.type === 'recharge') {
+                  runningCredits += e.amount || 0;
+                  // 规则实现：请假次数不累计，直接更新为最新一次充值的额度（覆盖旧值）
+                  runningLeaveQuota = e.quota || 0;
+              } else if (e.type === 'training') {
+                  if (e.status === 'Present') {
                       runningCredits -= 1;
-                  } else if (record.status === 'Leave') {
+                  } else if (e.status === 'Leave') {
                       if (runningLeaveQuota > 0) {
                           runningLeaveQuota -= 1;
                           usedLeaveQuota += 1;
@@ -66,7 +87,7 @@ function App() {
                           runningCredits -= 1;
                       }
                   }
-                  // Injury 通常不扣费，维持现状
+                  // Injury 状态通常不计费也不扣除额度
               }
           });
 
@@ -200,7 +221,7 @@ function App() {
       setPlayers(prev => prev.map(p => {
           if (p.id === playerId) {
               const newRecord: RechargeRecord = { id: Date.now().toString(), date: todayStr, amount, quotaAdded: leaveQuota };
-              return { ...p, validUntil: nextYearStr, leaveQuota, leavesUsed: 0, rechargeHistory: [...(p.rechargeHistory || []), newRecord] };
+              return { ...p, validUntil: nextYearStr, rechargeHistory: [...(p.rechargeHistory || []), newRecord] };
           }
           return p;
       }));
@@ -213,7 +234,7 @@ function App() {
       setPlayers(prev => prev.map(p => {
           if (playerIds.includes(p.id)) {
               const newRecord: RechargeRecord = { id: Date.now().toString() + Math.random().toString(36).substr(2, 5), date: todayStr, amount, quotaAdded: leaveQuota };
-              return { ...p, validUntil: nextYearStr, leaveQuota, leavesUsed: 0, rechargeHistory: [...(p.rechargeHistory || []), newRecord] };
+              return { ...p, validUntil: nextYearStr, rechargeHistory: [...(p.rechargeHistory || []), newRecord] };
           }
           return p;
       }));

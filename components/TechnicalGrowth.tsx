@@ -1,19 +1,8 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Cell, AreaChart, Area } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
-
-interface TechnicalGrowthProps {
-    players: Player[];
-    teams: Team[];
-    currentUser: User | null;
-    techTests?: TechTestDefinition[];
-    onUpdatePlayer: (player: Player) => void;
-    onUpdateTechTests?: (tests: TechTestDefinition[]) => void;
-    appLogo?: string;
-}
 
 const getMondayOfCurrentWeek = () => {
     const today = new Date();
@@ -331,13 +320,14 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
-        // Comment: Added optional chaining to techTests to avoid potential type issues
-        const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测试';
+        // Comment: Explicitly handle test name retrieval and potential undefined values
+        const selectedTest = techTests?.find(t => t.id === selectedTestId);
+        const testName = selectedTest?.name || '技术测试';
         try {
-            // Comment: Cast testName and testEntryDate to string explicitly to resolve "unknown" type error in construction of template literal.
+            // Comment: Ensure all parts of the filename are treated as strings to fix TS 'unknown' to 'string' assignment issues.
             await exportToPDF('tech-test-report-pdf', `${String(testName)}_测评报告_${String(testEntryDate)}`);
         } catch (error: any) {
-            // Comment: Changed catch block error type from unknown to any and fixed potential string assignment error by explicitly ignoring the unused unknown variable.
+            // Comment: Catch error as 'any' to avoid 'unknown' assignability issues in console and alert.
             console.error(error);
             alert('导出失败');
         } finally {
@@ -370,7 +360,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error: any) {
-            // Comment: Fixed catch block to handle unknown error type and ensured string argument in alert.
+            // Comment: Handle error as 'any' to prevent 'unknown' to 'string' errors when notifying user.
             console.error(error);
             alert('保存失败');
         } finally {
@@ -538,7 +528,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error) { console.error(error); alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="home-training-team-pdf">
@@ -584,7 +574,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                     <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
                         <div className="flex items-center gap-3"><h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><Gauge className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 技术测评录入</h3>
-                            <select value={selectedTestId} onChange={e => setSelectedTestId(e.target.value)} className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none">{techTests.length === 0 ? <option value="">请先配置测试项</option> : <><option value="">-- 选择测试项目 --</option>{techTests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.unit})</option>)}</>}</select>
+                            <select value={selectedTestId} onChange={e => setSelectedTestId(e.target.value)} className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none">{(techTests || []).length === 0 ? <option value="">请先配置测试项</option> : <><option value="">-- 选择测试项目 --</option>{techTests.map(t => <option key={t.id} value={t.id}>{t.name} ({t.unit})</option>)}</>}</select>
                         </div>
                         <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
                             <input type="date" className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" value={testEntryDate} onChange={e => setTestEntryDate(e.target.value)} />
@@ -639,7 +629,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </tbody>
                                 </table>
                             </div>
-                            <div className="p-6 bg-gray-50 border-t flex justify-end shrink-0"><button onClick={handleSaveBatchTests} disabled={isSavingTests || Object.keys(testScores).length === 0} className="px-10 py-3 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 uppercase italic text-sm">{isSavingTests ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Save Results</button></div>
+                            <div className="p-6 bg-gray-50 border-t flex justify-end shrink-0"><button onClick={handleSaveBatchTests} disabled={isSavingTests || Object.keys(testScores).length === 0} className="px-10 py-3 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl disabled:opacity-30 flex items-center justify-center gap-2 uppercase italic text-sm">{isSavingTests ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />} Save Results</button></div>
                         </div>
                     ) : (
                         <div className="bg-white rounded-3xl p-12 md:p-20 text-center border border-gray-100 shadow-sm flex flex-col items-center">
