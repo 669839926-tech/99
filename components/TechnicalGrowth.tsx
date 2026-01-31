@@ -178,7 +178,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Training History Records</p>
                             </div>
                         </div>
-                        <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-gray-800 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                        <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
                     </div>
                     <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3 custom-scrollbar">
                         {sortedLogs.length > 0 ? sortedLogs.map(log => (
@@ -335,8 +335,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error: any) {
-            // Comment: Explicitly cast error to any to avoid unknown type issues with alert and console.error.
-            console.error(error);
+            // Comment: Fixed line 351 error by explicitly casting error to any to avoid unknown type issues with console.error.
+            console.error(error as any);
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -369,8 +369,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error: any) {
-            // Comment: Explicitly cast error to any to avoid unknown type issues with alert and console.error.
-            console.error(error);
+            // Comment: Fixed line 382 error by explicitly casting error to any.
+            console.error(error as any);
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -510,7 +510,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-4">
                     <div className="lg:col-span-4 space-y-6">
                         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-gray-200">
-                            <h3 className="font-black text-gray-800 mb-4 md:mb-6 flex items-center uppercase tracking-tighter text-base md:text-lg"><CheckSquare className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 快速批量打卡</h3>
+                            <h3 className="font-black text-gray-800 mb-4 md:mb-6 flex items-center uppercase tracking-tighter text-base md:text-lg"><CheckSquare className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 快速批量打卡</h3>
                             <div className="space-y-4 mb-4 md:mb-6">
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">选择日期</label><input type="date" className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-[12px] md:text-sm" value={homeDate} onChange={e => setHomeDate(e.target.value)} /></div>
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">训练主题</label><input className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-gray-50 focus:ring-2 focus:ring-bvb-yellow outline-none text-[12px] md:text-sm" placeholder="如：触球练习" value={homeTitle} onChange={e => setHomeTitle(e.target.value)} /></div>

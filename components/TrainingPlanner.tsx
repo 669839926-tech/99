@@ -26,6 +26,13 @@ interface TrainingPlannerProps {
 type TimeScope = 'month' | 'quarter' | 'year';
 type ViewType = 'calendar' | 'list' | 'periodization';
 
+// 辅助函数：确保日期字符串按本地时间解析，修复 31 号等边界日期显示问题
+const parseLocalDate = (dateStr: string) => {
+    if (!dateStr) return new Date();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
 interface WeeklyPlanEditorProps {
     week: WeeklyPlan;
     onSave: (week: WeeklyPlan) => void;
@@ -503,21 +510,25 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
       if (timeScope === 'month') {
           startDate = new Date(year, month, 1);
-          endDate = new Date(year, month + 1, 0);
+          // 修正：将结束时间设为该月最后一天的深夜，确保 31 号包含在内
+          endDate = new Date(year, month + 1, 0, 23, 59, 59);
           label = `${year}年 ${month + 1}月`;
       } else if (timeScope === 'quarter') {
           const quarterStartMonth = Math.floor(month / 3) * 3;
           startDate = new Date(year, quarterStartMonth, 1);
-          endDate = new Date(year, quarterStartMonth + 3, 0);
+          // 修正：将结束时间设为该季度最后一天的深夜
+          endDate = new Date(year, quarterStartMonth + 3, 0, 23, 59, 59);
           label = `${year}年 Q${Math.floor(month / 3) + 1}季度`;
       } else {
           startDate = new Date(year, 0, 1);
-          endDate = new Date(year, 11, 31);
+          // 修正：将结束时间设为该年最后一天的深夜
+          endDate = new Date(year, 11, 31, 23, 59, 59);
           label = `${year}年度`;
       }
 
       const sessions = userManagedSessions.filter(t => {
-          const d = new Date(t.date);
+          // 使用本地解析确保日期对象比较的准确性
+          const d = parseLocalDate(t.date);
           const matchDate = d >= startDate && d <= endDate;
           const matchTeam = statsTeamFilter === 'all' || t.teamId === statsTeamFilter;
           return matchDate && matchTeam;
@@ -1152,7 +1163,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             </div>
         )}
         {sessionToDuplicate && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"><div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200"><div className="bg-bvb-black p-4 flex justify-between items-center text-white"><h3 className="font-bold flex items-center"><Copy className="w-4 h-4 mr-2 text-bvb-yellow" /> 复制训练计划</h3><button onClick={() => setSessionToDuplicate(null)}><X className="w-5 h-5" /></button></div><div className="p-6 space-y-4"><div className="bg-gray-50 p-3 rounded border border-gray-100"><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">正在复制</span><div className="font-bold text-gray-800">{sessionToDuplicate.title}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center"><CalendarDays className="w-3 h-3 mr-1 text-bvb-yellow" /> 选择新计划的日期</label><input type="date" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition-colors" value={duplicateDate} onChange={e => setDuplicateDate(e.target.value)}/></div><div className="pt-2 flex gap-3"><button onClick={() => setSessionToDuplicate(null)} className="flex-1 py-2 bg-gray-100 text-gray-600 font-bold rounded hover:bg-gray-200 transition-colors">取消</button><button onClick={handleDuplicateConfirm} className="flex-1 py-2 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 transition-colors shadow-sm">确认复制</button></div></div></div></div>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"><div className="bg-white rounded-xl shadow-2xl w-full max-sm overflow-hidden animate-in fade-in zoom-in duration-200"><div className="bg-bvb-black p-4 flex justify-between items-center text-white"><h3 className="font-bold flex items-center"><Copy className="w-4 h-4 mr-2 text-bvb-yellow" /> 复制训练计划</h3><button onClick={() => setSessionToDuplicate(null)}><X className="w-5 h-5" /></button></div><div className="p-6 space-y-4"><div className="bg-gray-50 p-3 rounded border border-gray-100"><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">正在复制</span><div className="font-bold text-gray-800">{sessionToDuplicate.title}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center"><CalendarDays className="w-3 h-3 mr-1 text-bvb-yellow" /> 选择新计划的日期</label><input type="date" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition-colors" value={duplicateDate} onChange={e => setDuplicateDate(e.target.value)}/></div><div className="pt-2 flex gap-3"><button onClick={() => setSessionToDuplicate(null)} className="flex-1 py-2 bg-gray-100 text-gray-600 font-bold rounded hover:bg-gray-200 transition-colors">取消</button><button onClick={handleDuplicateConfirm} className="flex-1 py-2 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 transition-colors shadow-sm">确认复制</button></div></div></div></div>
         )}
         {showDesignSelectModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
