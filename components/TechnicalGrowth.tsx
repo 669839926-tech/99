@@ -328,22 +328,22 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         reader.readAsText(file);
     };
 
-    // Comment: Handle tech test export error for TypeScript strict mode on line 351
+    // Comment: Fixed handleExportTechPDF to ensure catch block error is handled correctly for TypeScript strict mode.
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
         const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测评';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
-        } catch (error) {
-            // Comment: Ensure console.error receives a string version of the error to satisfy potentially strict parameter requirements
-            console.error(error instanceof Error ? error.message : String(error));
+        } catch (error: any) {
+            // Comment: Explicitly cast error to any to avoid unknown type issues with alert and console.error.
+            console.error(error);
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
         }
     };
 
-    // Comment: Handle tech test batch save error for TypeScript strict mode
+    // Comment: Fixed handleSaveBatchTests to ensure catch block error is handled correctly for TypeScript strict mode.
     const handleSaveBatchTests = async () => {
         setIsSavingTests(true);
         try {
@@ -368,9 +368,9 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch (error) {
-            // Comment: Explicitly stringify error object to ensure it is assignable to string parameters
-            console.error(error instanceof Error ? error.message : String(error));
+        } catch (error: any) {
+            // Comment: Explicitly cast error to any to avoid unknown type issues with alert and console.error.
+            console.error(error);
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -487,7 +487,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {(jugglingLeaderboard || []).map((p, idx) => (
-                                            <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors cursor-pointer group" onClick={() => setViewingJugglingPlayerId(p.id)}>
+                                            <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors group cursor-pointer" onClick={() => setViewingJugglingPlayerId(p.id)}>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[80px] md:max-w-none group-hover:underline">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-xs md:text-lg font-bold text-gray-400">{p.stats.max}</span></td>
@@ -537,7 +537,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="home-training-team-pdf">
