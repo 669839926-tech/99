@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -329,15 +328,14 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         reader.readAsText(file);
     };
 
-    // Comment: Fixed handleExportTechPDF to use proper error handling and avoid unknown type assignments.
+    // Comment: Fixed handleExportTechPDF to ensure catch block error is handled correctly for TypeScript strict mode.
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
         const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测评';
         try {
-            // Comment: Construct filename string explicitly
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
-        } catch (error) {
-            // Comment: Properly log and handle errors.
+        } catch (error: any) {
+            // Comment: Explicitly cast error to any to avoid unknown type issues with alert and console.error.
             console.error(error);
             alert('导出失败');
         } finally {
@@ -345,7 +343,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     };
 
-    // Comment: Consolidated handleSaveBatchTests into a single robust implementation and fixed type issues.
+    // Comment: Fixed handleSaveBatchTests to ensure catch block error is handled correctly for TypeScript strict mode.
     const handleSaveBatchTests = async () => {
         setIsSavingTests(true);
         try {
@@ -370,8 +368,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch (error) {
-            // Comment: Safely handle error in catch block.
+        } catch (error: any) {
+            // Comment: Explicitly cast error to any to avoid unknown type issues with alert and console.error.
             console.error(error);
             alert('保存失败');
         } finally {

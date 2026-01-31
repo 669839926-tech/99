@@ -190,6 +190,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const lowCreditPlayers = displayPlayers
         .filter(p => p.credits <= 2)
+        .filter(p => p.teamId !== 'unassigned') // 核心更新：余额预警中不显示待分配球员
         .filter(p => creditAlertTeamId === 'all' || p.teamId === creditAlertTeamId)
         .sort((a,b) => a.credits - b.credits);
 
