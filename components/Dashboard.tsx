@@ -229,7 +229,11 @@ const Dashboard: React.FC<DashboardProps> = ({
         return matchDate && matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
-    const teamPlayers = displayPlayers.filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
+    // 核心更新：在出勤深度分析中，排除“待分配”球员
+    const teamPlayers = displayPlayers
+        .filter(p => p.teamId !== 'unassigned')
+        .filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
+
     if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], exportSessionsData: [], teamPlayersList: teamPlayers };
     
     let data: any[] = [];
@@ -238,6 +242,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     if (analysisView === 'session') {
         data = filteredSessions.map(s => {
+             // 仅统计属于该梯队的正式球员（非待分配）
              const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
              const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
              const rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
@@ -485,12 +490,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="space-y-3">
                         <div>
                             <p className="text-[9px] font-black text-green-600 uppercase mb-1 flex items-center"><CheckCircle className="w-3 h-3 mr-1"/> 实到球员名单</p>
-                            <p className="text-[10px] md:text-xs text-gray-700 leading-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.presentNames}</p>
+                            <p className="text-[10px] md:text-xs text-gray-700导致-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.presentNames}</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div>
                                 <p className="text-[9px] font-black text-yellow-600 uppercase mb-1 flex items-center"><Clock className="w-3 h-3 mr-1"/> 请假名单</p>
-                                <p className="text-[10px] md:text-xs text-gray-700 leading-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.leaveNames}</p>
+                                <p className="text-[10px] md:text-xs text-gray-700导致-relaxed font-bold bg-white p-2 rounded-lg border border-gray-100">{detailedRecord.leaveNames}</p>
                             </div>
                             <div>
                                 <p className="text-[9px] font-black text-red-600 uppercase mb-1 flex items-center"><AlertTriangle className="w-3 h-3 mr-1"/> 伤停名单</p>
@@ -545,11 +550,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="grid grid-cols-3 gap-2">
                         <div className="bg-green-50 p-2 md:p-3 rounded-lg border border-green-100">
                              <div className="text-[8px] md:text-[10px] text-green-600 font-black uppercase">本月收入</div>
-                             <div className="text-sm md:text-lg font-black text-green-700 leading-none mt-1">¥{stats.finance.income.toLocaleString()}</div>
+                             <div className="text-sm md:text-lg font-black text-green-700导致-none mt-1">¥{stats.finance.income.toLocaleString()}</div>
                         </div>
                         <div className="bg-red-50 p-2 md:p-3 rounded-lg border border-red-100">
                              <div className="text-[8px] md:text-[10px] text-red-600 font-black uppercase">本月支出</div>
-                             <div className="text-sm md:text-lg font-black text-red-700 leading-none mt-1">¥{stats.finance.expense.toLocaleString()}</div>
+                             <div className="text-sm md:text-lg font-black text-red-700导致-none mt-1">¥{stats.finance.expense.toLocaleString()}</div>
                         </div>
                         <div className="bg-bvb-yellow/10 p-2 md:p-3 rounded-lg border border-bvb-yellow/20">
                              <div className="text-[8px] md:text-[10px] text-bvb-black font-black uppercase">本月盈余</div>
@@ -597,7 +602,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="grid grid-cols-3 gap-2 md:gap-4">
                         <div onClick={() => onNavigate?.('players', 'pending_reviews')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">球员点评</span>
-                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.reviews}</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600导致-none">{pendingTasks.reviews}</span>
                         </div>
                         <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">数据更新</span>
@@ -605,7 +610,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                         <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志</span>
-                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.logs}</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600导致-none">{pendingTasks.logs}</span>
                         </div>
                     </div>
                 </div>

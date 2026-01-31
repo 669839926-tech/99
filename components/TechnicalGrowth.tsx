@@ -236,7 +236,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Full Juggling History</p>
                             </div>
                         </div>
-                        <button onClick={() => setViewingJugglingPlayerId(null)} className="p-1 hover:bg-gray-800 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                        <button onClick={() => setViewingJugglingPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
                     </div>
                     <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
                          <div className="flex items-center gap-2">
@@ -306,8 +306,9 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = (evt) => {
-            const text = evt.target?.result as string;
+        reader.onload = () => {
+            // Comment: Fixed potential unknown type error by using reader.result as string on line 351 (shifted)
+            const text = (reader.result as string) || '';
             const lines = text.split('\n');
             const newScores: Record<string, string> = { ...testScores };
             for (let i = 1; i < lines.length; i++) {
@@ -328,22 +329,22 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         reader.readAsText(file);
     };
 
-    // Comment: Fixed handleExportTechPDF to ensure catch block error is handled correctly for TypeScript strict mode.
+    // Comment: Ensure catch block handles unknown error types correctly and converts them to string for logging
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
         const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测评';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
-        } catch (error: any) {
-            // Comment: Fixed line 351 error by explicitly casting error to any to avoid unknown type issues with console.error.
-            console.error(error as any);
+        } catch (error) {
+            // Comment: Convert unknown error to string before logging to satisfy TS constraints
+            console.error(error instanceof Error ? error.message : String(error));
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
         }
     };
 
-    // Comment: Fixed handleSaveBatchTests to ensure catch block error is handled correctly for TypeScript strict mode.
+    // Comment: Ensure catch block handles unknown error types correctly and converts them to string for logging
     const handleSaveBatchTests = async () => {
         setIsSavingTests(true);
         try {
@@ -368,9 +369,9 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             }
             setTestScores({});
             alert('成绩保存成功！');
-        } catch (error: any) {
-            // Comment: Fixed line 382 error by explicitly casting error to any.
-            console.error(error as any);
+        } catch (error) {
+            // Comment: Convert unknown error to string before logging to satisfy TS constraints
+            console.error(error instanceof Error ? error.message : String(error));
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -490,7 +491,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors group cursor-pointer" onClick={() => setViewingJugglingPlayerId(p.id)}>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[80px] md:max-w-none group-hover:underline">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td>
-                                                <td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-xs md:text-lg font-bold text-gray-400">{p.stats.max}</span></td>
+                                                <td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-xs font-bold text-gray-400">{p.stats.max}</span></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><div className="flex flex-col items-center"><span className={`text-sm md:text-xl font-black ${idx < 3 ? 'text-bvb-black' : 'text-gray-700'}`}>{p.stats.lifetimeMax}</span><div className="h-0.5 w-4 bg-bvb-yellow rounded-full"></div></div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><div className="flex flex-col text-[10px] md:text-xs font-bold text-gray-400"><span>Avg: {p.stats.avg}</span><span>Cnt: {p.stats.count}</span></div></td>
                                             </tr>
@@ -537,7 +538,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error: any) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
+                                    <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch (error) { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="home-training-team-pdf">
