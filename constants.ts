@@ -1,7 +1,7 @@
 
 import { Player, Match, TrainingSession, Position, Team, PlayerStats, AttributeConfig, PlayerReview, User, Announcement, RolePermissions, FinanceCategoryDefinition, SalarySettings } from './types';
 
-// CHINA_GEO_DATA 省略...
+// CHINA_GEO_DATA 省略保持原样...
 export const CHINA_GEO_DATA: Record<string, Record<string, string[]>> = {
     "北京市": {
         "北京市": ["东城区", "西城区", "朝阳区", "丰台区", "石景山区", "海淀区", "门头沟区", "房山区", "通州区", "顺义区", "昌平区", "大兴区", "怀柔区", "平谷区", "密云区", "延庆区"]
@@ -124,81 +124,6 @@ export const MOCK_TEAMS: Team[] = [
   { id: 't2', name: '多特蒙德 U17', level: 'U17', description: '专注于基础战术素养培养' },
 ];
 
-// Comment: Added missing mock data exports
-export const MOCK_PLAYERS: Player[] = [
-  {
-    id: 'p1',
-    teamId: 't1',
-    name: '马尔科·罗伊斯 (Jr)',
-    gender: '男',
-    idCard: '110101201001011234',
-    birthDate: '2010-01-01',
-    number: 11,
-    position: Position.ST,
-    age: 13,
-    goals: 12,
-    assists: 8,
-    appearances: 15,
-    image: 'https://picsum.photos/200/200?random=1',
-    joinDate: '2022-01-01',
-    preferredFoot: '右',
-    stats: {
-      technical: { passing: 8, dribbling: 9, shooting: 8, attacking1v1: 7, defending1v1: 4, goalkeeping: 2 },
-      tactical: { vision: 9, offBall: 8, positioning: 6, decision: 8 },
-      physical: { coordination: 8, agility: 8, speed: 7, endurance: 6, explosiveness: 7, strength: 5 },
-      mental: { focus: 8, confidence: 9, pressure: 7, teamwork: 8, discipline: 9, selfDiscipline: 8 }
-    },
-    statsStatus: 'Published',
-    reviews: [],
-    credits: 10,
-    validUntil: '2024-12-31',
-    leaveQuota: 3,
-    leavesUsed: 0,
-    remainingLeaveQuota: 3,
-    rechargeHistory: []
-  }
-];
-
-export const MOCK_MATCHES: Match[] = [
-  {
-    id: 'm1',
-    teamId: 't1',
-    opponent: '沙尔克04 U19',
-    date: '2023-11-20',
-    time: '14:30',
-    location: 'Away',
-    status: 'Completed',
-    result: '2-1',
-    competition: '地区联赛',
-    details: {
-      weather: 'Sunny',
-      pitch: 'Natural Grass',
-      lineup: ['p1'],
-      substitutes: [],
-      events: [{ id: 'e1', minute: 23, type: 'Goal', playerId: 'p1', playerName: '罗伊斯' }],
-      summary: '表现出色'
-    }
-  }
-];
-
-export const MOCK_TRAINING: TrainingSession[] = [
-  {
-    id: 's1',
-    teamId: 't1',
-    title: '传接球专项训练',
-    date: '2023-11-15',
-    focus: '传接球',
-    duration: 90,
-    drills: ['5v2 Rondo', '长传练习'],
-    intensity: 'Medium',
-    attendance: [{ playerId: 'p1', status: 'Present' }],
-    submissionStatus: 'Reviewed',
-    isReviewRead: true,
-    coachFeedback: '由于天气寒冷，热身时间延长。',
-    directorReview: '注意传球细节。'
-  }
-];
-
 export const MOCK_USERS: User[] = [
   { id: 'u1', username: 'admin', password: '123', name: '青训总监', role: 'director' },
   { id: 'u2', username: 'coach_u19', password: '123', name: 'U19 主教练', role: 'coach', teamIds: ['t1'], level: 'Intermediate' },
@@ -261,3 +186,65 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
     '对抗'
   ]
 };
+
+const generateStats = (): PlayerStats => {
+  const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+  const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
+  DEFAULT_ATTRIBUTE_CONFIG.technical.forEach(attr => stats.technical[attr.key] = rand(4, 9));
+  DEFAULT_ATTRIBUTE_CONFIG.tactical.forEach(attr => stats.tactical[attr.key] = rand(4, 9));
+  DEFAULT_ATTRIBUTE_CONFIG.physical.forEach(attr => stats.physical[attr.key] = rand(5, 9));
+  DEFAULT_ATTRIBUTE_CONFIG.mental.forEach(attr => stats.mental[attr.key] = rand(4, 9));
+  if (stats.technical.goalkeeping) stats.technical.goalkeeping = rand(1, 3);
+  return stats as PlayerStats;
+};
+
+const mockId = (year: number) => `110101${year}01011234`;
+
+const MOCK_REVIEWS: PlayerReview[] = [
+    { id: 'r1', date: '2023-04-01', year: 2023, quarter: 'Q1', technicalTacticalImprovement: '在高强度压迫下的出球能力有显著提升，能够更冷静地寻找队友。但是非惯用脚的传球精准度仍需加强。', mentalDevelopment: '自信心增强，但在比赛落后时容易急躁，需要学会控制情绪。', summary: '总体表现出色，已经成为中场的节拍器。下个季度重点提升左脚能力和情绪管理。', status: 'Published' },
+    { id: 'r2', date: '2023-07-01', year: 2023, quarter: 'Q2', technicalTacticalImprovement: '无球跑动更加聪明，经常能出现在对手防线的真空地带。射门转化率有所下降，需要加强门前终结能力训练。', mentalDevelopment: '作为队长展现了很好的领导力，能够鼓励队友。抗压能力在关键比赛中得到了验证。', summary: '战术执行力满分，是球队的核心。需要在休赛期加强力量训练，以适应更高强度的对抗。', status: 'Published' }
+];
+
+const getNextYear = () => {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().split('T')[0];
+};
+
+const createMockPlayer = (data: Partial<Player>): Player => {
+    const stats = generateStats();
+    return {
+        ...data,
+        preferredFoot: data.preferredFoot || '右',
+        height: data.height || 175,
+        weight: data.weight || 65,
+        nickname: data.nickname || '',
+        stats: stats,
+        statsStatus: 'Published',
+        lastPublishedStats: JSON.parse(JSON.stringify(stats)),
+        gallery: [],
+    } as Player;
+}
+
+export const MOCK_PLAYERS: Player[] = [
+  createMockPlayer({ id: '1', teamId: 't1', name: '马尔科·罗伊斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 11, position: Position.CAM, isCaptain: true, age: 18, goals: 12, assists: 8, appearances: 15, image: 'https://picsum.photos/200/200?random=1', reviews: MOCK_REVIEWS, credits: 50, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [{ id: 'init-1', date: '2023-01-01', amount: 52, quotaAdded: 3 }], nickname: '小火箭', joinDate: '2020-01-15' }),
+  createMockPlayer({ id: '2', teamId: 't1', name: '马茨·胡梅尔斯 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 15, position: Position.CB, isCaptain: false, age: 18, goals: 2, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=2', reviews: [], credits: 45, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 1, rechargeHistory: [{ id: 'init-2', date: '2023-01-01', amount: 46, quotaAdded: 3 }], joinDate: '2021-03-20' }),
+  createMockPlayer({ id: '3', teamId: 't1', name: '尤利安·布兰特 (Jr)', gender: '男', idCard: mockId(2006), birthDate: '2006-01-01', number: 19, position: Position.CM, isCaptain: false, age: 17, goals: 5, assists: 12, appearances: 14, image: 'https://picsum.photos/200/200?random=3', reviews: [], credits: 12, validUntil: '2023-12-31', leaveQuota: 3, leavesUsed: 2, rechargeHistory: [{ id: 'init-3', date: '2023-01-01', amount: 12, quotaAdded: 3 }], joinDate: '2022-09-01' }),
+  createMockPlayer({ id: '4', teamId: 't1', name: '格雷戈·科贝尔 (Jr)', gender: '男', idCard: mockId(2005), birthDate: '2005-01-01', number: 1, position: Position.GK_ATT, isCaptain: false, age: 18, goals: 0, assists: 1, appearances: 15, image: 'https://picsum.photos/200/200?random=4', reviews: [], credits: 100, validUntil: getNextYear(), leaveQuota: 5, leavesUsed: 0, rechargeHistory: [{ id: 'init-4', date: '2023-01-01', amount: 101, quotaAdded: 5 }], joinDate: '2021-11-10' }),
+  createMockPlayer({ id: '5', teamId: 't2', name: '卡里姆·阿德耶米 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 27, position: Position.LW, isCaptain: true, age: 16, goals: 15, assists: 4, appearances: 13, image: 'https://picsum.photos/200/200?random=5', reviews: [], credits: 0, validUntil: '2023-01-01', leaveQuota: 2, leavesUsed: 2, rechargeHistory: [], joinDate: '2023-02-14' }),
+  createMockPlayer({ id: '6', teamId: 't2', name: '尼科·施洛特贝克 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 4, position: Position.CB, isCaptain: false, age: 16, goals: 3, assists: 0, appearances: 14, image: 'https://picsum.photos/200/200?random=6', reviews: [], credits: 20, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [{ id: 'init-6', date: '2023-01-01', amount: 20, quotaAdded: 3 }], joinDate: '2023-01-05' }),
+  createMockPlayer({ id: '7', teamId: 't2', name: '埃姆雷·詹 (Jr)', gender: '男', idCard: mockId(2007), birthDate: '2007-01-01', number: 23, position: Position.CDM, isCaptain: false, age: 16, goals: 1, assists: 3, appearances: 12, image: 'https://picsum.photos/200/200?random=7', reviews: [], credits: 30, validUntil: getNextYear(), leaveQuota: 3, leavesUsed: 0, rechargeHistory: [{ id: 'init-7', date: '2023-01-01', amount: 30, quotaAdded: 3 }], joinDate: '2022-07-25' }),
+];
+
+export const MOCK_MATCHES: Match[] = [
+  { id: '1', teamId: 't1', title: 'U19 青年联赛第5轮', opponent: '沙尔克04 U19', date: '2023-10-01', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', result: '4-1', status: 'Completed', competition: '联赛' },
+  { id: '2', teamId: 't1', title: '国家德比青年版', opponent: '拜仁慕尼黑 U19', date: '2023-10-08', time: '11:00', location: 'Away', province: '广东省', city: '广州市', district: '天河区', result: '2-2', status: 'Completed', competition: '联赛' },
+  { id: '3', teamId: 't1', title: '地区杯赛半决赛', opponent: '波鸿 U19', date: '2023-10-15', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '海淀区', result: '3-0', status: 'Completed', competition: '杯赛' },
+  { id: '4', teamId: 't2', title: 'U17 关键战役', opponent: '勒沃库森 U17', date: '2023-11-20', time: '14:00', location: 'Away', province: '上海市', city: '上海市', district: '浦东新区', status: 'Upcoming', competition: '联赛' },
+  { id: '5', teamId: 't2', title: '主场收官战', opponent: '莱比锡 U17', date: '2023-11-27', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', status: 'Upcoming', competition: '联赛' },
+];
+
+export const MOCK_TRAINING: TrainingSession[] = [
+  { id: '1', teamId: 't1', title: '高位逼抢恢复', date: '2023-11-14', focus: '防守', duration: 90, intensity: 'High', drills: ['5v2 抢圈 (Rondo)', '3v3 攻守转换', '高位防线布置', '8v8 限制触球次数'], attendance: [ { playerId: '1', status: 'Present' }, { playerId: '2', status: 'Present' }, { playerId: '3', status: 'Leave' } ] },
+  { id: '2', teamId: 't1', title: '防守阵型保持', date: '2023-11-16', focus: '防守', duration: 75, intensity: 'Medium', drills: ['动态拉伸', '影子防守练习', '整体阵型移动', '放松整理'], attendance: [ { playerId: '1', status: 'Present' }, { playerId: '2', status: 'Injury' }, { playerId: '4', status: 'Present' } ] }
+];

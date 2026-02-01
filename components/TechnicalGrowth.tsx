@@ -309,9 +309,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const reader = new FileReader();
         // Comment: Explicitly cast FileReader result to string to resolve potential unknown type issues in specific TS environments
         reader.onload = () => {
-            // Comment: Cast reader.result to string to avoid 'unknown' type errors during split() or split-related operations
-            const result = reader.result as string;
-            // Comment: Perform type check to narrow type to string before string operations
+            const result = reader.result;
+            // Comment: Perform type check to narrow unknown or union type to string before string operations
             if (typeof result !== 'string') return;
             const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };
