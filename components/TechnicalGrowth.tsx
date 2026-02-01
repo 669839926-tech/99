@@ -306,10 +306,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = () => {
-            // Comment: Fixed potential unknown type error by using reader.result as string on line 351 (shifted)
-            const text = (reader.result as string) || '';
-            const lines = text.split('\n');
+        // Comment: Explicitly type event to resolve unknown type error on line 351 (1-based)
+        reader.onload = (event: ProgressEvent<FileReader>) => {
+            const result = event.target?.result;
+            // Comment: Type narrowing check to resolve unknown type error on line 352 (1-based)
+            if (typeof result !== 'string') return;
+            const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i].trim();
@@ -329,14 +331,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         reader.readAsText(file);
     };
 
-    // Comment: Ensure catch block handles unknown error types correctly and converts them to string for logging
     const handleExportTechPDF = async () => {
         setIsExportingTech(true);
         const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测评';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error) {
-            // Comment: Convert unknown error to string before logging to satisfy TS constraints
             console.error(error instanceof Error ? error.message : String(error));
             alert('导出失败');
         } finally {
@@ -344,7 +344,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     };
 
-    // Comment: Ensure catch block handles unknown error types correctly and converts them to string for logging
     const handleSaveBatchTests = async () => {
         setIsSavingTests(true);
         try {
@@ -370,7 +369,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error) {
-            // Comment: Convert unknown error to string before logging to satisfy TS constraints
             console.error(error instanceof Error ? error.message : String(error));
             alert('保存失败');
         } finally {
