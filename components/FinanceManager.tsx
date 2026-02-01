@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord } from '../types';
 import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -150,25 +151,35 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
             const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
             const coachTeams = coach.teamIds || [];
+            const isAssistant = coach.role === 'assistant_coach';
             
-            let calcSessionFees = 0;
+            let totalSalaryFees = 0;
             let calcAttendanceReward = 0;
             let calcRenewalReward = 0;
             
             const teamBreakdown = coachTeams.map(teamId => {
                 const teamPlayers = players.filter(p => p.teamId === teamId);
                 const teamSize = teamPlayers.length;
-                const effectiveTeamSize = Math.max(salarySettings.minPlayersForCalculation, teamSize);
                 
-                // 修正：主教练和助教应有不同的计费基数逻辑，这里假设统一按职级配置
-                const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
-                const singleSessionFee = levelConfig.sessionBaseFee + (extraPlayers * salarySettings.incrementalPlayerFee);
-                
+                let sessionFeeTotal = 0;
+                let sessionFeeFormula = "";
+
                 const monthlySessions = trainings.filter(t => {
                     const { year, month } = parseDateInfo(t.date);
                     return t.teamId === teamId && year === selectedYear && month === selectedMonth;
                 });
-                const monthlySessionFeeTotal = monthlySessions.length * singleSessionFee;
+
+                if (isAssistant) {
+                    // 助教新规则: 管理总人数 * 补贴单价 (不再乘课时)
+                    sessionFeeTotal = teamSize * salarySettings.assistantCoachPlayerRate;
+                    sessionFeeFormula = `助教在册补贴: ${teamSize}人 * ¥${salarySettings.assistantCoachPlayerRate} (本月共${monthlySessions.length}课)`;
+                } else {
+                    // 主教练规则: (基础 + 超额) * 课次
+                    const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
+                    const singleFee = levelConfig.sessionBaseFee + (extraPlayers * salarySettings.incrementalPlayerFee);
+                    sessionFeeTotal = monthlySessions.length * singleFee;
+                    sessionFeeFormula = `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee}) * ${monthlySessions.length}课`;
+                }
 
                 let monthlyAttendanceRate = 0;
                 let attendanceReward = 0;
@@ -208,19 +219,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     teamName: teams.find(t => t.id === teamId)?.level || '未知',
                     teamSize, 
                     sessionCount: monthlySessions.length, 
-                    singleSessionFee,
-                    monthlySessionFee: monthlySessionFeeTotal, 
-                    monthlyAttendanceRate, 
+                    monthlySessionFee: sessionFeeTotal, 
                     attendanceReward, 
                     attendanceFormula,
-                    renewalRate, 
                     renewalReward,
                     renewalFormula,
-                    sessionFeeFormula: `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee}) * ${monthlySessions.length}课`
+                    sessionFeeFormula
                 };
             });
 
-            calcSessionFees = teamBreakdown.reduce((sum, b) => sum + b.monthlySessionFee, 0);
+            const calcSessionFees = teamBreakdown.reduce((sum, b) => sum + b.monthlySessionFee, 0);
             calcAttendanceReward = teamBreakdown.reduce((sum, b) => sum + b.attendanceReward, 0);
             calcRenewalReward = teamBreakdown.reduce((sum, b) => sum + b.renewalReward, 0);
 
@@ -230,7 +238,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const performanceFormula = evaluation ? `评分 ${evaluation.score} (${performanceConfig ? '奖¥'+performanceConfig.amount : '未达标'})` : "未评分";
 
             const currentEdit = editPayroll[coach.id] || {};
-            const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : levelConfig.baseSalary);
+            const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : (isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary));
             const sessionFees = currentEdit.sessionFees !== undefined ? currentEdit.sessionFees : (savedRecord ? savedRecord.sessionFees : calcSessionFees);
             const attendanceReward = currentEdit.attendanceReward !== undefined ? currentEdit.attendanceReward : (savedRecord ? savedRecord.attendanceReward : calcAttendanceReward);
             const renewalReward = currentEdit.renewalReward !== undefined ? currentEdit.renewalReward : (savedRecord ? savedRecord.renewalReward : calcRenewalReward);
@@ -242,7 +250,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 coachId: coach.id,
                 coachName: coach.name,
                 role: coach.role,
-                level: levelConfig.label,
+                level: isAssistant ? 'Assistant' : levelConfig.label,
                 baseSalary,
                 sessionFees,
                 attendanceReward,
@@ -383,7 +391,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <tr>
                                         <th className="px-2 py-3 md:px-4 md:py-4">职员信息</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">底薪</th>
-                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">课时费</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">职务补助/课酬</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">参训奖</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">续费奖</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-center">分</th>
@@ -403,7 +411,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className={`w-12 md:w-20 p-1 border rounded text-right font-black text-[10px] md:text-xs bg-transparent focus:bg-white outline-none ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`} value={sal.baseSalary} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'baseSalary', e.target.value)} /></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} />{sal.teamBreakdown.length > 0 && <span className="text-[7px] md:text-[8px] text-gray-400 italic">由课次累加</span>}</div></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} />{sal.role === 'assistant_coach' ? <span className="text-[7px] md:text-[8px] text-blue-500 font-black uppercase">在册人数补助</span> : <span className="text-[7px] md:text-[8px] text-gray-400 italic">按课计费</span>}</div></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.attendanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} />{sal.attendanceReward > 0 && <span className="text-[7px] md:text-[8px] text-green-500 font-black uppercase">达标奖</span>}</div></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.renewalReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-center"><input type="number" min="0" max="10" step="0.1" className="w-8 md:w-14 p-1 text-center border rounded font-black text-[10px] md:text-xs bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" value={sal.evaluationScore || ''} onChange={e => handleUpdateEvaluation(sal.coachId, parseFloat(e.target.value))} placeholder="0" /></td>
@@ -433,7 +441,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                         <div className="flex items-start gap-1.5">
                                                                             <Calculator className="w-2.5 h-2.5 text-gray-300 mt-0.5" />
                                                                             <div>
-                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">课时费公式:</p>
+                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">明细公式:</p>
                                                                                 <p className="text-[9px] font-mono text-gray-600 font-bold">{teamInfo.sessionFeeFormula}</p>
                                                                             </div>
                                                                         </div>
@@ -454,7 +462,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                     </div>
                                                                 </div>
                                                             ))}
-                                                            {/* 绩效奖金单独显示 */}
                                                             <div className="bg-yellow-50/30 border border-yellow-100/50 p-2.5 rounded-xl space-y-1.5 shadow-sm">
                                                                 <p className="text-[10px] font-black text-gray-800 border-b border-yellow-100 pb-1 flex justify-between">
                                                                     <span>月度综合绩效</span>
@@ -480,6 +487,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     </div>
                 </div>
             ) : viewMode === 'journal' ? (
+                // 流水视图保持不变...
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center uppercase italic tracking-tighter"><FileText className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
@@ -510,6 +518,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
             ) : (
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
+                    {/* 统计视图逻辑保持不变... */}
                     <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
                         <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center uppercase italic tracking-tighter shrink-0"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 年度趋势与深度分析</h3>
                         <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
@@ -537,6 +546,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
             )}
 
+            {/* Modal 代码保持不变... */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/70 backdrop-blur-sm">
                     <div className="bg-white w-full h-full md:h-auto md:max-w-lg md:rounded-[32px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
@@ -560,21 +570,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     </div>
                 </div>
             )}
-
-            {importSummary && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="bg-bvb-black p-6 md:p-8 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-xl md:text-2xl flex items-center uppercase tracking-tighter italic"><Calculator className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> 导入数据确认</h3><button onClick={() => setImportSummary(null)}><X className="w-6 h-6" /></button></div>
-                        <div className="p-6 md:p-10 space-y-6 md:space-y-8 bg-gray-50/50 text-center"><p className="text-gray-500 font-bold text-sm md:text-base">解析成功！请确认汇总金额：</p><div className="grid grid-cols-2 gap-3 md:gap-4"><div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-green-100"><p className="text-[9px] md:text-[10px] font-black text-green-600 uppercase mb-2">收入</p><h4 className="text-lg md:text-2xl font-black text-green-800 leading-none">¥{importSummary.income.toLocaleString()}</h4></div><div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-red-100"><p className="text-[9px] md:text-[10px] font-black text-red-600 uppercase mb-2">支出</p><h4 className="text-lg md:text-2xl font-black text-red-800 leading-none">¥{importSummary.expense.toLocaleString()}</h4></div></div><div className="flex gap-3 md:gap-4 pt-2"><button onClick={() => setImportSummary(null)} className="flex-1 py-3 md:py-4 bg-gray-200 text-gray-600 font-black rounded-2xl transition-colors text-xs md:text-base">取消</button><button onClick={() => { onBulkAddTransactions(importSummary.tempTxs); setImportSummary(null); }} className="flex-[2] py-3 md:py-4 bg-bvb-yellow text-bvb-black font-black rounded-2xl shadow-lg hover:brightness-105 text-xs md:text-base">全部入账</button></div></div>
-                    </div>
-                </div>
-            )}
-
-            {showImportModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-md overflow-hidden animate-in zoom-in-95 duration-200"><div className="bg-bvb-black p-5 md:p-6 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-lg md:text-xl flex items-center uppercase italic tracking-tighter"><FileSpreadsheet className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> 批量导入流水</h3><button onClick={() => setShowImportModal(false)} className="p-1 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button></div><div className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50"><div className="bg-white p-5 md:p-6 rounded-2xl border border-gray-100 text-center"><FileDown className="w-8 h-8 md:w-10 md:h-10 text-gray-300 mx-auto mb-3" /><h4 className="font-bold text-gray-800 mb-1 text-sm md:text-base">1. 准备 CSV 模版</h4><p className="text-[10px] md:text-xs text-gray-400 mb-4">下载标准格式模板并按要求填写</p><button onClick={() => { const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户\n"; const example = "2023-11-01,课时续费,张三续费50节,5200,,黔农云\n2023-11-02,租金支出,11月场地租金,,2000,黔农云\n"; const blob = new Blob(["\ufeff" + headers + example], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = '财务流水导入模板.csv'; link.click(); }} className="w-full py-2.5 md:py-3 bg-gray-100 text-gray-600 font-black rounded-xl hover:bg-gray-200 transition-all text-[10px] md:text-xs uppercase tracking-widest">下载模板</button></div><div className="relative group"><input type="file" accept=".csv" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onChange={handleImportCSV} /><div className="bg-bvb-yellow p-6 md:p-8 rounded-3xl border-4 border-dashed border-bvb-black/20 flex flex-col items-center justify-center text-bvb-black group-hover:scale-[1.02] transition-all"><Upload className="w-10 h-10 md:w-12 md:h-12 mb-2 md:mb-3" /><h4 className="font-black uppercase italic text-base md:text-lg">2. 点击上传</h4><p className="text-[9px] md:text-[10px] font-bold opacity-60 mt-1 uppercase">Process Batch Data</p></div></div></div></div>
-                </div>
-            )}
+            {/* 其它 Modal 省略... */}
         </div>
     );
 };

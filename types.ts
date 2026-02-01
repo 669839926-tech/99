@@ -325,6 +325,8 @@ export interface SalarySettings {
     levels: CoachLevelSetting[];
     incrementalPlayerFee: number; // 5
     minPlayersForCalculation: number; // 6
+    assistantCoachBaseSalary: number; // 助教底薪
+    assistantCoachPlayerRate: number; // 助教人数补贴单价，如5元
     monthlyAttendanceRewards: { threshold: number; amount: number }[]; // 参训率改为月度
     quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，但仅季末发放
     monthlyPerformanceRewards: { minScore: number; maxScore: number; amount: number }[]; // [{8, 8.9, 100}, {9, 10, 200}]

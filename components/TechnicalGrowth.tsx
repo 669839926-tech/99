@@ -307,11 +307,11 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        // Comment: Use any type for event to bypass strict ProgressEvent compatibility issues and ensure reader access
-        reader.onload = (event: any) => {
-            // Comment: Get result directly from the closed reader variable to avoid unknown type on event.target
-            const result = reader.result;
-            // Comment: Fix potential unknown type error by ensuring result is a string before calling split()
+        // Comment: Explicitly cast FileReader result to string to resolve potential unknown type issues in specific TS environments
+        reader.onload = () => {
+            // Comment: Cast reader.result to string to avoid 'unknown' type errors during split() or split-related operations
+            const result = reader.result as string;
+            // Comment: Perform type check to narrow type to string before string operations
             if (typeof result !== 'string') return;
             const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };
