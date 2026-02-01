@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -306,10 +307,11 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        // Comment: Explicitly type event to resolve unknown type error on line 351 (1-based)
-        reader.onload = (event: ProgressEvent<FileReader>) => {
-            const result = event.target?.result;
-            // Comment: Type narrowing check to resolve unknown type error on line 352 (1-based)
+        // Comment: Use any type for event to bypass strict ProgressEvent compatibility issues and ensure reader access
+        reader.onload = (event: any) => {
+            // Comment: Get result directly from the closed reader variable to avoid unknown type on event.target
+            const result = reader.result;
+            // Comment: Fix potential unknown type error by ensuring result is a string before calling split()
             if (typeof result !== 'string') return;
             const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };
@@ -486,7 +488,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {(jugglingLeaderboard || []).map((p, idx) => (
-                                            <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors group cursor-pointer" onClick={() => setViewingJugglingPlayerId(p.id)}>
+                                            <tr key={p.id} className="hover:bg-yellow-50/30 transition-colors cursor-pointer group" onClick={() => setViewingJugglingPlayerId(p.id)}>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className={`w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center font-black text-[9px] md:text-xs ${idx < 3 ? 'bg-bvb-yellow text-bvb-black border-2 border-bvb-black shadow-md' : 'bg-gray-100 text-gray-400'}`}>{idx + 1}</div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><img src={p.image} className="w-7 h-7 md:w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" /><div><p className="font-black text-gray-800 text-[11px] md:text-sm truncate max-w-[80px] md:max-w-none group-hover:underline">{p.name}</p><p className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{teams.find(t => t.id === p.teamId)?.level}</p></div></div></td>
                                                 <td className="px-2 py-3 md:px-6 md:py-4 text-center"><span className="text-xs font-bold text-gray-400">{p.stats.max}</span></td>

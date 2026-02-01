@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
 import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle, Pencil } from 'lucide-react';
@@ -218,7 +217,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     };
   }, [displayPlayers, displayTeams, transactions, matches, isDirector, creditAlertTeamId]);
 
-  const { chartData, exportPlayersData, exportSessionsData, teamPlayersList } = useMemo(() => {
+  const { chartData, exportPlayersData, exportSessionsData, teamPlayersList, aggregateTotals } = useMemo(() => {
     const start = dateRange.start;
     const end = dateRange.end;
 
@@ -234,18 +233,28 @@ const Dashboard: React.FC<DashboardProps> = ({
         .filter(p => p.teamId !== 'unassigned')
         .filter(p => attendanceTeamId === 'all' || p.teamId === attendanceTeamId);
 
-    if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], exportSessionsData: [], teamPlayersList: teamPlayers };
+    if (filteredSessions.length === 0) return { chartData: [], averageRate: 0, exportPlayersData: [], exportSessionsData: [], teamPlayersList: teamPlayers, aggregateTotals: { present: 0, leave: 0, injury: 0, absent: 0 } };
     
     let data: any[] = [];
     let grandTotalRate = 0;
     let grandTotalCount = 0;
 
+    // 是否选择了特定球员进行下钻分析
+    const isIndividualMode = attendancePlayerId !== 'all';
+
     if (analysisView === 'session') {
         data = filteredSessions.map(s => {
-             // 仅统计属于该梯队的正式球员（非待分配）
-             const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
-             const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
-             const rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
+             let rate = 0;
+             if (isIndividualMode) {
+                 // 个人模式：检查该球员在该场次是否签到
+                 const playerRecord = s.attendance?.find(r => r.playerId === attendancePlayerId);
+                 rate = playerRecord?.status === 'Present' ? 100 : 0;
+             } else {
+                 // 全队模式：统计该场次到课率
+                 const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
+                 const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
+                 rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
+             }
              grandTotalRate += rate;
              grandTotalCount++;
              const d = parseLocalDate(s.date);
@@ -256,9 +265,17 @@ const Dashboard: React.FC<DashboardProps> = ({
         filteredSessions.forEach(session => {
             const date = parseLocalDate(session.date);
             let key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
-            const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
-            const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
-            const rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
+            
+            let rate = 0;
+            if (isIndividualMode) {
+                const playerRecord = session.attendance?.find(r => r.playerId === attendancePlayerId);
+                rate = playerRecord?.status === 'Present' ? 100 : 0;
+            } else {
+                const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
+                const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
+                rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
+            }
+
             if (!groupedData[key]) groupedData[key] = { totalRate: 0, count: 0 };
             groupedData[key].totalRate += rate;
             groupedData[key].count += 1;
@@ -267,6 +284,11 @@ const Dashboard: React.FC<DashboardProps> = ({
         });
         data = Object.keys(groupedData).map(key => ({ name: key, rate: Math.round(groupedData[key].totalRate / groupedData[key].count) }));
     }
+
+    let aggPresent = 0;
+    let aggLeave = 0;
+    let aggInjury = 0;
+    let aggAbsent = 0;
 
     const exportList = teamPlayers.map(p => {
          const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
@@ -277,6 +299,15 @@ const Dashboard: React.FC<DashboardProps> = ({
          const pNoRecord = pSessions.filter(t => !t.attendance?.some(r => r.playerId === p.id)).length;
          
          const rate = pSessions.length > 0 ? Math.round((pPresent / pSessions.length) * 100) : 0;
+         
+         // 核心逻辑：汇总统计必须与选择的球员范围完全同步
+         if (!isIndividualMode || p.id === attendancePlayerId) {
+             aggPresent += pPresent;
+             aggLeave += pLeave;
+             aggInjury += pInjury;
+             aggAbsent += (pAbsent + pNoRecord);
+         }
+
          return { ...p, present: pPresent, leave: pLeave, injury: pInjury, absent: pAbsent + pNoRecord, total: pSessions.length, rate };
     }).sort((a,b) => b.rate - a.rate);
 
@@ -325,8 +356,8 @@ const Dashboard: React.FC<DashboardProps> = ({
          };
     });
 
-    return { chartData: data, averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0, exportPlayersData: exportList, exportSessionsData: exportSessions, teamPlayersList: teamPlayers };
-  }, [displayTrainings, displayPlayers, dateRange, attendanceRange, attendanceTeamId, analysisView, teams, players]);
+    return { chartData: data, averageRate: grandTotalCount > 0 ? Math.round(grandTotalRate / grandTotalCount) : 0, exportPlayersData: exportList, exportSessionsData: exportSessions, teamPlayersList: teamPlayers, aggregateTotals: { present: aggPresent, leave: aggLeave, injury: aggInjury, absent: aggAbsent } };
+  }, [displayTrainings, displayPlayers, dateRange, attendanceRange, attendanceTeamId, analysisView, teams, players, attendancePlayerId]);
 
   const individualReport = useMemo(() => {
       if (attendancePlayerId === 'all') return null;
@@ -352,7 +383,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (attendancePlayerId !== 'all' && individualReport) {
             await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}_${attendanceYear}`);
         } else {
-            await exportToPDF('attendance-report-export', `训练出勤分析报告_${attendanceYear}`);
+            await exportToPDF('attendance-report-export', `训练出勤 analysis 报告_${attendanceYear}`);
         }
     } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
   };
@@ -375,7 +406,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               headers = "姓名,球衣号码,所属梯队,总训练场次,实到场次,请假场次,伤停场次,缺席场次,出勤率(%),当前课时余额\n";
               rows = exportPlayersData.map(p => {
                   const teamName = teams.find(t => t.id === p.teamId)?.name || '未知';
-                  return `${p.name},${p.number},${teamName},${p.total},${p.present},${p.leave},${p.injury},${p.absent},${p.rate},${p.credits}`;
+                  return `${p.name},${p.number},"${teamName}",${p.total},${p.present},${p.leave},${p.injury},${p.absent},${p.rate},${p.credits}`;
               }).join('\n');
               fileName = `全员出勤统计_${attendanceYear}.csv`;
           } else {
@@ -840,6 +871,38 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
+            {/* 全局汇总统计卡片 - 响应球员选择 */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                <div className="bg-green-50/50 border border-green-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                    <CheckCircle className="w-5 h-5 text-green-600 mb-2" />
+                    <span className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1">
+                        {attendancePlayerId === 'all' ? '总参训人次' : '个人参训次数'}
+                    </span>
+                    <span className="text-2xl font-black text-green-800 tabular-nums">{aggregateTotals.present}</span>
+                </div>
+                <div className="bg-yellow-50/50 border border-yellow-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                    <Clock className="w-5 h-5 text-yellow-600 mb-2" />
+                    <span className="text-[10px] font-black text-yellow-700 uppercase tracking-widest mb-1">
+                        {attendancePlayerId === 'all' ? '累计请假人次' : '累计请假次数'}
+                    </span>
+                    <span className="text-2xl font-black text-yellow-800 tabular-nums">{aggregateTotals.leave}</span>
+                </div>
+                <div className="bg-red-50/50 border border-red-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                    <AlertTriangle className="w-5 h-5 text-red-600 mb-2" />
+                    <span className="text-[10px] font-black text-red-700 uppercase tracking-widest mb-1">
+                        {attendancePlayerId === 'all' ? '累计伤停人次' : '累计伤停次数'}
+                    </span>
+                    <span className="text-2xl font-black text-red-800 tabular-nums">{aggregateTotals.injury}</span>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                    <Ban className="w-5 h-5 text-gray-400 mb-2" />
+                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">
+                        {attendancePlayerId === 'all' ? '缺席/未登记' : '累计缺席次数'}
+                    </span>
+                    <span className="text-2xl font-black text-gray-600 tabular-nums">{aggregateTotals.absent}</span>
+                </div>
+            </div>
+
             {attendancePlayerId !== 'all' && individualReport ? (
                 <div id="individual-attendance-export" className="space-y-4 md:space-y-6 animate-in fade-in bg-white rounded-xl">
                     <div className="bg-gray-50 rounded-2xl p-4 flex justify-between items-center border border-gray-100 shadow-inner">
@@ -851,6 +914,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">参训率</div><div className="text-xl md:text-2xl font-black tabular-nums">{individualReport.stats.rate}%</div></div>
                             <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">实到</div><div className="text-xl md:text-2xl font-black text-green-600 tabular-nums">{individualReport.stats.present}</div></div>
                         </div>
+                    </div>
+                    {/* 个人详细出勤图表 */}
+                    <div className="h-40 md:h-56 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50 mb-6">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" domain={[0, 100]} />
+                                <Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} formatter={(val) => [val === 100 ? '已到' : '未到', '出勤状态']} />
+                                <Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                     <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
                         <table className="w-full text-left">
@@ -954,7 +1029,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 <div className="space-y-1">
                                                     <p className="text-[8px] md:text-[9px] font-black text-yellow-600 uppercase flex items-center"><Clock className="w-2.5 h-2.5 mr-1"/> 请假/伤停 ({s.leave + s.injury})</p>
                                                     <p className="text-[10px] text-gray-600 leading-relaxed font-bold bg-white/50 p-2 rounded border border-gray-100/50">
-                                                        {/* Comment: Use loop variable 's' directly as 'detailedRecord' is out of scope here */}
                                                         请假：{s.leaveNames} | 伤停：{s.injuryNames}
                                                     </p>
                                                 </div>
