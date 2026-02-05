@@ -669,7 +669,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             ) : null}
         </div>
 
-        {/* Updated Layout: Span grouped Balance Alerts across more space */}
+        {/* Updated Layout: Space utilization */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="space-y-4">
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
@@ -707,14 +707,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-            {/* Re-designed Balance Alert Section: Grouped by team and more spacious */}
+            {/* Compact Credit Alert Section: High density small cards */}
             <div className="lg:col-span-2">
                 {isDirector && (
                     <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 md:p-6 h-full flex flex-col ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
                         <div className="flex justify-between items-center mb-5 shrink-0">
                             <h3 className="font-black text-sm md:text-lg flex items-center text-gray-800">
                                 <AlertTriangle className={`w-4 h-4 md:w-6 md:h-6 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 
-                                课时余额预警 (按梯队分组)
+                                课时预警 (精简看板)
                             </h3>
                             <div className="flex items-center gap-2 md:gap-3">
                                 <select 
@@ -738,37 +738,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                         
                         <div className="flex-1 overflow-y-auto max-h-[400px] md:max-h-[500px] custom-scrollbar pr-2 -mr-2">
                             {groupedLowCredits.length > 0 ? (
-                                <div className="space-y-6">
+                                <div className="space-y-5">
                                     {groupedLowCredits.map(([teamId, group]) => (
                                         <div key={teamId} className="space-y-2">
-                                            <div className="flex items-center gap-2 sticky top-0 bg-white py-1.5 z-10 border-b border-gray-50 mb-2">
-                                                <div className="w-1.5 h-4 bg-bvb-yellow rounded-full"></div>
-                                                <h4 className="text-[10px] md:text-xs font-black text-gray-800 uppercase tracking-widest">{group.name}</h4>
-                                                <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 rounded-full font-bold">({group.players.length}人)</span>
+                                            <div className="flex items-center gap-2 sticky top-0 bg-white py-1 z-10 border-b border-gray-50 mb-1.5">
+                                                <div className="w-1 h-3 bg-bvb-yellow rounded-full"></div>
+                                                <h4 className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.name}</h4>
+                                                <span className="text-[8px] bg-gray-100 text-gray-400 px-1 rounded-full font-bold">({group.players.length})</span>
                                             </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                                                 {group.players.map(p => (
                                                     <div 
                                                         key={p.id} 
                                                         onClick={() => handleLowCreditPlayerClick(p)} 
-                                                        className={`flex justify-between items-center p-3 rounded-xl border transition-all cursor-pointer group ${p.credits <= 0 ? 'bg-red-50 border-red-100 hover:bg-red-100' : 'bg-orange-50/30 border-orange-100 hover:bg-orange-50'}`}
+                                                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer hover:scale-[1.02] ${p.credits <= 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50/50 border-orange-200'}`}
                                                     >
-                                                        <div className="flex items-center gap-2.5">
-                                                            <div className="w-8 h-8 rounded-full overflow-hidden border border-white shadow-sm shrink-0">
-                                                                <img src={p.image} className="w-full h-full object-cover" />
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="font-black text-gray-800 text-xs md:text-sm group-hover:text-bvb-black">{p.name}</span>
-                                                                <span className="text-[9px] text-gray-400 font-bold uppercase">#{p.number}</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <div className={`text-sm md:text-base font-black tabular-nums ${p.credits <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
-                                                                {p.credits} <span className="text-[10px]">节</span>
-                                                            </div>
-                                                            <div className="text-[8px] text-gray-400 font-bold flex items-center justify-end">
-                                                                查看详情 <ChevronRight className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                            </div>
+                                                        <span className="font-bold text-[11px] md:text-xs text-gray-800 truncate" title={p.name}>{p.name}</span>
+                                                        <div className={`flex items-baseline gap-0.5 ml-2 ${p.credits <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                                                            <span className="text-xs md:text-sm font-black tabular-nums">{p.credits}</span>
+                                                            <span className="text-[8px] font-bold opacity-70">节</span>
                                                         </div>
                                                     </div>
                                                 ))}
@@ -779,7 +767,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center py-20 text-gray-300">
                                     <ShieldCheck className="w-12 h-12 opacity-20 mb-3" />
-                                    <p className="text-sm font-black uppercase tracking-widest italic">All Accounts Normal</p>
+                                    <p className="text-sm font-black uppercase tracking-widest italic text-center">正常 • 暂无预警人员</p>
                                 </div>
                             )}
                         </div>
