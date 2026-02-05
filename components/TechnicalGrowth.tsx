@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -307,10 +306,10 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        // Comment: Explicitly cast FileReader result to string to resolve potential unknown type issues in specific TS environments
-        reader.onload = () => {
-            const result = reader.result;
-            // Comment: Perform type check to narrow unknown or union type to string before string operations
+        // Comment: Explicitly type the onload event to avoid implicit result access that might be inferred as unknown
+        reader.onload = (event: ProgressEvent<FileReader>) => {
+            const result = event.target?.result;
+            // Comment: Narrow type of result to string before performing split or other string operations
             if (typeof result !== 'string') return;
             const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };

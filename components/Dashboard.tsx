@@ -1,6 +1,7 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle, Pencil } from 'lucide-react';
+import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle, Pencil, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -216,6 +217,22 @@ const Dashboard: React.FC<DashboardProps> = ({
         finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense } 
     };
   }, [displayPlayers, displayTeams, transactions, matches, isDirector, creditAlertTeamId]);
+
+  // 新增：按梯队对余额不足的球员进行分组
+  const groupedLowCredits = useMemo(() => {
+    const groups: Record<string, { name: string, players: Player[] }> = {};
+    stats.lowCreditPlayers.forEach(p => {
+        const team = teams.find(t => t.id === p.teamId);
+        const teamId = p.teamId || 'unknown';
+        const teamName = team?.name || '未知梯队';
+        if (!groups[teamId]) {
+            groups[teamId] = { name: teamName, players: [] };
+        }
+        groups[teamId].players.push(p);
+    });
+    // 按照梯队名称排序，或者保持原有的梯队列表顺序
+    return Object.entries(groups).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  }, [stats.lowCreditPlayers, teams]);
 
   const { chartData, exportPlayersData, exportSessionsData, teamPlayersList, aggregateTotals } = useMemo(() => {
     const start = dateRange.start;
@@ -652,6 +669,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             ) : null}
         </div>
 
+        {/* Updated Layout: Span grouped Balance Alerts across more space */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="space-y-4">
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-indigo-500 p-4">
@@ -665,47 +683,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         ))}
                     </div>
                 </div>
-                {isDirector && (
-                    <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-black text-sm flex items-center text-gray-800">
-                                <AlertTriangle className={`w-4 h-4 mr-1.5 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 余额预警
-                            </h3>
-                            <div className="flex items-center gap-1.5">
-                                <select 
-                                    value={creditAlertTeamId} 
-                                    onChange={(e) => setCreditAlertTeamId(e.target.value)}
-                                    className="text-[10px] bg-gray-100 border-none rounded px-1 py-0.5 font-black outline-none focus:ring-1 focus:ring-bvb-yellow"
-                                >
-                                    <option value="all">全部</option>
-                                    {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
-                                </select>
-                                <button 
-                                    onClick={handleExportCreditsPDF} 
-                                    disabled={isExportingCredits || stats.lowCreditPlayers.length === 0}
-                                    className="p-1 text-gray-400 hover:text-bvb-black disabled:opacity-30"
-                                    title="导出预警名单"
-                                >
-                                    {isExportingCredits ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                                </button>
-                            </div>
-                        </div>
-                        <div className="space-y-2 max-h-[160px] md:max-h-[180px] overflow-y-auto custom-scrollbar pr-1">
-                            {stats.lowCreditPlayers.map(p => {
-                                const team = teams.find(t => t.id === p.teamId);
-                                return (
-                                    <div key={p.id} onClick={() => handleLowCreditPlayerClick(p)} className="flex justify-between items-center bg-red-50 p-2 rounded-lg text-xs cursor-pointer hover:bg-red-100 transition-colors group">
-                                        <div className="flex flex-col">
-                                            <span className="font-black text-gray-700">{p.name}</span>
-                                            <span className="text-[9px] text-gray-400 font-bold uppercase">{team?.name || '未知梯队'}</span>
-                                        </div>
-                                        <span className="font-mono font-black text-red-600">{p.credits} 节</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                
                 <div className="bg-white rounded-xl shadow-sm border-l-4 border-pink-500 p-4">
                     <h3 className="font-black text-sm flex items-center text-gray-800 mb-3"><Cake className="w-4 h-4 mr-1.5 text-pink-500" /> 近期生日</h3>
                     {stats.upcomingBirthdays.length > 0 ? (
@@ -729,7 +707,89 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-            <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+            {/* Re-designed Balance Alert Section: Grouped by team and more spacious */}
+            <div className="lg:col-span-2">
+                {isDirector && (
+                    <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 md:p-6 h-full flex flex-col ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
+                        <div className="flex justify-between items-center mb-5 shrink-0">
+                            <h3 className="font-black text-sm md:text-lg flex items-center text-gray-800">
+                                <AlertTriangle className={`w-4 h-4 md:w-6 md:h-6 mr-2 ${stats.lowCreditPlayers.length > 0 ? 'text-red-500' : 'text-green-500'}`} /> 
+                                课时余额预警 (按梯队分组)
+                            </h3>
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <select 
+                                    value={creditAlertTeamId} 
+                                    onChange={(e) => setCreditAlertTeamId(e.target.value)}
+                                    className="text-[10px] md:text-xs bg-gray-100 border-none rounded-lg px-2 py-1 font-black outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                >
+                                    <option value="all">全部梯队</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                                </select>
+                                <button 
+                                    onClick={handleExportCreditsPDF} 
+                                    disabled={isExportingCredits || stats.lowCreditPlayers.length === 0}
+                                    className="p-1.5 md:p-2 bg-gray-100 hover:bg-bvb-black hover:text-white rounded-lg text-gray-400 transition-all disabled:opacity-30"
+                                    title="导出预警名单"
+                                >
+                                    {isExportingCredits ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto max-h-[400px] md:max-h-[500px] custom-scrollbar pr-2 -mr-2">
+                            {groupedLowCredits.length > 0 ? (
+                                <div className="space-y-6">
+                                    {groupedLowCredits.map(([teamId, group]) => (
+                                        <div key={teamId} className="space-y-2">
+                                            <div className="flex items-center gap-2 sticky top-0 bg-white py-1.5 z-10 border-b border-gray-50 mb-2">
+                                                <div className="w-1.5 h-4 bg-bvb-yellow rounded-full"></div>
+                                                <h4 className="text-[10px] md:text-xs font-black text-gray-800 uppercase tracking-widest">{group.name}</h4>
+                                                <span className="text-[9px] bg-gray-100 text-gray-400 px-1.5 rounded-full font-bold">({group.players.length}人)</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {group.players.map(p => (
+                                                    <div 
+                                                        key={p.id} 
+                                                        onClick={() => handleLowCreditPlayerClick(p)} 
+                                                        className={`flex justify-between items-center p-3 rounded-xl border transition-all cursor-pointer group ${p.credits <= 0 ? 'bg-red-50 border-red-100 hover:bg-red-100' : 'bg-orange-50/30 border-orange-100 hover:bg-orange-50'}`}
+                                                    >
+                                                        <div className="flex items-center gap-2.5">
+                                                            <div className="w-8 h-8 rounded-full overflow-hidden border border-white shadow-sm shrink-0">
+                                                                <img src={p.image} className="w-full h-full object-cover" />
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-black text-gray-800 text-xs md:text-sm group-hover:text-bvb-black">{p.name}</span>
+                                                                <span className="text-[9px] text-gray-400 font-bold uppercase">#{p.number}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className={`text-sm md:text-base font-black tabular-nums ${p.credits <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                                                                {p.credits} <span className="text-[10px]">节</span>
+                                                            </div>
+                                                            <div className="text-[8px] text-gray-400 font-bold flex items-center justify-end">
+                                                                查看详情 <ChevronRight className="w-2.5 h-2.5 ml-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center py-20 text-gray-300">
+                                    <ShieldCheck className="w-12 h-12 opacity-20 mb-3" />
+                                    <p className="text-sm font-black uppercase tracking-widest italic">All Accounts Normal</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
                 <div className="p-3 md:p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
                     <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center italic uppercase tracking-tighter"><Megaphone className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2 text-bvb-yellow" /> 俱乐部公告栏</h3>
                     {isDirector && (
