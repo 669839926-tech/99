@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -24,13 +24,39 @@ interface TrainingPlannerProps {
 }
 
 type TimeScope = 'month' | 'quarter' | 'year';
-type ViewType = 'calendar' | 'list' | 'periodization';
+type ViewType = 'calendar' | 'list' | 'periodization' | 'focus';
 
-// 辅助函数：确保日期字符串按本地时间解析，修复 31 号等边界日期显示问题
 const parseLocalDate = (dateStr: string) => {
     if (!dateStr) return new Date();
     const [y, m, d] = dateStr.split('-').map(Number);
     return new Date(y, m - 1, d);
+};
+
+// 辅助函数：计算球员关注统计
+const calculateFocusStats = (playerId: string, allSessions: TrainingSession[]) => {
+    const today = new Date();
+    const curYear = today.getFullYear();
+    const curMonth = today.getMonth();
+    const curQuarter = Math.floor(curMonth / 3);
+
+    const playerSessions = allSessions.filter(s => s.focusedPlayerIds?.includes(playerId));
+
+    const stats = {
+        month: 0,
+        quarter: 0,
+        year: 0
+    };
+
+    playerSessions.forEach(s => {
+        const d = parseLocalDate(s.date);
+        if (d.getFullYear() === curYear) {
+            stats.year++;
+            if (d.getMonth() === curMonth) stats.month++;
+            if (Math.floor(d.getMonth() / 3) === curQuarter) stats.quarter++;
+        }
+    });
+
+    return stats;
 };
 
 interface WeeklyPlanEditorProps {
@@ -136,7 +162,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci, currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -154,7 +180,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
         return () => clearTimeout(timer);
     }, [localSession]);
 
-    // 教练端自动标记已读逻辑
     useEffect(() => {
         if (activeTab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
             setLocalSession(prev => ({ ...prev, isReviewRead: true }));
@@ -203,6 +228,15 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
             onDelete(session.id);
             onClose();
         }
+    };
+
+    const updateFocusNote = (playerId: string, field: 'technical' | 'mental', value: string) => {
+        setLocalSession(prev => {
+            const notes = { ...(prev.focusedPlayerNotes || {}) };
+            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '' };
+            notes[playerId][field] = value;
+            return { ...prev, focusedPlayerNotes: notes };
+        });
     };
 
     return (
@@ -272,32 +306,29 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                         />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">重点科目</label>
-                                        <select 
-                                            disabled={!canEdit}
-                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                            value={localSession.focus}
-                                            onChange={e => setLocalSession({...localSession, focus: e.target.value})}
-                                        >
-                                            {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
-                                        </select>
+                                
+                                {/* 重点关注球员显示 (仅查看) */}
+                                {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) && (
+                                    <div className="bg-yellow-50/50 border border-yellow-100 p-4 rounded-xl">
+                                        <label className="block text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                            <Star className="w-3 h-3 fill-current" /> 本课重点关注球员
+                                        </label>
+                                        <div className="flex flex-wrap gap-2">
+                                            {localSession.focusedPlayerIds.map(pid => {
+                                                const p = players.find(p => p.id === pid);
+                                                if (!p) return null;
+                                                return (
+                                                    <div key={pid} className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-yellow-200 shadow-sm">
+                                                        <img src={p.image} className="w-5 h-5 rounded-full object-cover" />
+                                                        <span className="text-xs font-black text-gray-800">{p.name}</span>
+                                                        <span className="text-[10px] text-gray-400 font-mono">#{p.number}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
-                                        <select 
-                                            disabled={!canEdit}
-                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                            value={localSession.intensity}
-                                            onChange={e => setLocalSession({...localSession, intensity: e.target.value as any})}
-                                        >
-                                            <option value="Low">低强度</option>
-                                            <option value="Medium">中等强度</option>
-                                            <option value="High">高强度</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                )}
+
                                 <div>
                                     <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
                                         <List className="w-3 h-3" /> 训练项目清单 (Drills)
@@ -350,16 +381,28 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                               <div className="space-y-3">
                                   {teamPlayers.map(player => {
                                       const status = getStatus(player.id);
+                                      const isFocused = localSession.focusedPlayerIds?.includes(player.id);
                                       return (
-                                          <div key={player.id} className="flex flex-col p-3 bg-white border border-gray-100 rounded-lg shadow-sm">
+                                          <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-sm transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-white border-gray-100'}`}>
                                               <div className="flex items-center justify-between mb-3">
                                                   <div className="flex items-center">
-                                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold mr-2 border-2 ${status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' : status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>{player.name.charAt(0)}</div>
-                                                      <div><div className="font-bold text-gray-800 text-sm">{player.name}</div><div className="text-[10px] text-gray-400">#{player.number}</div></div>
+                                                      <div className="relative">
+                                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold mr-3 border-2 ${status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' : status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                                                              {player.name.charAt(0)}
+                                                          </div>
+                                                          {isFocused && <div className="absolute -top-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white shadow-sm"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>}
+                                                      </div>
+                                                      <div>
+                                                          <div className="flex items-center gap-1.5">
+                                                              <div className="font-black text-gray-800 text-sm">{player.name}</div>
+                                                              {isFocused && <span className="text-[8px] font-black uppercase text-bvb-black bg-bvb-yellow px-1.5 rounded-sm">Focused</span>}
+                                                          </div>
+                                                          <div className="text-[10px] text-gray-400 font-mono">#{player.number} • {player.position}</div>
+                                                      </div>
                                                   </div>
                                                   <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
                                               </div>
-                                              <div className="flex bg-gray-50 p-1 rounded-lg gap-1">
+                                              <div className="flex bg-gray-50/50 p-1 rounded-lg gap-1">
                                                   <button onClick={() => setPlayerStatus(player.id, 'Present')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}><CheckCircle className="w-5 h-5" /></button>
                                                   <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}><Clock className="w-5 h-5" /></button>
                                                   <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-sm text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}><AlertCircle className="w-5 h-5" /></button>
@@ -373,9 +416,63 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                         </div>
                     )}
                     {activeTab === 'log' && (
-                        <div className="animate-in fade-in duration-200 space-y-6">
-                            <div className="space-y-3">
-                                <div className="flex justify-between items-center"><h4 className="font-bold text-gray-800 flex items-center"><UserIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 教练日志 (Coach)</h4><span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${localSession.submissionStatus === 'Planned' ? 'bg-gray-100 text-gray-500' : localSession.submissionStatus === 'Submitted' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{localSession.submissionStatus === 'Planned' ? '未提交' : localSession.submissionStatus === 'Submitted' ? '待审核' : '已审核'}</span></div>
+                        <div className="animate-in fade-in duration-200 space-y-8">
+                            {/* 重点关注球员评价区 (NEW) */}
+                            {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) && (
+                                <div className="space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <Star className="w-5 h-5 text-bvb-yellow fill-current" />
+                                        <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">重点球员成长反馈</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6">
+                                        {localSession.focusedPlayerIds.map(pid => {
+                                            const p = players.find(p => p.id === pid);
+                                            if (!p) return null;
+                                            const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '' };
+                                            return (
+                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-2xl p-5 shadow-sm space-y-4">
+                                                    <div className="flex items-center gap-3 border-b border-yellow-100 pb-3">
+                                                        <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                        <div>
+                                                            <div className="font-black text-gray-800 text-sm">{p.name}</div>
+                                                            <div className="text-[10px] text-gray-500 font-bold uppercase">Target Feedback Session</div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                                <Target className="w-3 h-3 text-bvb-yellow" /> 技术表现反馈
+                                                            </label>
+                                                            <textarea 
+                                                                disabled={!canEdit}
+                                                                className="w-full h-24 p-3 bg-white border border-yellow-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
+                                                                placeholder="点评该球员本课的技术执行、基本功及战术理解..."
+                                                                value={note.technical}
+                                                                onChange={e => updateFocusNote(pid, 'technical', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                                <Brain className="w-3 h-3 text-indigo-400" /> 心理/态度反馈
+                                                            </label>
+                                                            <textarea 
+                                                                disabled={!canEdit}
+                                                                className="w-full h-24 p-3 bg-white border border-yellow-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
+                                                                placeholder="评价球员本课的训练态度、专注度及自信心..."
+                                                                value={note.mental}
+                                                                onChange={e => updateFocusNote(pid, 'mental', e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-3 pt-6 border-t border-gray-100">
+                                <div className="flex justify-between items-center"><h4 className="font-bold text-gray-800 flex items-center"><UserIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 整体训练总结 (Team Summary)</h4><span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${localSession.submissionStatus === 'Planned' ? 'bg-gray-100 text-gray-500' : localSession.submissionStatus === 'Submitted' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{localSession.submissionStatus === 'Planned' ? '未提交' : localSession.submissionStatus === 'Submitted' ? '待审核' : '已审核'}</span></div>
                                 <div className="relative">
                                     <textarea disabled={!canEdit || localSession.submissionStatus === 'Reviewed'} className="w-full h-40 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100" placeholder="请描述球队整体训练状态，以及教案实际执行效果..." value={localSession.coachFeedback || ''} onChange={e => setLocalSession({...localSession, coachFeedback: e.target.value})} />
                                     {canEdit && localSession.submissionStatus !== 'Reviewed' && (
@@ -451,7 +548,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   
-  // 梯队过滤器状态，默认选中该教练的第一个队或全部
   const [statsTeamFilter, setStatsTeamFilter] = useState<string>(() => {
     if (isCoach && currentUser?.teamIds?.length) return currentUser.teamIds[0];
     return 'all';
@@ -459,6 +555,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const [activeWeekPlan, setActiveWeekPlan] = useState<WeeklyPlan | null>(null);
   const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
+
+  // 球员关注追踪子模块状态
+  const [focusSearchTerm, setFocusSearchTerm] = useState('');
+  const [selectedFocusPlayerId, setSelectedFocusPlayerId] = useState<string | null>(null);
 
   const userManagedSessions = useMemo(() => {
       if (isDirector) return trainings;
@@ -490,7 +590,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       intensity: 'Medium',
       date: new Date().toISOString().split('T')[0],
       drills: [] as string[],
-      linkedDesignId: undefined as string | undefined
+      linkedDesignId: undefined as string | undefined,
+      focusedPlayerIds: [] as string[]
   });
 
   useEffect(() => {
@@ -510,24 +611,20 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
       if (timeScope === 'month') {
           startDate = new Date(year, month, 1);
-          // 修正：将结束时间设为该月最后一天的深夜，确保 31 号包含在内
           endDate = new Date(year, month + 1, 0, 23, 59, 59);
           label = `${year}年 ${month + 1}月`;
       } else if (timeScope === 'quarter') {
           const quarterStartMonth = Math.floor(month / 3) * 3;
           startDate = new Date(year, quarterStartMonth, 1);
-          // 修正：将结束时间设为该季度最后一天的深夜
           endDate = new Date(year, quarterStartMonth + 3, 0, 23, 59, 59);
           label = `${year}年 Q${Math.floor(month / 3) + 1}季度`;
       } else {
           startDate = new Date(year, 0, 1);
-          // 修正：将结束时间设为该年最后一天的深夜
           endDate = new Date(year, 11, 31, 23, 59, 59);
           label = `${year}年度`;
       }
 
       const sessions = userManagedSessions.filter(t => {
-          // 使用本地解析确保日期对象比较的准确性
           const d = parseLocalDate(t.date);
           const matchDate = d >= startDate && d <= endDate;
           const matchTeam = statsTeamFilter === 'all' || t.teamId === statsTeamFilter;
@@ -550,6 +647,41 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const year = currentDate.getFullYear();
       return periodizationPlans.find(p => p.teamId === teamId && p.year === year) || { id: `p-${teamId}-${year}`, teamId, year, weeks: [] };
   }, [periodizationPlans, statsTeamFilter, availableTeams, currentDate]);
+
+  // 球员关注追踪视图逻辑
+  const focusedPlayersSummary = useMemo(() => {
+    const focusMap: Record<string, { player: Player; stats: any; history: any[] }> = {};
+    const relevantTrainings = userManagedSessions.filter(s => statsTeamFilter === 'all' || s.teamId === statsTeamFilter);
+    
+    relevantTrainings.forEach(s => {
+        if (s.focusedPlayerIds) {
+            s.focusedPlayerIds.forEach(pid => {
+                if (!focusMap[pid]) {
+                    const p = players.find(p => p.id === pid);
+                    if (p) {
+                        focusMap[pid] = { 
+                            player: p, 
+                            stats: calculateFocusStats(pid, userManagedSessions),
+                            history: []
+                        };
+                    }
+                }
+                if (focusMap[pid]) {
+                    focusMap[pid].history.push({
+                        id: s.id,
+                        date: s.date,
+                        title: s.title,
+                        notes: s.focusedPlayerNotes?.[pid] || { technical: '', mental: '' }
+                    });
+                }
+            });
+        }
+    });
+
+    return Object.values(focusMap)
+        .filter(entry => entry.player.name.includes(focusSearchTerm))
+        .sort((a, b) => b.stats.year - a.stats.year);
+  }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
 
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
@@ -610,6 +742,156 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       );
   };
 
+  const renderFocusView = () => {
+    return (
+        <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500">
+            {/* 球员关注列表 */}
+            <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none shadow-sm"
+                        placeholder="搜索球员追踪成长..."
+                        value={focusSearchTerm}
+                        onChange={e => setFocusSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-20 md:pb-4">
+                    {focusedPlayersSummary.map(entry => {
+                        const isSelected = selectedFocusPlayerId === entry.player.id;
+                        return (
+                            <div 
+                                key={entry.player.id} 
+                                onClick={() => setSelectedFocusPlayerId(entry.player.id)}
+                                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <img src={entry.player.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-black text-sm truncate">{entry.player.name}</h4>
+                                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                    </div>
+                                    <ChevronRight className={`w-5 h-5 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
+                                </div>
+                                <div className={`grid grid-cols-3 gap-2 mt-4 pt-3 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                    <div className="text-center">
+                                        <p className="text-[8px] font-black uppercase opacity-60">本月关注</p>
+                                        <p className="text-sm font-black tabular-nums">{entry.stats.month}</p>
+                                    </div>
+                                    <div className="text-center border-x border-white/5">
+                                        <p className="text-[8px] font-black uppercase opacity-60">本季关注</p>
+                                        <p className="text-sm font-black tabular-nums">{entry.stats.quarter}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[8px] font-black uppercase opacity-60">年度总计</p>
+                                        <p className={`text-sm font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {focusedPlayersSummary.length === 0 && (
+                        <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-4">
+                            <History className="w-12 h-12 opacity-10" />
+                            <p className="text-xs font-black uppercase tracking-widest">暂无重点关注球员记录</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 球员成长追踪时间轴 */}
+            <div className="flex-1 flex flex-col bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+                {selectedFocusPlayerId ? (
+                    <React.Fragment>
+                        {(() => {
+                            const entry = focusedPlayersSummary.find(e => e.player.id === selectedFocusPlayerId);
+                            if (!entry) return null;
+                            const history = [...entry.history].sort((a,b) => b.date.localeCompare(a.date));
+                            return (
+                                <React.Fragment>
+                                    <div className="p-6 md:p-8 bg-gray-50 border-b flex justify-between items-end shrink-0">
+                                        <div className="flex items-center gap-5">
+                                            <img src={entry.player.image} className="w-20 h-20 rounded-3xl object-cover border-4 border-white shadow-xl rotate-[-2deg]" />
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="text-2xl font-black text-gray-800">{entry.player.name}</h3>
+                                                    <Star className="w-5 h-5 text-bvb-yellow fill-current" />
+                                                </div>
+                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Growth & Psychological Tracking Portal</p>
+                                                <div className="flex gap-4 mt-4">
+                                                    <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">年度关注频次</span><span className="text-lg font-black text-bvb-black">{entry.stats.year} 次</span></div>
+                                                    <div className="w-px h-8 bg-gray-200"></div>
+                                                    <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">最后关注日期</span><span className="text-lg font-black text-gray-800">{history[0]?.date || '-'}</span></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={async () => {
+                                                setIsExporting(true);
+                                                try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
+                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
+                                            }}
+                                            className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
+                                        >
+                                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4 text-bvb-yellow"/>}
+                                            Export Profile
+                                        </button>
+                                    </div>
+                                    <div id="focus-tracking-export" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+                                        <div className="relative space-y-8">
+                                            <div className="absolute left-[23px] top-4 bottom-4 w-1 bg-gray-100 rounded-full"></div>
+                                            {history.map((h, idx) => (
+                                                <div key={h.id} className="relative pl-14 animate-in slide-in-from-left-4" style={{ animationDelay: `${idx * 100}ms` }}>
+                                                    <div className="absolute left-0 top-0 w-12 h-12 bg-white rounded-2xl border-4 border-gray-50 shadow-md flex items-center justify-center z-10">
+                                                        <span className="text-[10px] font-black text-gray-400 font-mono leading-none">{h.date.split('-').slice(1).join('/')}</span>
+                                                    </div>
+                                                    <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-6 hover:bg-white hover:shadow-md transition-all group">
+                                                        <div className="flex justify-between items-start mb-4">
+                                                            <h5 className="font-black text-lg text-gray-800 group-hover:text-bvb-black transition-colors">{h.title}</h5>
+                                                            <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                            <div className="space-y-2">
+                                                                <label className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center gap-1.5">
+                                                                    <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现评价
+                                                                </label>
+                                                                <div className="text-sm text-gray-600 leading-relaxed italic bg-white p-3 rounded-xl border border-gray-50 min-h-[60px]">
+                                                                    {h.notes.technical || '-- 暂无技战术层反馈记录 --'}
+                                                                </div>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                                                                    <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度评估
+                                                                </label>
+                                                                <div className="text-sm text-gray-600 leading-relaxed italic bg-white p-3 rounded-xl border border-gray-50 min-h-[60px]">
+                                                                    {h.notes.mental || '-- 暂无心理层面评估记录 --'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </React.Fragment>
+                            );
+                        })()}
+                    </React.Fragment>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center text-gray-300 p-10">
+                        <Users className="w-20 h-20 opacity-10 mb-6" />
+                        <h4 className="text-xl font-black text-gray-400 uppercase italic tracking-tighter mb-2">Focus Player Analytics</h4>
+                        <p className="text-sm font-bold text-center max-w-xs uppercase tracking-widest opacity-60">请从左侧列表中选择一名关注球员查看其历史成长轨迹及反馈。</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+  };
+
   const renderPeriodizationView = () => {
     const year = currentDate.getFullYear();
     const months = timeScope === 'year' ? Array.from({length: 12}, (_, i) => i + 1) : 
@@ -646,8 +928,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         onUpdatePeriodization?.({ ...currentPeriodization, weeks: nextWeeks });
         alert(`内容已成功粘贴到 ${month}月 第${weekNum}周`);
     };
-
-    const selectedTeamName = teams.find(t => t.id === statsTeamFilter)?.name || '未分配梯队';
 
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
@@ -886,17 +1166,33 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                  if (plan.title) finalTitle = plan.title;
             }
             if (!finalTitle) finalTitle = `${formData.focus} 训练`;
-            const newSession: TrainingSession = { id: Date.now().toString(), teamId: formData.teamId, title: finalTitle, date: formData.date, focus: formData.focus === 'Custom' ? formData.focusCustom : formData.focus, duration: formData.duration, intensity: formData.intensity as any, drills: finalDrills, aiGenerated: isAiMode, attendance: [], submissionStatus: 'Planned', isReviewRead: true, linkedDesignId: formData.linkedDesignId };
+            const newSession: TrainingSession = { 
+                id: Date.now().toString(), 
+                teamId: formData.teamId, 
+                title: finalTitle, 
+                date: formData.date, 
+                focus: formData.focus === 'Custom' ? formData.focusCustom : formData.focus, 
+                duration: formData.duration, 
+                intensity: formData.intensity as any, 
+                drills: finalDrills, 
+                aiGenerated: isAiMode, 
+                attendance: [], 
+                submissionStatus: 'Planned', 
+                isReviewRead: true, 
+                linkedDesignId: formData.linkedDesignId,
+                focusedPlayerIds: formData.focusedPlayerIds,
+                focusedPlayerNotes: {}
+            };
             onAddTraining(newSession);
             setShowAddModal(false);
-            setFormData({ teamId: availableTeams[0]?.id || '', title: '', focus: trainingFoci[0] || '传接球', focusCustom: '', duration: 90, intensity: 'Medium', date: new Date().toISOString().split('T')[0], drills: [], linkedDesignId: undefined });
+            setFormData({ teamId: availableTeams[0]?.id || '', title: '', focus: trainingFoci[0] || '传接球', focusCustom: '', duration: 90, intensity: 'Medium', date: new Date().toISOString().split('T')[0], drills: [], linkedDesignId: undefined, focusedPlayerIds: [] });
             setIsAiMode(false);
         } catch (error) { console.error(error); alert('创建失败'); } finally { setLoading(false); }
   };
 
   const handleDuplicateConfirm = () => {
       if (!sessionToDuplicate) return;
-      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', isReviewRead: true, attendance: [], coachFeedback: '', directorReview: '' };
+      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', isReviewRead: true, attendance: [], coachFeedback: '', directorReview: '', focusedPlayerNotes: {} };
       onAddTraining(copy);
       setSessionToDuplicate(null);
       alert('已成功复制训练计划到 ' + duplicateDate);
@@ -919,7 +1215,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             <LayoutList className="w-3 h-3 md:w-3.5 md:h-3.5" /> 列表
                         </button>
                         <button onClick={() => setViewType('periodization')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'periodization' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
-                            <TableProperties className="w-3 h-3 md:w-3.5 md:h-3.5" /> 周期排版
+                            <TableProperties className="w-3 h-3 md:w-3.5 md:h-3.5" /> 周期
+                        </button>
+                        <button onClick={() => setViewType('focus')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'focus' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                            <Star className="w-3 h-3 md:w-3.5 md:h-3.5" /> 关注
                         </button>
                     </div>
                     <div className="h-4 w-px bg-gray-300 mx-1"></div>
@@ -930,7 +1229,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             </div>
             
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-                {/* 梯队全局筛选器 - 放置在核心操作区 */}
                 <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1.5 shadow-sm shrink-0 flex-1 md:flex-none">
                     <Users className="w-4 h-4 text-gray-400 ml-1" />
                     <select 
@@ -966,11 +1264,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
              <div className="flex-1 p-1">
                  {viewType === 'calendar' ? renderCalendarView() : 
                   viewType === 'list' ? renderListView() : 
-                  renderPeriodizationView()}
+                  viewType === 'periodization' ? renderPeriodizationView() :
+                  renderFocusView()}
              </div>
              
-             {/* Right Sidebar: Stats & Selected Day Summary */}
-             {viewType !== 'periodization' && (
+             {viewType !== 'periodization' && viewType !== 'focus' && (
              <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
                  {renderStats()}
                  <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-h-[300px]">
@@ -989,6 +1287,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{team?.name}</span>
                                             <div className="flex items-center gap-1.5">
+                                                {s.focusedPlayerIds && s.focusedPlayerIds.length > 0 && <Star className="w-3 h-3 text-bvb-yellow fill-current" />}
                                                 {s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500" />}
                                                 {s.submissionStatus === 'Submitted' && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>}
                                                 {s.submissionStatus === 'Reviewed' && <ShieldCheck className={`w-3 h-3 ${isUnread ? 'text-blue-600' : 'text-green-600'}`} />}
@@ -1018,118 +1317,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
              )}
         </div>
 
-        {/* --- EXPORT TEMPLATE --- */}
-        <div id="training-plan-list-pdf" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
-            <div className="w-full p-[15mm] flex flex-col bg-white">
-                <div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-6 mb-10">
-                    <div className="flex items-center gap-4">
-                        {appLogo && <img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" />}
-                        <div>
-                            <h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1>
-                            <p className="text-sm font-bold text-gray-400 tracking-widest uppercase">训练计划执行明细报表</p>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-sm font-bold text-gray-500 uppercase">Training Journal</div>
-                        <div className="text-2xl font-black text-bvb-black">{dateLabel}</div>
-                    </div>
-                </div>
-
-                <div className="space-y-12">
-                    {filteredSessions.length > 0 ? (
-                        filteredSessions.map((s, idx) => {
-                            const team = teams.find(t => t.id === s.teamId);
-                            const sessionAttendance = s.attendance || [];
-                            const presentPlayers = players.filter(p => sessionAttendance.find(a => a.playerId === p.id && a.status === 'Present'));
-
-                            return (
-                                <div key={s.id} className="relative border-b border-gray-100 pb-10 last:border-b-0 break-inside-avoid">
-                                    <div className="flex justify-between items-center mb-6 bg-gray-50 p-5 rounded-2xl border border-gray-100">
-                                        <div className="flex items-center gap-5">
-                                            <div className="w-14 h-14 bg-bvb-black text-bvb-yellow rounded-2xl flex flex-col items-center justify-center font-black">
-                                                <span className="text-[10px] font-black leading-none uppercase">ENTRY</span>
-                                                <span className="text-xl leading-none">{idx + 1}</span>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-2xl font-black text-gray-800 uppercase tracking-tight">{s.title}</h3>
-                                                <div className="flex gap-4 text-xs font-bold text-gray-500 mt-1">
-                                                    <span className="flex items-center"><CalendarIcon className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> {s.date}</span>
-                                                    <span className="flex items-center"><Users className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> {team?.name} ({team?.level})</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end gap-1.5">
-                                            <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-widest border ${s.intensity === 'High' ? 'bg-red-50 border-red-200 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' : 'bg-green-50 border-green-200 text-green-700'}`}>
-                                                {s.intensity} INTENSITY
-                                            </span>
-                                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{s.duration} MINS • FOCUS: {s.focus}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-12 gap-8 px-2">
-                                        <div className="col-span-4 space-y-4">
-                                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center">
-                                                <List className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练项目清单
-                                            </h4>
-                                            <ul className="space-y-2.5">
-                                                {s.drills.map((drill, dIdx) => (
-                                                    <li key={dIdx} className="text-xs font-bold text-gray-600 flex items-start bg-gray-50/50 p-2 rounded-lg border border-gray-100">
-                                                        <span className="w-4 h-4 rounded bg-bvb-black text-bvb-yellow text-[8px] flex items-center justify-center mr-2 shrink-0 mt-0.5">{dIdx + 1}</span>
-                                                        {drill}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-
-                                        <div className="col-span-8 space-y-6">
-                                            <div className="bg-gray-50 rounded-2xl p-6 border-l-4 border-bvb-black">
-                                                <h4 className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center mb-4">
-                                                    <FileText className="w-3.5 h-3.5 mr-1.5" /> 实际执行日志
-                                                </h4>
-                                                <div className="text-sm text-gray-700 leading-relaxed italic whitespace-pre-wrap">
-                                                    {s.coachFeedback || "-- 暂无教练员训练日志记录 --"}
-                                                </div>
-                                            </div>
-
-                                            {s.directorReview && (
-                                                <div className="bg-yellow-50/50 rounded-2xl p-6 border-l-4 border-bvb-yellow">
-                                                    <h4 className="text-[10px] font-black text-yellow-700 uppercase tracking-widest flex items-center mb-4">
-                                                        <ShieldCheck className="w-3.5 h-3.5 mr-1.5" /> 总监评审意见
-                                                    </h4>
-                                                    <div className="text-sm text-gray-800 leading-relaxed font-bold italic whitespace-pre-wrap">
-                                                        {s.directorReview}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="bg-white border border-gray-100 rounded-2xl p-5">
-                                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center mb-4">
-                                                    <UserCheck className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 正常参训人员 ({presentPlayers.length})
-                                                </h4>
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {presentPlayers.map(p => (
-                                                        <span key={p.id} className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded text-[10px] font-bold">#{p.number} {p.name}</span>
-                                                    ))}
-                                                    {presentPlayers.length === 0 && <span className="text-[10px] text-gray-300 italic">暂无实到人员记录</span>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    ) : (
-                        <div className="py-24 text-center text-gray-300 italic font-bold">
-                            -- 当前选定周期内暂无任何训练记录 --
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-
         {showAddModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white w-full h-full md:h-auto md:max-w-lg rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
+              <div className="bg-white w-full h-full md:h-auto md:max-w-xl rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
                 <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
                   <h3 className="font-bold flex items-center"><Plus className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建训练计划</h3>
                   <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
@@ -1143,8 +1333,53 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </label>
                   </div>
                   {!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}
-                  <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>)}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>
+                  </div>
+
+                  {/* 重点关注球员选择器 (NEW) */}
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <Star className="w-3.5 h-3.5 text-bvb-yellow fill-current" /> 重点关注球员 (最多2名)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                          {players.filter(p => p.teamId === formData.teamId).map(p => {
+                              const isSelected = formData.focusedPlayerIds.includes(p.id);
+                              const stats = calculateFocusStats(p.id, userManagedSessions);
+                              return (
+                                  <button 
+                                      key={p.id}
+                                      type="button"
+                                      onClick={() => {
+                                          setFormData(prev => {
+                                              if (prev.focusedPlayerIds.includes(p.id)) return { ...prev, focusedPlayerIds: prev.focusedPlayerIds.filter(id => id !== p.id) };
+                                              if (prev.focusedPlayerIds.length >= 2) {
+                                                  alert('每课次最多选择2名重点关注球员');
+                                                  return prev;
+                                              }
+                                              return { ...prev, focusedPlayerIds: [...prev.focusedPlayerIds, p.id] };
+                                          });
+                                      }}
+                                      className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all text-left ${isSelected ? 'bg-white border-bvb-black shadow-md ring-2 ring-bvb-yellow/20' : 'bg-white border-transparent grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:border-gray-200'}`}
+                                  >
+                                      <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-gray-100" />
+                                      <div className="flex-1 min-w-0">
+                                          <div className="text-[11px] font-black text-gray-800 truncate">{p.name}</div>
+                                          <div className="flex gap-1 text-[8px] font-bold text-gray-400 mt-0.5">
+                                              <span title="本月被关注次数">M:{stats.month}</span>
+                                              <span title="本季被关注次数">Q:{stats.quarter}</span>
+                                              <span title="本年被关注次数">Y:{stats.year}</span>
+                                          </div>
+                                      </div>
+                                      {isSelected && <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
@@ -1156,7 +1391,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </select>{formData.focus === 'Custom' && (<input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />)}</div>
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
                   </div>
-                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm font-bold bg-white" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div>{drillLibrary && drillLibrary.length > 0 && (<div className="mt-2 flex flex-wrap gap-1"><span className="text-xs text-gray-400 mr-1">快捷添加:</span>{drillLibrary.slice(0, 4).map(d => (<button key={d} type="button" onClick={() => setFormData(prev => ({...prev, drills: [...prev.drills, d]}))} className="text-[10px] bg-gray-100 px-2 py-0.5 rounded hover:bg-yellow-50 hover:text-bvb-black transition-colors">{d}</button>))}</div>)}</div>)}
+                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm font-bold bg-white" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div></div>)}
                   <button type="submit" disabled={loading} className="w-full py-4 bg-bvb-black text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center shadow-lg transition-all">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button>
                 </form>
               </div>
@@ -1169,7 +1404,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} allSessions={userManagedSessions} />
         )}
     </div>
   );

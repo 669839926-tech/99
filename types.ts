@@ -211,6 +211,9 @@ export interface TrainingSession {
   coachFeedback?: string;
   directorReview?: string;
   linkedDesignId?: string;
+  // --- New Focus Fields ---
+  focusedPlayerIds?: string[]; // 1-2 重点关注球员
+  focusedPlayerNotes?: Record<string, { technical: string; mental: string }>; // 重点关注笔记
 }
 
 // --- Periodization Plan Types ---
