@@ -338,8 +338,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error) {
-            // Comment: Log error safely by using String conversion for 'unknown' catch variables
-            console.error(String(error));
+            // Comment: Log error safely by using original error object for console.error (accepts any/unknown)
+            console.error(error);
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -371,8 +371,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error) {
-            // Comment: Log error safely by using String conversion for 'unknown' catch variables
-            console.error(String(error));
+            // Comment: Log error safely for debugging
+            console.error(error);
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
@@ -437,7 +437,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-in slide-in-from-right-4">
                     <div className="lg:col-span-4 space-y-6">
                         <div className="bg-white p-4 md:p-6 rounded-2xl md:rounded-3xl shadow-sm border border-gray-200">
-                            <h3 className="font-black text-gray-800 mb-4 md:mb-6 flex items-center uppercase tracking-tighter text-base md:text-lg"><Plus className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 录入颠球成绩</h3>
+                            <h3 className="font-black text-gray-800 mb-4 md:mb-6 flex items-center uppercase tracking-tighter text-base md:text-lg"><Plus className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 录入颠球成绩</h3>
                             <div className="space-y-4">
                                 <div className="relative">
                                     <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1.5 md:mb-2">选择球员</label>

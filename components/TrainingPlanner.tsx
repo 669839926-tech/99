@@ -268,6 +268,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                     <button onClick={() => setActiveTab('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors relative ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}>
                         <FileText className="w-4 h-4 mr-2" /> 训练日志
                         {isCoach && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead && <span className="absolute top-2 right-4 w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>}
+                        {isDirector && localSession.submissionStatus === 'Submitted' && <span className="absolute top-2 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse border border-white"></span>}
                     </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
@@ -761,11 +762,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
           if (isCompact) {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-8 border-r border-b border-gray-200 relative cursor-pointer hover:bg-yellow-50 transition-colors flex items-center justify-center ${isSelected ? 'bg-yellow-100' : 'bg-white'}`}>{sessionsOnDay.length > 0 ? (<div className={`w-3 h-3 rounded-full relative ${sessionsOnDay[0].intensity === 'High' ? 'bg-red-500' : sessionsOnDay[0].intensity === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'} ${hasPending ? 'ring-2 ring-blue-400' : ''}`} title={`${sessionsOnDay.length} 节训练`}>{hasUnreadReview && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>}</div>) : (<span className={`text-[10px] ${isToday ? 'font-black text-bvb-black' : 'text-gray-300'}`}>{d}</span>)}</div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-8 border-r border-b border-gray-200 relative cursor-pointer hover:bg-yellow-50 transition-colors flex items-center justify-center ${isSelected ? 'bg-yellow-100' : 'bg-white'}`}>{sessionsOnDay.length > 0 ? (<div className={`w-3 h-3 rounded-full relative ${hasPending ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse' : sessionsOnDay[0].intensity === 'High' ? 'bg-red-500' : sessionsOnDay[0].intensity === 'Medium' ? 'bg-yellow-500' : 'bg-green-500'}`} title={`${sessionsOnDay.length} 节训练`}>{hasUnreadReview && <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-blue-500 rounded-full"></span>}</div>) : (<span className={`text-[10px] ${isToday ? 'font-black text-bvb-black' : 'text-gray-300'}`}>{d}</span>)}</div>
               );
           } else {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 animate-pulse" title="待审核日志"></div>}{hasUnreadReview && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 shadow-sm" title="有新审核建议"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Reviewed' ? (s.isReviewRead ? 'bg-green-50 border-green-500 text-green-700' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm') : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}</div>); })}</div></div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2.5 md:h-2.5 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)] border border-white" title="待审核日志"></div>}{hasUnreadReview && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 shadow-sm" title="有新审核建议"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-sm ring-1 ring-blue-100' : s.submissionStatus === 'Reviewed' ? (s.isReviewRead ? 'bg-green-50 border-green-500 text-green-700' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm') : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <FileText className="w-2 md:w-3 h-2 md:h-3 text-blue-600 ml-1 flex-shrink-0 animate-pulse" />}</div>); })}</div></div>
               );
           }
       }
@@ -1076,22 +1077,24 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             filteredSessions.map(s => {
                                 const team = teams.find(t => t.id === s.teamId);
                                 const isUnread = isCoach && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
+                                const isPendingDirector = isDirector && s.submissionStatus === 'Submitted';
+                                
                                 return (
                                     <tr 
                                         key={s.id} 
                                         onClick={() => setSelectedSession(s)}
-                                        className={`hover:bg-yellow-50/50 cursor-pointer transition-colors group ${isUnread ? 'bg-blue-50/30' : ''}`}
+                                        className={`hover:bg-yellow-50/50 cursor-pointer transition-colors group ${isUnread ? 'bg-blue-50/30' : isPendingDirector ? 'bg-blue-50/20' : ''}`}
                                     >
                                         <td className="px-3 md:px-6 py-4 font-mono text-xs md:text-sm text-gray-500 whitespace-nowrap">
                                             <div className="flex items-center gap-2">
-                                                {isUnread && <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-sm"></span>}
+                                                {(isUnread || isPendingDirector) && <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-sm"></span>}
                                                 {s.date}
                                             </div>
                                         </td>
                                         <td className="px-3 md:px-6 py-4 font-bold text-xs md:text-sm text-gray-700">{team?.level || '-'}</td>
                                         <td className="px-3 md:px-6 py-4">
                                             <div className="flex items-center gap-1.5 md:gap-2">
-                                                <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread ? 'text-blue-700' : 'text-bvb-black'}`}>{s.title}</span>
+                                                <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread || isPendingDirector ? 'text-blue-700' : 'text-bvb-black'}`}>{s.title}</span>
                                                 {s.linkedDesignId && <PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" title="关联教案" />}
                                             </div>
                                         </td>
@@ -1116,7 +1119,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                         <span className="hidden sm:inline">{isUnread ? '反馈待阅' : '已审核'}</span>
                                                     </span>
                                                 ) : s.submissionStatus === 'Submitted' ? (
-                                                    <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-black text-blue-600 uppercase"><RefreshCw className="w-3 h-3 animate-spin" /> <span className="hidden sm:inline">待审核</span></span>
+                                                    <span className="flex items-center gap-1 text-[9px] md:text-[10px] font-black text-blue-600 uppercase">
+                                                        <RefreshCw className="w-3 h-3 animate-spin" /> 
+                                                        <span className="hidden sm:inline">{isDirector ? '待审核日志' : '审核中'}</span>
+                                                    </span>
                                                 ) : (
                                                     <span className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase">未提交</span>
                                                 )}
@@ -1314,22 +1320,24 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             filteredSessions.filter(t => t.date === selectedDate).map(s => {
                                 const team = teams.find(t => t.id === s.teamId);
                                 const isUnread = isCoach && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
+                                const isPendingDirector = isDirector && s.submissionStatus === 'Submitted';
+
                                 return (
-                                    <div key={s.id} onClick={() => setSelectedSession(s)} className={`p-4 border rounded-2xl cursor-pointer transition-all group relative ${isUnread ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:bg-yellow-50 hover:border-bvb-yellow/30 shadow-none'}`}>
-                                        {isUnread && <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white animate-pulse"></span>}
+                                    <div key={s.id} onClick={() => setSelectedSession(s)} className={`p-4 border rounded-2xl cursor-pointer transition-all group relative ${isUnread || isPendingDirector ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:bg-yellow-50 hover:border-bvb-yellow/30 shadow-none'}`}>
+                                        {(isUnread || isPendingDirector) && <span className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border-2 border-white animate-pulse"></span>}
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{team?.name}</span>
                                             <div className="flex items-center gap-1.5">
                                                 {s.focusedPlayerIds && s.focusedPlayerIds.length > 0 && <Star className="w-3 h-3 text-bvb-yellow fill-current" />}
                                                 {s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500" />}
-                                                {s.submissionStatus === 'Submitted' && <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>}
+                                                {s.submissionStatus === 'Submitted' && <FileText className="w-3 h-3 text-blue-600 animate-pulse" title="日志待审核" />}
                                                 {s.submissionStatus === 'Reviewed' && <ShieldCheck className={`w-3 h-3 ${isUnread ? 'text-blue-600' : 'text-green-600'}`} />}
                                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
                                                     s.intensity === 'High' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'
                                                 }`}>{s.intensity}</span>
                                             </div>
                                         </div>
-                                        <h5 className={`font-black group-hover:text-bvb-black leading-tight ${isUnread ? 'text-blue-900' : 'text-gray-800'}`}>{s.title}</h5>
+                                        <h5 className={`font-black group-hover:text-bvb-black leading-tight ${isUnread || isPendingDirector ? 'text-blue-900' : 'text-gray-800'}`}>{s.title}</h5>
                                         <div className="flex items-center gap-3 text-[10px] text-gray-400 font-bold mt-4 uppercase">
                                             <div className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {s.duration} MIN</div>
                                             <div className="flex items-center"><Target className="w-3 h-3 mr-1" /> {s.focus}</div>
