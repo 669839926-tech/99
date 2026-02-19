@@ -208,12 +208,20 @@ export interface TrainingSession {
   attendance: AttendanceRecord[];
   submissionStatus?: 'Planned' | 'Submitted' | 'Reviewed';
   isReviewRead?: boolean;
-  coachFeedback?: string;
+  coachFeedback?: string; // Repurposed as Overall Evaluation
   directorReview?: string;
   linkedDesignId?: string;
   // --- New Focus Fields ---
   focusedPlayerIds?: string[]; // 1-2 重点关注球员
   focusedPlayerNotes?: Record<string, { technical: string; mental: string }>; // 重点关注笔记
+  // --- Structured Log Fields ---
+  performanceRatings?: {
+    technical: number;
+    application: number;
+    focus: number;
+    discipline: number;
+  };
+  planReflection?: string;
 }
 
 // --- Periodization Plan Types ---

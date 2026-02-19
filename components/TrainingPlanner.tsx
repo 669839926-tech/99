@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search, AlignLeft } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -166,7 +167,13 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
 
-    const [localSession, setLocalSession] = useState<TrainingSession>(JSON.parse(JSON.stringify(session)));
+    const [localSession, setLocalSession] = useState<TrainingSession>(() => {
+        const copy = JSON.parse(JSON.stringify(session));
+        if (!copy.performanceRatings) {
+            copy.performanceRatings = { technical: 5, application: 5, focus: 5, discipline: 5 };
+        }
+        return copy;
+    });
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [drillInput, setDrillInput] = useState('');
 
@@ -238,6 +245,16 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
         });
     };
 
+    const handleRatingChange = (key: string, value: number) => {
+        setLocalSession(prev => ({
+            ...prev,
+            performanceRatings: {
+                ...(prev.performanceRatings || { technical: 5, application: 5, focus: 5, discipline: 5 }),
+                [key]: value
+            }
+        }));
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
@@ -271,7 +288,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                         {isDirector && localSession.submissionStatus === 'Submitted' && <span className="absolute top-2 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse border border-white"></span>}
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6 custom-scrollbar">
                     {activeTab === 'info' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                             <div className="space-y-4">
@@ -307,7 +324,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                     </div>
                                 </div>
                                 
-                                {/* 重点与强度编辑 (NEW) */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练重点</label>
@@ -341,7 +357,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                     </div>
                                 </div>
 
-                                {/* 重点关注球员显示 (仅查看) */}
                                 {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) && (
                                     <div className="bg-yellow-50/50 border border-yellow-100 p-4 rounded-xl">
                                         <label className="block text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-2 flex items-center gap-1">
@@ -450,49 +465,119 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                         </div>
                     )}
                     {activeTab === 'log' && (
-                        <div className="animate-in fade-in duration-200 space-y-8">
-                            {/* 重点关注球员评价区 (NEW) */}
-                            {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) && (
-                                <div className="space-y-6">
-                                    <div className="flex items-center gap-3">
-                                        <Star className="w-5 h-5 text-bvb-yellow fill-current" />
-                                        <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">重点球员成长反馈</h4>
-                                    </div>
+                        <div className="animate-in fade-in duration-200 space-y-10">
+                            {/* 一、整体训练表现 (NEW) */}
+                            <section className="space-y-6">
+                                <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                                    <TrendingUp className="w-5 h-5 text-bvb-yellow" />
+                                    <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">一、整体训练表现</h4>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[
+                                        { key: 'technical', label: '1. 技术执行质量' },
+                                        { key: 'application', label: '2. 比赛运用效果' },
+                                        { key: 'focus', label: '3. 球员专注度' },
+                                        { key: 'discipline', label: '4. 球队纪律性' },
+                                    ].map(metric => {
+                                        const value = localSession.performanceRatings?.[metric.key as keyof typeof localSession.performanceRatings] ?? 5;
+                                        const getMeta = (v: number) => {
+                                            if (v >= 8) return { color: 'text-green-600', hex: '#16a34a' };
+                                            if (v >= 6) return { color: 'text-blue-600', hex: '#2563eb' };
+                                            if (v >= 4) return { color: 'text-yellow-600', hex: '#EAB308' };
+                                            return { color: 'text-red-500', hex: '#ef4444' };
+                                        };
+                                        const meta = getMeta(value);
+                                        return (
+                                            <div key={metric.key} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <label className="text-xs font-black text-gray-500 uppercase tracking-widest">{metric.label}</label>
+                                                    <span className={`text-sm font-black font-mono px-2 py-0.5 rounded bg-gray-50 ${meta.color}`}>{value}</span>
+                                                </div>
+                                                <input 
+                                                    type="range" min="1" max="10" step="1"
+                                                    disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
+                                                    value={value}
+                                                    onChange={e => handleRatingChange(metric.key, parseInt(e.target.value))}
+                                                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-gray-100 outline-none"
+                                                    style={{ background: `linear-gradient(to right, ${meta.hex} ${(value-1)/9*100}%, #f3f4f6 ${(value-1)/9*100}%)` }}
+                                                />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+                                        <AlignLeft className="w-3 h-3" /> 总体评价
+                                    </label>
+                                    <textarea 
+                                        disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
+                                        className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner placeholder:text-gray-300"
+                                        placeholder="对本次训练的整体表现进行综合性总结评价..."
+                                        value={localSession.coachFeedback || ''}
+                                        onChange={e => setLocalSession({...localSession, coachFeedback: e.target.value})}
+                                    />
+                                </div>
+                            </section>
+
+                            {/* 二、教案反思评价 (NEW) */}
+                            <section className="space-y-4">
+                                <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                                    <RefreshCw className="w-5 h-5 text-indigo-400" />
+                                    <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">二、教案反思评价</h4>
+                                </div>
+                                <textarea 
+                                    disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
+                                    className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner placeholder:text-gray-300"
+                                    placeholder="反思教案难度是否合理、器械布置、组织流畅度及需要改进的细节..."
+                                    value={localSession.planReflection || ''}
+                                    onChange={e => setLocalSession({...localSession, planReflection: e.target.value})}
+                                />
+                            </section>
+
+                            {/* 三、重点关注球员内容 (保持现状) */}
+                            <section className="space-y-6">
+                                <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                                    <Star className="w-5 h-5 text-bvb-yellow fill-current" />
+                                    <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">三、重点球员成长反馈</h4>
+                                </div>
+                                {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) ? (
                                     <div className="grid grid-cols-1 gap-6">
                                         {localSession.focusedPlayerIds.map(pid => {
                                             const p = players.find(p => p.id === pid);
                                             if (!p) return null;
                                             const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '' };
                                             return (
-                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-2xl p-5 shadow-sm space-y-4">
-                                                    <div className="flex items-center gap-3 border-b border-yellow-100 pb-3">
-                                                        <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-3xl p-6 shadow-sm space-y-4">
+                                                    <div className="flex items-center gap-3 border-b border-yellow-100 pb-4">
+                                                        <img src={p.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
                                                         <div>
-                                                            <div className="font-black text-gray-800 text-sm">{p.name}</div>
-                                                            <div className="text-[10px] text-gray-500 font-bold uppercase">Target Feedback Session</div>
+                                                            <div className="font-black text-gray-800 text-base">{p.name}</div>
+                                                            <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Focused Player Stats Tracking</div>
                                                         </div>
                                                     </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                         <div className="space-y-1.5">
                                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                                <Target className="w-3 h-3 text-bvb-yellow" /> 技术表现反馈
+                                                                <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现反馈
                                                             </label>
                                                             <textarea 
-                                                                disabled={!canEdit}
-                                                                className="w-full h-24 p-3 bg-white border border-yellow-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
-                                                                placeholder="点评该球员本课的技术执行、基本功及战术理解..."
+                                                                disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
+                                                                className="w-full h-28 p-4 bg-white border border-yellow-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
+                                                                placeholder="点评该球员的技术执行..."
                                                                 value={note.technical}
                                                                 onChange={e => updateFocusNote(pid, 'technical', e.target.value)}
                                                             />
                                                         </div>
                                                         <div className="space-y-1.5">
                                                             <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                                <Brain className="w-3 h-3 text-indigo-400" /> 心理/态度反馈
+                                                                <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度反馈
                                                             </label>
                                                             <textarea 
-                                                                disabled={!canEdit}
-                                                                className="w-full h-24 p-3 bg-white border border-yellow-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
-                                                                placeholder="评价球员本课的训练态度、专注度及自信心..."
+                                                                disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
+                                                                className="w-full h-28 p-4 bg-white border border-yellow-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
+                                                                placeholder="评价球员的心理状态、抗压能力和团队融入..."
                                                                 value={note.mental}
                                                                 onChange={e => updateFocusNote(pid, 'mental', e.target.value)}
                                                             />
@@ -502,45 +587,58 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                             );
                                         })}
                                     </div>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="p-10 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                                        <p className="text-gray-400 font-bold text-sm italic">本课次未设置重点关注球员</p>
+                                    </div>
+                                )}
+                            </section>
 
-                            <div className="space-y-3 pt-6 border-t border-gray-100">
-                                <div className="flex justify-between items-center"><h4 className="font-bold text-gray-800 flex items-center"><UserIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 整体训练总结 (Team Summary)</h4><span className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${localSession.submissionStatus === 'Planned' ? 'bg-gray-100 text-gray-500' : localSession.submissionStatus === 'Submitted' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>{localSession.submissionStatus === 'Planned' ? '未提交' : localSession.submissionStatus === 'Submitted' ? '待审核' : '已审核'}</span></div>
-                                <div className="relative">
-                                    <textarea disabled={!canEdit || localSession.submissionStatus === 'Reviewed'} className="w-full h-40 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors disabled:opacity-70 disabled:bg-gray-100" placeholder="请描述球队整体训练状态，以及教案实际执行效果..." value={localSession.coachFeedback || ''} onChange={e => setLocalSession({...localSession, coachFeedback: e.target.value})} />
-                                    {canEdit && localSession.submissionStatus !== 'Reviewed' && (
-                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Submitted', isReviewRead: false})} disabled={!(localSession.coachFeedback || '').trim()} className="bg-bvb-black text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-gray-800 flex items-center disabled:opacity-50"><Send className="w-3 h-3 mr-1" /> 提交</button></div>
-                                    )}
+                            {/* 提交控制区 */}
+                            <div className="flex justify-between items-center pt-10 border-t border-gray-100">
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-widest border shadow-sm ${localSession.submissionStatus === 'Planned' ? 'bg-gray-100 text-gray-500 border-gray-200' : localSession.submissionStatus === 'Submitted' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-green-50 text-green-700 border-green-100'}`}>
+                                        Status: {localSession.submissionStatus === 'Planned' ? 'Draft' : localSession.submissionStatus === 'Submitted' ? 'Submitted' : 'Reviewed'}
+                                    </span>
                                 </div>
+                                {canEdit && localSession.submissionStatus !== 'Reviewed' && (
+                                    <button 
+                                        onClick={() => setLocalSession({...localSession, submissionStatus: 'Submitted', isReviewRead: false})}
+                                        className="bg-bvb-black text-bvb-yellow font-black px-8 py-3 rounded-2xl hover:brightness-110 shadow-xl transition-all flex items-center gap-2 uppercase italic text-sm tracking-widest"
+                                    >
+                                        <Send className="w-4 h-4" /> 提交日志进行审核
+                                    </button>
+                                )}
                             </div>
-                            <div className="space-y-3 pt-4 border-t border-gray-100">
+
+                            {/* 总监审核 (Director) */}
+                            <div className="space-y-4 pt-10 border-t border-gray-100">
                                 <div className="flex justify-between items-center">
-                                    <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 总监审核 (Director)</h4>
-                                    {localSession.submissionStatus === 'Reviewed' && <span className="text-[10px] bg-green-500 text-white px-2 py-0.5 rounded-full font-black flex items-center gap-1 shadow-sm"><CheckCircle className="w-2.5 h-2.5"/> 已阅准</span>}
+                                    <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-5 h-5 mr-2 text-bvb-yellow" /> 总监审核意见 (WSZG Director Review)</h4>
+                                    {localSession.submissionStatus === 'Reviewed' && <span className="text-[10px] bg-green-500 text-white px-3 py-1 rounded-full font-black flex items-center gap-1 shadow-sm"><CheckCircle className="w-3 h-3"/> 已阅准</span>}
                                 </div>
                                 {isDirector ? (
                                     <div className="relative">
-                                        <textarea className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm resize-none bg-gray-50 focus:bg-white transition-colors" placeholder="请对本次训练及教练反馈进行点评..." value={localSession.directorReview || ''} onChange={e => setLocalSession({...localSession, directorReview: e.target.value})} />
-                                        <div className="absolute bottom-2 right-2"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Reviewed', isReviewRead: false})} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-md hover:bg-green-700 flex items-center disabled:opacity-50 disabled:bg-gray-400"><CheckCircle className="w-3 h-3 mr-1" /> {localSession.submissionStatus === 'Reviewed' ? '已审核' : '确认审核'}</button></div>
+                                        <textarea className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" placeholder="请对本次训练日志及教练表现进行评价..." value={localSession.directorReview || ''} onChange={e => setLocalSession({...localSession, directorReview: e.target.value})} />
+                                        <div className="absolute bottom-3 right-3"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Reviewed', isReviewRead: false})} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:bg-green-700 flex items-center gap-1.5 disabled:opacity-50 disabled:bg-gray-400 shadow-lg"><CheckCircle className="w-4 h-4" /> {localSession.submissionStatus === 'Reviewed' ? '已完成审核' : '确认并发布意见'}</button></div>
                                     </div>
                                 ) : (
-                                    <div className={`p-4 md:p-6 rounded-2xl border-2 transition-all ${localSession.directorReview ? 'bg-yellow-50/50 border-bvb-yellow/30 shadow-sm' : 'bg-gray-50 border-gray-100'}`}>
+                                    <div className={`p-6 rounded-3xl border-2 transition-all ${localSession.directorReview ? 'bg-yellow-50/30 border-bvb-yellow/30 shadow-sm' : 'bg-gray-50 border-gray-100 border-dashed'}`}>
                                         {localSession.directorReview ? (
                                             <div className="relative">
-                                                <Quote className="absolute -top-2 -left-2 w-8 h-8 text-bvb-yellow/20" />
-                                                <div className="text-sm text-gray-700 leading-relaxed font-bold italic relative z-10">
+                                                <Quote className="absolute -top-3 -left-3 w-10 h-10 text-bvb-yellow/20" />
+                                                <div className="text-sm text-gray-700 leading-relaxed font-bold italic relative z-10 pl-2">
                                                     {localSession.directorReview}
                                                 </div>
-                                                <div className="mt-4 flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest border-t border-bvb-yellow/10 pt-2">
-                                                    <ShieldCheck className="w-3 h-3 text-bvb-yellow" /> 
-                                                    WSZG DIRECTOR VERIFIED
+                                                <div className="mt-5 flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-t border-bvb-yellow/10 pt-3">
+                                                    <ShieldCheck className="w-4 h-4 text-bvb-yellow" /> 
+                                                    OFFICIAL WSZG ACADEMY FEEDBACK
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="text-sm text-gray-400 italic text-center py-4 flex flex-col items-center gap-2">
-                                                <RefreshCw className="w-6 h-6 opacity-20" />
-                                                等待总监审阅反馈...
+                                            <div className="text-sm text-gray-400 italic text-center py-6 flex flex-col items-center gap-3">
+                                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border border-gray-100 shadow-sm"><RefreshCw className="w-6 h-6 opacity-30 animate-spin" /></div>
+                                                <span className="font-black uppercase tracking-widest">Waiting for director's review...</span>
                                             </div>
                                         )}
                                     </div>
@@ -829,6 +927,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     })}
                     {focusedPlayersSummary.length === 0 && (
                         <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-4">
+                            {/* Comment: Fixed name collision error by changing HistoryIcon to History */}
                             <History className="w-12 h-12 opacity-10" />
                             <p className="text-xs font-black uppercase tracking-widest">暂无重点关注球员记录</p>
                         </div>
@@ -1220,7 +1319,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 isReviewRead: true, 
                 linkedDesignId: formData.linkedDesignId,
                 focusedPlayerIds: formData.focusedPlayerIds,
-                focusedPlayerNotes: {}
+                focusedPlayerNotes: {},
+                performanceRatings: { technical: 5, application: 5, focus: 5, discipline: 5 },
+                planReflection: ''
             };
             onAddTraining(newSession);
             setShowAddModal(false);
@@ -1247,16 +1348,16 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase">训练计划</h2>
                 <div className="flex items-center gap-2">
                     <div className="flex bg-gray-100 p-1 rounded-lg">
-                        <button onClick={() => setViewType('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'calendar' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                        <button onClick={() => setViewType('calendar')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'calendar' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
                             <CalendarIcon className="w-3 h-3 md:w-3.5 md:h-3.5" /> 日历
                         </button>
-                        <button onClick={() => setViewType('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                        <button onClick={() => setViewType('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
                             <LayoutList className="w-3 h-3 md:w-3.5 md:h-3.5" /> 列表
                         </button>
-                        <button onClick={() => setViewType('periodization')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'periodization' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                        <button onClick={() => setViewType('periodization')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'periodization' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
                             <TableProperties className="w-3 h-3 md:w-3.5 md:h-3.5" /> 周期
                         </button>
-                        <button onClick={() => setViewType('focus')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'focus' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}>
+                        <button onClick={() => setViewType('focus')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'focus' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
                             <Star className="w-3 h-3 md:w-3.5 md:h-3.5" /> 关注
                         </button>
                     </div>

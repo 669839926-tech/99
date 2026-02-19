@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Player, Team, JugglingRecord, HomeTrainingLog, TechTestDefinition, TechTestResult, User } from '../types';
 import { TrendingUp, Award, Activity, History, Plus, Target, CheckCircle, BarChart3, ChevronRight, User as UserIcon, Medal, Calendar, ChevronLeft, ChevronRight as ChevronRightIcon, Users, CheckSquare, Square, Save, Trash2, FileText, Download, Loader2, X, Search, Trophy, TrendingDown, Star, LayoutList, FileDown, Settings, Gauge, ArrowRight, ClipboardList, FileSpreadsheet, Upload, Clock, History as HistoryIcon } from 'lucide-react';
@@ -338,8 +339,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error) {
-            // Comment: Log error safely by using original error object for console.error (accepts any/unknown)
-            console.error(error);
+            // Comment: Cast error to any for safe logging in console.error
+            console.error(error as any);
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -371,8 +372,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error) {
-            // Comment: Log error safely for debugging
-            console.error(error);
+            // Comment: Cast error to any for safe debugging logging
+            console.error(error as any);
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
