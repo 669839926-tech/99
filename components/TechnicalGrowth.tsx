@@ -307,15 +307,15 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        // Comment: Handle result type safely to avoid 'unknown' mapping errors during string operations
-        reader.onload = (event: ProgressEvent<FileReader>) => {
-            const result = event.target?.result;
+        // Comment: Use reader.result directly for better type inference during CSV processing. Removed generic from ProgressEvent to avoid potential EventTarget casting issues.
+        reader.onload = () => {
+            const result = reader.result;
             if (typeof result !== 'string') return;
             const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };
             for (let i = 1; i < lines.length; i++) {
                 const rawLine = lines[i];
-                if (!rawLine) continue;
+                if (typeof rawLine !== 'string') continue;
                 const line = rawLine.trim();
                 if (!line) continue;
                 const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));

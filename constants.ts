@@ -120,8 +120,8 @@ export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [
 ];
 
 export const MOCK_TEAMS: Team[] = [
-  { id: 't1', name: '多特蒙德 U19', level: 'U19', description: '主要青年梯队，备战青年欧冠' },
-  { id: 't2', name: '多特蒙德 U17', level: 'U17', description: '专注于基础战术素养培养' },
+  { id: 't1', name: '多特蒙德 U19', level: 'U19', attribute: '竞技', description: '主要青年梯队，备战青年欧冠' },
+  { id: 't2', name: '多特蒙德 U17', level: 'U17', attribute: '兴趣', description: '专注于基础战术素养培养' },
 ];
 
 export const MOCK_USERS: User[] = [
