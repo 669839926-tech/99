@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
 import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search } from 'lucide-react';
@@ -162,7 +161,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci, currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -307,6 +306,40 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                     </div>
                                 </div>
                                 
+                                {/* 重点与强度编辑 (NEW) */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练重点</label>
+                                        <select 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={trainingFoci.includes(localSession.focus) ? localSession.focus : 'Custom'}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val !== 'Custom') {
+                                                    setLocalSession({...localSession, focus: val});
+                                                }
+                                            }}
+                                        >
+                                            {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
+                                            {!trainingFoci.includes(localSession.focus) && <option value="Custom">{localSession.focus}</option>}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
+                                        <select 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.intensity}
+                                            onChange={e => setLocalSession({...localSession, intensity: e.target.value as any})}
+                                        >
+                                            <option value="Low">低 (恢复性)</option>
+                                            <option value="Medium">中 (常规训练)</option>
+                                            <option value="High">高 (比赛高强)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 {/* 重点关注球员显示 (仅查看) */}
                                 {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) && (
                                     <div className="bg-yellow-50/50 border border-yellow-100 p-4 rounded-xl">

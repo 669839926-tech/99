@@ -306,16 +306,16 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         const file = e.target.files?.[0];
         if (!file) return;
         const reader = new FileReader();
-        // Comment: Explicitly type the onload event to avoid implicit result access that might be inferred as unknown
+        // Comment: Handle result type safely to avoid 'unknown' mapping errors during string operations
         reader.onload = (event: ProgressEvent<FileReader>) => {
-            // Comment: Use reader.result directly for more stable type inference to avoid potential unknown errors on split
-            const result = reader.result;
-            // Comment: Narrow type of result to string before performing split or other string operations
+            const result = event.target?.result;
             if (typeof result !== 'string') return;
             const lines = result.split('\n');
             const newScores: Record<string, string> = { ...testScores };
             for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
+                const rawLine = lines[i];
+                if (!rawLine) continue;
+                const line = rawLine.trim();
                 if (!line) continue;
                 const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
                 if (cols.length >= 4) {
@@ -338,8 +338,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error) {
-            // Comment: Safer catch variable handling for potential 'unknown' error type when logging or converting to string
-            console.error(error instanceof Error ? error.message : String(error));
+            // Comment: Log error safely by using String conversion for 'unknown' catch variables
+            console.error(String(error));
             alert('导出失败');
         } finally {
             setIsExportingTech(false);
@@ -371,8 +371,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error) {
-            // Comment: Safer catch variable handling for potential 'unknown' error type when logging or converting to string
-            console.error(error instanceof Error ? error.message : String(error));
+            // Comment: Log error safely by using String conversion for 'unknown' catch variables
+            console.error(String(error));
             alert('保存失败');
         } finally {
             setIsSavingTests(false);
