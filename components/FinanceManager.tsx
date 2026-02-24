@@ -63,6 +63,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         date: '',
         category: '',
         details: '',
+        account: '',
         income: '',
         expense: '',
         balance: ''
@@ -90,6 +91,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 t.date.includes(filters.date) &&
                 catLabel.includes(filters.category) &&
                 t.details.toLowerCase().includes(filters.details.toLowerCase()) &&
+                t.account.toLowerCase().includes(filters.account.toLowerCase()) &&
                 (filters.income === '' || String(t.income).includes(filters.income)) &&
                 (filters.expense === '' || String(t.expense).includes(filters.expense)) &&
                 (filters.balance === '' || String(t.balance.toFixed(2)).includes(filters.balance))
@@ -361,6 +363,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
         alert(`发放成功！已为 ${coach.name} 生成一笔 ¥${row.totalSalary} 的薪酬支出记录。`);
     };
+
+    const uniqueAccounts = useMemo(() => {
+        const accounts = new Set(transactions.map(t => t.account).filter(Boolean));
+        return Array.from(accounts).sort();
+    }, [transactions]);
+
+    const uniqueDetails = useMemo(() => {
+        const details = new Set(transactions.map(t => t.details).filter(Boolean));
+        return Array.from(details).sort();
+    }, [transactions]);
 
     const handleUpdateEvaluation = (coachId: string, score: number) => {
         const coach = users.find(u => u.id === coachId);
@@ -699,6 +711,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <th className="px-3 py-3 md:px-6 md:py-4"><button onClick={() => toggleSort('date')} className="flex items-center gap-1 hover:text-bvb-black transition-colors">日期 {journalSortField === 'date' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4"><button onClick={() => toggleSort('category')} className="flex items-center gap-1 hover:text-bvb-black transition-colors">分类 {journalSortField === 'category' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4">备注/摘要</th>
+                                    <th className="px-3 py-3 md:px-6 md:py-4">账户</th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right"><button onClick={() => toggleSort('income')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">收入 {journalSortField === 'income' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right"><button onClick={() => toggleSort('expense')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">支出 {journalSortField === 'expense' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right font-black">结余</th>
@@ -707,8 +720,43 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                 <tr className="bg-gray-50 border-b border-gray-200">
                                     <td className="px-3 py-2 md:px-6 md:py-3"></td>
                                     <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选日期..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} /></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选分类..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" value={filters.category} onChange={e => setFilters({...filters, category: e.target.value})} /></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选备注..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" value={filters.details} onChange={e => setFilters({...filters, details: e.target.value})} /></td>
+                                    <td className="px-3 py-2 md:px-6 md:py-3">
+                                        <select 
+                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
+                                            value={filters.category} 
+                                            onChange={e => setFilters({...filters, category: e.target.value})}
+                                        >
+                                            <option value="">全部分类</option>
+                                            {financeCategories.map(c => (
+                                                <option key={c.id} value={c.label}>{c.label}</option>
+                                            ))}
+                                        </select>
+                                    </td>
+                                    <td className="px-3 py-2 md:px-6 md:py-3">
+                                        <input 
+                                            list="details-list"
+                                            type="text" 
+                                            placeholder="筛选备注..." 
+                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
+                                            value={filters.details} 
+                                            onChange={e => setFilters({...filters, details: e.target.value})} 
+                                        />
+                                        <datalist id="details-list">
+                                            {uniqueDetails.map((d, i) => <option key={i} value={d} />)}
+                                        </datalist>
+                                    </td>
+                                    <td className="px-3 py-2 md:px-6 md:py-3">
+                                        <select 
+                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
+                                            value={filters.account} 
+                                            onChange={e => setFilters({...filters, account: e.target.value})}
+                                        >
+                                            <option value="">全部账户</option>
+                                            {uniqueAccounts.map((acc, i) => (
+                                                <option key={i} value={acc}>{acc}</option>
+                                            ))}
+                                        </select>
+                                    </td>
                                     <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选收入..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow text-right" value={filters.income} onChange={e => setFilters({...filters, income: e.target.value})} /></td>
                                     <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选支出..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow text-right" value={filters.expense} onChange={e => setFilters({...filters, expense: e.target.value})} /></td>
                                     <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选结余..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow text-right" value={filters.balance} onChange={e => setFilters({...filters, balance: e.target.value})} /></td>
@@ -716,7 +764,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {journalWithBalance.map((t) => { const cat = financeCategories.find(c => c.id === t.category); const isSelected = selectedIds.has(t.id); return ( <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}> <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td> <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td> <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td> </tr> ); })}
+                                {journalWithBalance.map((t) => { const cat = financeCategories.find(c => c.id === t.category); const isSelected = selectedIds.has(t.id); return ( <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}> <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td> <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td> <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-400 text-[10px] md:text-xs">{t.account}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td> </tr> ); })}
                             </tbody>
                         </table>
                     </div>
