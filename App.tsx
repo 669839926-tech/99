@@ -37,6 +37,7 @@ function App() {
   const [techTests, setTechTests] = useState<TechTestDefinition[]>([]);
   const [salarySettings, setSalarySettings] = useState<SalarySettings>(DEFAULT_SALARY_SETTINGS);
   const [periodizationPlans, setPeriodizationPlans] = useState<PeriodizationPlan[]>([]);
+  const [accountingRecords, setAccountingRecords] = useState<AccountingRecord[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -116,6 +117,7 @@ function App() {
             if (cloudData.techTests) setTechTests(cloudData.techTests);
             if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
+            if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
         }
         setIsInitializing(false);
     };
@@ -148,7 +150,8 @@ function App() {
                 financeCategories,
                 techTests,
                 salarySettings,
-                periodizationPlans
+                periodizationPlans,
+                accountingRecords
             });
         } catch (e) {
             console.error("Auto-save failed", e);
@@ -241,6 +244,11 @@ function App() {
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => setTrainings(prev => prev.map(t => t.id === session.id ? { ...session, attendance: newAttendance } : t));
   const handleUpdateAttributeConfig = (newConfig: AttributeConfig) => setAttributeConfig(newConfig);
 
+  // Accounting Records Handlers
+  const handleAddAccountingRecord = (record: AccountingRecord) => setAccountingRecords(prev => [...prev, record]);
+  const handleUpdateAccountingRecord = (updatedRecord: AccountingRecord) => setAccountingRecords(prev => prev.map(r => r.id === updatedRecord.id ? updatedRecord : r));
+  const handleDeleteAccountingRecord = (id: string) => { if(confirm('确定要删除这条会计账款记录吗？')) setAccountingRecords(prev => prev.filter(r => r.id !== id)); };
+
   const handleUpdatePeriodization = (plan: PeriodizationPlan) => {
       setPeriodizationPlans(prev => {
           const idx = prev.findIndex(p => p.teamId === plan.teamId && p.year === plan.year);
@@ -280,7 +288,7 @@ function App() {
       case 'growth':
         return <TechnicalGrowth players={derivedPlayers} teams={teams} currentUser={currentUser} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} onUpdateTechTests={setTechTests} />;
       case 'finance':
-        return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} onBulkDeleteTransactions={handleBulkDeleteTransactions} users={users} players={derivedPlayers} teams={teams} trainings={trainings} salarySettings={salarySettings} onUpdateUser={handleUpdateUser} />;
+        return <FinanceManager transactions={transactions} financeCategories={financeCategories} currentUser={currentUser} onAddTransaction={handleAddTransaction} onBulkAddTransactions={handleBulkAddTransactions} onDeleteTransaction={handleDeleteTransaction} onBulkDeleteTransactions={handleBulkDeleteTransactions} users={users} players={derivedPlayers} teams={teams} trainings={trainings} salarySettings={salarySettings} onUpdateUser={handleUpdateUser} accountingRecords={accountingRecords} onAddAccountingRecord={handleAddAccountingRecord} onUpdateAccountingRecord={handleUpdateAccountingRecord} onDeleteAccountingRecord={handleDeleteAccountingRecord} />;
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
