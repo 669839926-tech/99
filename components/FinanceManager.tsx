@@ -110,7 +110,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         });
     }, [transactions, journalSortField, journalSortOrder, financeCategories, filters]);
 
-    const toggleSort = (field: 'date' | 'income' | 'expense' | 'category' | 'balance') => {
+    const toggleSort = (field: 'date' | 'income' | 'expense' | 'category') => {
         if (journalSortField === field) setJournalSortOrder(journalSortOrder === 'asc' ? 'desc' : 'asc');
         else { setJournalSortField(field); setJournalSortOrder('desc'); }
     };
@@ -372,16 +372,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const uniqueDetails = useMemo(() => {
         const details = new Set(transactions.map(t => t.details).filter(Boolean));
         return Array.from(details).sort();
-    }, [transactions]);
-
-    const uniqueCategories = useMemo(() => {
-        const catIds = new Set(transactions.map(t => t.category));
-        return Array.from(catIds).map(id => financeCategories.find(c => c.id === id)).filter(Boolean) as FinanceCategoryDefinition[];
-    }, [transactions, financeCategories]);
-
-    const uniqueDates = useMemo(() => {
-        const dates = new Set(transactions.map(t => t.date).filter(Boolean));
-        return Array.from(dates).sort((a, b) => b.localeCompare(a));
     }, [transactions]);
 
     const handleUpdateEvaluation = (coachId: string, score: number) => {
@@ -724,21 +714,12 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <th className="px-3 py-3 md:px-6 md:py-4">账户</th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right"><button onClick={() => toggleSort('income')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">收入 {journalSortField === 'income' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right"><button onClick={() => toggleSort('expense')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">支出 {journalSortField === 'expense' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
-                                    <th className="px-3 py-3 md:px-6 md:py-4 text-right font-black">
-                                        <button onClick={() => toggleSort('balance')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">
-                                            结余 {journalSortField === 'balance' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}
-                                        </button>
-                                    </th>
+                                    <th className="px-3 py-3 md:px-6 md:py-4 text-right font-black">结余</th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-center">操作</th>
                                 </tr>
                                 <tr className="bg-gray-50 border-b border-gray-200">
                                     <td className="px-3 py-2 md:px-6 md:py-3"></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3">
-                                        <input type="text" list="filter-dates" placeholder="筛选日期..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} />
-                                        <datalist id="filter-dates">
-                                            {uniqueDates.map((d, i) => <option key={i} value={d} />)}
-                                        </datalist>
-                                    </td>
+                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选日期..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} /></td>
                                     <td className="px-3 py-2 md:px-6 md:py-3">
                                         <select 
                                             className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
@@ -746,7 +727,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             onChange={e => setFilters({...filters, category: e.target.value})}
                                         >
                                             <option value="">全部分类</option>
-                                            {uniqueCategories.map(c => (
+                                            {financeCategories.map(c => (
                                                 <option key={c.id} value={c.label}>{c.label}</option>
                                             ))}
                                         </select>
@@ -856,68 +837,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             </div>
                         </div>
                     </div>
-
-                    {/* 月度深度分析 */}
-                    <div className="bg-gray-50/50 p-4 md:p-6 rounded-2xl border border-dashed border-gray-200 space-y-6">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                            <div className="flex items-center gap-2">
-                                <PieChartIcon className="w-5 h-5 text-bvb-yellow" />
-                                <h4 className="font-black text-sm md:text-base text-gray-800 uppercase italic tracking-tighter">
-                                    {selectedYear === 'all' ? `历年 ${selectedMonth + 1}月 深度分析` : `${selectedYear}年 ${selectedMonth + 1}月 深度分析`}
-                                </h4>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="text-right"><p className="text-[8px] font-black text-gray-400 uppercase">月收入</p><p className="text-xs font-black text-green-600">¥{monthlyAnalysis.income.toLocaleString()}</p></div>
-                                <div className="text-right"><p className="text-[8px] font-black text-gray-400 uppercase">月支出</p><p className="text-xs font-black text-red-500">¥{monthlyAnalysis.expense.toLocaleString()}</p></div>
-                                <div className="text-right"><p className="text-[8px] font-black text-gray-400 uppercase">月盈余</p><p className={`text-xs font-black ${monthlyAnalysis.profit >= 0 ? 'text-blue-600' : 'text-red-600'}`}>¥{monthlyAnalysis.profit.toLocaleString()}</p></div>
-                            </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30">
-                                    <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700">
-                                        <TrendingUp className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 月度收入构成
-                                    </h4>
-                                </div>
-                                <div className="p-4 md:p-6 space-y-4 md:space-y-5">
-                                    {monthlyAnalysis.incomeData.length > 0 ? monthlyAnalysis.incomeData.map((item, idx) => (
-                                        <div key={idx} className="space-y-1">
-                                            <div className="flex justify-between items-center text-[10px] md:text-xs">
-                                                <span className="font-bold text-gray-600">{item.name}</span>
-                                                <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
-                                            </div>
-                                            <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-green-500 rounded-full" style={{ width: `${item.percent}%` }}></div>
-                                            </div>
-                                        </div>
-                                    )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">该月暂无收入记录</div>}
-                                </div>
-                            </div>
-                            
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                                <div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30">
-                                    <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700">
-                                        <TrendingDown className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 月度支出构成
-                                    </h4>
-                                </div>
-                                <div className="p-4 md:p-6 space-y-4 md:space-y-5">
-                                    {monthlyAnalysis.expenseData.length > 0 ? monthlyAnalysis.expenseData.map((item, idx) => (
-                                        <div key={idx} className="space-y-1">
-                                            <div className="flex justify-between items-center text-[10px] md:text-xs">
-                                                <span className="font-bold text-gray-600">{item.name}</span>
-                                                <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span>
-                                            </div>
-                                            <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-red-500 rounded-full" style={{ width: `${item.percent}%` }}></div>
-                                            </div>
-                                        </div>
-                                    )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">该月暂无支出记录</div>}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30"><h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700"><ArrowUpRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度收入分析</h4><span className="text-[8px] md:text-[10px] font-black text-green-600 bg-white px-1.5 py-0.5 rounded border border-green-100">¥{annualStats.income.toLocaleString()}</span></div><div className="p-4 md:p-6 space-y-4 md:space-y-5">{annualCategoryAnalysis.incomeData.length > 0 ? annualCategoryAnalysis.incomeData.map((item, idx) => ( <div key={idx} className="space-y-1"> <div className="flex justify-between items-center text-[10px] md:text-xs"> <span className="font-bold text-gray-600">{item.name}</span> <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span> </div> <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden"> <div className="h-full bg-green-500 rounded-full" style={{ width: `${item.percent}%` }}></div> </div> </div> )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}</div></div>
                         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30"><h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700"><ArrowDownRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度支出分析</h4><span className="text-[8px] md:text-[10px] font-black text-red-600 bg-white px-1.5 py-0.5 rounded border border-red-100">¥{annualStats.expense.toLocaleString()}</span></div><div className="p-4 md:p-6 space-y-4 md:space-y-5">{annualCategoryAnalysis.expenseData.length > 0 ? annualCategoryAnalysis.expenseData.map((item, idx) => ( <div key={idx} className="space-y-1"> <div className="flex justify-between items-center text-[10px] md:text-xs"> <span className="font-bold text-gray-600">{item.name}</span> <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span> </div> <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden"> <div className="h-full bg-red-500 rounded-full" style={{ width: `${item.percent}%` }}></div> </div> </div> )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}</div></div>
