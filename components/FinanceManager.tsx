@@ -867,15 +867,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <div className="p-4 md:p-6">
                                 {annualCategoryAnalysis.incomeData.length > 0 ? (
                                     <div className="flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="w-full sm:w-1/2 h-[160px]">
+                                        <div className="w-full sm:w-1/2 h-[240px]">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <PieChart>
                                                     <Pie
                                                         data={annualCategoryAnalysis.incomeData}
                                                         cx="50%"
                                                         cy="50%"
-                                                        innerRadius={40}
-                                                        outerRadius={65}
+                                                        innerRadius={60}
+                                                        outerRadius={90}
                                                         paddingAngle={5}
                                                         dataKey="value"
                                                     >
@@ -887,14 +887,17 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                 </PieChart>
                                             </ResponsiveContainer>
                                         </div>
-                                        <div className="w-full sm:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
+                                        <div className="w-full sm:w-1/2 space-y-2.5 max-h-[240px] overflow-y-auto custom-scrollbar pr-2">
                                             {annualCategoryAnalysis.incomeData.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center group">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
-                                                        <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{item.name}</span>
+                                                <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1.5 last:border-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
+                                                        <span className="text-xs font-bold text-gray-600 truncate max-w-[100px]">{item.name}</span>
                                                     </div>
-                                                    <span className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</span>
+                                                    <div className="text-right">
+                                                        <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
+                                                        <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -919,15 +922,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <div className="p-4 md:p-6">
                                 {annualCategoryAnalysis.expenseData.length > 0 ? (
                                     <div className="flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="w-full sm:w-1/2 h-[160px]">
+                                        <div className="w-full sm:w-1/2 h-[240px]">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <PieChart>
                                                     <Pie
                                                         data={annualCategoryAnalysis.expenseData}
                                                         cx="50%"
                                                         cy="50%"
-                                                        innerRadius={40}
-                                                        outerRadius={65}
+                                                        innerRadius={60}
+                                                        outerRadius={90}
                                                         paddingAngle={5}
                                                         dataKey="value"
                                                     >
@@ -939,14 +942,17 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                 </PieChart>
                                             </ResponsiveContainer>
                                         </div>
-                                        <div className="w-full sm:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
+                                        <div className="w-full sm:w-1/2 space-y-2.5 max-h-[240px] overflow-y-auto custom-scrollbar pr-2">
                                             {annualCategoryAnalysis.expenseData.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center group">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
-                                                        <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{item.name}</span>
+                                                <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1.5 last:border-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
+                                                        <span className="text-xs font-bold text-gray-600 truncate max-w-[100px]">{item.name}</span>
                                                     </div>
-                                                    <span className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</span>
+                                                    <div className="text-right">
+                                                        <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
+                                                        <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -992,15 +998,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <h5 className="text-xs font-black text-gray-700 uppercase tracking-wider">月度收入构成</h5>
                                 </div>
                                 <div className="flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-full md:w-1/2 h-[200px]">
+                                    <div className="w-full md:w-1/2 h-[160px]">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={monthlyAnalysis.incomeData}
                                                     cx="50%"
                                                     cy="50%"
-                                                    innerRadius={50}
-                                                    outerRadius={80}
+                                                    innerRadius={40}
+                                                    outerRadius={65}
                                                     paddingAngle={5}
                                                     dataKey="value"
                                                 >
@@ -1012,16 +1018,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
-                                    <div className="w-full md:w-1/2 space-y-3">
+                                    <div className="w-full md:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
                                         {monthlyAnalysis.incomeData.length > 0 ? monthlyAnalysis.incomeData.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center group">
+                                            <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1 last:border-0">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
-                                                    <span className="text-xs font-bold text-gray-600 group-hover:text-gray-900 transition-colors">{item.name}</span>
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
+                                                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors truncate max-w-[80px]">{item.name}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                    <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
+                                                    <p className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</p>
+                                                    <p className="text-[8px] text-gray-400 font-bold">{item.percent}%</p>
                                                 </div>
                                             </div>
                                         )) : <p className="text-xs text-gray-300 italic text-center py-8">本月无收入数据</p>}
@@ -1036,15 +1042,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <h5 className="text-xs font-black text-gray-700 uppercase tracking-wider">月度支出构成</h5>
                                 </div>
                                 <div className="flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-full md:w-1/2 h-[200px]">
+                                    <div className="w-full md:w-1/2 h-[160px]">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={monthlyAnalysis.expenseData}
                                                     cx="50%"
                                                     cy="50%"
-                                                    innerRadius={50}
-                                                    outerRadius={80}
+                                                    innerRadius={40}
+                                                    outerRadius={65}
                                                     paddingAngle={5}
                                                     dataKey="value"
                                                 >
@@ -1056,16 +1062,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
-                                    <div className="w-full md:w-1/2 space-y-3">
+                                    <div className="w-full md:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
                                         {monthlyAnalysis.expenseData.length > 0 ? monthlyAnalysis.expenseData.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center group">
+                                            <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1 last:border-0">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
-                                                    <span className="text-xs font-bold text-gray-600 group-hover:text-gray-900 transition-colors">{item.name}</span>
+                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
+                                                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors truncate max-w-[80px]">{item.name}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                    <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
+                                                    <p className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</p>
+                                                    <p className="text-[8px] text-gray-400 font-bold">{item.percent}%</p>
                                                 </div>
                                             </div>
                                         )) : <p className="text-xs text-gray-300 italic text-center py-8">本月无支出数据</p>}
