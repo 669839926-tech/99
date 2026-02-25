@@ -853,115 +853,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                        {/* 年度收入分析 */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30">
-                                <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700">
-                                    <ArrowUpRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 
-                                    {selectedYear === 'all' ? '历年收入分析' : '年度收入分析'}
-                                </h4>
-                                <span className="text-[8px] md:text-[10px] font-black text-green-600 bg-white px-1.5 py-0.5 rounded border border-green-100">
-                                    ¥{annualStats.income.toLocaleString()}
-                                </span>
-                            </div>
-                            <div className="p-4 md:p-6">
-                                {annualCategoryAnalysis.incomeData.length > 0 ? (
-                                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="w-full sm:w-1/2 h-[240px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={annualCategoryAnalysis.incomeData}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                    >
-                                                        {annualCategoryAnalysis.incomeData.map((_, index) => (
-                                                            <Cell key={`cell-${index}`} fill={['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][index % 5]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="w-full sm:w-1/2 space-y-2.5 max-h-[240px] overflow-y-auto custom-scrollbar pr-2">
-                                            {annualCategoryAnalysis.incomeData.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1.5 last:border-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
-                                                        <span className="text-xs font-bold text-gray-600 truncate max-w-[100px]">{item.name}</span>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                        <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 年度支出分析 */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30">
-                                <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700">
-                                    <ArrowDownRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 
-                                    {selectedYear === 'all' ? '历年支出分析' : '年度支出分析'}
-                                </h4>
-                                <span className="text-[8px] md:text-[10px] font-black text-red-600 bg-white px-1.5 py-0.5 rounded border border-red-100">
-                                    ¥{annualStats.expense.toLocaleString()}
-                                </span>
-                            </div>
-                            <div className="p-4 md:p-6">
-                                {annualCategoryAnalysis.expenseData.length > 0 ? (
-                                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="w-full sm:w-1/2 h-[240px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={annualCategoryAnalysis.expenseData}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                    >
-                                                        {annualCategoryAnalysis.expenseData.map((_, index) => (
-                                                            <Cell key={`cell-${index}`} fill={['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][index % 5]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="w-full sm:w-1/2 space-y-2.5 max-h-[240px] overflow-y-auto custom-scrollbar pr-2">
-                                            {annualCategoryAnalysis.expenseData.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1.5 last:border-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
-                                                        <span className="text-xs font-bold text-gray-600 truncate max-w-[100px]">{item.name}</span>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                        <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>
-                                )}
-                            </div>
-                        </div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30"><h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700"><ArrowUpRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度收入分析</h4><span className="text-[8px] md:text-[10px] font-black text-green-600 bg-white px-1.5 py-0.5 rounded border border-green-100">¥{annualStats.income.toLocaleString()}</span></div><div className="p-4 md:p-6 space-y-4 md:space-y-5">{annualCategoryAnalysis.incomeData.length > 0 ? annualCategoryAnalysis.incomeData.map((item, idx) => ( <div key={idx} className="space-y-1"> <div className="flex justify-between items-center text-[10px] md:text-xs"> <span className="font-bold text-gray-600">{item.name}</span> <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span> </div> <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden"> <div className="h-full bg-green-500 rounded-full" style={{ width: `${item.percent}%` }}></div> </div> </div> )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}</div></div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30"><h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700"><ArrowDownRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度支出分析</h4><span className="text-[8px] md:text-[10px] font-black text-red-600 bg-white px-1.5 py-0.5 rounded border border-red-100">¥{annualStats.expense.toLocaleString()}</span></div><div className="p-4 md:p-6 space-y-4 md:space-y-5">{annualCategoryAnalysis.expenseData.length > 0 ? annualCategoryAnalysis.expenseData.map((item, idx) => ( <div key={idx} className="space-y-1"> <div className="flex justify-between items-center text-[10px] md:text-xs"> <span className="font-bold text-gray-600">{item.name}</span> <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span> </div> <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden"> <div className="h-full bg-red-500 rounded-full" style={{ width: `${item.percent}%` }}></div> </div> </div> )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}</div></div>
                     </div>
 
                     {/* 月度深度分析 */}
@@ -998,15 +891,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <h5 className="text-xs font-black text-gray-700 uppercase tracking-wider">月度收入构成</h5>
                                 </div>
                                 <div className="flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-full md:w-1/2 h-[160px]">
+                                    <div className="w-full md:w-1/2 h-[200px]">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={monthlyAnalysis.incomeData}
                                                     cx="50%"
                                                     cy="50%"
-                                                    innerRadius={40}
-                                                    outerRadius={65}
+                                                    innerRadius={50}
+                                                    outerRadius={80}
                                                     paddingAngle={5}
                                                     dataKey="value"
                                                 >
@@ -1018,16 +911,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
-                                    <div className="w-full md:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
+                                    <div className="w-full md:w-1/2 space-y-3">
                                         {monthlyAnalysis.incomeData.length > 0 ? monthlyAnalysis.incomeData.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1 last:border-0">
+                                            <div key={idx} className="flex justify-between items-center group">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
-                                                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors truncate max-w-[80px]">{item.name}</span>
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
+                                                    <span className="text-xs font-bold text-gray-600 group-hover:text-gray-900 transition-colors">{item.name}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                    <p className="text-[8px] text-gray-400 font-bold">{item.percent}%</p>
+                                                    <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
+                                                    <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
                                                 </div>
                                             </div>
                                         )) : <p className="text-xs text-gray-300 italic text-center py-8">本月无收入数据</p>}
@@ -1042,15 +935,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <h5 className="text-xs font-black text-gray-700 uppercase tracking-wider">月度支出构成</h5>
                                 </div>
                                 <div className="flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-full md:w-1/2 h-[160px]">
+                                    <div className="w-full md:w-1/2 h-[200px]">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <PieChart>
                                                 <Pie
                                                     data={monthlyAnalysis.expenseData}
                                                     cx="50%"
                                                     cy="50%"
-                                                    innerRadius={40}
-                                                    outerRadius={65}
+                                                    innerRadius={50}
+                                                    outerRadius={80}
                                                     paddingAngle={5}
                                                     dataKey="value"
                                                 >
@@ -1062,16 +955,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             </PieChart>
                                         </ResponsiveContainer>
                                     </div>
-                                    <div className="w-full md:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
+                                    <div className="w-full md:w-1/2 space-y-3">
                                         {monthlyAnalysis.expenseData.length > 0 ? monthlyAnalysis.expenseData.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1 last:border-0">
+                                            <div key={idx} className="flex justify-between items-center group">
                                                 <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
-                                                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors truncate max-w-[80px]">{item.name}</span>
+                                                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
+                                                    <span className="text-xs font-bold text-gray-600 group-hover:text-gray-900 transition-colors">{item.name}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                    <p className="text-[8px] text-gray-400 font-bold">{item.percent}%</p>
+                                                    <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
+                                                    <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
                                                 </div>
                                             </div>
                                         )) : <p className="text-xs text-gray-300 italic text-center py-8">本月无支出数据</p>}
