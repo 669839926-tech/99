@@ -75,6 +75,12 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         setFormData(prev => ({ ...prev, category: categoriesForType.length > 0 ? categoriesForType[0].id : '' }));
     }, [activeType, financeCategories]);
 
+    useEffect(() => {
+        if (viewMode === 'salary' && selectedYear === 'all') {
+            setSelectedYear(new Date().getFullYear());
+        }
+    }, [viewMode, selectedYear]);
+
     const isDirector = currentUser?.role === 'director';
 
     const journalWithBalance = useMemo(() => {
@@ -258,7 +264,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let renewalReward = 0;
                 let renewalRate = 0;
                 let renewalFormula = "非季末月份";
-                if (isDistributionMonth) {
+                if (isDistributionMonth && typeof selectedYear === 'number') {
                     const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
                     const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
                     const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();

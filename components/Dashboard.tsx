@@ -1,8 +1,8 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, TrendingUp, AlertCircle, Calendar, Cake, Activity, Filter, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, Bell, Send, Lock, FileText, ClipboardCheck, ShieldAlert, Edit2, ArrowRight, User as UserIcon, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, ArrowUpRight, ArrowDownRight, Sparkles, Share2, Camera, Medal, Target, Flame, FileDown, FileSpreadsheet, Quote, ShieldCheck, Type, PartyPopper, Gift, Star, Triangle, Pencil, ChevronRight } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, LineChart, Line } from 'recharts';
+import { Users, Trophy, Calendar, Cake, Activity, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, ClipboardCheck, Edit2, ArrowRight, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, Sparkles, Camera, FileDown, FileSpreadsheet, Quote, ShieldCheck, PartyPopper, Star, Triangle, Pencil } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
 
@@ -169,7 +169,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (!p.birthDate) return false;
         const [y, m, d] = p.birthDate.split('-').map(Number);
         if(!y || !m || !d) return false;
-        let nextBirthday = new Date(today.getFullYear(), m - 1, d);
+        const nextBirthday = new Date(today.getFullYear(), m - 1, d);
         if (nextBirthday < today) {
             nextBirthday.setFullYear(today.getFullYear() + 1);
         }
@@ -200,8 +200,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     const currentYear = new Date().getFullYear();
     const monthlyTransactions = transactions.filter(t => {
         const d = new Date(t.date);
-        let year = isNaN(d.getTime()) ? -1 : d.getFullYear();
-        let month = isNaN(d.getTime()) ? -1 : d.getMonth();
+        const year = isNaN(d.getTime()) ? -1 : d.getFullYear();
+        const month = isNaN(d.getTime()) ? -1 : d.getMonth();
         return month === currentMonth && year === currentYear;
     });
     const monthlyIncome = monthlyTransactions.reduce((s, t) => s + (Number(t.income) || 0), 0);
@@ -216,7 +216,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         teamCounts, 
         finance: { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense } 
     };
-  }, [displayPlayers, displayTeams, transactions, matches, isDirector, creditAlertTeamId]);
+  }, [displayPlayers, displayTeams, transactions, matches, creditAlertTeamId]);
 
   // 新增：按梯队对余额不足的球员进行分组
   const groupedLowCredits = useMemo(() => {
@@ -281,7 +281,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         const groupedData: Record<string, { totalRate: number; count: number }> = {};
         filteredSessions.forEach(session => {
             const date = parseLocalDate(session.date);
-            let key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
+            const key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
             
             let rate = 0;
             if (isIndividualMode) {
@@ -391,18 +391,40 @@ const Dashboard: React.FC<DashboardProps> = ({
           return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', teamName };
       });
       const present = sessionRecords.filter(r => r.status === 'Present').length;
-      return { player, sessions: sessionRecords, stats: { total: sessionRecords.length, present, rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 } };
+      const leave = sessionRecords.filter(r => r.status === 'Leave').length;
+      const injury = sessionRecords.filter(r => r.status === 'Injury').length;
+      const absent = sessionRecords.filter(r => r.status === 'Absent').length;
+      
+      return { 
+          player, 
+          sessions: sessionRecords, 
+          stats: { 
+              total: sessionRecords.length, 
+              present, 
+              leave,
+              injury,
+              absent,
+              rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 
+          } 
+      };
   }, [attendancePlayerId, displayTrainings, displayPlayers, dateRange, teams]);
 
   const handleExportPDF = async () => {
     setIsExporting(true);
-    try {
-        if (attendancePlayerId !== 'all' && individualReport) {
-            await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}_${attendanceYear}`);
-        } else {
-            await exportToPDF('attendance-report-export', `训练出勤 analysis 报告_${attendanceYear}`);
+    // 给 DOM 渲染留出时间，确保 isExporting 状态生效（隐藏图表）
+    setTimeout(async () => {
+        try {
+            if (attendancePlayerId !== 'all' && individualReport) {
+                await exportToPDF('individual-attendance-export', `个人出勤_${individualReport.player.name}_${attendanceYear}`);
+            } else {
+                await exportToPDF('attendance-report-export', `训练出勤分析报告_${attendanceYear}`);
+            }
+        } catch { 
+            alert('导出失败，请重试'); 
+        } finally { 
+            setIsExporting(false); 
         }
-    } catch (e) { alert('导出失败，请重试'); } finally { setIsExporting(false); }
+    }, 100);
   };
 
   const handleExportExcel = () => {
@@ -413,7 +435,16 @@ const Dashboard: React.FC<DashboardProps> = ({
           let fileName = "";
 
           if (attendancePlayerId !== 'all' && individualReport) {
-              headers = "日期,训练主题,所属梯队,训练重点,出勤状态\n";
+              // 添加个人汇总统计行
+              headers = `姓名,${individualReport.player.name}\n`;
+              headers += `总场次,${individualReport.stats.total}\n`;
+              headers += `实到,${individualReport.stats.present}\n`;
+              headers += `请假,${individualReport.stats.leave}\n`;
+              headers += `伤停,${individualReport.stats.injury}\n`;
+              headers += `缺席,${individualReport.stats.absent}\n`;
+              headers += `出勤率,${individualReport.stats.rate}%\n\n`;
+              
+              headers += "日期,训练主题,所属梯队,训练重点,出勤状态\n";
               rows = individualReport.sessions.map(s => {
                   const statusMap = { 'Present': '实到', 'Leave': '请假', 'Injury': '伤停', 'Absent': '缺席' };
                   return `${s.date},"${s.title.replace(/"/g, '""')}",${s.teamName},${s.focus},${statusMap[s.status] || '缺席'}`;
@@ -439,7 +470,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           link.href = URL.createObjectURL(blob);
           link.download = fileName;
           link.click();
-      } catch (e) {
+      } catch {
           alert('Excel 导出失败');
       } finally {
           setIsExportingExcel(false);
@@ -451,7 +482,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const teamLabel = creditAlertTeamId === 'all' ? '全部梯队' : teams.find(t => t.id === creditAlertTeamId)?.name || '未知梯队';
     try {
         await exportToPDF('low-credits-export', `课时余额预警名单_${teamLabel}`);
-    } catch (e) { alert('导出失败'); } finally { setIsExportingCredits(false); }
+    } catch { alert('导出失败'); } finally { setIsExportingCredits(false); }
   };
 
   const handleAddAnnouncementSubmit = (e: React.FormEvent) => {
@@ -478,7 +509,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         link.download = `顽石之光生日贺卡_${selectedBirthdayPlayer.name}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
-    } catch (e) {
+    } catch {
         alert('贺卡生成失败，请稍后重试');
     } finally {
         setIsCapturingCard(false);
@@ -958,23 +989,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <img src={individualReport.player.image} className="w-12 h-12 md:w-16 md:h-16 rounded-full object-cover border-2 border-white shadow-sm" />
                             <div><h3 className="text-base md:text-lg font-black text-gray-800">{individualReport.player.name}</h3><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">#{individualReport.player.number} • {individualReport.player.position}</p></div>
                         </div>
-                        <div className="flex gap-4 md:gap-8 text-center pr-2">
+                        <div className="flex gap-4 md:gap-6 text-center pr-2">
                             <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">参训率</div><div className="text-xl md:text-2xl font-black tabular-nums">{individualReport.stats.rate}%</div></div>
                             <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">实到</div><div className="text-xl md:text-2xl font-black text-green-600 tabular-nums">{individualReport.stats.present}</div></div>
+                            <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">请假</div><div className="text-xl md:text-2xl font-black text-yellow-600 tabular-nums">{individualReport.stats.leave}</div></div>
+                            <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">伤停</div><div className="text-xl md:text-2xl font-black text-red-600 tabular-nums">{individualReport.stats.injury}</div></div>
+                            <div><div className="text-[9px] md:text-xs text-gray-400 font-black uppercase">缺席</div><div className="text-xl md:text-2xl font-black text-gray-400 tabular-nums">{individualReport.stats.absent}</div></div>
                         </div>
                     </div>
                     {/* 个人详细出勤图表 */}
-                    <div className="h-40 md:h-56 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50 mb-6">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" domain={[0, 100]} />
-                                <Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} formatter={(val) => [val === 100 ? '已到' : '未到', '出勤状态']} />
-                                <Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
+                    {!isExporting && (
+                        <div className="h-40 md:h-56 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50 mb-6">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" domain={[0, 100]} />
+                                    <Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} formatter={(val) => [val === 100 ? '已到' : '未到', '出勤状态']} />
+                                    <Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
                     <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 font-black text-gray-500 text-[9px] md:text-xs uppercase tracking-widest border-b">
@@ -1011,9 +1047,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {analysisView === 'session' ? (
                         selectedSessionId ? renderSessionDetail() : (
                         <div className="space-y-6">
-                            <div className="h-32 md:h-48 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50">
-                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" /><Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
-                            </div>
+                            {!isExporting && (
+                                <div className="h-32 md:h-48 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50">
+                                    <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" /><Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30} onClick={(data) => setSelectedSessionId(data.id)} cursor="pointer"/></BarChart></ResponsiveContainer>
+                                </div>
+                            )}
                             <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
                                 <table className="w-full text-left">
                                     <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 border-b">
@@ -1093,9 +1131,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )
                     ) : (
                         <div className="space-y-6">
-                            <div className="h-40 md:h-56 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50">
-                                <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" /><Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30}/></BarChart></ResponsiveContainer>
-                            </div>
+                            {!isExporting && (
+                                <div className="h-40 md:h-56 w-full bg-gray-50/50 rounded-2xl p-2 border border-gray-50">
+                                    <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 'bold', fill: '#9ca3af' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 8, fill: '#d1d5db' }} unit="%" /><Tooltip cursor={{fill: '#fefce8'}} contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px' }} /><Bar dataKey="rate" fill="#FDE100" radius={[4, 4, 0, 0]} maxBarSize={30}/></BarChart></ResponsiveContainer>
+                                </div>
+                            )}
                             <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm max-h-[400px]">
                                 <table className="w-full text-left border-collapse">
                                     <thead className="bg-gray-50 font-black text-[9px] md:text-[10px] uppercase tracking-tighter md:tracking-widest text-gray-500 sticky top-0 z-10 border-b">
