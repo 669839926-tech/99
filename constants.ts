@@ -178,13 +178,21 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
     '传中射门练习'
   ],
   trainingFoci: [
-    { id: 'f1', name: '传接球', themes: ['短传配合', '长传转移', '接球转身', '一脚传球'] },
-    { id: 'f2', name: '射门', themes: ['禁区外远射', '门前抢点', '单刀球处理', '头球攻门'] },
-    { id: 'f3', name: '防守', themes: ['个人防守姿态', '小组协防', '防线整体移动', '防守反击'] },
-    { id: 'f4', name: '体能', themes: ['有氧耐力', '无氧耐力', '灵敏协调', '核心力量'] },
-    { id: 'f5', name: '战术', themes: ['进攻阵型', '防守阵型', '定位球战术', '攻守转换'] },
-    { id: 'f6', name: '对抗', themes: ['1v1 对抗', '2v2 小组对抗', '半场攻防', '全场比赛'] }
-  ]
+    '传接球',
+    '射门',
+    '防守',
+    '体能',
+    '战术',
+    '对抗'
+  ],
+  trainingThemes: {
+    '传接球': ['短传配合', '长传转移', '接球转身', '一脚传球'],
+    '射门': ['禁区外远射', '门前抢点', '单刀球处理', '头球攻门'],
+    '防守': ['个人防守姿态', '小组协防', '造越位战术', '防守选位'],
+    '体能': ['耐力训练', '爆发力训练', '灵敏协调', '核心力量'],
+    '战术': ['快速反击', '高位压迫', '边路进攻', '中路渗透'],
+    '对抗': ['1v1 攻防', '2v2 小组对抗', '全场对抗', '高强度逼抢']
+  }
 };
 
 const generateStats = (): PlayerStats => {
@@ -242,99 +250,6 @@ export const MOCK_MATCHES: Match[] = [
   { id: '3', teamId: 't1', title: '地区杯赛半决赛', opponent: '波鸿 U19', date: '2023-10-15', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '海淀区', result: '3-0', status: 'Completed', competition: '杯赛' },
   { id: '4', teamId: 't2', title: 'U17 关键战役', opponent: '勒沃库森 U17', date: '2023-11-20', time: '14:00', location: 'Away', province: '上海市', city: '上海市', district: '浦东新区', status: 'Upcoming', competition: '联赛' },
   { id: '5', teamId: 't2', title: '主场收官战', opponent: '莱比锡 U17', date: '2023-11-27', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', status: 'Upcoming', competition: '联赛' },
-];
-
-export const FORMATION_TEMPLATES: FormationTemplate[] = [
-    {
-        id: '11-4-3-3',
-        name: '4-3-3',
-        format: '11v11',
-        elements: [
-            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
-            { type: 'player', label: 'LB', x: 0.15, y: 0.75 },
-            { type: 'player', label: 'CB', x: 0.38, y: 0.8 },
-            { type: 'player', label: 'CB', x: 0.62, y: 0.8 },
-            { type: 'player', label: 'RB', x: 0.85, y: 0.75 },
-            { type: 'player', label: 'DM', x: 0.5, y: 0.65 },
-            { type: 'player', label: 'CM', x: 0.3, y: 0.55 },
-            { type: 'player', label: 'CM', x: 0.7, y: 0.55 },
-            { type: 'player', label: 'LW', x: 0.2, y: 0.35 },
-            { type: 'player', label: 'RW', x: 0.8, y: 0.35 },
-            { type: 'player', label: 'ST', x: 0.5, y: 0.25 },
-        ]
-    },
-    {
-        id: '11-4-4-2',
-        name: '4-4-2',
-        format: '11v11',
-        elements: [
-            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
-            { type: 'player', label: 'LB', x: 0.15, y: 0.75 },
-            { type: 'player', label: 'CB', x: 0.38, y: 0.8 },
-            { type: 'player', label: 'CB', x: 0.62, y: 0.8 },
-            { type: 'player', label: 'RB', x: 0.85, y: 0.75 },
-            { type: 'player', label: 'LM', x: 0.15, y: 0.55 },
-            { type: 'player', label: 'CM', x: 0.38, y: 0.55 },
-            { type: 'player', label: 'CM', x: 0.62, y: 0.55 },
-            { type: 'player', label: 'RM', x: 0.85, y: 0.55 },
-            { type: 'player', label: 'ST', x: 0.4, y: 0.25 },
-            { type: 'player', label: 'ST', x: 0.6, y: 0.25 },
-        ]
-    },
-    {
-        id: '8-3-3-1',
-        name: '3-3-1',
-        format: '8v8',
-        elements: [
-            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
-            { type: 'player', label: 'DF', x: 0.2, y: 0.75 },
-            { type: 'player', label: 'DF', x: 0.5, y: 0.8 },
-            { type: 'player', label: 'DF', x: 0.8, y: 0.75 },
-            { type: 'player', label: 'MF', x: 0.2, y: 0.5 },
-            { type: 'player', label: 'MF', x: 0.5, y: 0.55 },
-            { type: 'player', label: 'MF', x: 0.8, y: 0.5 },
-            { type: 'player', label: 'FW', x: 0.5, y: 0.25 },
-        ]
-    },
-    {
-        id: '8-2-4-1',
-        name: '2-4-1',
-        format: '8v8',
-        elements: [
-            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
-            { type: 'player', label: 'DF', x: 0.35, y: 0.8 },
-            { type: 'player', label: 'DF', x: 0.65, y: 0.8 },
-            { type: 'player', label: 'MF', x: 0.15, y: 0.55 },
-            { type: 'player', label: 'MF', x: 0.38, y: 0.5 },
-            { type: 'player', label: 'MF', x: 0.62, y: 0.5 },
-            { type: 'player', label: 'MF', x: 0.85, y: 0.55 },
-            { type: 'player', label: 'FW', x: 0.5, y: 0.25 },
-        ]
-    },
-    {
-        id: '5-1-2-1',
-        name: '1-2-1',
-        format: '5v5',
-        elements: [
-            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
-            { type: 'player', label: 'DF', x: 0.5, y: 0.75 },
-            { type: 'player', label: 'MF', x: 0.25, y: 0.5 },
-            { type: 'player', label: 'MF', x: 0.75, y: 0.5 },
-            { type: 'player', label: 'FW', x: 0.5, y: 0.25 },
-        ]
-    },
-    {
-        id: '5-2-2',
-        name: '2-2',
-        format: '5v5',
-        elements: [
-            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
-            { type: 'player', label: 'DF', x: 0.3, y: 0.75 },
-            { type: 'player', label: 'DF', x: 0.7, y: 0.75 },
-            { type: 'player', label: 'FW', x: 0.3, y: 0.35 },
-            { type: 'player', label: 'FW', x: 0.7, y: 0.35 },
-        ]
-    }
 ];
 
 export const MOCK_TRAINING: TrainingSession[] = [

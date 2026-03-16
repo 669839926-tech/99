@@ -65,6 +65,8 @@ const Settings: React.FC<SettingsProps> = ({
   const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'drills' | 'foci' | 'branding'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
+  const [editingFocusThemes, setEditingFocusThemes] = useState<string | null>(null);
+  const [newThemeName, setNewThemeName] = useState('');
 
   const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior' });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -115,8 +117,33 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddFocus = () => {
       if (!newItemName.trim()) return;
-      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] }));
+      const newFocus = newItemName.trim();
+      setLocalConfig(prev => ({ 
+          ...prev, 
+          trainingFoci: [...(prev.trainingFoci || []), newFocus],
+          trainingThemes: { ...(prev.trainingThemes || {}), [newFocus]: [] }
+      }));
       setNewItemName('');
+  };
+
+  const handleAddTheme = () => {
+      if (!newThemeName.trim() || !editingFocusThemes) return;
+      const focus = editingFocusThemes;
+      const theme = newThemeName.trim();
+      setLocalConfig(prev => {
+          const themes = { ...(prev.trainingThemes || {}) };
+          themes[focus] = [...(themes[focus] || []), theme];
+          return { ...prev, trainingThemes: themes };
+      });
+      setNewThemeName('');
+  };
+
+  const handleDeleteTheme = (focus: string, theme: string) => {
+      setLocalConfig(prev => {
+          const themes = { ...(prev.trainingThemes || {}) };
+          themes[focus] = (themes[focus] || []).filter(t => t !== theme);
+          return { ...prev, trainingThemes: themes };
+      });
   };
 
   const handleAddFinanceCategory = (type: 'income' | 'expense') => {
@@ -206,7 +233,16 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteFocus = (focus: string) => {
     if(confirm('确定要删除此训练重点吗？删除后历史训练记录仍会保留该重点名称，但新建计划时不可选。')) {
-        setLocalConfig(prev => ({ ...prev, trainingFoci: (prev.trainingFoci || []).filter(f => f !== focus) }));
+        setLocalConfig(prev => {
+            const newThemes = { ...(prev.trainingThemes || {}) };
+            delete newThemes[focus];
+            return { 
+                ...prev, 
+                trainingFoci: (prev.trainingFoci || []).filter(f => f !== focus),
+                trainingThemes: newThemes
+            };
+        });
+        if (editingFocusThemes === focus) setEditingFocusThemes(null);
     }
   };
 
@@ -614,9 +650,30 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {(localConfig.trainingFoci || []).map(focus => (
-                        <div key={focus} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group hover:border-bvb-yellow transition-colors">
-                            <span className="font-bold text-sm">{focus}</span>
-                            <button onClick={() => handleDeleteFocus(focus)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        <div key={focus} className="flex flex-col p-3 bg-white border border-gray-100 rounded-lg shadow-sm group hover:border-bvb-yellow transition-colors">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="font-bold text-sm">{focus}</span>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setEditingFocusThemes(editingFocusThemes === focus ? null : focus)} className={`p-1 rounded transition-colors ${editingFocusThemes === focus ? 'text-bvb-yellow bg-bvb-black' : 'text-gray-300 hover:text-bvb-black hover:bg-gray-100'}`} title="管理训练主题"><Edit2 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => handleDeleteFocus(focus)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                                </div>
+                            </div>
+                            {editingFocusThemes === focus && (
+                                <div className="mt-2 pt-2 border-t border-gray-50 space-y-2 animate-in fade-in slide-in-from-top-1">
+                                    <div className="flex gap-1">
+                                        <input type="text" placeholder="新主题..." className="flex-1 p-1 text-[10px] border rounded outline-none focus:ring-1 focus:ring-bvb-yellow" value={newThemeName} onChange={e => setNewThemeName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddTheme()} />
+                                        <button onClick={handleAddTheme} className="p-1 bg-bvb-black text-white rounded hover:bg-gray-800"><Plus className="w-3 h-3" /></button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {(localConfig.trainingThemes?.[focus] || []).map(theme => (
+                                            <div key={theme} className="flex items-center gap-1 px-1.5 py-0.5 bg-gray-50 border border-gray-100 rounded text-[9px] font-bold text-gray-500 group/theme">
+                                                <span>{theme}</span>
+                                                <button onClick={() => handleDeleteTheme(focus, theme)} className="text-gray-300 hover:text-red-500"><X className="w-2.5 h-2.5" /></button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
