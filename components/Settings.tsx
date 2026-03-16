@@ -602,7 +602,82 @@ const Settings: React.FC<SettingsProps> = ({
              </div>
         )}
 
-        {/* ... 其他 Tab 代码保持不变 ... */}
+        {activeTab === 'foci' && isDirector && (
+            <div className="flex-1 p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练重点预设管理</h3>
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-sm font-bold text-gray-600 mb-2">新增训练重点</label>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder="例如：1对1进攻、传球配合..." className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                        <button onClick={handleAddFocus} className="px-6 py-2 bg-bvb-black text-white text-xs font-black rounded-lg flex items-center gap-2"><Plus className="w-4 h-4" /> 添加重点</button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {(localConfig.trainingFoci || []).map(focus => (
+                        <div key={focus} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group hover:border-bvb-yellow transition-colors">
+                            <span className="font-bold text-sm">{focus}</span>
+                            <button onClick={() => handleDeleteFocus(focus)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'attributes' && isDirector && (
+            <div className="flex-1 p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Target className="w-5 h-5 mr-2 text-bvb-yellow" /> 球员能力模型设置</h3>
+                
+                <div className="flex gap-2 mb-6 overflow-x-auto no-scrollbar pb-2">
+                    {(['technical', 'tactical', 'physical', 'mental'] as AttributeCategory[]).map(cat => (
+                        <button
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
+                            className={`px-4 py-2 rounded-full text-xs font-black transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                        >
+                            {categoryLabels[cat]}
+                        </button>
+                    ))}
+                </div>
+
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-sm font-bold text-gray-600 mb-2">新增 {categoryLabels[activeCategory]} 项</label>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder={`输入新的${categoryLabels[activeCategory]}名称...`} className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                        <button onClick={handleAddAttribute} className="px-6 py-2 bg-bvb-black text-white text-xs font-black rounded-lg flex items-center gap-2"><Plus className="w-4 h-4" /> 添加能力项</button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {localConfig[activeCategory].map(attr => (
+                        <div key={attr.key} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group hover:border-bvb-yellow transition-colors">
+                            <span className="font-bold text-sm">{attr.label}</span>
+                            <button onClick={() => handleDeleteAttribute(activeCategory, attr.key)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {activeTab === 'drills' && isDirector && (
+            <div className="flex-1 p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Book className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练内容库管理</h3>
+                <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <label className="block text-sm font-bold text-gray-600 mb-2">新增训练内容</label>
+                    <div className="flex gap-2">
+                        <input type="text" placeholder="输入训练科目名称..." className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                        <button onClick={handleAddDrill} className="px-6 py-2 bg-bvb-black text-white text-xs font-black rounded-lg flex items-center gap-2"><Plus className="w-4 h-4" /> 添加内容</button>
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {(localConfig.drillLibrary || []).map(drill => (
+                        <div key={drill} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group hover:border-bvb-yellow transition-colors">
+                            <span className="font-bold text-sm">{drill}</span>
+                            <button onClick={() => handleDeleteDrill(drill)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
         {activeTab === 'finance_cats' && isDirector && (
             <div className="flex-1 p-6">
                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Wallet className="w-5 h-5 mr-2 text-bvb-yellow" /> 财务科目与分类管理</h3>

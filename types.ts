@@ -46,13 +46,19 @@ export interface AttributeDefinition {
 
 export type AttributeCategory = 'technical' | 'tactical' | 'physical' | 'mental';
 
+export interface TrainingFocus {
+    id: string;
+    name: string;
+    themes: string[];
+}
+
 export interface AttributeConfig {
     technical: AttributeDefinition[];
     tactical: AttributeDefinition[];
     physical: AttributeDefinition[];
     mental: AttributeDefinition[];
     drillLibrary: string[];
-    trainingFoci: string[];
+    trainingFoci: TrainingFocus[];
 }
 
 export interface PlayerStats {
@@ -169,6 +175,32 @@ export interface MatchEvent {
     description?: string;
 }
 
+export interface TacticsPlayer {
+    id: string;
+    playerId?: string;
+    name?: string;
+    number?: number;
+    positionLabel: string; // GK, CB, etc.
+    x: number;
+    y: number;
+    isStarting: boolean;
+}
+
+export interface TacticsDrawing {
+    id: string;
+    type: 'arrow' | 'curve' | 'run' | 'pass' | 'highlight' | 'text';
+    points: number[];
+    color: string;
+    text?: string;
+}
+
+export interface TacticsBoardData {
+    format: '11v11' | '8v8' | '5v5';
+    formation: string;
+    players: TacticsPlayer[];
+    drawings: TacticsDrawing[];
+}
+
 export interface MatchDetails {
     weather: string;
     pitch: string;
@@ -176,6 +208,7 @@ export interface MatchDetails {
     substitutes: string[];
     events: MatchEvent[];
     summary: string;
+    tactics?: TacticsBoardData;
 }
 
 export interface Match {
@@ -202,6 +235,7 @@ export interface TrainingSession {
   title: string;
   date: string;
   focus: string;
+  theme?: string;
   duration: number;
   drills: string[];
   intensity: 'Low' | 'Medium' | 'High';
@@ -298,6 +332,13 @@ export interface DesignLine {
     color: string;
 }
 
+export interface FormationTemplate {
+    id: string;
+    name: string;
+    format: '11v11' | '8v8' | '5v5';
+    positions: { label: string; x: number; y: number }[];
+}
+
 export interface DrillDesign {
     id: string;
     title: string;
@@ -364,6 +405,16 @@ export interface MonthlySalaryRecord {
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;
+}
+
+export interface AccountingRecord {
+    id: string;
+    date: string;
+    type: 'income' | 'expense';
+    category: string;
+    amount: number;
+    description: string;
+    status: 'Pending' | 'Completed';
 }
 
 // --- RBAC Types ---

@@ -162,133 +162,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
         }
     };
 
-    const HomeLogDetailModal = () => {
-        if (!detailPlayerId) return null;
-        const player = players.find(p => p.id === detailPlayerId);
-        if (!player) return null;
-        const sortedLogs = [...(player.homeTrainingLogs || [])].sort((a,b) => b.date.localeCompare(a.date));
 
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                    <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
-                        <div className="flex items-center gap-3">
-                            <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow" />
-                            <div>
-                                <h3 className="font-bold text-lg">{player.name} 打卡档案</h3>
-                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Training History Records</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
-                    </div>
-                    <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3 custom-scrollbar">
-                        {sortedLogs.length > 0 ? sortedLogs.map(log => (
-                            <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl group hover:bg-white hover:border-bvb-yellow/30 transition-all">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm shrink-0 border border-gray-100">
-                                        <History className="w-5 h-5 text-bvb-yellow" />
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-gray-800 text-sm leading-none mb-1">{log.title || '居家练习'}</p>
-                                        <p className="text-[10px] text-gray-400 font-mono flex items-center"><Clock className="w-2.5 h-2.5 mr-1" /> {log.date}</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        if (confirm('确定要删除这条打卡记录吗？')) {
-                                            onUpdatePlayer({
-                                                ...player,
-                                                homeTrainingLogs: (player.homeTrainingLogs || []).filter(l => l.id !== log.id)
-                                            });
-                                        }
-                                    }}
-                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )) : (
-                            <div className="py-20 text-center text-gray-300 italic font-black uppercase text-xs tracking-widest">No records found</div>
-                        )}
-                    </div>
-                    <div className="bg-gray-50 p-4 border-t flex justify-end">
-                        <button onClick={() => setDetailPlayerId(null)} className="px-6 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">关闭窗口</button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const JugglingHistoryModal = () => {
-        if (!viewingJugglingPlayerId) return null;
-        const player = players.find(p => p.id === viewingJugglingPlayerId);
-        if (!player) return null;
-        const history = [...(player.jugglingHistory || [])].sort((a, b) => b.date.localeCompare(a.date));
-        const maxVal = history.length > 0 ? Math.max(...history.map(h => h.count)) : 0;
-
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                    <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
-                        <div className="flex items-center gap-3">
-                            <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow shadow-sm" />
-                            <div>
-                                <h3 className="font-bold text-lg">{player.name} 颠球档案</h3>
-                                <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Full Juggling History</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setViewingJugglingPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
-                    </div>
-                    <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                         <div className="flex items-center gap-2">
-                             <Trophy className="w-4 h-4 text-bvb-yellow" />
-                             <span className="text-xs font-black text-gray-400 uppercase tracking-widest">历史最高纪录</span>
-                         </div>
-                         <div className="flex items-baseline gap-1">
-                             <span className="text-2xl font-black text-bvb-black">{maxVal}</span>
-                             <span className="text-[10px] font-bold text-gray-400 uppercase">Counts</span>
-                         </div>
-                    </div>
-                    <div className="p-6 overflow-y-auto max-h-[50vh] space-y-2 custom-scrollbar">
-                        {history.length > 0 ? history.map(item => (
-                            <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group hover:border-bvb-yellow/30 transition-all shadow-sm">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black transition-colors ${item.count === maxVal ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-50 text-gray-400'}`}>
-                                        {item.count}
-                                    </div>
-                                    <div>
-                                        <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">记录日期</p>
-                                        <p className="font-bold text-gray-700 text-sm font-mono">{item.date}</p>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        if (confirm('确定要永久删除这条颠球记录吗？')) {
-                                            onUpdatePlayer({
-                                                ...player,
-                                                jugglingHistory: (player.jugglingHistory || []).filter(h => h.id !== item.id)
-                                            });
-                                        }
-                                    }}
-                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        )) : (
-                            <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
-                                <Activity className="w-12 h-12" />
-                                <p className="text-xs font-black uppercase tracking-widest">No history recorded yet</p>
-                            </div>
-                        )}
-                    </div>
-                    <div className="bg-gray-50 p-4 border-t flex justify-end">
-                        <button onClick={() => setViewingJugglingPlayerId(null)} className="px-8 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 transition-colors shadow-lg uppercase italic text-xs tracking-widest">Close Profile</button>
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     const getPlayerLatestResult = (player: Player, testId: string) => {
         if (!player.testResults) return null;
@@ -654,8 +528,131 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             )}
 
             {/* Modals */}
-            <HomeLogDetailModal />
-            <JugglingHistoryModal />
+            {detailPlayerId && (() => {
+                const player = players.find(p => p.id === detailPlayerId);
+                if (!player) return null;
+                const sortedLogs = [...(player.homeTrainingLogs || [])].sort((a,b) => b.date.localeCompare(a.date));
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                            <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow" />
+                                    <div>
+                                        <h3 className="font-bold text-lg">{player.name} 打卡档案</h3>
+                                        <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Training History Records</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3 custom-scrollbar">
+                                {sortedLogs.length > 0 ? sortedLogs.map(log => (
+                                    <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl group hover:bg-white hover:border-bvb-yellow/30 transition-all">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm shrink-0 border border-gray-100">
+                                                <History className="w-5 h-5 text-bvb-yellow" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 text-sm leading-none mb-1">{log.title || '居家练习'}</p>
+                                                <p className="text-[10px] text-gray-400 font-mono flex items-center"><Clock className="w-2.5 h-2.5 mr-1" /> {log.date}</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                if (confirm('确定要删除这条打卡记录吗？')) {
+                                                    onUpdatePlayer({
+                                                        ...p,
+                                                        homeTrainingLogs: (p.homeTrainingLogs || []).filter(l => l.id !== log.id)
+                                                    });
+                                                }
+                                            }}
+                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )) : (
+                                    <div className="py-20 text-center text-gray-300 italic font-black uppercase text-xs tracking-widest">No records found</div>
+                                )}
+                            </div>
+                            <div className="bg-gray-50 p-4 border-t flex justify-end">
+                                <button onClick={() => setDetailPlayerId(null)} className="px-6 py-2 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-lg">关闭窗口</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
+
+            {viewingJugglingPlayerId && (() => {
+                const player = players.find(p => p.id === viewingJugglingPlayerId);
+                if (!player) return null;
+                const history = [...(player.jugglingHistory || [])].sort((a, b) => b.date.localeCompare(a.date));
+                const maxVal = history.length > 0 ? Math.max(...history.map(h => h.count)) : 0;
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                            <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow shadow-sm" />
+                                    <div>
+                                        <h3 className="font-bold text-lg">{player.name} 颠球档案</h3>
+                                        <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Full Juggling History</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setViewingJugglingPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                            </div>
+                            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                                 <div className="flex items-center gap-2">
+                                     <Trophy className="w-4 h-4 text-bvb-yellow" />
+                                     <span className="text-xs font-black text-gray-400 uppercase tracking-widest">历史最高纪录</span>
+                                 </div>
+                                 <div className="flex items-baseline gap-1">
+                                     <span className="text-2xl font-black text-bvb-black">{maxVal}</span>
+                                     <span className="text-[10px] font-bold text-gray-400 uppercase">Counts</span>
+                                 </div>
+                            </div>
+                            <div className="p-6 overflow-y-auto max-h-[50vh] space-y-2 custom-scrollbar">
+                                {history.length > 0 ? history.map(item => (
+                                    <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group hover:border-bvb-yellow/30 transition-all shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black transition-colors ${item.count === maxVal ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-50 text-gray-400'}`}>
+                                                {item.count}
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">记录日期</p>
+                                                <p className="font-bold text-gray-700 text-sm font-mono">{item.date}</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                if (confirm('确定要永久删除这条颠球记录吗？')) {
+                                                    onUpdatePlayer({
+                                                        ...p,
+                                                        jugglingHistory: (p.jugglingHistory || []).filter(h => h.id !== item.id)
+                                                    });
+                                                }
+                                            }}
+                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )) : (
+                                    <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
+                                        <Activity className="w-12 h-12" />
+                                        <p className="text-xs font-black uppercase tracking-widest">No history recorded yet</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="bg-gray-50 p-4 border-t flex justify-end">
+                                <button onClick={() => setViewingJugglingPlayerId(null)} className="px-8 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 transition-colors shadow-lg uppercase italic text-xs tracking-widest">Close Profile</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
             {showConfigModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"><div className="bg-white rounded-[32px] shadow-2xl w-full max-md overflow-hidden animate-in zoom-in-95 duration-200"><div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-xl flex items-center uppercase italic"><Settings className="w-6 h-6 mr-3 text-bvb-yellow" /> 技术测试项设置</h3><button onClick={() => setShowConfigModal(false)}><X className="w-6 h-6" /></button></div><div className="p-8 space-y-8 overflow-y-auto max-h-[70vh] custom-scrollbar"><div className="space-y-4"><div><label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">测试名称</label><input className="w-full p-3 border rounded-2xl font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow" placeholder="如：30米直线运球" value={newTestDef.name} onChange={e => setNewTestDef({...newTestDef, name: e.target.value})} /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">计量单位</label><input className="w-full p-3 border rounded-2xl font-bold bg-gray-50 outline-none focus:ring-2 focus:ring-bvb-yellow" placeholder="如：秒, 个, 次" value={newTestDef.unit} onChange={e => setNewTestDef({...newTestDef, unit: e.target.value})} /></div><div className="flex items-end"><button onClick={handleAddTestDef} className="w-full h-[54px] bg-bvb-black text-white font-black rounded-2xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 shadow-lg shadow-black/10"><Plus className="w-4 h-4 text-bvb-yellow" /> 添加项目</button></div></div></div><div className="space-y-3">{(techTests || []).map(t => (<div key={t.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl border border-gray-100 group transition-all hover:bg-white hover:shadow-md"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm font-black text-xs">{t.unit}</div><span className="font-black text-gray-800">{t.name}</span></div><button onClick={() => handleDeleteTestDef(t.id)} className="p-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-4 h-4" /></button></div>))}</div></div></div></div>
             )}
