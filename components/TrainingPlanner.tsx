@@ -184,13 +184,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1500);
         return () => clearTimeout(timer);
-    }, [localSession]);
-
-    useEffect(() => {
-        if (activeTab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
-            setLocalSession(prev => ({ ...prev, isReviewRead: true }));
-        }
-    }, [activeTab]);
+    }, [localSession, onUpdateSession]);
 
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
@@ -282,7 +276,15 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                 <div className="flex border-b border-gray-200 shrink-0 sticky top-0 bg-white z-10 overflow-x-auto no-scrollbar">
                     <button onClick={() => setActiveTab('info')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'info' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><Settings2 className="w-4 h-4 mr-2" /> 计划内容</button>
                     <button onClick={() => setActiveTab('attendance')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><UserCheck className="w-4 h-4 mr-2" /> 考勤管理</button>
-                    <button onClick={() => setActiveTab('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors relative ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}>
+                    <button 
+                        onClick={() => {
+                            setActiveTab('log');
+                            if (currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
+                                setLocalSession(prev => ({ ...prev, isReviewRead: true }));
+                            }
+                        }} 
+                        className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors relative ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}
+                    >
                         <FileText className="w-4 h-4 mr-2" /> 训练日志
                         {isCoach && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead && <span className="absolute top-2 right-4 w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>}
                         {isDirector && localSession.submissionStatus === 'Submitted' && <span className="absolute top-2 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse border border-white"></span>}
