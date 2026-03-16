@@ -47,7 +47,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
       return base;
   }, [currentUser, matches, isDirector, filterTeamId]);
 
-  // Comment: Defined upcomingMatches and pastMatches based on displayMatches
   const upcomingMatches = useMemo(() => {
     return displayMatches.filter(m => m.status === 'Upcoming').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [displayMatches]);
@@ -63,17 +62,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
       }
       return base;
   }, [currentUser, players, isDirector, filterTeamId]);
-
-  // 自动保存逻辑：当编辑中的比赛数据变化时触发
-  useEffect(() => {
-    if (!editingMatch) return;
-    const timer = setTimeout(() => {
-        setSaveStatus('saving');
-        onUpdateMatch(editingMatch);
-        setTimeout(() => setSaveStatus('saved'), 800);
-    }, 1500); 
-    return () => clearTimeout(timer);
-  }, [editingMatch]);
 
   const seasonStats = useMemo(() => {
       const completed = displayMatches.filter(m => m.status === 'Completed' && m.result);
@@ -94,6 +82,13 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
 
       return { wins, draws, losses, topScorer, winRate, total };
   }, [displayMatches, displayPlayers]);
+
+  const handleConfirmEdit = () => {
+    if (editingMatch) {
+      onUpdateMatch(editingMatch);
+      setEditingMatch(null);
+    }
+  };
 
   const [newMatchForm, setNewMatchForm] = useState<Partial<Match>>({
       teamId: availableTeams[0]?.id || '',
@@ -194,11 +189,134 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
     }
   };
 
-  const MatchDetailModal = () => {
-    if (!editingMatch) return null;
-    const teamPlayers = players.filter(p => p.teamId === editingMatch.teamId);
-    
-    return (
+
+
+  const getLocationLabel = (loc: string) => loc === 'Home' ? '主场' : '客场';
+  const getFullAddress = (m: Match) => {
+      if (m.location === 'Home') return '俱乐部主球场';
+      const parts = [m.province, m.city, m.district].filter(Boolean);
+      return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
+  };
+
+  return (
+    <div className="space-y-6 md:space-y-8 relative pb-20 md:pb-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+            <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase tracking-tighter">比赛日中心</h2>
+            <p className="text-gray-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest">Match Schedule & Performance Analytics</p>
+        </div>
+        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+            <div className="relative group flex-1 md:flex-none">
+                <div className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400"><Filter className="w-3.5 h-3.5 md:w-4 md:h-4" /></div>
+                <select value={filterTeamId} onChange={e => setFilterTeamId(e.target.value)} className="w-full md:w-48 pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-white border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-bvb-yellow shadow-sm transition-all">
+                    {isDirector && <option value="all">所有梯队</option>}
+                    {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+            </div>
+            <button onClick={() => setShowAddModal(true)} className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"><Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建</button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-green-500 flex flex-col justify-between">
+              <div className="flex justify-between items-start">
+                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">本季胜场</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.wins}</h3></div>
+                  <div className="p-1.5 md:p-2 bg-green-50 rounded-lg text-green-600 shadow-inner"><TrendingUp className="w-4 h-4 md:w-5 md:h-5" /></div>
+              </div>
+              <div className="mt-2 md:mt-3 flex items-center gap-1.5 md:gap-2">
+                  <div className="flex-1 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${seasonStats.winRate}%` }}></div></div>
+                  <span className="text-[8px] md:text-[10px] font-black text-green-600 tabular-nums">{seasonStats.winRate}%</span>
+              </div>
+          </div>
+          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col justify-between">
+               <div className="flex justify-between items-start">
+                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">战平局数</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.draws}</h3></div>
+                  <div className="p-1.5 md:p-2 bg-gray-100 rounded-lg text-gray-600 shadow-inner"><Activity className="w-4 h-4 md:w-5 md:h-5" /></div>
+              </div>
+              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">总: {seasonStats.total} 场</p>
+          </div>
+          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
+               <div className="flex justify-between items-start">
+                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">失利记录</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.losses}</h3></div>
+                  <div className="p-1.5 md:p-2 bg-red-50 rounded-lg text-red-600 shadow-inner"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /></div>
+              </div>
+              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">需总结</p>
+          </div>
+          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-bvb-yellow flex flex-col justify-between">
+               <div className="flex justify-between items-start">
+                  <div className="flex-1 min-w-0">
+                      <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">队内射手王</p>
+                      <h3 className="text-sm md:text-lg font-black text-gray-800 truncate">{seasonStats.topScorer?.name || '-'}</h3>
+                      <p className="text-[8px] md:text-[10px] text-bvb-yellow font-black bg-black inline-block px-1.5 md:px-2 py-0.5 rounded mt-1.5 md:mt-2 uppercase italic tracking-tighter">{seasonStats.topScorer?.goals || 0} G</p>
+                  </div>
+                  <div className="p-1.5 md:p-2 bg-yellow-50 rounded-lg text-yellow-600 shadow-inner"><Trophy className="w-4 h-4 md:w-5 md:h-5" /></div>
+              </div>
+          </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6 md:gap-8">
+          <div className="animate-in slide-in-from-left-4 duration-500">
+              <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-bvb-black uppercase tracking-tighter italic">
+                  <Shield className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> Upcoming / 即将进行
+              </h3>
+              <div className="space-y-3 md:space-y-4">
+                  {upcomingMatches.length > 0 ? upcomingMatches.map(m => (
+                    <MatchCard 
+                        key={m.id} 
+                        match={m} 
+                        teams={teams}
+                        onDelete={onDeleteMatch}
+                        onEdit={(match) => { setEditingMatch(match); setActiveTab('info'); }}
+                        onGenerateStrategy={handleGenerateStrategy}
+                    />
+                  )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
+              </div>
+          </div>
+          <div className="animate-in slide-in-from-right-4 duration-500">
+              <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-gray-400 uppercase tracking-tighter italic">
+                  <Trophy className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" /> History / 近期赛果
+              </h3>
+              <div className="space-y-3 md:space-y-4 opacity-90">
+                  {pastMatches.length > 0 ? pastMatches.map(m => (
+                    <MatchCard 
+                        key={m.id} 
+                        match={m} 
+                        teams={teams}
+                        onDelete={onDeleteMatch}
+                        onEdit={(match) => { setEditingMatch(match); setActiveTab('info'); }}
+                        onGenerateStrategy={handleGenerateStrategy}
+                    />
+                  )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
+              </div>
+          </div>
+      </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full h-full md:h-auto md:max-w-xl rounded-none md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            <div className="bg-bvb-black p-4 md:p-6 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-lg md:text-xl flex items-center uppercase italic"><Plus className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 安排新赛程</h3><button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button></div>
+            <form onSubmit={handleAddSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 overflow-y-auto flex-1 pb-24 md:pb-8">
+                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">所属梯队</label>
+                    <select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" value={newMatchForm.teamId} onChange={e => setNewMatchForm({...newMatchForm, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                </div>
+                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">对手全称</label><input required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" placeholder="输入对手梯队名称..." value={newMatchForm.opponent} onChange={e => setNewMatchForm({...newMatchForm, opponent: e.target.value})} /></div>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold text-xs md:text-sm" value={newMatchForm.date} onChange={e => setNewMatchForm({...newMatchForm, date: e.target.value})} /></div>
+                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">开球时间</label><input type="time" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold text-xs md:text-sm" value={newMatchForm.time} onChange={e => setNewMatchForm({...newMatchForm, time: e.target.value})} /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">主/客场</label>
+                        <select className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm" value={newMatchForm.location} onChange={e => setNewMatchForm({...newMatchForm, location: e.target.value as any})}><option value="Home">主场</option><option value="Away">客场</option></select>
+                    </div>
+                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">赛事名称</label><input className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" placeholder="例如: 地区青少年联赛" value={newMatchForm.competition} onChange={e => setNewMatchForm({...newMatchForm, competition: e.target.value})} /></div>
+                </div>
+                <button type="submit" className="w-full py-4 md:py-5 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 uppercase italic tracking-widest text-xs md:text-sm"><Save className="w-4 h-4 md:w-5 md:h-5 text-bvb-yellow" /> Create Match Event</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editingMatch && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white w-full h-full md:h-[90vh] md:max-w-4xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="bg-bvb-black p-3 md:p-4 flex justify-between items-center text-white shrink-0">
@@ -285,7 +403,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                 <div className="space-y-3 md:space-y-4">
                                     <h4 className="font-black text-[10px] md:text-xs text-gray-800 flex items-center uppercase tracking-widest"><CheckCircle className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 text-green-500" /> 首发名单 ({editingMatch.details?.lineup.length})</h4>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {teamPlayers.map(p => {
+                                        {players.filter(p => p.teamId === editingMatch.teamId).map(p => {
                                             const isSelected = editingMatch.details?.lineup.includes(p.id);
                                             return (
                                                 <button key={p.id} onClick={() => toggleLineupPlayer(p.id)} className={`p-2 md:p-3 rounded-xl border-2 flex items-center gap-2 md:gap-3 transition-all ${isSelected ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-lg' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300'}`}>
@@ -299,7 +417,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                 <div className="space-y-3 md:space-y-4">
                                     <h4 className="font-black text-[10px] md:text-xs text-gray-800 flex items-center uppercase tracking-widest"><Clock className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 text-blue-500" /> 替补名单 ({editingMatch.details?.substitutes.length})</h4>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {teamPlayers.map(p => {
+                                        {players.filter(p => p.teamId === editingMatch.teamId).map(p => {
                                             const isSelected = editingMatch.details?.substitutes.includes(p.id);
                                             return (
                                                 <button key={p.id} onClick={() => toggleLineupPlayer(p.id, true)} className={`p-2 md:p-3 rounded-xl border-2 flex items-center gap-2 md:gap-3 transition-all ${isSelected ? 'bg-gray-800 text-white border-gray-800 shadow-md' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300'}`}>
@@ -322,7 +440,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                     <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">球员</label>
                                         <select className="w-full p-2 md:p-2.5 border rounded-xl text-[11px] md:text-sm font-bold bg-white" value={newEvent.playerId} onChange={e => setNewEvent({...newEvent, playerId: e.target.value})}>
                                             <option value="">选择球员...</option>
-                                            {teamPlayers.filter(p => editingMatch.details?.lineup.includes(p.id) || editingMatch.details?.substitutes.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                            {players.filter(p => p.teamId === editingMatch.teamId && (editingMatch.details?.lineup.includes(p.id) || editingMatch.details?.substitutes.includes(p.id))).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                                         </select>
                                     </div>
                                     <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">类型</label>
@@ -375,32 +493,54 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                 </div>
                 
                 <div className="bg-gray-50 p-3 md:p-4 border-t flex justify-end shrink-0 hidden md:flex">
-                    <button onClick={() => setEditingMatch(null)} className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm">
-                        确认并退出
+                    <button onClick={handleConfirmEdit} className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm">
+                        确认并保存
                     </button>
                 </div>
             </div>
         </div>
-    );
-  };
+      )}
 
-  const getLocationLabel = (loc: string) => loc === 'Home' ? '主场' : '客场';
-  const getFullAddress = (m: Match) => {
-      if (m.location === 'Home') return '俱乐部主球场';
-      const parts = [m.province, m.city, m.district].filter(Boolean);
-      return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
-  };
+      {selectedMatchForAi && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[80vh]">
+                  <div className="bg-bvb-black p-4 md:p-6 flex justify-between items-center text-white"><h3 className="font-bold flex items-center text-sm md:text-base"><Bot className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> AI 战术分析报告</h3><button onClick={() => setSelectedMatchForAi(null)}><X className="w-6 h-6" /></button></div>
+                  <div className="p-6 md:p-8 overflow-y-auto flex-1 custom-scrollbar prose prose-sm max-w-none prose-p:text-gray-600">
+                      {loading ? <div className="flex flex-col items-center justify-center py-16 md:py-20 gap-4"><Loader2 className="w-10 h-10 md:w-12 md:h-12 text-bvb-yellow animate-spin" /><p className="text-gray-400 font-black italic uppercase tracking-widest text-xs md:text-sm">Generating Strategy...</p></div> : <ReactMarkdown>{strategy}</ReactMarkdown>}
+                  </div>
+              </div>
+          </div>
+      )}
+    </div>
+  );
+};
 
-  const MatchCard: React.FC<{ match: Match }> = ({ match }) => {
+interface MatchCardProps {
+    match: Match;
+    teams: Team[];
+    onDelete: (id: string) => void;
+    onEdit: (match: Match) => void;
+    onGenerateStrategy: (match: Match) => void;
+}
+
+const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDelete, onEdit, onGenerateStrategy }) => {
     const team = teams.find(t => t.id === match.teamId);
+    
+    const getLocationLabel = (loc: string) => loc === 'Home' ? '主场' : '客场';
+    const getFullAddress = (m: Match) => {
+        if (m.location === 'Home') return '俱乐部主球场';
+        const parts = [m.province, m.city, m.district].filter(Boolean);
+        return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
+    };
+
     return (
         <div className={`bg-white rounded-xl shadow-sm border-l-4 p-3 md:p-5 transition-all hover:shadow-md relative group ${match.status === 'Completed' ? (
             match.result && match.result.split('-')[0] > match.result.split('-')[1] ? 'border-green-500' : 
             match.result && match.result.split('-')[0] < match.result.split('-')[1] ? 'border-red-500' : 'border-yellow-500'
         ) : 'border-gray-300'}`}>
             <div className="absolute top-2.5 md:top-3 right-2.5 md:right-3 flex gap-1.5 md:gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                <button onClick={(e) => { e.stopPropagation(); setEditingMatch(match); setActiveTab('info'); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded">
+                <button onClick={(e) => { e.stopPropagation(); onDelete(match.id); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                <button onClick={(e) => { e.stopPropagation(); onEdit(match); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded">
                     {match.status === 'Completed' ? <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />}
                 </button>
             </div>
@@ -423,129 +563,13 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                     <div className="text-xl md:text-3xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">{match.result || '-:-'}</div>
                 ) : (
                     <div className="flex flex-col items-end gap-1.5 md:gap-2">
-                         <button onClick={() => { setEditingMatch(match); setActiveTab('info'); }} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-3 py-1 md:py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all">录入赛果 <PenTool className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1 md:ml-1.5" /></button>
-                         <button onClick={() => handleGenerateStrategy(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-black text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-gray-800 transition-all"><Bot className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> 助手</button>
+                         <button onClick={() => onEdit(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-3 py-1 md:py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all">录入赛果 <PenTool className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1 md:ml-1.5" /></button>
+                         <button onClick={() => onGenerateStrategy(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-black text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-gray-800 transition-all"><Bot className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> 助手</button>
                     </div>
                 )}
             </div>
         </div>
     );
-  };
-
-  return (
-    <div className="space-y-6 md:space-y-8 relative pb-20 md:pb-0">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-            <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase tracking-tighter">比赛日中心</h2>
-            <p className="text-gray-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest">Match Schedule & Performance Analytics</p>
-        </div>
-        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
-            <div className="relative group flex-1 md:flex-none">
-                <div className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400"><Filter className="w-3.5 h-3.5 md:w-4 md:h-4" /></div>
-                <select value={filterTeamId} onChange={e => setFilterTeamId(e.target.value)} className="w-full md:w-48 pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-white border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-bvb-yellow shadow-sm transition-all">
-                    {isDirector && <option value="all">所有梯队</option>}
-                    {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-            </div>
-            <button onClick={() => setShowAddModal(true)} className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"><Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建</button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in slide-in-from-top-4 duration-300">
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-green-500 flex flex-col justify-between">
-              <div className="flex justify-between items-start">
-                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">本季胜场</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.wins}</h3></div>
-                  <div className="p-1.5 md:p-2 bg-green-50 rounded-lg text-green-600 shadow-inner"><TrendingUp className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-              <div className="mt-2 md:mt-3 flex items-center gap-1.5 md:gap-2">
-                  <div className="flex-1 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${seasonStats.winRate}%` }}></div></div>
-                  <span className="text-[8px] md:text-[10px] font-black text-green-600 tabular-nums">{seasonStats.winRate}%</span>
-              </div>
-          </div>
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col justify-between">
-               <div className="flex justify-between items-start">
-                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">战平局数</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.draws}</h3></div>
-                  <div className="p-1.5 md:p-2 bg-gray-100 rounded-lg text-gray-600 shadow-inner"><Activity className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">总: {seasonStats.total} 场</p>
-          </div>
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
-               <div className="flex justify-between items-start">
-                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">失利记录</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.losses}</h3></div>
-                  <div className="p-1.5 md:p-2 bg-red-50 rounded-lg text-red-600 shadow-inner"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">需总结</p>
-          </div>
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-bvb-yellow flex flex-col justify-between">
-               <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                      <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">队内射手王</p>
-                      <h3 className="text-sm md:text-lg font-black text-gray-800 truncate">{seasonStats.topScorer?.name || '-'}</h3>
-                      <p className="text-[8px] md:text-[10px] text-bvb-yellow font-black bg-black inline-block px-1.5 md:px-2 py-0.5 rounded mt-1.5 md:mt-2 uppercase italic tracking-tighter">{seasonStats.topScorer?.goals || 0} G</p>
-                  </div>
-                  <div className="p-1.5 md:p-2 bg-yellow-50 rounded-lg text-yellow-600 shadow-inner"><Trophy className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-          </div>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-6 md:gap-8">
-          <div className="animate-in slide-in-from-left-4 duration-500">
-              <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-bvb-black uppercase tracking-tighter italic">
-                  <Shield className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> Upcoming / 即将进行
-              </h3>
-              <div className="space-y-3 md:space-y-4">
-                  {upcomingMatches.length > 0 ? upcomingMatches.map(m => <MatchCard key={m.id} match={m} />) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
-              </div>
-          </div>
-          <div className="animate-in slide-in-from-right-4 duration-500">
-              <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-gray-400 uppercase tracking-tighter italic">
-                  <Trophy className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" /> History / 近期赛果
-              </h3>
-              <div className="space-y-3 md:space-y-4 opacity-90">
-                  {pastMatches.length > 0 ? pastMatches.map(m => <MatchCard key={m.id} match={m} />) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
-              </div>
-          </div>
-      </div>
-
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full h-full md:h-auto md:max-w-xl rounded-none md:rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className="bg-bvb-black p-4 md:p-6 flex justify-between items-center text-white shrink-0"><h3 className="font-black text-lg md:text-xl flex items-center uppercase italic"><Plus className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 安排新赛程</h3><button onClick={() => setShowAddModal(false)}><X className="w-6 h-6" /></button></div>
-            <form onSubmit={handleAddSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 overflow-y-auto flex-1 pb-24 md:pb-8">
-                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">所属梯队</label>
-                    <select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" value={newMatchForm.teamId} onChange={e => setNewMatchForm({...newMatchForm, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-                </div>
-                <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">对手全称</label><input required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" placeholder="输入对手梯队名称..." value={newMatchForm.opponent} onChange={e => setNewMatchForm({...newMatchForm, opponent: e.target.value})} /></div>
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold text-xs md:text-sm" value={newMatchForm.date} onChange={e => setNewMatchForm({...newMatchForm, date: e.target.value})} /></div>
-                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">开球时间</label><input type="time" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold text-xs md:text-sm" value={newMatchForm.time} onChange={e => setNewMatchForm({...newMatchForm, time: e.target.value})} /></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">主/客场</label>
-                        <select className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm" value={newMatchForm.location} onChange={e => setNewMatchForm({...newMatchForm, location: e.target.value as any})}><option value="Home">主场</option><option value="Away">客场</option></select>
-                    </div>
-                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">赛事名称</label><input className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" placeholder="例如: 地区青少年联赛" value={newMatchForm.competition} onChange={e => setNewMatchForm({...newMatchForm, competition: e.target.value})} /></div>
-                </div>
-                <button type="submit" className="w-full py-4 md:py-5 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 uppercase italic tracking-widest text-xs md:text-sm"><Save className="w-4 h-4 md:w-5 md:h-5 text-bvb-yellow" /> Create Match Event</button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      <MatchDetailModal />
-
-      {selectedMatchForAi && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[80vh]">
-                  <div className="bg-bvb-black p-4 md:p-6 flex justify-between items-center text-white"><h3 className="font-bold flex items-center text-sm md:text-base"><Bot className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> AI 战术分析报告</h3><button onClick={() => setSelectedMatchForAi(null)}><X className="w-6 h-6" /></button></div>
-                  <div className="p-6 md:p-8 overflow-y-auto flex-1 custom-scrollbar prose prose-sm max-w-none prose-p:text-gray-600">
-                      {loading ? <div className="flex flex-col items-center justify-center py-16 md:py-20 gap-4"><Loader2 className="w-10 h-10 md:w-12 md:h-12 text-bvb-yellow animate-spin" /><p className="text-gray-400 font-black italic uppercase tracking-widest text-xs md:text-sm">Generating Strategy...</p></div> : <ReactMarkdown>{strategy}</ReactMarkdown>}
-                  </div>
-              </div>
-          </div>
-      )}
-    </div>
-  );
 };
 
 export default MatchPlanner;

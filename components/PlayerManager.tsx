@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Player, Position, Team, PlayerStats, AttributeConfig, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -116,7 +116,7 @@ const getCategoryRadarData = (player: Player, category: AttributeCategory, attri
 const calculateAttendanceRate = (player: Player, trainings: TrainingSession[], scope: 'month' | 'quarter' | 'year') => {
     if (!trainings || trainings.length === 0) return 0;
     const now = new Date();
-    let startDate = new Date();
+    const startDate = new Date();
     if (scope === 'month') { startDate.setMonth(now.getMonth() - 1); } 
     else if (scope === 'quarter') { startDate.setMonth(now.getMonth() - 3); } 
     else { startDate.setFullYear(now.getFullYear() - 1); }
@@ -135,7 +135,7 @@ const getBirthdayStatus = (dateStr: string) => {
   today.setHours(0,0,0,0);
   const [y, m, d] = dateStr.split('-').map(Number);
   if (!y || !m || !d) return null;
-  let nextBirthday = new Date(today.getFullYear(), m - 1, d);
+  const nextBirthday = new Date(today.getFullYear(), m - 1, d);
   if (nextBirthday < today) { nextBirthday.setFullYear(today.getFullYear() + 1); }
   const diffTime = nextBirthday.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -224,7 +224,6 @@ interface ImportPlayersModalProps {
     onClose: () => void;
 }
 const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attributeConfig, onImport, onClose }) => {
-    const [csvContent, setCsvContent] = useState('');
     const [parsedPlayers, setParsedPlayers] = useState<Partial<Player>[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id || '');
     const [step, setStep] = useState<'upload' | 'preview'>('upload');
@@ -251,7 +250,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
             const line = lines[i].trim(); if (!line) continue;
             const cols = line.split(',').map(c => c.trim());
             if (cols.length >= 2) {
-                const name = cols[0]; const number = parseInt(cols[1]) || 0; let pos1Str = cols[2]; let pos2Str = cols[3];
+                const name = cols[0]; const number = parseInt(cols[1]) || 0; const pos1Str = cols[2]; const pos2Str = cols[3];
                 const idCard = cols[4] || ''; const joinDate = cols[5] || ''; const school = cols[6] || '';
                 const parentName = cols[7] || ''; const parentPhone = cols[8] || ''; const foot = cols[9] === '左' ? '左' : '右';
                 
@@ -260,8 +259,8 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                     return Position.TBD;
                 };
 
-                let position = parsePos(pos1Str);
-                let secondaryPosition = parsePos(pos2Str);
+                const position = parsePos(pos1Str);
+                const secondaryPosition = parsePos(pos2Str);
 
                 let gender: '男' | '女' = '男'; let age = 10; let birthDate = '';
                 if (idCard.length === 18) {
@@ -401,7 +400,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('overview');
-    const [detailAttendanceScope, setDetailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+    const [detailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -420,7 +419,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                  setEditedPlayer(JSON.parse(JSON.stringify(player)));
              }
         }
-    }, [player, isEditing]);
+    }, [player, isEditing, editedPlayer]);
 
     useEffect(() => {
         if (!isEditing) return;
@@ -435,7 +434,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1200);
         return () => clearTimeout(timer);
-    }, [editedPlayer, isEditing]);
+    }, [editedPlayer, isEditing, onUpdatePlayer]);
 
     useEffect(() => {
         if (initialFilter === 'pending_reviews') { setActiveTab('reviews'); } 
@@ -462,6 +461,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     ];
 
     const attendanceRate = calculateAttendanceRate(player, trainings, detailAttendanceScope);
+    console.log('Attendance Rate:', attendanceRate);
     const handleSave = () => {
       const updatedPlayer = { ...editedPlayer, statsStatus: 'Published' as ApprovalStatus, lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats)) };
       onUpdatePlayer(updatedPlayer); setSaveStatus('saved');
@@ -471,7 +471,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
          onDeleteRecharge(player.id, rechargeId);
          setEditedPlayer(prev => ({ ...prev, rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || [] }));
     };
-    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch (error) { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
+    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
     const handleStatChange = (category: keyof PlayerStats, key: string, value: number) => {
       setEditedPlayer(prev => ({ ...prev, stats: { ...prev.stats, [category]: { ...prev.stats[category], [key]: value } }, }));
     };
@@ -494,7 +494,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         try {
             const draft = await generatePlayerReview(player, newReview.quarter || 'Q1', newReview.year || new Date().getFullYear());
             setNewReview(prev => ({ ...prev, technicalTacticalImprovement: draft.tech, mentalDevelopment: draft.mental, summary: draft.summary }));
-        } catch (e) { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
+        } catch { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
     };
 
     const handleEditReview = (review: PlayerReview) => {
@@ -1083,7 +1083,7 @@ interface PlayerManagerProps {
 
 // --- PlayerManager (Main Component) ---
 const PlayerManager: React.FC<PlayerManagerProps> = ({ 
-  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onAddPlayerReview, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
+  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -1115,11 +1115,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
     const teamExists = teams.some(t => t.id === selectedTeamId); const isUnassigned = selectedTeamId === 'unassigned';
     if (!teamExists && !isUnassigned) { if (teams.length > 0) { setSelectedTeamId(teams[0].id); } else { setSelectedTeamId('unassigned'); } } else if (!selectedTeamId && teams.length > 0) { setSelectedTeamId(teams[0].id); }
-  }, [teams, currentUser, isCoach, selectedTeamId]);
+  }, [teams, currentUser, isCoach, selectedTeamId, initialFilter]);
 
-  const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+  const [attendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  useEffect(() => { if (selectedPlayer) { const updated = players.find(p => p.id === selectedPlayer.id); if (updated && updated !== selectedPlayer) { setSelectedPlayer(updated); } } }, [players]);
+  useEffect(() => { if (selectedPlayer) { const updated = players.find(p => p.id === selectedPlayer.id); if (updated && updated !== selectedPlayer) { setSelectedPlayer(updated); } } }, [players, selectedPlayer]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1190,7 +1190,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     try { 
         const exportTitle = selectedTeam ? `${selectedTeam.name}_球员档案登记表` : '全俱乐部球员档案库'; 
         await exportToPDF('player-list-export', exportTitle); 
-    } catch (e) { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
+    } catch { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
   };
 
   const handleExportPlayerExcel = () => {
@@ -1209,7 +1209,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         link.href = URL.createObjectURL(blob);
         link.download = `${selectedTeam?.name || '全部球员'}_完整档案明细_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
-    } catch (e) {
+    } catch {
         alert('Excel 导出失败');
     } finally {
         setIsExportingExcel(false);
@@ -1380,7 +1380,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 flex flex-col min-h-0">
                         <h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-4 uppercase">年度考评记录</h3>
                         <div className="grid grid-cols-2 gap-4 flex-1">
-                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review, idx) => (
+                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review) => (
                                 <div key={review.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-xs">
                                     <div className="flex justify-between items-center mb-2 border-b border-gray-200 pb-2"><span className="font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className="text-gray-400 font-mono">{review.date}</span></div>
                                     <div className="space-y-2">

@@ -244,6 +244,99 @@ export const MOCK_MATCHES: Match[] = [
   { id: '5', teamId: 't2', title: '主场收官战', opponent: '莱比锡 U17', date: '2023-11-27', time: '10:00', location: 'Home', province: '北京市', city: '北京市', district: '朝阳区', status: 'Upcoming', competition: '联赛' },
 ];
 
+export const FORMATION_TEMPLATES: FormationTemplate[] = [
+    {
+        id: '11-4-3-3',
+        name: '4-3-3',
+        format: '11v11',
+        elements: [
+            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
+            { type: 'player', label: 'LB', x: 0.15, y: 0.75 },
+            { type: 'player', label: 'CB', x: 0.38, y: 0.8 },
+            { type: 'player', label: 'CB', x: 0.62, y: 0.8 },
+            { type: 'player', label: 'RB', x: 0.85, y: 0.75 },
+            { type: 'player', label: 'DM', x: 0.5, y: 0.65 },
+            { type: 'player', label: 'CM', x: 0.3, y: 0.55 },
+            { type: 'player', label: 'CM', x: 0.7, y: 0.55 },
+            { type: 'player', label: 'LW', x: 0.2, y: 0.35 },
+            { type: 'player', label: 'RW', x: 0.8, y: 0.35 },
+            { type: 'player', label: 'ST', x: 0.5, y: 0.25 },
+        ]
+    },
+    {
+        id: '11-4-4-2',
+        name: '4-4-2',
+        format: '11v11',
+        elements: [
+            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
+            { type: 'player', label: 'LB', x: 0.15, y: 0.75 },
+            { type: 'player', label: 'CB', x: 0.38, y: 0.8 },
+            { type: 'player', label: 'CB', x: 0.62, y: 0.8 },
+            { type: 'player', label: 'RB', x: 0.85, y: 0.75 },
+            { type: 'player', label: 'LM', x: 0.15, y: 0.55 },
+            { type: 'player', label: 'CM', x: 0.38, y: 0.55 },
+            { type: 'player', label: 'CM', x: 0.62, y: 0.55 },
+            { type: 'player', label: 'RM', x: 0.85, y: 0.55 },
+            { type: 'player', label: 'ST', x: 0.4, y: 0.25 },
+            { type: 'player', label: 'ST', x: 0.6, y: 0.25 },
+        ]
+    },
+    {
+        id: '8-3-3-1',
+        name: '3-3-1',
+        format: '8v8',
+        elements: [
+            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
+            { type: 'player', label: 'DF', x: 0.2, y: 0.75 },
+            { type: 'player', label: 'DF', x: 0.5, y: 0.8 },
+            { type: 'player', label: 'DF', x: 0.8, y: 0.75 },
+            { type: 'player', label: 'MF', x: 0.2, y: 0.5 },
+            { type: 'player', label: 'MF', x: 0.5, y: 0.55 },
+            { type: 'player', label: 'MF', x: 0.8, y: 0.5 },
+            { type: 'player', label: 'FW', x: 0.5, y: 0.25 },
+        ]
+    },
+    {
+        id: '8-2-4-1',
+        name: '2-4-1',
+        format: '8v8',
+        elements: [
+            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
+            { type: 'player', label: 'DF', x: 0.35, y: 0.8 },
+            { type: 'player', label: 'DF', x: 0.65, y: 0.8 },
+            { type: 'player', label: 'MF', x: 0.15, y: 0.55 },
+            { type: 'player', label: 'MF', x: 0.38, y: 0.5 },
+            { type: 'player', label: 'MF', x: 0.62, y: 0.5 },
+            { type: 'player', label: 'MF', x: 0.85, y: 0.55 },
+            { type: 'player', label: 'FW', x: 0.5, y: 0.25 },
+        ]
+    },
+    {
+        id: '5-1-2-1',
+        name: '1-2-1',
+        format: '5v5',
+        elements: [
+            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
+            { type: 'player', label: 'DF', x: 0.5, y: 0.75 },
+            { type: 'player', label: 'MF', x: 0.25, y: 0.5 },
+            { type: 'player', label: 'MF', x: 0.75, y: 0.5 },
+            { type: 'player', label: 'FW', x: 0.5, y: 0.25 },
+        ]
+    },
+    {
+        id: '5-2-2',
+        name: '2-2',
+        format: '5v5',
+        elements: [
+            { type: 'player', label: 'GK', x: 0.5, y: 0.9 },
+            { type: 'player', label: 'DF', x: 0.3, y: 0.75 },
+            { type: 'player', label: 'DF', x: 0.7, y: 0.75 },
+            { type: 'player', label: 'FW', x: 0.3, y: 0.35 },
+            { type: 'player', label: 'FW', x: 0.7, y: 0.35 },
+        ]
+    }
+];
+
 export const MOCK_TRAINING: TrainingSession[] = [
   { id: '1', teamId: 't1', title: '高位逼抢恢复', date: '2023-11-14', focus: '防守', duration: 90, intensity: 'High', drills: ['5v2 抢圈 (Rondo)', '3v3 攻守转换', '高位防线布置', '8v8 限制触球次数'], attendance: [ { playerId: '1', status: 'Present' }, { playerId: '2', status: 'Present' }, { playerId: '3', status: 'Leave' } ] },
   { id: '2', teamId: 't1', title: '防守阵型保持', date: '2023-11-16', focus: '防守', duration: 75, intensity: 'Medium', drills: ['动态拉伸', '影子防守练习', '整体阵型移动', '放松整理'], attendance: [ { playerId: '1', status: 'Present' }, { playerId: '2', status: 'Injury' }, { playerId: '4', status: 'Present' } ] }
