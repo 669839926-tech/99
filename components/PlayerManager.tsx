@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
-import { Player, Position, Team, PlayerStats, AttributeConfig, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -116,7 +116,7 @@ const getCategoryRadarData = (player: Player, category: AttributeCategory, attri
 const calculateAttendanceRate = (player: Player, trainings: TrainingSession[], scope: 'month' | 'quarter' | 'year') => {
     if (!trainings || trainings.length === 0) return 0;
     const now = new Date();
-    const startDate = new Date();
+    let startDate = new Date();
     if (scope === 'month') { startDate.setMonth(now.getMonth() - 1); } 
     else if (scope === 'quarter') { startDate.setMonth(now.getMonth() - 3); } 
     else { startDate.setFullYear(now.getFullYear() - 1); }
@@ -135,7 +135,7 @@ const getBirthdayStatus = (dateStr: string) => {
   today.setHours(0,0,0,0);
   const [y, m, d] = dateStr.split('-').map(Number);
   if (!y || !m || !d) return null;
-  const nextBirthday = new Date(today.getFullYear(), m - 1, d);
+  let nextBirthday = new Date(today.getFullYear(), m - 1, d);
   if (nextBirthday < today) { nextBirthday.setFullYear(today.getFullYear() + 1); }
   const diffTime = nextBirthday.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -251,7 +251,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
             const line = lines[i].trim(); if (!line) continue;
             const cols = line.split(',').map(c => c.trim());
             if (cols.length >= 2) {
-                const name = cols[0]; const number = parseInt(cols[1]) || 0; const pos1Str = cols[2]; const pos2Str = cols[3];
+                const name = cols[0]; const number = parseInt(cols[1]) || 0; let pos1Str = cols[2]; let pos2Str = cols[3];
                 const idCard = cols[4] || ''; const joinDate = cols[5] || ''; const school = cols[6] || '';
                 const parentName = cols[7] || ''; const parentPhone = cols[8] || ''; const foot = cols[9] === '左' ? '左' : '右';
                 
@@ -260,8 +260,8 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                     return Position.TBD;
                 };
 
-                const position = parsePos(pos1Str);
-                const secondaryPosition = parsePos(pos2Str);
+                let position = parsePos(pos1Str);
+                let secondaryPosition = parsePos(pos2Str);
 
                 let gender: '男' | '女' = '男'; let age = 10; let birthDate = '';
                 if (idCard.length === 18) {
