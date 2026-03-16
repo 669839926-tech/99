@@ -169,32 +169,6 @@ export interface MatchEvent {
     description?: string;
 }
 
-export interface TacticsPlayer {
-    id: string;
-    playerId?: string;
-    name?: string;
-    number?: number;
-    positionLabel: string; // GK, CB, etc.
-    x: number;
-    y: number;
-    isStarting: boolean;
-}
-
-export interface TacticsDrawing {
-    id: string;
-    type: 'arrow' | 'curve' | 'run' | 'pass' | 'highlight' | 'text';
-    points: number[];
-    color: string;
-    text?: string;
-}
-
-export interface TacticsBoardData {
-    format: '11v11' | '8v8' | '5v5';
-    formation: string;
-    players: TacticsPlayer[];
-    drawings: TacticsDrawing[];
-}
-
 export interface MatchDetails {
     weather: string;
     pitch: string;
@@ -202,7 +176,6 @@ export interface MatchDetails {
     substitutes: string[];
     events: MatchEvent[];
     summary: string;
-    tactics?: TacticsBoardData;
 }
 
 export interface Match {
@@ -325,13 +298,6 @@ export interface DesignLine {
     color: string;
 }
 
-export interface FormationTemplate {
-    id: string;
-    name: string;
-    format: '11v11' | '8v8' | '5v5';
-    positions: { label: string; x: number; y: number }[];
-}
-
 export interface DrillDesign {
     id: string;
     title: string;
@@ -398,16 +364,6 @@ export interface MonthlySalaryRecord {
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;
-}
-
-export interface AccountingRecord {
-    id: string;
-    date: string;
-    type: 'income' | 'expense';
-    category: string;
-    amount: number;
-    description: string;
-    status: 'Pending' | 'Completed';
 }
 
 // --- RBAC Types ---
