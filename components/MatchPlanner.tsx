@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User } from '../types';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { Match, Player, Team, MatchDetails, MatchEvent, MatchEventType, User } from '../types';
 // Comment: Added 'Info' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Download, Sun, Cloud, CloudRain, CloudSnow, Wind, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, ChevronDown, UserPlus, UserMinus, Star, ClipboardList, PenTool, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -20,10 +20,11 @@ interface MatchPlannerProps {
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
 
-const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, currentUser, onAddMatch, onDeleteMatch, onUpdateMatch }) => {
+const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, currentUser, onAddMatch, onDeleteMatch, onUpdateMatch, appLogo }) => {
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
   const [strategy, setStrategy] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   
   const [filterTeamId, setFilterTeamId] = useState<string>('all');
@@ -186,7 +187,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
     try {
         const result = await generateMatchStrategy(match.opponent, "控制球权，快速转换");
         setStrategy(result);
-    } catch {
+    } catch (e) {
         setStrategy("生成失败。");
     } finally {
         setLoading(false);
