@@ -1,21 +1,17 @@
 
 import React, { useState, useMemo } from 'react';
-import { Player, Team, AttributeConfig, AttributeCategory, TrainingSession, TechTestDefinition, JugglingRecord, HomeTrainingLog } from '../types';
-import { User, LogOut, Activity, Calendar, Trophy, History, Clock, TrendingUp, Medal, Plus, Send, Target, ChevronLeft, ChevronRight, CheckCircle, Tag } from 'lucide-react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { Player, Team, JugglingRecord, HomeTrainingLog } from '../types';
+import { LogOut, Activity, TrendingUp, Medal, Plus, CheckCircle } from 'lucide-react';
 
 interface ParentPortalProps {
     player: Player;
     team?: Team;
-    attributeConfig: AttributeConfig;
-    trainings: TrainingSession[];
     onLogout: () => void;
     appLogo?: string;
-    techTests?: TechTestDefinition[];
     onUpdatePlayer: (player: Player) => void;
 }
 
-const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, attributeConfig, trainings, onLogout, appLogo, techTests = [], onUpdatePlayer }) => {
+const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, onLogout, appLogo, onUpdatePlayer }) => {
     
     const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'history'>('overview');
     
