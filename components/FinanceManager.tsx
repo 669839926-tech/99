@@ -1,8 +1,39 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, History, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area, Cell, PieChart, Pie } from 'recharts';
+import React, { useState, useMemo, useRef } from 'react';
+import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
+import { 
+    Wallet, 
+    Plus, 
+    Trash2, 
+    FileText, 
+    Download, 
+    Calculator, 
+    ChevronLeft, 
+    ChevronRight, 
+    ArrowUpRight, 
+    ArrowDownRight, 
+    FileSpreadsheet, 
+    Upload, 
+    FileDown, 
+    CheckSquare, 
+    RefreshCw, 
+    Star, 
+    Gauge, 
+    X, 
+    BarChart3, 
+    Save, 
+    Banknote, 
+    UserCheck, 
+    PieChart as PieChartIcon, 
+    AlignLeft, 
+    ArrowUpDown, 
+    ArrowUp, 
+    ArrowDown, 
+    Briefcase, 
+    Clock, 
+    CheckCircle2
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
     transactions: FinanceTransaction[];
@@ -31,7 +62,7 @@ const parseDateInfo = (dateStr: string) => {
         return { year: d.getFullYear(), month: d.getMonth() };
     }
     const yMatch = dateStr.match(/(\d{4})/);
-    const mMatch = dateStr.match(/(?:\-|年|\/)(\d{1,2})(?:\-|月|\/)?/);
+    const mMatch = dateStr.match(/(?:-|年|\/)(\d{1,2})(?:-|月|\/)?/);
     return {
         year: yMatch ? parseInt(yMatch[1]) : 0,
         month: mMatch ? parseInt(mMatch[1]) - 1 : -1
@@ -39,7 +70,7 @@ const parseDateInfo = (dateStr: string) => {
 };
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ 
-    transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
+    transactions, financeCategories, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
     users, players, teams, trainings, salarySettings, onUpdateUser,
     accountingRecords, onAddAccountingRecord, onUpdateAccountingRecord, onDeleteAccountingRecord
 }) => {
@@ -70,22 +101,29 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        const categoriesForType = financeCategories.filter(c => c.type === activeType);
-        setFormData(prev => ({ ...prev, category: categoriesForType.length > 0 ? categoriesForType[0].id : '' }));
-    }, [activeType, financeCategories]);
+    const handleViewModeChange = (mode: 'journal' | 'summary' | 'salary' | 'accounting') => {
+        setViewMode(mode);
+        if (mode === 'salary' && selectedYear === 'all') {
+            setSelectedYear(new Date().getFullYear());
+        }
+    };
 
-    const isDirector = currentUser?.role === 'director';
+    const handleActiveTypeChange = (type: 'income' | 'expense') => {
+        setActiveType(type);
+        const categoriesForType = financeCategories.filter(c => c.type === type);
+        setFormData(prev => ({ ...prev, category: categoriesForType.length > 0 ? categoriesForType[0].id : '' }));
+    };
 
     const journalWithBalance = useMemo(() => {
         const baseSorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        let balance = 0;
-        const recordsWithBalance = baseSorted.map(t => {
-            balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
-            return { ...t, balance };
-        });
+        const result: (FinanceTransaction & { balance: number })[] = [];
+        let runningBalance = 0;
+        for (const t of baseSorted) {
+            runningBalance += (Number(t.income) || 0) - (Number(t.expense) || 0);
+            result.push({ ...t, balance: runningBalance });
+        }
 
-        const filtered = recordsWithBalance.filter(t => {
+        const filtered = result.filter(t => {
             const catLabel = financeCategories.find(c => c.id === t.category)?.label || '';
             return (
                 t.date.includes(filters.date) &&
@@ -258,7 +296,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let renewalReward = 0;
                 let renewalRate = 0;
                 let renewalFormula = "非季末月份";
-                if (isDistributionMonth) {
+                if (isDistributionMonth && typeof selectedYear === 'number') {
                     const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
                     const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
                     const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
@@ -340,7 +378,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
         const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
-        let nextRecords = [...records];
+        const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const nextEdit = { ...editPayroll }; delete nextEdit[coachId]; setEditPayroll(nextEdit);
@@ -348,6 +386,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleDisburseSalary = (coachId: string) => {
+        const now = Date.now();
         const coach = users.find(u => u.id === coachId);
         const row = coachSalaries.find(s => s.coachId === coachId);
         if (!coach || !row) return;
@@ -356,11 +395,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
         const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
-        let nextRecords = [...records];
+        const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const salaryExpenseCategory = financeCategories.find(c => c.label.includes('工资支出') || c.id === 'cat-4');
-        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
+        onAddTransaction({ id: `disburse-${now}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
         alert(`发放成功！已为 ${coach.name} 生成一笔 ¥${row.totalSalary} 的薪酬支出记录。`);
     };
 
@@ -375,27 +414,40 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     }, [transactions]);
 
     const handleUpdateEvaluation = (coachId: string, score: number) => {
+        const now = Date.now();
         const coach = users.find(u => u.id === coachId);
         if (!coach) return;
         const evaluations = coach.monthlyEvaluations || [];
         const existingIdx = evaluations.findIndex(e => e.year === selectedYear && e.month === selectedMonth);
-        let nextEvals = [...evaluations];
+        const nextEvals = [...evaluations];
         if (existingIdx >= 0) nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
-        else nextEvals.push({ id: `eval-${Date.now()}`, year: selectedYear, month: selectedMonth, score, comment: '' });
+        else nextEvals.push({ id: `eval-${now}`, year: selectedYear, month: selectedMonth, score, comment: '' });
         onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
     };
 
     const handleAccountingSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const now = Date.now();
         if (editingAccountingRecord) {
             onUpdateAccountingRecord({ ...editingAccountingRecord, ...accountingFormData } as AccountingRecord);
         } else {
-            onAddAccountingRecord({ ...accountingFormData, id: Date.now().toString() } as AccountingRecord);
+            onAddAccountingRecord({ ...accountingFormData, id: now.toString() } as AccountingRecord);
         }
         setShowAccountingModal(false);
         setEditingAccountingRecord(null);
     };
 
+    const handleExportAccountingExcel = () => {
+        const headers = "类型,日期,对方单位,摘要明细,金额,状态,结算日期\n";
+        const rows = accountingRecords.map(r => {
+            return `${r.type === 'receivable' ? '应收' : '应付'},${r.date},${r.entity},${r.details},${r.amount},${r.status === 'settled' ? '已结算' : '待处理'},${r.settledDate || '-'}`;
+        }).join("\n");
+        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `会计账款导出_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+    };
     const handleSettleAccountingRecord = (record: AccountingRecord) => {
         if (!confirm(`确定要结算这笔${record.type === 'receivable' ? '应收' : '应付'}账款吗？结算后将自动生成一笔财务流水。`)) return;
         
@@ -404,7 +456,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         
         // Generate transaction
         onAddTransaction({
-            id: `settle-${Date.now()}`,
+            id: `settle-${record.id}-${settledDate}`,
             date: settledDate,
             details: `[账款结算] ${record.entity}: ${record.details}`,
             category: record.category,
@@ -420,9 +472,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const toggleSelectId = (id: string) => { const newSet = new Set(selectedIds); if (newSet.has(id)) newSet.delete(id); else newSet.add(id); setSelectedIds(newSet); };
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const now = Date.now();
         const amountNum = parseFloat(formData.amount) || 0;
         if (!formData.category) { alert('请选择一个项目分类'); return; }
-        onAddTransaction({ id: Date.now().toString(), date: formData.date, details: formData.details, category: formData.category, income: activeType === 'income' ? amountNum : 0, expense: activeType === 'expense' ? amountNum : 0, account: formData.account, attachment: formData.attachment });
+        onAddTransaction({ id: now.toString(), date: formData.date, details: formData.details, category: formData.category, income: activeType === 'income' ? amountNum : 0, expense: activeType === 'expense' ? amountNum : 0, account: formData.account, attachment: formData.attachment });
         setShowAddModal(false); setFormData({ ...formData, details: '', amount: '', attachment: '' });
     };
 
@@ -430,6 +483,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const file = e.target.files?.[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (evt) => {
+            const now = Date.now();
             const text = evt.target?.result as string; const lines = text.split('\n'); const newTxs: FinanceTransaction[] = []; let batchIncome = 0; let batchExpense = 0;
             const cleanAmount = (str: string) => str ? parseFloat(str.replace(/[¥, ]/g, '')) || 0 : 0;
             const normalizeDateStr = (str: string) => str.trim().replace(/(\d{4})年(\d{1,2})月(\d{1,2})日/, (_, y, m, d) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`).replace(/\//g, '-');
@@ -441,7 +495,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     const catDef = financeCategories.find(c => c.label === catLabel);
                     if (!catDef || (income === 0 && expense === 0)) continue;
                     batchIncome += income; batchExpense += expense;
-                    newTxs.push({ id: `imp-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`, date, details, category: catDef.id, income, expense, account });
+                    newTxs.push({ id: `imp-${now}-${i}-${Math.random().toString(36).substr(2, 4)}`, date, details, category: catDef.id, income, expense, account });
                 }
             }
             if (newTxs.length > 0) { setImportSummary({ count: newTxs.length, income: batchIncome, expense: batchExpense, tempTxs: newTxs }); setShowImportModal(false); } else alert('未解析到有效数据。');
@@ -458,13 +512,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 </div>
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
                     <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm shrink-0">
-                        <button onClick={() => setViewMode('journal')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>流水</button>
-                        <button onClick={() => setViewMode('summary')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>统计</button>
-                        <button onClick={() => setViewMode('salary')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'salary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>薪资</button>
-                        <button onClick={() => setViewMode('accounting')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'accounting' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>账款</button>
+                        <button onClick={() => handleViewModeChange('journal')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'journal' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>流水</button>
+                        <button onClick={() => handleViewModeChange('summary')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'summary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>统计</button>
+                        <button onClick={() => handleViewModeChange('salary')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'salary' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>薪资</button>
+                        <button onClick={() => handleViewModeChange('accounting')} className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-black transition-all ${viewMode === 'accounting' ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'text-gray-400 hover:text-gray-800'}`}>账款</button>
                     </div>
                     <button onClick={() => setShowImportModal(true)} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-white border border-gray-300 text-gray-600 font-bold rounded-xl shadow-sm hover:bg-gray-50 transition-colors text-xs"><FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-600" /> 导入</button>
-                    <button onClick={() => { setActiveType('income'); setShowAddModal(true); }} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-md hover:brightness-105 active:scale-95 transition-all text-xs"><Plus className="w-4 h-4 mr-1.5" /> 记账</button>
+                    <button onClick={() => { handleActiveTypeChange('income'); setShowAddModal(true); }} className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-md hover:brightness-105 active:scale-95 transition-all text-xs"><Plus className="w-4 h-4 mr-1.5" /> 记账</button>
                 </div>
             </div>
 
@@ -616,6 +670,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center uppercase italic tracking-tighter"><Briefcase className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 应收应付账款管理明细</h3>
+                            <button onClick={handleExportAccountingExcel} className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-black text-gray-600 hover:text-bvb-black hover:border-bvb-yellow transition-all shadow-sm">
+                                <Download className="w-3.5 h-3.5" /> 导出数据
+                            </button>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-xs">
@@ -1092,7 +1149,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50 flex-1 overflow-y-auto pb-24 md:pb-8">
-                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => setActiveType('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => setActiveType('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
+                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => handleActiveTypeChange('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => handleActiveTypeChange('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">发生日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label><select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
