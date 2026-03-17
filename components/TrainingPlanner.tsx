@@ -12,7 +12,6 @@ interface TrainingPlannerProps {
   players: Player[];
   drillLibrary: string[];
   trainingFoci?: string[];
-  attributeConfig?: AttributeConfig;
   designs?: DrillDesign[];
   currentUser: User | null;
   onAddTraining: (session: TrainingSession) => void;
@@ -665,7 +664,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, trainingFoci = [], attributeConfig, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -717,7 +716,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [formData, setFormData] = useState({
       teamId: availableTeams[0]?.id || '',
       title: '',
-      titleCustom: '',
       focus: trainingFoci[0] || '传接球',
       focusCustom: '',
       duration: 90,
@@ -733,15 +731,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
       }
   }, [availableTeams]);
-
-  useEffect(() => {
-      if (formData.focus && attributeConfig?.trainingThemes?.[formData.focus]) {
-          const themes = attributeConfig.trainingThemes[formData.focus];
-          if (themes.length > 0) {
-              setFormData(prev => ({ ...prev, title: themes[0] }));
-          }
-      }
-  }, [formData.focus, attributeConfig]);
 
   const [drillInput, setDrillInput] = useState('');
 
@@ -1308,7 +1297,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         setLoading(true);
         try {
             let finalDrills = formData.drills;
-            let finalTitle = formData.title === 'Custom_Theme' ? formData.titleCustom : formData.title;
+            let finalTitle = formData.title;
             if (isAiMode && !finalDrills.length) {
                  const plan = await generateTrainingPlan(formData.focus === 'Custom' ? formData.focusCustom : formData.focus, formData.duration, formData.intensity);
                  if (plan.drills) finalDrills = plan.drills;
@@ -1336,7 +1325,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             };
             onAddTraining(newSession);
             setShowAddModal(false);
-            setFormData({ teamId: availableTeams[0]?.id || '', title: '', titleCustom: '', focus: trainingFoci[0] || '传接球', focusCustom: '', duration: 90, intensity: 'Medium', date: new Date().toISOString().split('T')[0], drills: [], linkedDesignId: undefined, focusedPlayerIds: [] });
+            setFormData({ teamId: availableTeams[0]?.id || '', title: '', focus: trainingFoci[0] || '传接球', focusCustom: '', duration: 90, intensity: 'Medium', date: new Date().toISOString().split('T')[0], drills: [], linkedDesignId: undefined, focusedPlayerIds: [] });
             setIsAiMode(false);
         } catch (error) { console.error(error); alert('创建失败'); } finally { setLoading(false); }
   };
@@ -1489,41 +1478,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
-                      {formData.focus !== 'Custom' && attributeConfig?.trainingThemes?.[formData.focus] ? (
-                        <div className="space-y-2">
-                          <select 
-                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                            value={formData.title} 
-                            onChange={e => setFormData({...formData, title: e.target.value})}
-                            required={!isAiMode}
-                          >
-                            {attributeConfig.trainingThemes[formData.focus].map(theme => (
-                              <option key={theme} value={theme}>{theme}</option>
-                            ))}
-                            <option value="Custom_Theme">自定义主题...</option>
-                          </select>
-                          {formData.title === 'Custom_Theme' && (
-                            <input 
-                              className="w-full p-2 border rounded text-xs font-bold" 
-                              placeholder="输入主题..." 
-                              value={formData.titleCustom} 
-                              onChange={e => setFormData({...formData, titleCustom: e.target.value})} 
-                              required={!isAiMode}
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <input 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
-                          placeholder="例如: 快速反击演练" 
-                          value={formData.title} 
-                          onChange={e => setFormData({...formData, title: e.target.value})} 
-                          required={!isAiMode} 
-                        />
-                      )}
-                    </div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>
                   </div>
 
                   {/* 重点关注球员选择器 (NEW) */}
