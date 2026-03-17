@@ -184,14 +184,6 @@ export const DEFAULT_ATTRIBUTE_CONFIG: AttributeConfig = {
     '体能',
     '战术',
     '对抗'
-  ],
-  focusThemeMappings: [
-    { focus: '传接球', themes: ['短传配合', '长传转移', '接球转身', '传中抢点'] },
-    { focus: '射门', themes: ['禁区外远射', '门前包抄', '单刀球处理', '头球攻门'] },
-    { focus: '防守', themes: ['1对1防守', '阵型移动', '高位压迫', '防守反击'] },
-    { focus: '体能', themes: ['耐力训练', '爆发力训练', '灵敏性训练', '核心力量'] },
-    { focus: '战术', themes: ['进攻组织', '防守轮转', '定位球战术', '边路进攻'] },
-    { focus: '对抗', themes: ['小场地对抗', '半场攻防', '全场比赛', '少打多演练'] }
   ]
 };
 
