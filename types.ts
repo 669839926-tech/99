@@ -46,11 +46,6 @@ export interface AttributeDefinition {
 
 export type AttributeCategory = 'technical' | 'tactical' | 'physical' | 'mental';
 
-export interface FocusThemeMapping {
-    focus: string;
-    themes: string[];
-}
-
 export interface AttributeConfig {
     technical: AttributeDefinition[];
     tactical: AttributeDefinition[];
@@ -58,7 +53,6 @@ export interface AttributeConfig {
     mental: AttributeDefinition[];
     drillLibrary: string[];
     trainingFoci: string[];
-    focusThemeMappings?: FocusThemeMapping[];
 }
 
 export interface PlayerStats {

@@ -115,43 +115,8 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddFocus = () => {
       if (!newItemName.trim()) return;
-      setLocalConfig(prev => {
-        const next = { ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] };
-        // Initialize mapping for new focus
-        if (!next.focusThemeMappings) next.focusThemeMappings = [];
-        if (!next.focusThemeMappings.find(m => m.focus === newItemName.trim())) {
-            next.focusThemeMappings.push({ focus: newItemName.trim(), themes: [] });
-        }
-        return next;
-      });
+      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] }));
       setNewItemName('');
-  };
-
-  const handleAddTheme = (focus: string, theme: string) => {
-    if (!theme.trim()) return;
-    setLocalConfig(prev => {
-      const mappings = [...(prev.focusThemeMappings || [])];
-      const index = mappings.findIndex(m => m.focus === focus);
-      if (index >= 0) {
-        if (!mappings[index].themes.includes(theme.trim())) {
-          mappings[index].themes = [...mappings[index].themes, theme.trim()];
-        }
-      } else {
-        mappings.push({ focus, themes: [theme.trim()] });
-      }
-      return { ...prev, focusThemeMappings: mappings };
-    });
-  };
-
-  const handleDeleteTheme = (focus: string, theme: string) => {
-    setLocalConfig(prev => {
-      const mappings = [...(prev.focusThemeMappings || [])];
-      const index = mappings.findIndex(m => m.focus === focus);
-      if (index >= 0) {
-        mappings[index].themes = mappings[index].themes.filter(t => t !== theme);
-      }
-      return { ...prev, focusThemeMappings: mappings };
-    });
   };
 
   const handleAddFinanceCategory = (type: 'income' | 'expense') => {
@@ -315,91 +280,7 @@ const Settings: React.FC<SettingsProps> = ({
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col min-h-[500px]">
-        {activeTab === 'foci' && isDirector && (
-            <div className="flex-1 p-6">
-                <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练重点与主题预设</h3>
-                
-                <div className="mb-8 bg-gray-50 p-6 rounded-2xl border border-gray-200">
-                    <label className="block text-sm font-bold text-gray-700 mb-3">新增训练重点 (Focus Area)</label>
-                    <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            placeholder="输入重点名称，如：传接球、射门..." 
-                            className="flex-1 p-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow font-bold" 
-                            value={newItemName} 
-                            onChange={(e) => setNewItemName(e.target.value)} 
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddFocus()}
-                        />
-                        <button onClick={handleAddFocus} className="px-6 py-3 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 transition-all flex items-center gap-2">
-                            <Plus className="w-4 h-4" /> 添加重点
-                        </button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {(localConfig.trainingFoci || []).map(focus => {
-                        const mapping = (localConfig.focusThemeMappings || []).find(m => m.focus === focus);
-                        const themes = mapping?.themes || [];
-                        
-                        return (
-                            <div key={focus} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-                                <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
-                                    <span className="font-black text-bvb-black flex items-center gap-2">
-                                        <Target className="w-4 h-4 text-bvb-yellow" /> {focus}
-                                    </span>
-                                    <button onClick={() => handleDeleteFocus(focus)} className="text-gray-300 hover:text-red-500 transition-colors">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <div className="p-4 flex-1 space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">预设主题 (Themes)</label>
-                                        <div className="flex flex-wrap gap-2">
-                                            {themes.map(theme => (
-                                                <div key={theme} className="flex items-center gap-1.5 bg-yellow-50 text-bvb-black px-3 py-1.5 rounded-lg border border-yellow-100 text-xs font-bold group">
-                                                    {theme}
-                                                    <button onClick={() => handleDeleteTheme(focus, theme)} className="text-yellow-300 hover:text-red-500">
-                                                        <X className="w-3 h-3" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                            {themes.length === 0 && <span className="text-xs text-gray-400 italic">暂无预设主题</span>}
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="pt-4 border-t border-gray-50">
-                                        <div className="flex gap-2">
-                                            <input 
-                                                type="text" 
-                                                placeholder="添加主题..." 
-                                                className="flex-1 p-2 border rounded-lg text-xs font-bold outline-none focus:ring-1 focus:ring-bvb-yellow"
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter') {
-                                                        const val = (e.target as HTMLInputElement).value;
-                                                        handleAddTheme(focus, val);
-                                                        (e.target as HTMLInputElement).value = '';
-                                                    }
-                                                }}
-                                            />
-                                            <button 
-                                                onClick={(e) => {
-                                                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                                                    handleAddTheme(focus, input.value);
-                                                    input.value = '';
-                                                }}
-                                                className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 text-gray-500"
-                                            >
-                                                <Plus className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        )}
+        {/* 其他 Tab 保持原样 ... */}
         {activeTab === 'account' && (
             <div className="flex-1 p-6 flex flex-col items-center justify-center">
                 <div className="w-full max-md bg-gray-50 p-8 rounded-xl border border-gray-200">

@@ -1,7 +1,7 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { DrillDesign, DesignElement, DesignLine, PitchType, PitchTheme, ElementType, LineType, User } from '../types';
-import { Plus, Save, Trash2, Layout, User as UserIcon, ArrowRight, Move, ChevronRight, PenTool, Type as TypeIcon, Cone as ConeIcon, Component, Activity, ChevronLeft, Palette, CheckCircle, X, Maximize2 } from 'lucide-react';
+import { Plus, Save, Trash2, Layout, User as UserIcon, ArrowRight, Move, RotateCw, ChevronRight, PenTool, Type as TypeIcon, Cone as ConeIcon, Component, Activity, ChevronLeft, Palette, CheckCircle, X, Maximize2, Monitor } from 'lucide-react';
 
 interface SessionDesignerProps {
     designs: DrillDesign[];
