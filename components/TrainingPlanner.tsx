@@ -12,7 +12,6 @@ interface TrainingPlannerProps {
   players: Player[];
   drillLibrary: string[];
   trainingFoci?: string[];
-  focusThemes?: Record<string, string[]>;
   designs?: DrillDesign[];
   currentUser: User | null;
   onAddTraining: (session: TrainingSession) => void;
@@ -163,7 +162,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], focusThemes = {}, currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -293,6 +292,39 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                     {activeTab === 'info' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
+                                    <input 
+                                        disabled={!canEdit}
+                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                        value={localSession.title}
+                                        onChange={e => setLocalSession({...localSession, title: e.target.value})}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练日期</label>
+                                        <input 
+                                            disabled={!canEdit}
+                                            type="date"
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.date}
+                                            onChange={e => setLocalSession({...localSession, date: e.target.value})}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">时长 (分钟)</label>
+                                        <input 
+                                            disabled={!canEdit}
+                                            type="number"
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.duration}
+                                            onChange={e => setLocalSession({...localSession, duration: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练重点</label>
                                         <select 
@@ -302,38 +334,13 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                             onChange={e => {
                                                 const val = e.target.value;
                                                 if (val !== 'Custom') {
-                                                    const themes = focusThemes[val] || [];
-                                                    setLocalSession({
-                                                        ...localSession, 
-                                                        focus: val,
-                                                        title: themes.length > 0 ? themes[0] : localSession.title
-                                                    });
+                                                    setLocalSession({...localSession, focus: val});
                                                 }
                                             }}
                                         >
                                             {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
                                             {!trainingFoci.includes(localSession.focus) && <option value="Custom">{localSession.focus}</option>}
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
-                                        {focusThemes[localSession.focus] && focusThemes[localSession.focus]!.length > 0 ? (
-                                            <select
-                                                disabled={!canEdit}
-                                                className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                                value={localSession.title}
-                                                onChange={e => setLocalSession({...localSession, title: e.target.value})}
-                                            >
-                                                {focusThemes[localSession.focus]!.map(t => <option key={t} value={t}>{t}</option>)}
-                                            </select>
-                                        ) : (
-                                            <input 
-                                                disabled={!canEdit}
-                                                className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                                value={localSession.title}
-                                                onChange={e => setLocalSession({...localSession, title: e.target.value})}
-                                            />
-                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
@@ -406,8 +413,9 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                     )}
                                 </div>
                             </div>
-                        )}
-                        {activeTab === 'attendance' && (
+                        </div>
+                    )}
+                    {activeTab === 'attendance' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                           <div className="grid grid-cols-3 gap-3 text-center">
                               <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">时长</span><div className="font-bold text-sm">{localSession.duration}分钟</div></div>
@@ -656,7 +664,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, trainingFoci = [], focusThemes = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, drillLibrary, trainingFoci = [], designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -705,13 +713,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [isAiMode, setIsAiMode] = useState(false);
-  const [formData, setFormData] = useState(() => {
-    const initialFocus = trainingFoci[0] || '传接球';
-    const themes = focusThemes[initialFocus] || [];
-    return {
+  const [formData, setFormData] = useState({
       teamId: availableTeams[0]?.id || '',
-      title: themes[0] || '',
-      focus: initialFocus,
+      title: '',
+      focus: trainingFoci[0] || '传接球',
       focusCustom: '',
       duration: 90,
       intensity: 'Medium',
@@ -719,7 +724,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       drills: [] as string[],
       linkedDesignId: undefined as string | undefined,
       focusedPlayerIds: [] as string[]
-    };
   });
 
   useEffect(() => {
@@ -1321,20 +1325,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             };
             onAddTraining(newSession);
             setShowAddModal(false);
-            const initialFocus = trainingFoci[0] || '传接球';
-            const themes = focusThemes[initialFocus] || [];
-            setFormData({ 
-                teamId: availableTeams[0]?.id || '', 
-                title: themes[0] || '', 
-                focus: initialFocus, 
-                focusCustom: '', 
-                duration: 90, 
-                intensity: 'Medium', 
-                date: new Date().toISOString().split('T')[0], 
-                drills: [], 
-                linkedDesignId: undefined, 
-                focusedPlayerIds: [] 
-            });
+            setFormData({ teamId: availableTeams[0]?.id || '', title: '', focus: trainingFoci[0] || '传接球', focusCustom: '', duration: 90, intensity: 'Medium', date: new Date().toISOString().split('T')[0], drills: [], linkedDesignId: undefined, focusedPlayerIds: [] });
             setIsAiMode(false);
         } catch (error) { console.error(error); alert('创建失败'); } finally { setLoading(false); }
   };
@@ -1487,26 +1478,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
-                      {focusThemes[formData.focus] && focusThemes[formData.focus]!.length > 0 ? (
-                        <select 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                          value={formData.title} 
-                          onChange={e => setFormData({...formData, title: e.target.value})}
-                        >
-                          {focusThemes[formData.focus]!.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      ) : (
-                        <input 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
-                          placeholder="例如: 快速反击演练" 
-                          value={formData.title} 
-                          onChange={e => setFormData({...formData, title: e.target.value})} 
-                          required={!isAiMode} 
-                        />
-                      )}
-                    </div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="例如: 快速反击演练" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} required={!isAiMode} /></div>
                   </div>
 
                   {/* 重点关注球员选择器 (NEW) */}
@@ -1555,11 +1527,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.focus} onChange={e => {
-                      const val = e.target.value;
-                      const themes = focusThemes[val] || [];
-                      setFormData({...formData, focus: val, title: themes.length > 0 ? themes[0] : formData.title});
-                    }}>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.focus} onChange={e => setFormData({...formData, focus: e.target.value})}>
                       {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
                       <option value="Custom">自定义...</option>
                     </select>{formData.focus === 'Custom' && (<input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />)}</div>
@@ -1578,7 +1546,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} focusThemes={focusThemes} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} allSessions={userManagedSessions} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} allSessions={userManagedSessions} />
         )}
     </div>
   );
