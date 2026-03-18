@@ -1,53 +1,26 @@
 
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
-import { put, list } from '@vercel/blob';
+import { fileURLToPath } from 'url';
+import { createServer as createViteServer } from 'vite';
+import storageHandler from './api/storage.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
-
-  const DB_FILENAME = 'football_manager_db.json';
+  app.use(express.json());
 
   // API Routes
-  app.get('/api/storage', async (req, res) => {
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
+  app.all('/api/storage', async (req, res) => {
     try {
-      const { blobs } = await list({ prefix: DB_FILENAME, limit: 1, token });
-      
-      if (blobs.length === 0) {
-        return res.json(null);
-      }
-
-      const jsonUrl = blobs[0].url;
-      const response = await fetch(jsonUrl, { cache: 'no-store' });
-      const data = await response.json();
-      
-      res.setHeader('Cache-Control', 'no-store, max-age=0');
-      return res.json(data);
+      await storageHandler(req, res);
     } catch (error) {
-      console.error('Storage API GET Error:', error);
-      return res.status(500).json({ error: 'Internal Server Error' });
-    }
-  });
-
-  app.post('/api/storage', async (req, res) => {
-    const token = process.env.BLOB_READ_WRITE_TOKEN;
-    try {
-      const body = req.body;
-      const { url } = await put(DB_FILENAME, JSON.stringify(body), {
-        access: 'public',
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        token,
-      });
-      return res.json({ success: true, url });
-    } catch (error) {
-      console.error('Storage API POST Error:', error);
-      return res.status(500).json({ error: 'Internal Server Error' });
+      console.error('API Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
     }
   });
 
