@@ -115,7 +115,12 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddFocus = () => {
       if (!newItemName.trim()) return;
-      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] }));
+      const newFocus: TrainingFocus = {
+          id: `f-${Date.now()}`,
+          name: newItemName.trim(),
+          themes: []
+      };
+      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newFocus] }));
       setNewItemName('');
   };
 
@@ -204,9 +209,9 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
-  const handleDeleteFocus = (focus: string) => {
+  const handleDeleteFocus = (id: string) => {
     if(confirm('确定要删除此训练重点吗？删除后历史训练记录仍会保留该重点名称，但新建计划时不可选。')) {
-        setLocalConfig(prev => ({ ...prev, trainingFoci: (prev.trainingFoci || []).filter(f => f !== focus) }));
+        setLocalConfig(prev => ({ ...prev, trainingFoci: (prev.trainingFoci || []).filter(f => f.id !== id) }));
     }
   };
 
@@ -428,7 +433,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex justify-between items-end mb-6">
                     <div>
                         <h3 className="text-xl font-bold text-gray-800 flex items-center"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练重点预设</h3>
-                        <p className="text-sm text-gray-500 mt-1">定义在制定训练计划时可选的重点方向。</p>
+                        <p className="text-sm text-gray-500 mt-1">定义在制定训练计划时可选的重点方向及对应的训练主题。</p>
                     </div>
                 </div>
                 <div className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
@@ -438,11 +443,48 @@ const Settings: React.FC<SettingsProps> = ({
                         <button onClick={handleAddFocus} className="px-6 py-2 bg-bvb-black text-white text-xs font-black rounded-lg flex items-center"><Plus className="w-4 h-4 mr-1" /> 添加</button>
                     </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {(localConfig.trainingFoci || []).map((focus, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm group hover:border-bvb-yellow transition-colors">
-                            <span className="font-bold text-gray-700">{focus}</span>
-                            <button onClick={() => handleDeleteFocus(focus)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(localConfig.trainingFoci || []).map((focus) => (
+                        <div key={focus.id} className="flex flex-col p-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:border-bvb-yellow transition-colors">
+                            <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <span className="font-black text-gray-800">{focus.name}</span>
+                                <button onClick={() => handleDeleteFocus(focus.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                            <div className="space-y-3">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest">预设训练主题 (Themes)</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {focus.themes.map((theme, tIdx) => (
+                                        <div key={tIdx} className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100 group/theme">
+                                            <span className="text-xs font-bold text-gray-600">{theme}</span>
+                                            <button 
+                                                onClick={() => {
+                                                    const next = { ...localConfig };
+                                                    const fIdx = next.trainingFoci.findIndex(f => f.id === focus.id);
+                                                    next.trainingFoci[fIdx].themes = next.trainingFoci[fIdx].themes.filter((_, i) => i !== tIdx);
+                                                    setLocalConfig(next);
+                                                }}
+                                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover/theme:opacity-100 transition-opacity"
+                                            >
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button 
+                                        onClick={() => {
+                                            const theme = prompt('请输入新的训练主题名称:');
+                                            if (theme && theme.trim()) {
+                                                const next = { ...localConfig };
+                                                const fIdx = next.trainingFoci.findIndex(f => f.id === focus.id);
+                                                next.trainingFoci[fIdx].themes.push(theme.trim());
+                                                setLocalConfig(next);
+                                            }
+                                        }}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-gray-300 text-gray-400 hover:border-bvb-yellow hover:text-bvb-black transition-all text-xs font-bold"
+                                    >
+                                        <Plus className="w-3 h-3" /> 添加主题
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     ))}
                 </div>

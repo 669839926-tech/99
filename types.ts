@@ -47,8 +47,9 @@ export interface AttributeDefinition {
 export type AttributeCategory = 'technical' | 'tactical' | 'physical' | 'mental';
 
 export interface TrainingFocus {
-    name: string;
-    topics: string[];
+  id: string;
+  name: string;
+  themes: string[];
 }
 
 export interface AttributeConfig {

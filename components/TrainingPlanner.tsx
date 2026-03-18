@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan, TrainingFocus } from '../types';
+import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
 import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search, AlignLeft } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -162,7 +162,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [] as TrainingFocus[], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -293,37 +293,13 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                         <div className="animate-in fade-in duration-200 space-y-6">
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练重点</label>
-                                    <select 
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
+                                    <input 
                                         disabled={!canEdit}
                                         className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                        value={trainingFoci.some(f => f.name === localSession.focus) ? localSession.focus : 'Custom'}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            if (val !== 'Custom') {
-                                                const focusObj = trainingFoci.find(f => f.name === val);
-                                                setLocalSession({
-                                                    ...localSession, 
-                                                    focus: val,
-                                                    title: focusObj?.topics[0] || localSession.title
-                                                });
-                                            } else {
-                                                setLocalSession({...localSession, focus: 'Custom'});
-                                            }
-                                        }}
-                                    >
-                                        {trainingFoci.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
-                                        {!trainingFoci.some(f => f.name === localSession.focus) && localSession.focus !== 'Custom' && <option value="Custom">{localSession.focus}</option>}
-                                        <option value="Custom">自定义...</option>
-                                    </select>
-                                    {localSession.focus === 'Custom' && (
-                                        <input 
-                                            className="w-full p-2 border rounded mt-2 text-xs font-bold" 
-                                            placeholder="输入重点..." 
-                                            value={localSession.focus === 'Custom' ? '' : localSession.focus} 
-                                            onChange={e => setLocalSession({...localSession, focus: e.target.value})} 
-                                        />
-                                    )}
+                                        value={localSession.title}
+                                        onChange={e => setLocalSession({...localSession, title: e.target.value})}
+                                    />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -347,37 +323,74 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                         />
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
-                                    {localSession.focus === 'Custom' ? (
-                                        <input 
-                                            disabled={!canEdit}
-                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                            value={localSession.title}
-                                            onChange={e => setLocalSession({...localSession, title: e.target.value})}
-                                        />
-                                    ) : (
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练重点</label>
                                         <select 
                                             disabled={!canEdit}
                                             className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                            value={localSession.title}
-                                            onChange={e => setLocalSession({...localSession, title: e.target.value})}
+                                            value={trainingFoci.some(f => f.name === localSession.focus) ? localSession.focus : 'Custom'}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                if (val !== 'Custom') {
+                                                    const focusObj = trainingFoci.find(f => f.name === val);
+                                                    setLocalSession({
+                                                        ...localSession, 
+                                                        focus: val,
+                                                        theme: focusObj && focusObj.themes.length > 0 ? focusObj.themes[0] : ''
+                                                    });
+                                                } else {
+                                                    setLocalSession({...localSession, focus: '自定义'});
+                                                }
+                                            }}
                                         >
-                                            <option value="">请选择主题...</option>
-                                            {(trainingFoci.find(f => f.name === localSession.focus)?.topics || []).map(topic => (
-                                                <option key={topic} value={topic}>{topic}</option>
-                                            ))}
-                                            <option value="Other">其他 (手动输入)...</option>
+                                            {trainingFoci.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
+                                            <option value="Custom">自定义...</option>
                                         </select>
-                                    )}
-                                    {localSession.focus !== 'Custom' && localSession.title === 'Other' && (
-                                        <input 
-                                            className="w-full p-2 border rounded mt-2 text-xs font-bold" 
-                                            placeholder="输入自定义主题..." 
-                                            onChange={e => setLocalSession({...localSession, title: e.target.value})} 
-                                        />
-                                    )}
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
+                                        {(() => {
+                                            const currentFocusObj = trainingFoci.find(f => f.name === localSession.focus);
+                                            if (currentFocusObj && currentFocusObj.themes.length > 0) {
+                                                return (
+                                                    <select
+                                                        disabled={!canEdit}
+                                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                                        value={localSession.theme || ''}
+                                                        onChange={e => setLocalSession({...localSession, theme: e.target.value, title: e.target.value})}
+                                                    >
+                                                        {currentFocusObj.themes.map(t => <option key={t} value={t}>{t}</option>)}
+                                                        <option value="">自定义主题...</option>
+                                                    </select>
+                                                );
+                                            }
+                                            return (
+                                                <input 
+                                                    disabled={!canEdit}
+                                                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                                    value={localSession.theme || localSession.title}
+                                                    onChange={e => setLocalSession({...localSession, theme: e.target.value, title: e.target.value})}
+                                                    placeholder="输入训练主题..."
+                                                />
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
+                                {localSession.focus === '自定义' && (
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">自定义重点名称</label>
+                                        <input 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
+                                            value={localSession.focus === '自定义' ? '' : localSession.focus}
+                                            onChange={e => setLocalSession({...localSession, focus: e.target.value})}
+                                            placeholder="输入自定义重点..."
+                                        />
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
                                         <select 
@@ -752,8 +765,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [formData, setFormData] = useState({
       teamId: availableTeams[0]?.id || '',
       title: '',
-      focus: trainingFoci[0]?.name || '传接球',
+      focus: (trainingFoci && trainingFoci.length > 0) ? trainingFoci[0].name : '传接球',
       focusCustom: '',
+      theme: '',
       duration: 90,
       intensity: 'Medium',
       date: new Date().toISOString().split('T')[0],
@@ -1333,18 +1347,18 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         setLoading(true);
         try {
             let finalDrills = formData.drills;
+            let finalFocus = formData.focus === 'Custom' ? formData.focusCustom : formData.focus;
+            let finalTheme = formData.theme;
             let finalTitle = formData.title;
-            const currentFocus = trainingFoci.find(f => f.name === formData.focus);
-            
+
             if (isAiMode && !finalDrills.length) {
-                 const plan = await generateTrainingPlan(formData.focus === 'Custom' ? formData.focusCustom : formData.focus, formData.duration, formData.intensity);
+                 const plan = await generateTrainingPlan(finalFocus, formData.duration, formData.intensity);
                  if (plan.drills) finalDrills = plan.drills;
                  if (plan.title) finalTitle = plan.title;
             }
-            
-            // 如果没有选择主题且不是AI模式，默认使用重点名称
+
             if (!finalTitle) {
-                finalTitle = `${formData.focus} 训练`;
+                finalTitle = finalTheme || `${finalFocus} 训练`;
             }
 
             const newSession: TrainingSession = { 
@@ -1352,7 +1366,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 teamId: formData.teamId, 
                 title: finalTitle, 
                 date: formData.date, 
-                focus: formData.focus === 'Custom' ? formData.focusCustom : formData.focus, 
+                focus: finalFocus,
+                theme: finalTheme,
                 duration: formData.duration, 
                 intensity: formData.intensity as any, 
                 drills: finalDrills, 
@@ -1371,8 +1386,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setFormData({ 
                 teamId: availableTeams[0]?.id || '', 
                 title: '', 
-                focus: trainingFoci[0]?.name || '传接球', 
+                focus: (trainingFoci && trainingFoci.length > 0) ? trainingFoci[0].name : '传接球', 
                 focusCustom: '', 
+                theme: '',
                 duration: 90, 
                 intensity: 'Medium', 
                 date: new Date().toISOString().split('T')[0], 
@@ -1531,60 +1547,65 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   {!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
-                        <select 
-                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                            value={formData.focus} 
-                            onChange={e => {
-                                const newFocus = e.target.value;
-                                const focusObj = trainingFoci.find(f => f.name === newFocus);
-                                setFormData({
-                                    ...formData, 
-                                    focus: newFocus,
-                                    title: focusObj?.topics[0] || '' // 切换重点时，默认选择第一个主题
-                                });
-                            }}
-                        >
-                            {trainingFoci.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
-                            <option value="Custom">自定义...</option>
-                        </select>
-                        {formData.focus === 'Custom' && (
-                            <input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />
-                        )}
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
+                      <select 
+                        className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
+                        value={formData.focus} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          const focusObj = trainingFoci.find(f => f.name === val);
+                          setFormData({
+                            ...formData, 
+                            focus: val,
+                            theme: focusObj && focusObj.themes.length > 0 ? focusObj.themes[0] : ''
+                          });
+                        }}
+                      >
+                        {trainingFoci.map(f => <option key={f.id} value={f.name}>{f.name}</option>)}
+                        <option value="Custom">自定义...</option>
+                      </select>
+                      {formData.focus === 'Custom' && (
+                        <input 
+                          className="w-full p-2 border rounded mt-2 text-xs font-bold" 
+                          placeholder="输入重点..." 
+                          value={formData.focusCustom} 
+                          onChange={e => setFormData({...formData, focusCustom: e.target.value})} 
+                        />
+                      )}
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
-                        {formData.focus === 'Custom' ? (
-                            <input 
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
-                                placeholder="输入主题..." 
-                                value={formData.title} 
-                                onChange={e => setFormData({...formData, title: e.target.value})} 
-                                required={!isAiMode} 
-                            />
-                        ) : (
-                            <select 
-                                className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                                value={formData.title} 
-                                onChange={e => setFormData({...formData, title: e.target.value})}
-                                required={!isAiMode}
+                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
+                      {(() => {
+                        const currentFocusObj = trainingFoci.find(f => f.name === formData.focus);
+                        if (currentFocusObj && currentFocusObj.themes.length > 0) {
+                          return (
+                            <select
+                              className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
+                              value={formData.theme}
+                              onChange={e => setFormData({...formData, theme: e.target.value})}
                             >
-                                <option value="">请选择主题...</option>
-                                {(trainingFoci.find(f => f.name === formData.focus)?.topics || []).map(topic => (
-                                    <option key={topic} value={topic}>{topic}</option>
-                                ))}
-                                <option value="Other">其他 (手动输入)...</option>
+                              {currentFocusObj.themes.map(t => <option key={t} value={t}>{t}</option>)}
+                              <option value="">自定义主题...</option>
                             </select>
-                        )}
-                        {formData.focus !== 'Custom' && formData.title === 'Other' && (
-                            <input 
-                                className="w-full p-2 border rounded mt-2 text-xs font-bold" 
-                                placeholder="输入自定义主题..." 
-                                onChange={e => setFormData({...formData, title: e.target.value})} 
-                            />
-                        )}
+                          );
+                        }
+                        return (
+                          <input 
+                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
+                            placeholder="例如: 快速反击演练" 
+                            value={formData.theme || formData.title} 
+                            onChange={e => setFormData({...formData, theme: e.target.value, title: e.target.value})} 
+                            required={!isAiMode} 
+                          />
+                        );
+                      })()}
                     </div>
+                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
                   </div>
 
                   {/* 重点关注球员选择器 (NEW) */}
@@ -1631,10 +1652,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
                     <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
                   </div>
                   {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm font-bold bg-white" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div></div>)}
                   <button type="submit" disabled={loading} className="w-full py-4 bg-bvb-black text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center shadow-lg transition-all">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button>
