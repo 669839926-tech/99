@@ -62,7 +62,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
   const [localSalarySettings, setLocalSalarySettings] = useState<SalarySettings>(JSON.parse(JSON.stringify(salarySettings)));
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'drills' | 'foci' | 'branding' | 'sync'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'drills' | 'foci' | 'branding'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
 
@@ -275,7 +275,6 @@ const Settings: React.FC<SettingsProps> = ({
                 <button onClick={() => setActiveTab('attributes')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Target className="w-4 h-4 mr-2" /> 球员能力模型</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
                 <button onClick={() => setActiveTab('branding')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ImageIcon className="w-4 h-4 mr-2" /> 品牌外观</button>
-                <button onClick={() => setActiveTab('sync')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'sync' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><RotateCcw className="w-4 h-4 mr-2" /> 数据同步</button>
               </>
           )}
       </div>
@@ -638,56 +637,12 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
         )}
 
-        {activeTab === 'sync' && isDirector && (
+        {activeTab === 'branding' && isDirector && (
             <div className="flex-1 p-6 flex flex-col items-center justify-center">
-                <div className="w-full max-w-2xl bg-gray-50 p-8 rounded-xl border border-gray-200">
-                    <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center"><RotateCcw className="w-5 h-5 mr-2 text-bvb-yellow" /> 云端数据同步控制</h3>
-                    <div className="space-y-6">
-                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 text-sm">
-                            <p className="font-bold mb-1">提示：</p>
-                            <p>系统默认每隔 2 秒会自动保存更改到云端。如果您发现数据未同步，可以尝试手动触发同步操作。</p>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button 
-                                onClick={async () => {
-                                    if (confirm('确定要手动保存当前所有数据到云端吗？这会覆盖云端已有的备份。')) {
-                                        // We'll trigger a manual save by calling a prop or just letting the auto-save handle it
-                                        // But for a true manual trigger, we need a prop.
-                                        // For now, we'll just show a message that auto-save is active.
-                                        alert('手动保存已触发，请查看浏览器控制台日志确认同步状态。');
-                                    }
-                                }}
-                                className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-xl hover:border-bvb-yellow hover:shadow-md transition-all group"
-                            >
-                                <Upload className="w-8 h-8 text-gray-400 group-hover:text-bvb-yellow mb-2" />
-                                <span className="font-bold text-gray-700">手动保存到云端</span>
-                                <span className="text-[10px] text-gray-400 mt-1">覆盖云端备份</span>
-                            </button>
-
-                            <button 
-                                onClick={() => {
-                                    if (confirm('警告：从云端强制载入将丢失当前未保存的所有本地更改！确定要继续吗？')) {
-                                        window.location.reload();
-                                    }
-                                }}
-                                className="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-xl hover:border-red-500 hover:shadow-md transition-all group"
-                            >
-                                <RotateCcw className="w-8 h-8 text-gray-400 group-hover:text-red-500 mb-2" />
-                                <span className="font-bold text-gray-700">从云端强制载入</span>
-                                <span className="text-[10px] text-gray-400 mt-1">刷新页面并重新获取</span>
-                            </button>
-                        </div>
-
-                        <div className="pt-6 border-t border-gray-200">
-                            <h4 className="text-xs font-black text-gray-400 uppercase mb-3">同步故障排查</h4>
-                            <ul className="text-xs text-gray-500 space-y-2 list-disc pl-4">
-                                <li>确保 Vercel 环境变量 <code className="bg-gray-100 px-1 rounded">BLOB_READ_WRITE_TOKEN</code> 已正确配置。</li>
-                                <li>检查浏览器控制台 (F12) 是否有 <code className="bg-gray-100 px-1 rounded">Storage API Error</code> 报错。</li>
-                                <li>如果部署了新版本，系统会自动尝试寻找最近的数据库备份文件。</li>
-                            </ul>
-                        </div>
-                    </div>
+                <div className="w-full max-lg bg-gray-50 p-8 rounded-xl border border-gray-200 text-center">
+                    <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center"><ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 应用 Logo 设置</h3>
+                    <div className="mb-8 flex flex-col items-center"><div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4">{appLogo ? <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" /> : <span className="text-gray-300 font-bold">No Logo</span>}</div></div>
+                    <div className="relative group w-full"><input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-bvb-yellow hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center"><Upload className="w-8 h-8 text-gray-400 mb-2" /><span className="font-bold text-gray-600">点击上传新 Logo 图片</span></div></div>
                 </div>
             </div>
         )}
