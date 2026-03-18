@@ -46,19 +46,13 @@ export interface AttributeDefinition {
 
 export type AttributeCategory = 'technical' | 'tactical' | 'physical' | 'mental';
 
-export interface TrainingFocus {
-  id: string;
-  name: string;
-  themes: string[];
-}
-
 export interface AttributeConfig {
     technical: AttributeDefinition[];
     tactical: AttributeDefinition[];
     physical: AttributeDefinition[];
     mental: AttributeDefinition[];
     drillLibrary: string[];
-    trainingFoci: TrainingFocus[];
+    trainingFoci: string[];
 }
 
 export interface PlayerStats {
