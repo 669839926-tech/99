@@ -17,17 +17,23 @@ export interface AppData {
     // Comment: Added periodizationPlans to AppData interface to fix build errors in App.tsx
     periodizationPlans?: any[];
     accountingRecords?: any[];
-    formationTemplates?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
     try {
+        console.log('Fetching data from cloud storage API...');
         const res = await fetch('/api/storage');
         if (!res.ok) {
-            console.warn('API route not found or error. Are you running via "vercel dev"?');
+            const errorText = await res.text();
+            console.warn('API route error:', res.status, errorText);
             return null;
         }
         const data = await res.json();
+        if (data) {
+            console.log('Data successfully loaded from cloud storage.');
+        } else {
+            console.log('Cloud storage is empty (new database).');
+        }
         return data;
     } catch (error) {
         console.error('Failed to load data from cloud:', error);
@@ -37,13 +43,20 @@ export const loadDataFromCloud = async (): Promise<AppData | null> => {
 
 export const saveDataToCloud = async (data: AppData) => {
     try {
+        console.log('Saving data to cloud storage API...');
         const res = await fetch('/api/storage', {
             method: 'POST',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
         });
-        if (!res.ok) throw new Error('Save failed');
-        return await res.json();
+        if (!res.ok) {
+            const errorText = await res.text();
+            console.error('Failed to save data to cloud storage:', res.status, errorText);
+            throw new Error(`Save failed: ${res.status} ${errorText}`);
+        }
+        const result = await res.json();
+        console.log('Data successfully saved to cloud storage:', result.url);
+        return result;
     } catch (error) {
         console.error('Failed to save data to cloud:', error);
         throw error;
