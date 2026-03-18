@@ -115,39 +115,8 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleAddFocus = () => {
       if (!newItemName.trim()) return;
-      const newFocus: TrainingFocusConfig = {
-          id: `f-${Date.now()}`,
-          name: newItemName.trim(),
-          themes: []
-      };
-      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newFocus] }));
+      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] }));
       setNewItemName('');
-  };
-
-  const [newThemeInputs, setNewThemeInputs] = useState<{[key: string]: string}>({});
-
-  const handleAddTheme = (focusId: string) => {
-      const themeName = newThemeInputs[focusId]?.trim();
-      if (!themeName) return;
-      
-      setLocalConfig(prev => ({
-          ...prev,
-          trainingFoci: prev.trainingFoci.map(f => 
-              f.id === focusId ? { ...f, themes: [...f.themes, themeName] } : f
-          )
-      }));
-      setNewThemeInputs(prev => ({ ...prev, [focusId]: '' }));
-  };
-
-  const handleDeleteTheme = (focusId: string, themeToDelete: string) => {
-      if (confirm(`确定要删除主题 "${themeToDelete}" 吗？`)) {
-          setLocalConfig(prev => ({
-              ...prev,
-              trainingFoci: prev.trainingFoci.map(f => 
-                  f.id === focusId ? { ...f, themes: f.themes.filter(t => t !== themeToDelete) } : f
-              )
-          }));
-      }
   };
 
   const handleAddFinanceCategory = (type: 'income' | 'expense') => {
@@ -235,9 +204,9 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
-  const handleDeleteFocus = (focusId: string) => {
+  const handleDeleteFocus = (focus: string) => {
     if(confirm('确定要删除此训练重点吗？删除后历史训练记录仍会保留该重点名称，但新建计划时不可选。')) {
-        setLocalConfig(prev => ({ ...prev, trainingFoci: (prev.trainingFoci || []).filter(f => f.id !== focusId) }));
+        setLocalConfig(prev => ({ ...prev, trainingFoci: (prev.trainingFoci || []).filter(f => f !== focus) }));
     }
   };
 
@@ -631,70 +600,6 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                 </div>
              </div>
-        )}
-
-        {activeTab === 'foci' && isDirector && (
-            <div className="flex-1 p-6 space-y-6">
-                <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                    <h3 className="text-xl font-bold text-gray-800 flex items-center mb-4"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练重点与主题预设</h3>
-                    <p className="text-sm text-gray-500 mb-6">在此预设训练的“重点”及其对应的“主题”。新建训练计划时，选择重点后将自动弹出相应的主题供选择。</p>
-                    
-                    <div className="flex gap-2 mb-8">
-                        <input 
-                            type="text" 
-                            className="flex-1 p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow" 
-                            placeholder="输入新的训练重点名称 (如: 传接球)..." 
-                            value={newItemName}
-                            onChange={e => setNewItemName(e.target.value)}
-                            onKeyDown={e => e.key === 'Enter' && handleAddFocus()}
-                        />
-                        <button onClick={handleAddFocus} className="px-6 py-3 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors flex items-center">
-                            <Plus className="w-5 h-5 mr-2" /> 添加重点
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {localConfig.trainingFoci.map((focus) => (
-                            <div key={focus.id} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col">
-                                <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-                                    <h4 className="font-black text-lg text-bvb-black">{focus.name}</h4>
-                                    <button onClick={() => handleDeleteFocus(focus.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                
-                                <div className="flex-1 space-y-3">
-                                    <div className="flex flex-wrap gap-2">
-                                        {focus.themes.map((theme, idx) => (
-                                            <div key={idx} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold flex items-center group">
-                                                {theme}
-                                                <button onClick={() => handleDeleteTheme(focus.id, theme)} className="ml-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                        {focus.themes.length === 0 && <p className="text-xs text-gray-400 italic">暂无主题，请添加</p>}
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        className="flex-1 p-2 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-bvb-yellow" 
-                                        placeholder="添加主题..." 
-                                        value={newThemeInputs[focus.id] || ''}
-                                        onChange={e => setNewThemeInputs(prev => ({ ...prev, [focus.id]: e.target.value }))}
-                                        onKeyDown={e => e.key === 'Enter' && handleAddTheme(focus.id)}
-                                    />
-                                    <button onClick={() => handleAddTheme(focus.id)} className="p-2 bg-gray-100 text-gray-600 rounded hover:bg-bvb-yellow hover:text-bvb-black transition-colors">
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
         )}
 
         {/* ... 其他 Tab 代码保持不变 ... */}
