@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -208,7 +208,7 @@ const TransferModal: React.FC<TransferModalProps> = ({ teams, count, onClose, on
                 <h3 className="font-bold text-lg mb-2 flex items-center"><ArrowRightLeft className="w-5 h-5 mr-2 text-bvb-yellow"/>批量移交球员</h3>
                 <p className="text-sm text-gray-500 mb-4">即将把选中的 <span className="font-bold text-bvb-black">{count}</span> 名球员移交至：</p>
                 <select className="w-full p-2.5 border border-gray-200 rounded-lg mb-6 text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none bg-white" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {(teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     <option value="unassigned">待分配 (Unassigned)</option>
                 </select>
                 <div className="flex justify-end gap-3"><button onClick={onClose} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-200">取消</button><button onClick={() => onConfirm(targetId)} className="px-4 py-2 bg-bvb-black text-white rounded-lg text-xs font-bold hover:bg-gray-800">确认移交</button></div>
@@ -224,7 +224,6 @@ interface ImportPlayersModalProps {
     onClose: () => void;
 }
 const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attributeConfig, onImport, onClose }) => {
-    const [csvContent, setCsvContent] = useState('');
     const [parsedPlayers, setParsedPlayers] = useState<Partial<Player>[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id || '');
     const [step, setStep] = useState<'upload' | 'preview'>('upload');
@@ -296,7 +295,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                     ) : (
                         <div className="space-y-4">
                             <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200"><div className="flex items-center"><CheckCircle className="w-5 h-5 text-green-500 mr-2" /><span className="font-bold text-sm">成功解析 {parsedPlayers.length} 名球员数据</span></div><button onClick={() => setStep('upload')} className="text-xs text-gray-500 hover:underline">重新上传</button></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">选择导入梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold bg-white" value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">选择导入梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold bg-white" value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)}>{(teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
                             <div className="max-h-[300px] overflow-y-auto border rounded-lg"><table className="w-full text-xs text-left"><thead className="bg-gray-100 font-bold text-gray-600 sticky top-0"><tr><th className="p-2 border-b">姓名</th><th className="p-2 border-b">号码</th><th className="p-2 border-b">主位置</th><th className="p-2 border-b">年龄</th><th className="p-2 border-b">惯用脚</th></tr></thead><tbody className="divide-y divide-gray-100">{parsedPlayers.map((p, i) => (<tr key={i} className="hover:bg-gray-50"><td className="p-2 font-bold">{p.name}</td><td className="p-2">{p.number}</td><td className="p-2">{p.position}</td><td className="p-2">{p.age}</td><td className="p-2">{p.preferredFoot}</td></tr>))}</tbody></table></div>
                         </div>
                     )}
@@ -401,7 +400,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('overview');
-    const [detailAttendanceScope, setDetailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+    const [detailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -420,7 +419,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                  setEditedPlayer(JSON.parse(JSON.stringify(player)));
              }
         }
-    }, [player, isEditing]);
+    }, [player, isEditing, editedPlayer]);
 
     useEffect(() => {
         if (!isEditing) return;
@@ -435,7 +434,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1200);
         return () => clearTimeout(timer);
-    }, [editedPlayer, isEditing]);
+    }, [editedPlayer, isEditing, onUpdatePlayer]);
 
     useEffect(() => {
         if (initialFilter === 'pending_reviews') { setActiveTab('reviews'); } 
@@ -462,6 +461,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     ];
 
     const attendanceRate = calculateAttendanceRate(player, trainings, detailAttendanceScope);
+    console.log('Attendance Rate:', attendanceRate);
     const handleSave = () => {
       const updatedPlayer = { ...editedPlayer, statsStatus: 'Published' as ApprovalStatus, lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats)) };
       onUpdatePlayer(updatedPlayer); setSaveStatus('saved');
@@ -471,7 +471,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
          onDeleteRecharge(player.id, rechargeId);
          setEditedPlayer(prev => ({ ...prev, rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || [] }));
     };
-    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch (error) { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
+    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
     const handleStatChange = (category: keyof PlayerStats, key: string, value: number) => {
       setEditedPlayer(prev => ({ ...prev, stats: { ...prev.stats, [category]: { ...prev.stats[category], [key]: value } }, }));
     };
@@ -494,7 +494,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         try {
             const draft = await generatePlayerReview(player, newReview.quarter || 'Q1', newReview.year || new Date().getFullYear());
             setNewReview(prev => ({ ...prev, technicalTacticalImprovement: draft.tech, mentalDevelopment: draft.mental, summary: draft.summary }));
-        } catch (e) { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
+        } catch { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
     };
 
     const handleEditReview = (review: PlayerReview) => {
@@ -1083,12 +1083,12 @@ interface PlayerManagerProps {
 
 // --- PlayerManager (Main Component) ---
 const PlayerManager: React.FC<PlayerManagerProps> = ({ 
-  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onAddPlayerReview, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
+  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
-  const availableTeams = isCoach ? teams.filter(t => currentUser?.teamIds?.includes(t.id)) : teams;
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const availableTeams = isCoach ? (teams || []).filter(t => currentUser?.teamIds?.includes(t.id)) : (teams || []);
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(initialFilter || (currentUser?.role === 'director' ? 'all' : (currentUser?.role === 'coach' && currentUser?.teamIds?.[0]) ? currentUser.teamIds[0] : 'unassigned'));
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPos, setFilterPos] = useState<string>('全部');
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
@@ -1103,23 +1103,54 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [exportingPlayerId, setExportingPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') { setShowDraftsOnly(true); } 
-    else { const isTeamId = teams.some(t => t.id === initialFilter) || initialFilter === 'unassigned'; if (isTeamId) { setSelectedTeamId(initialFilter as string); setShowDraftsOnly(false); } }
+    if (!teams) return;
+    if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') { 
+      setShowDraftsOnly(true); 
+    } else { 
+      const isValidFilter = teams.some(t => t.id === initialFilter) || initialFilter === 'unassigned' || initialFilter === 'all'; 
+      if (isValidFilter) { 
+        setSelectedTeamId(initialFilter as string); 
+        setShowDraftsOnly(false); 
+      } 
+    }
   }, [initialFilter, teams]);
 
   useEffect(() => {
+    if (!teams) return;
     if (isCoach && currentUser?.teamIds && currentUser.teamIds.length > 0) {
         if (!selectedTeamId || !currentUser.teamIds.includes(selectedTeamId)) {
-             if (!(teams.some(t => t.id === initialFilter) && currentUser.teamIds.includes(initialFilter as string))) { setSelectedTeamId(currentUser.teamIds[0]); }
-        } return;
+             if (!(teams.some(t => t.id === initialFilter) && currentUser.teamIds.includes(initialFilter as string))) { 
+               setSelectedTeamId(currentUser.teamIds[0]); 
+             }
+        } 
+        return;
     }
-    const teamExists = teams.some(t => t.id === selectedTeamId); const isUnassigned = selectedTeamId === 'unassigned';
-    if (!teamExists && !isUnassigned) { if (teams.length > 0) { setSelectedTeamId(teams[0].id); } else { setSelectedTeamId('unassigned'); } } else if (!selectedTeamId && teams.length > 0) { setSelectedTeamId(teams[0].id); }
-  }, [teams, currentUser, isCoach, selectedTeamId]);
+    
+    const isSpecial = selectedTeamId === 'unassigned' || (isDirector && selectedTeamId === 'all');
+    const teamExists = teams.some(t => t.id === selectedTeamId);
+    
+    if (!teamExists && !isSpecial) { 
+      if (isDirector) {
+        setSelectedTeamId('all');
+      } else if (teams.length > 0) { 
+        setSelectedTeamId(teams[0].id); 
+      } else { 
+        setSelectedTeamId('unassigned'); 
+      } 
+    } else if (!selectedTeamId) {
+      if (isDirector) {
+        setSelectedTeamId('all');
+      } else if (teams.length > 0) {
+        setSelectedTeamId(teams[0].id);
+      } else {
+        setSelectedTeamId('unassigned');
+      }
+    }
+  }, [teams, currentUser, isCoach, isDirector, selectedTeamId, initialFilter]);
 
-  const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+  const [attendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  useEffect(() => { if (selectedPlayer) { const updated = players.find(p => p.id === selectedPlayer.id); if (updated && updated !== selectedPlayer) { setSelectedPlayer(updated); } } }, [players]);
+  useEffect(() => { if (selectedPlayer) { const updated = players.find(p => p.id === selectedPlayer.id); if (updated && updated !== selectedPlayer) { setSelectedPlayer(updated); } } }, [players, selectedPlayer]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1162,7 +1193,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         reader.readAsDataURL(file); 
     } 
   };
-  const filteredPlayers = players.filter(p => {
+  const filteredPlayers = (players || []).filter(p => {
     const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
     const posVal = p.position.toString(); const isFwd = posVal.includes('锋') || posVal.includes('9'); const isMid = posVal.includes('中场'); const isDef = posVal.includes('后卫') || posVal.includes('翼卫'); const isGk = posVal.includes('守门员');
@@ -1190,7 +1221,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     try { 
         const exportTitle = selectedTeam ? `${selectedTeam.name}_球员档案登记表` : '全俱乐部球员档案库'; 
         await exportToPDF('player-list-export', exportTitle); 
-    } catch (e) { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
+    } catch { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
   };
 
   const handleExportPlayerExcel = () => {
@@ -1209,7 +1240,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         link.href = URL.createObjectURL(blob);
         link.download = `${selectedTeam?.name || '全部球员'}_完整档案明细_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
-    } catch (e) {
+    } catch {
         alert('Excel 导出失败');
     } finally {
         setIsExportingExcel(false);
@@ -1380,7 +1411,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 flex flex-col min-h-0">
                         <h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-4 uppercase">年度考评记录</h3>
                         <div className="grid grid-cols-2 gap-4 flex-1">
-                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review, idx) => (
+                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review) => (
                                 <div key={review.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-xs">
                                     <div className="flex justify-between items-center mb-2 border-b border-gray-200 pb-2"><span className="font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className="text-gray-400 font-mono">{review.date}</span></div>
                                     <div className="space-y-2">
@@ -1513,7 +1544,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
-                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || selectedTeamId} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
+                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || selectedTeamId} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{(teams || []).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">主位置</label><PositionSelect value={newPlayer.position || Position.ST} onChange={val => setNewPlayer({...newPlayer, position: val})} className="border-gray-200 border"/></div>
