@@ -1,11 +1,8 @@
-import express from "express";
-import { createServer as createViteServer } from "vite";
-import path from "path";
-import { fileURLToPath } from "url";
-import { put, list } from '@vercel/blob';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
+import path from 'path';
+import { put, list } from '@vercel/blob';
 
 async function startServer() {
   const app = express();
@@ -13,20 +10,16 @@ async function startServer() {
 
   app.use(express.json({ limit: '50mb' }));
 
-  // API routes
   const DB_FILENAME = 'football_manager_db.json';
 
-  app.get("/api/storage", async (req, res) => {
+  // API Routes
+  app.get('/api/storage', async (req, res) => {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
-      console.warn('BLOB_READ_WRITE_TOKEN is not configured. Cloud storage is disabled.');
-      return res.status(200).json(null);
-    }
     try {
       const { blobs } = await list({ prefix: DB_FILENAME, limit: 1, token });
       
       if (blobs.length === 0) {
-        return res.status(200).json(null);
+        return res.json(null);
       }
 
       const jsonUrl = blobs[0].url;
@@ -34,18 +27,15 @@ async function startServer() {
       const data = await response.json();
       
       res.setHeader('Cache-Control', 'no-store, max-age=0');
-      return res.status(200).json(data);
+      return res.json(data);
     } catch (error) {
-      console.error('Storage API Error (GET):', error);
+      console.error('Storage API GET Error:', error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   });
 
-  app.post("/api/storage", async (req, res) => {
+  app.post('/api/storage', async (req, res) => {
     const token = process.env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
-      return res.status(400).json({ error: 'BLOB_READ_WRITE_TOKEN is not configured.' });
-    }
     try {
       const body = req.body;
       const { url } = await put(DB_FILENAME, JSON.stringify(body), {
@@ -54,19 +44,18 @@ async function startServer() {
         allowOverwrite: true,
         token,
       });
-
-      return res.status(200).json({ success: true, url });
+      return res.json({ success: true, url });
     } catch (error) {
-      console.error('Storage API Error (POST):', error);
+      console.error('Storage API POST Error:', error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: 'spa',
     });
     app.use(vite.middlewares);
   } else {
@@ -77,7 +66,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
