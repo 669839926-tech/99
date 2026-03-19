@@ -53,6 +53,7 @@ export interface AttributeConfig {
     mental: AttributeDefinition[];
     drillLibrary: string[];
     trainingFoci: string[];
+    focusSubjects?: Record<string, string[]>;
 }
 
 export interface PlayerStats {

@@ -12,12 +12,13 @@ const getAiClient = () => {
 // Comment: Using gemini-3-flash-preview for basic text tasks like plan generation
 const TRAINING_MODEL = 'gemini-3-flash-preview';
 
-export const generateTrainingPlan = async (focus: string, duration: number, intensity: string): Promise<Partial<TrainingSession>> => {
+export const generateTrainingPlan = async (focus: string, duration: number, intensity: string, theme?: string): Promise<Partial<TrainingSession>> => {
   try {
     const ai = getAiClient();
     const prompt = `
       Create a professional youth football (soccer) training session plan.
       Focus Area: ${focus}
+      ${theme ? `Specific Theme: ${theme}` : ''}
       Duration: ${duration} minutes
       Intensity: ${intensity}
 
@@ -129,7 +130,36 @@ export const generatePlayerReview = async (player: Player, quarter: string, year
     return JSON.parse(jsonText);
 
   } catch (error) {
-      console.error("Error generating player review", error);
-      throw error;
+    console.error("Error generating player review", error);
+    throw error;
+  }
+}
+
+export const generateTrainingFeedback = async (session: TrainingSession): Promise<string> => {
+  try {
+    const ai = getAiClient();
+    const prompt = `
+      Act as a professional football technical director.
+      Review the following training session and provide constructive feedback for the coach.
+      
+      Session Title: ${session.title}
+      Focus: ${session.focus}
+      Intensity: ${session.intensity}
+      Drills: ${session.drills.join(', ')}
+      Reflection: ${session.planReflection}
+      Performance Ratings (1-10): Technical: ${session.performanceRatings?.technical}, Application: ${session.performanceRatings?.application}, Focus: ${session.performanceRatings?.focus}, Discipline: ${session.performanceRatings?.discipline}
+      
+      Provide a concise, professional review in Chinese (Markdown format).
+    `;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+    });
+
+    return response.text || "无法生成反馈。";
+  } catch (error) {
+    console.error("Error generating training feedback:", error);
+    return "连接 AI 助手失败。";
   }
 }

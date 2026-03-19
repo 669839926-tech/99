@@ -81,24 +81,38 @@ const calculateTenure = (dateStr?: string) => {
 };
 
 const getOverallRating = (player: Player): string => {
+  if (!player) return '0.0';
   const sourceStats = player.lastPublishedStats || player.stats;
+  if (!sourceStats) return '0.0';
+  
   let total = 0;
   let count = 0;
   (['technical', 'tactical', 'physical', 'mental'] as AttributeCategory[]).forEach(cat => {
-    if (sourceStats[cat]) {
-      Object.values(sourceStats[cat]).forEach(val => { total += val; count++; });
+    const catStats = sourceStats[cat];
+    if (catStats) {
+      Object.values(catStats).forEach(val => { 
+        if (typeof val === 'number') {
+          total += val; 
+          count++; 
+        }
+      });
     }
   });
   return count === 0 ? '0.0' : (total / count).toFixed(1);
 };
 
 const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
+  if (!player || !player.stats || !attributeConfig) return 0;
   const configItems = attributeConfig[category];
   if (!configItems || configItems.length === 0) return 0;
+  
+  const catStats = player.stats[category];
+  if (!catStats) return 0;
+
   let sum = 0;
   let count = 0;
   configItems.forEach(attr => {
-    const val = player.stats[category][attr.key] || 0;
+    const val = catStats[attr.key] || 0;
     sum += val;
     count++;
   });
@@ -106,9 +120,12 @@ const getCategoryAvg = (player: Player, category: AttributeCategory, attributeCo
 };
 
 const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
+  if (!player || !player.stats || !attributeConfig || !attributeConfig[category]) return [];
+  
+  const catStats = player.stats[category];
   return attributeConfig[category].map(attr => ({
     subject: attr.label,
-    value: player.stats[category][attr.key] || 0,
+    value: (catStats && catStats[attr.key]) || 0,
     fullMark: 10
   }));
 };
@@ -415,21 +432,25 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const isDirector = currentUser?.role === 'director';
 
     useEffect(() => {
-        if (!isEditing && player) {
+        if (!isEditing && player && editedPlayer) {
              if (player.id === editedPlayer.id && JSON.stringify(editedPlayer) !== JSON.stringify(player)) {
-                 setEditedPlayer(JSON.parse(JSON.stringify(player)));
+                 try {
+                    setEditedPlayer(JSON.parse(JSON.stringify(player)));
+                 } catch (e) {
+                    console.error("Failed to sync editedPlayer", e);
+                 }
              }
         }
     }, [player, isEditing]);
 
     useEffect(() => {
-        if (!isEditing) return;
+        if (!isEditing || !editedPlayer) return;
         const timer = setTimeout(() => {
             setSaveStatus('saving');
             const updatedPlayer = {
                 ...editedPlayer,
                 statsStatus: 'Published' as ApprovalStatus,
-                lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats))
+                lastPublishedStats: editedPlayer.stats ? JSON.parse(JSON.stringify(editedPlayer.stats)) : undefined
             };
             onUpdatePlayer(updatedPlayer);
             setTimeout(() => setSaveStatus('saved'), 800);
@@ -463,8 +484,14 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const attendanceRate = calculateAttendanceRate(player, trainings, detailAttendanceScope);
     const handleSave = () => {
-      const updatedPlayer = { ...editedPlayer, statsStatus: 'Published' as ApprovalStatus, lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats)) };
-      onUpdatePlayer(updatedPlayer); setSaveStatus('saved');
+      if (!editedPlayer) return;
+      const updatedPlayer = { 
+        ...editedPlayer, 
+        statsStatus: 'Published' as ApprovalStatus, 
+        lastPublishedStats: editedPlayer.stats ? JSON.parse(JSON.stringify(editedPlayer.stats)) : undefined 
+      };
+      onUpdatePlayer(updatedPlayer); 
+      setSaveStatus('saved');
     };
     const handleDelete = () => { if (confirm('确定要删除这名球员吗？此操作不可撤销。')) { onDeletePlayer(player.id); onClose(); } };
     const handleDeleteRechargeAction = (rechargeId: string) => {
@@ -1163,20 +1190,54 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     } 
   };
   const filteredPlayers = players.filter(p => {
-    const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
+    if (!p || !p.name) return false;
+    const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; 
+    const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const posVal = p.position.toString(); const isFwd = posVal.includes('锋') || posVal.includes('9'); const isMid = posVal.includes('中场'); const isDef = posVal.includes('后卫') || posVal.includes('翼卫'); const isGk = posVal.includes('守门员');
+    const posVal = (p.position || '').toString(); 
+    const isFwd = posVal.includes('锋') || posVal.includes('9'); 
+    const isMid = posVal.includes('中场'); 
+    const isDef = posVal.includes('后卫') || posVal.includes('翼卫'); 
+    const isGk = posVal.includes('守门员');
     const matchesPos = filterPos === '全部' || (filterPos === '前锋' && isFwd) || (filterPos === '中场' && isMid) || (filterPos === '后卫' && isDef) || (filterPos === '门将' && isGk);
-    if (showDraftsOnly) { const hasDraftReviews = p.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted'); const hasDraftStats = p.statsStatus === 'Draft' || p.statsStatus === 'Submitted'; if (!hasDraftReviews && !hasDraftStats) return false; }
+    if (showDraftsOnly) { 
+      const hasDraftReviews = p.reviews?.some(r => r && (r.status === 'Draft' || r.status === 'Submitted')); 
+      const hasDraftStats = p.statsStatus === 'Draft' || p.statsStatus === 'Submitted'; 
+      if (!hasDraftReviews && !hasDraftStats) return false; 
+    }
     return matchesTeam && matchesSearch && matchesPos;
   }).sort((a, b) => {
-    if (sortField === 'age') { const dateA = a.birthDate || '0000-00-00'; const dateB = b.birthDate || '0000-00-00'; return sortDirection === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA); }
-    if (sortField === 'rating') { const rateA = parseFloat(getOverallRating(a)); const rateB = parseFloat(getOverallRating(b)); return sortDirection === 'asc' ? rateA - rateB : rateB - rateA; }
-    if (sortField === 'attendance') { const attA = calculateAttendanceRate(a, trainings, 'year'); const attB = calculateAttendanceRate(b, trainings, 'year'); return sortDirection === 'asc' ? attA - attB : attB - attA; }
-    if (sortField === 'credits') { return sortDirection === 'asc' ? a.credits - b.credits : b.credits - a.credits; }
-    if (sortField === 'position') { const orderA = POSITION_ORDER[a.position] || 999; const orderB = POSITION_ORDER[b.position] || 999; return sortDirection === 'asc' ? orderA - orderB : orderB - orderA; }
-    const joinA = a.joinDate || '9999-99-99'; const joinB = b.joinDate || '9999-99-99'; if (joinA !== joinB) { return joinA.localeCompare(joinB); }
-    if (a.isCaptain && !b.isCaptain) return -1; if (!a.isCaptain && b.isCaptain) return 1; return (a.number || 0) - (b.number || 0);
+    if (sortField === 'age') { 
+      const dateA = a.birthDate || '0000-00-00'; 
+      const dateB = b.birthDate || '0000-00-00'; 
+      return sortDirection === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA); 
+    }
+    if (sortField === 'rating') { 
+      const rateA = parseFloat(getOverallRating(a)); 
+      const rateB = parseFloat(getOverallRating(b)); 
+      return sortDirection === 'asc' ? rateA - rateB : rateB - rateA; 
+    }
+    if (sortField === 'attendance') { 
+      const attA = calculateAttendanceRate(a, trainings, 'year'); 
+      const attB = calculateAttendanceRate(b, trainings, 'year'); 
+      return sortDirection === 'asc' ? attA - attB : attB - attA; 
+    }
+    if (sortField === 'credits') { 
+      return sortDirection === 'asc' ? (a.credits || 0) - (b.credits || 0) : (b.credits || 0) - (a.credits || 0); 
+    }
+    if (sortField === 'position') { 
+      const orderA = POSITION_ORDER[a.position] || 999; 
+      const orderB = POSITION_ORDER[b.position] || 999; 
+      return sortDirection === 'asc' ? orderA - orderB : orderB - orderA; 
+    }
+    const joinA = a.joinDate || '9999-99-99'; 
+    const joinB = b.joinDate || '9999-99-99'; 
+    if (joinA !== joinB) { 
+      return sortDirection === 'asc' ? joinA.localeCompare(joinB) : joinB.localeCompare(joinA); 
+    }
+    if (a.isCaptain && !b.isCaptain) return -1; 
+    if (!a.isCaptain && b.isCaptain) return 1; 
+    return (a.number || 0) - (b.number || 0);
   });
 
   const toggleSelection = (id: string) => { const newSet = new Set(selectedIds); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } setSelectedIds(newSet); };

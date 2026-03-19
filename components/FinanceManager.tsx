@@ -203,6 +203,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const coachSalaries = useMemo(() => {
         const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
+        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
 
         return staff.map(coach => {
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
@@ -260,8 +261,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let renewalFormula = "非季末月份";
                 if (isDistributionMonth) {
                     const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
-                    const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
-                    const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
+                    const qStart = new Date(effectiveYear, quarterMonths[0], 1).toISOString();
+                    const qEnd = new Date(effectiveYear, quarterMonths[2] + 1, 0).toISOString();
                     const renewedCount = teamPlayers.filter(p => {
                         const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
                         const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
@@ -831,9 +832,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             if (data && data.activeTooltipIndex !== undefined) {
                                                 if (selectedYear === 'all') {
                                                     const item = monthlySummaryData[data.activeTooltipIndex] as any;
-                                                    const yearStr = item.year;
-                                                    const year = parseInt(yearStr);
-                                                    if (!isNaN(year)) setSelectedYear(year);
+                                                    if (item) {
+                                                        const yearStr = item.year;
+                                                        const year = parseInt(yearStr);
+                                                        if (!isNaN(year)) setSelectedYear(year);
+                                                    }
                                                 } else {
                                                     setSelectedMonth(data.activeTooltipIndex);
                                                 }
@@ -845,8 +848,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
                                         <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} />
                                         <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{ paddingBottom: '10px' }} formatter={(value) => <span className="text-[11px] font-black uppercase tracking-wider text-gray-600 mr-4 ml-1">{value}</span>} />
-                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} cursor="pointer" />
-                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} cursor="pointer" />
+                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} cursor="pointer" />
+                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} cursor="pointer" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
