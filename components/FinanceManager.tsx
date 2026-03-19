@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
 import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, Gauge, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts';
@@ -39,7 +39,7 @@ const parseDateInfo = (dateStr: string) => {
 };
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ 
-    transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
+    transactions, financeCategories, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
     users, players, teams, trainings, salarySettings, onUpdateUser,
     accountingRecords, onAddAccountingRecord, onUpdateAccountingRecord, onDeleteAccountingRecord
 }) => {
@@ -70,17 +70,22 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        const categoriesForType = financeCategories.filter(c => c.type === activeType);
-        setFormData(prev => ({ ...prev, category: categoriesForType.length > 0 ? categoriesForType[0].id : '' }));
-    }, [activeType, financeCategories]);
+    const handleTypeChange = (type: 'income' | 'expense') => {
+        setActiveType(type);
+        const categoriesForType = financeCategories.filter(c => c.type === type);
+        if (categoriesForType.length > 0) {
+            setFormData(prev => ({ ...prev, category: categoriesForType[0].id }));
+        }
+    };
 
     const journalWithBalance = useMemo(() => {
         const baseSorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        let balance = 0;
-        const recordsWithBalance = baseSorted.map(t => {
-            balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
-            return { ...t, balance };
+        
+        const recordsWithBalance: any[] = [];
+        let runningBalance = 0;
+        baseSorted.forEach(t => {
+            runningBalance += (Number(t.income) || 0) - (Number(t.expense) || 0);
+            recordsWithBalance.push({ ...t, balance: runningBalance });
         });
 
         const filtered = recordsWithBalance.filter(t => {
@@ -396,14 +401,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleSettleAccountingRecord = (record: AccountingRecord) => {
-        if (!confirm(`确定要结算这笔${record.type === 'receivable' ? '应收' : '应付'}账款吗？结算后将自动生成一笔财务流水。`)) return;
-        
         const settledDate = new Date().toISOString().split('T')[0];
         onUpdateAccountingRecord({ ...record, status: 'settled', settledDate });
         
         // Generate transaction
+        const transactionId = `settle-${new Date().getTime()}`;
         onAddTransaction({
-            id: `settle-${Date.now()}`,
+            id: transactionId,
             date: settledDate,
             details: `[账款结算] ${record.entity}: ${record.details}`,
             category: record.category,
@@ -411,8 +415,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             expense: record.type === 'payable' ? record.amount : 0,
             account: '黔农云 (结算入账)'
         });
-        
-        alert('结算成功，已同步至财务流水。');
     };
 
     const toggleSelectAll = () => setSelectedIds(selectedIds.size === journalWithBalance.length ? new Set() : new Set(journalWithBalance.map(t => t.id)));
@@ -1093,7 +1095,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50 flex-1 overflow-y-auto pb-24 md:pb-8">
-                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => setActiveType('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => setActiveType('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
+                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => handleTypeChange('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => handleTypeChange('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">发生日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label><select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
