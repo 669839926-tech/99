@@ -1488,36 +1488,94 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   </div>
                   {!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
-                      {formData.focus !== 'Custom' && focusSubjects?.[formData.focus] && focusSubjects[formData.focus].length > 0 ? (
+                  <div className="space-y-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
+                      
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
                         <select 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
-                          value={formData.title}
-                          onChange={e => setFormData({...formData, title: e.target.value})}
-                          required={!isAiMode}
+                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
+                          value={formData.focus} 
+                          onChange={e => {
+                            const newFocus = e.target.value;
+                            setFormData({
+                              ...formData, 
+                              focus: newFocus,
+                              title: '' // Reset title when focus changes to force selection from new list
+                            });
+                          }}
                         >
-                          <option value="">请选择训练主题...</option>
-                          {focusSubjects[formData.focus].map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
+                          {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
+                          <option value="Custom">自定义...</option>
                         </select>
-                      ) : (
-                        <input 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
-                          placeholder="例如: 快速反击演练" 
-                          value={formData.title} 
-                          onChange={e => setFormData({...formData, title: e.target.value})} 
-                          required={!isAiMode} 
-                        />
-                      )}
+                        {formData.focus === 'Custom' && (
+                          <input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
+                        {formData.focus !== 'Custom' && focusSubjects?.[formData.focus] && focusSubjects[formData.focus].length > 0 ? (
+                          <select 
+                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
+                            value={formData.title}
+                            onChange={e => setFormData({...formData, title: e.target.value})}
+                            required={!isAiMode}
+                          >
+                            <option value="">请选择训练主题...</option>
+                            {focusSubjects[formData.focus].map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input 
+                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
+                            placeholder="例如: 快速反击演练" 
+                            value={formData.title} 
+                            onChange={e => setFormData({...formData, title: e.target.value})} 
+                            required={!isAiMode} 
+                          />
+                        )}
+                      </div>
                     </div>
+
+                    {!isAiMode && (
+                      <div className="pt-2 border-t border-gray-100">
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                          <LayoutList className="w-3 h-3 text-bvb-yellow" /> 训练项目
+                        </label>
+                        <div className="space-y-2 mb-2">
+                          {formData.drills.map((drill, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-sm shadow-sm">
+                              <span className="font-bold text-gray-700">{drill}</span>
+                              <button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500">
+                                <X className="w-4 h-4"/>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2">
+                          <input 
+                            className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                            placeholder="添加项目..." 
+                            value={drillInput} 
+                            onChange={e => setDrillInput(e.target.value)} 
+                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} 
+                          />
+                          <button type="button" onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110 transition-all">
+                            <Plus className="w-4 h-4"/>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* 重点关注球员选择器 (NEW) */}
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                       <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                           <Star className="w-3.5 h-3.5 text-bvb-yellow fill-current" /> 重点关注球员 (最多2名)
                       </label>
@@ -1556,36 +1614,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                           })}
                       </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
-                      <select 
-                        className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                        value={formData.focus} 
-                        onChange={e => {
-                          const newFocus = e.target.value;
-                          setFormData({
-                            ...formData, 
-                            focus: newFocus,
-                            title: '' // Reset title when focus changes to force selection from new list
-                          });
-                        }}
-                      >
-                        {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
-                        <option value="Custom">自定义...</option>
-                      </select>
-                      {formData.focus === 'Custom' && (
-                        <input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />
-                      )}
-                    </div>
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
-                  </div>
-                  {!isAiMode && (<div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练项目</label><div className="space-y-2 mb-2">{formData.drills.map((drill, idx) => (<div key={idx} className="flex justify-between items-center bg-gray-50 p-2 rounded text-sm"><span>{drill}</span><button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500"><X className="w-4 h-4"/></button></div>))}</div><div className="flex gap-2"><input className="flex-1 p-2 border rounded text-sm font-bold bg-white" placeholder="添加项目..." value={drillInput} onChange={e => setDrillInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} /><button type="button" onClick={addDrill} className="px-3 bg-gray-200 rounded hover:bg-gray-300"><Plus className="w-4 h-4"/></button></div></div>)}
                   <button type="submit" disabled={loading} className="w-full py-4 bg-bvb-black text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center shadow-lg transition-all">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button>
                 </form>
               </div>
