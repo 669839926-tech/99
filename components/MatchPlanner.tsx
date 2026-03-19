@@ -72,17 +72,23 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
     return () => clearTimeout(timer);
   }, [editingMatch, onUpdateMatch]);
 
-  const ensureDetails = (match: Match): Match => ({
-    ...match,
-    details: {
-        weather: match.details?.weather || '晴朗',
-        pitch: match.details?.pitch || '天然草',
-        lineup: match.details?.lineup || [],
-        substitutes: match.details?.substitutes || [],
-        events: match.details?.events || [],
-        summary: match.details?.summary || ''
-    }
-  });
+  const ensureDetails = (match: Match): Match => {
+    const defaultDetails: MatchDetails = {
+        weather: '晴朗',
+        pitch: '天然草',
+        lineup: [],
+        substitutes: [],
+        events: [],
+        summary: ''
+    };
+    return {
+        ...match,
+        details: {
+            ...defaultDetails,
+            ...(match.details || {})
+        }
+    };
+  };
 
   const startEditing = (match: Match) => {
     setEditingMatch(ensureDetails(match));
@@ -335,7 +341,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
             <div className="bg-white w-full h-full md:h-[90vh] md:max-w-4xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="bg-bvb-black p-3 md:p-4 flex justify-between items-center text-white shrink-0">
                     <div className="flex items-center gap-2 md:gap-3">
-                        <button onClick={() => setEditingMatch(null)} className="md:hidden"><ChevronLeft className="w-6 h-6" /></button>
+                        <button 
+                            onClick={() => {
+                                if (editingMatch) onUpdateMatch(editingMatch);
+                                setEditingMatch(null);
+                            }} 
+                            className="md:hidden"
+                        >
+                            <ChevronLeft className="w-6 h-6" />
+                        </button>
                         <div>
                             <h3 className="font-bold text-base md:text-lg leading-tight">比赛录入: VS {editingMatch.opponent}</h3>
                             <p className="text-[10px] md:text-xs text-gray-400 font-mono uppercase">{editingMatch.date} • {editingMatch.competition}</p>
@@ -344,7 +358,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                     <div className="flex items-center gap-4">
                          {saveStatus === 'saving' && <span className="text-[10px] md:text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 同步中</span>}
                          {saveStatus === 'saved' && <span className="text-[10px] md:text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 云端已存</span>}
-                         <button onClick={() => setEditingMatch(null)} className="hidden md:block hover:bg-gray-800 p-1 rounded"><X className="w-6 h-6" /></button>
+                         <button 
+                            onClick={() => {
+                                if (editingMatch) onUpdateMatch(editingMatch);
+                                setEditingMatch(null);
+                            }} 
+                            className="hidden md:block hover:bg-gray-800 p-1 rounded"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
                     </div>
                 </div>
 
@@ -498,7 +520,9 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                                         <p className="text-[8px] md:text-[10px] text-gray-400 font-black uppercase">{event.type === 'Goal' ? '进球' : event.type === 'Assist' ? '助攻' : event.type === 'YellowCard' ? '黄牌' : '事件'}</p>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => removeEvent(event.id)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4"/></button>
+                                                <button onClick={() => removeEvent(event.id)} className="p-2 text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
@@ -508,23 +532,30 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                     )}
 
                     {activeTab === 'report' && (
-                        <div className="animate-in fade-in duration-300 space-y-4 md:space-y-6">
+                        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
                             <div className="space-y-3 md:space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h4 className="font-bold text-sm md:text-base text-gray-800 flex items-center"><PenTool className="w-4 h-4 mr-2 text-bvb-yellow" /> 教练赛后复盘</h4>
                                     <button onClick={() => handleGenerateStrategy(editingMatch)} className="text-[10px] md:text-xs bg-white border border-gray-300 px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-bold flex items-center hover:bg-yellow-50 transition-colors"><Bot className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1 md:mr-1.5 text-bvb-yellow" /> AI 建议</button>
                                 </div>
                                 <textarea 
+                                    key={`summary-${editingMatch.id}`}
                                     className="w-full h-48 md:h-64 p-3 md:p-5 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" 
                                     placeholder="详细记录本场表现及个人球员点评..." 
                                     value={editingMatch.details?.summary || ''} 
-                                    onChange={e => setEditingMatch({
-                                        ...editingMatch, 
-                                        details: {
-                                            ...ensureDetails(editingMatch).details!, 
-                                            summary: e.target.value
-                                        }
-                                    })} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setEditingMatch(prev => {
+                                            if (!prev) return prev;
+                                            return {
+                                                ...prev,
+                                                details: {
+                                                    ...(prev.details || {}),
+                                                    summary: val
+                                                }
+                                            };
+                                        });
+                                    }} 
                                 />
                             </div>
                         </div>
@@ -532,7 +563,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                 </div>
                 
                 <div className="bg-gray-50 p-3 md:p-4 border-t flex justify-end shrink-0 hidden md:flex">
-                    <button onClick={() => setEditingMatch(null)} className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm">
+                    <button 
+                        onClick={() => {
+                            if (editingMatch) {
+                                onUpdateMatch(editingMatch);
+                            }
+                            setEditingMatch(null);
+                        }} 
+                        className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm"
+                    >
                         确认并退出
                     </button>
                 </div>

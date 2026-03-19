@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Player, Team, TechTestDefinition, User } from '../types';
-import { Activity, History, Plus, Target, CheckCircle, BarChart3, Medal, ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Save, Trash2, Download, Loader2, X, Search, Trophy, Star, FileDown, Settings, Gauge, ArrowRight, FileSpreadsheet, Upload, Clock } from 'lucide-react';
+import { Player, Team, TechTestDefinition, User, TechTestResult } from '../types';
+import { Activity, History, Plus, Target, CheckCircle, BarChart3, Medal, ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Save, Trash2, Download, Loader2, X, Search, Trophy, Star, FileDown, Settings, Gauge, ArrowRight, FileSpreadsheet, Upload, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { exportToPDF } from '../services/pdfService';
 
 interface TechnicalGrowthProps {
@@ -41,6 +41,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     });
 
     const [isExportingHome, setIsExportingHome] = useState(false);
+    const [isExportingTech, setIsExportingTech] = useState(false);
     const [jugglingPlayerId, setJugglingPlayerId] = useState<string>('');
     const [jugglingDate, setJugglingDate] = useState(new Date().toISOString().split('T')[0]);
     const [jugglingCount, setJugglingCount] = useState<string>('');
@@ -55,6 +56,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
     const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
     const [viewingJugglingPlayerId, setViewingJugglingPlayerId] = useState<string | null>(null);
+    const [showTestHistoryPlayerId, setShowTestHistoryPlayerId] = useState<string | null>(null);
 
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [newTestDef, setNewTestDef] = useState({ name: '', unit: '', description: '' });
@@ -559,8 +561,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             onClick={() => {
                                                 if (confirm('确定要删除这条打卡记录吗？')) {
                                                     onUpdatePlayer({
-                                                        ...p,
-                                                        homeTrainingLogs: (p.homeTrainingLogs || []).filter(l => l.id !== log.id)
+                                                        ...player,
+                                                        homeTrainingLogs: (player.homeTrainingLogs || []).filter(l => l.id !== log.id)
                                                     });
                                                 }
                                             }}
@@ -626,8 +628,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             onClick={() => {
                                                 if (confirm('确定要永久删除这条颠球记录吗？')) {
                                                     onUpdatePlayer({
-                                                        ...p,
-                                                        jugglingHistory: (p.jugglingHistory || []).filter(h => h.id !== item.id)
+                                                        ...player,
+                                                        jugglingHistory: (player.jugglingHistory || []).filter(h => h.id !== item.id)
                                                     });
                                                 }
                                             }}

@@ -441,7 +441,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                  }
              }
         }
-    }, [player, isEditing]);
+    }, [player, isEditing, editedPlayer]);
 
     useEffect(() => {
         if (!isEditing || !editedPlayer) return;
@@ -456,7 +456,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1200);
         return () => clearTimeout(timer);
-    }, [editedPlayer, isEditing]);
+    }, [editedPlayer, isEditing, onUpdatePlayer]);
 
     useEffect(() => {
         if (initialFilter === 'pending_reviews') { setActiveTab('reviews'); } 
@@ -1441,7 +1441,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 flex flex-col min-h-0">
                         <h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-4 uppercase">年度考评记录</h3>
                         <div className="grid grid-cols-2 gap-4 flex-1">
-                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review, idx) => (
+                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review) => (
                                 <div key={review.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-xs">
                                     <div className="flex justify-between items-center mb-2 border-b border-gray-200 pb-2"><span className="font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className="text-gray-400 font-mono">{review.date}</span></div>
                                     <div className="space-y-2">
