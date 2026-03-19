@@ -72,6 +72,29 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
     return () => clearTimeout(timer);
   }, [editingMatch, onUpdateMatch]);
 
+  const ensureDetails = (match: Match): Match => {
+    const defaultDetails: MatchDetails = {
+        weather: '晴朗',
+        pitch: '天然草',
+        lineup: [],
+        substitutes: [],
+        events: [],
+        summary: ''
+    };
+    return {
+        ...match,
+        details: {
+            ...defaultDetails,
+            ...(match.details || {})
+        }
+    };
+  };
+
+  const startEditing = (match: Match) => {
+    setEditingMatch(ensureDetails(match));
+    setActiveTab('info');
+  };
+
   const seasonStats = useMemo(() => {
       const completed = displayMatches.filter(m => m.status === 'Completed' && m.result);
       let wins = 0, draws = 0, losses = 0;
@@ -145,36 +168,39 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
               description: newEvent.description || ''
           };
           
+          const currentMatch = ensureDetails(editingMatch);
           const updatedDetails = {
-              ...editingMatch.details!,
-              events: [...(editingMatch.details?.events || []), event]
+              ...currentMatch.details!,
+              events: [...(currentMatch.details?.events || []), event]
           };
           
-          setEditingMatch({ ...editingMatch, details: updatedDetails });
+          setEditingMatch({ ...currentMatch, details: updatedDetails });
           setNewEvent({ minute: 0, type: 'Goal', playerId: '' });
       }
   };
 
   const removeEvent = (id: string) => {
       if (editingMatch) {
-          const updatedEvents = editingMatch.details?.events.filter(e => e.id !== id) || [];
-          setEditingMatch({ ...editingMatch, details: { ...editingMatch.details!, events: updatedEvents } });
+          const currentMatch = ensureDetails(editingMatch);
+          const updatedEvents = currentMatch.details?.events.filter(e => e.id !== id) || [];
+          setEditingMatch({ ...currentMatch, details: { ...currentMatch.details!, events: updatedEvents } });
       }
   };
 
   const toggleLineupPlayer = (playerId: string, isSub: boolean = false) => {
       if (!editingMatch) return;
-      const details = editingMatch.details!;
+      const currentMatch = ensureDetails(editingMatch);
+      const details = currentMatch.details!;
       if (isSub) {
           const nextSubs = details.substitutes.includes(playerId) 
             ? details.substitutes.filter(id => id !== playerId)
             : [...details.substitutes, playerId];
-          setEditingMatch({ ...editingMatch, details: { ...details, substitutes: nextSubs } });
+          setEditingMatch({ ...currentMatch, details: { ...details, substitutes: nextSubs } });
       } else {
           const nextLineup = details.lineup.includes(playerId) 
             ? details.lineup.filter(id => id !== playerId)
             : [...details.lineup, playerId];
-          setEditingMatch({ ...editingMatch, details: { ...details, lineup: nextLineup } });
+          setEditingMatch({ ...currentMatch, details: { ...details, lineup: nextLineup } });
       }
   };
 
@@ -191,54 +217,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
     }
   };
 
-
-  const getLocationLabel = (loc: string) => loc === 'Home' ? '主场' : '客场';
-  const getFullAddress = (m: Match) => {
-      if (m.location === 'Home') return '俱乐部主球场';
-      const parts = [m.province, m.city, m.district].filter(Boolean);
-      return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
-  };
-
-  const MatchCard: React.FC<{ match: Match }> = ({ match }) => {
-    const team = teams.find(t => t.id === match.teamId);
-    return (
-        <div className={`bg-white rounded-xl shadow-sm border-l-4 p-3 md:p-5 transition-all hover:shadow-md relative group ${match.status === 'Completed' ? (
-            match.result && match.result.split('-')[0] > match.result.split('-')[1] ? 'border-green-500' : 
-            match.result && match.result.split('-')[0] < match.result.split('-')[1] ? 'border-red-500' : 'border-yellow-500'
-        ) : 'border-gray-300'}`}>
-            <div className="absolute top-2.5 md:top-3 right-2.5 md:right-3 flex gap-1.5 md:gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                <button onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
-                <button onClick={(e) => { e.stopPropagation(); setEditingMatch(match); setActiveTab('info'); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded">
-                    {match.status === 'Completed' ? <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-                </button>
-            </div>
-            <div className="flex justify-between items-center mb-1.5 md:mb-2">
-                <span className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 flex items-center tracking-widest"><Calendar className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> {match.date} • {match.time}</span>
-                <div className="flex items-center gap-1.5 md:gap-2 pr-10 md:pr-0">
-                    <span className="text-[8px] md:text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 rounded border border-gray-200">{team?.level}</span>
-                    <span className={`px-1.5 py-0.5 text-[8px] md:text-[10px] font-black rounded uppercase tracking-tighter ${match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-200 text-gray-600'}`}>{getLocationLabel(match.location)}</span>
-                </div>
-            </div>
-            <div className="flex justify-between items-end">
-                <div>
-                    {match.title && <h4 className="text-[8px] md:text-[10px] font-bold text-gray-400 mb-0.5 uppercase truncate max-w-[150px] md:max-w-none">{match.title}</h4>}
-                    <h3 className="text-base md:text-xl font-black text-gray-900 flex items-center">VS {match.opponent}</h3>
-                    <div className="text-[10px] md:text-xs text-gray-500 mt-1 md:mt-1.5 flex items-center font-bold">
-                         <MapPin className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 text-gray-400" /> {getFullAddress(match)}
-                    </div>
-                </div>
-                {match.status === 'Completed' ? (
-                    <div className="text-xl md:text-3xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">{match.result || '-:-'}</div>
-                ) : (
-                    <div className="flex flex-col items-end gap-1.5 md:gap-2">
-                         <button onClick={() => { setEditingMatch(match); setActiveTab('info'); }} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-3 py-1 md:py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all">录入赛果 <PenTool className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1 md:ml-1.5" /></button>
-                         <button onClick={() => handleGenerateStrategy(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-black text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-gray-800 transition-all"><Bot className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> 助手</button>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-  };
 
   return (
     <div className="space-y-6 md:space-y-8 relative pb-20 md:pb-0">
@@ -302,7 +280,16 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                   <Shield className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> Upcoming / 即将进行
               </h3>
               <div className="space-y-3 md:space-y-4">
-                  {upcomingMatches.length > 0 ? upcomingMatches.map(m => <MatchCard key={m.id} match={m} />) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
+                  {upcomingMatches.length > 0 ? upcomingMatches.map(m => (
+                    <MatchCard 
+                        key={m.id} 
+                        match={m} 
+                        teams={teams}
+                        onDeleteMatch={onDeleteMatch}
+                        startEditing={startEditing}
+                        handleGenerateStrategy={handleGenerateStrategy}
+                    />
+                  )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
               </div>
           </div>
           <div className="animate-in slide-in-from-right-4 duration-500">
@@ -310,7 +297,16 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                   <Trophy className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" /> History / 近期赛果
               </h3>
               <div className="space-y-3 md:space-y-4 opacity-90">
-                  {pastMatches.length > 0 ? pastMatches.map(m => <MatchCard key={m.id} match={m} />) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
+                  {pastMatches.length > 0 ? pastMatches.map(m => (
+                    <MatchCard 
+                        key={m.id} 
+                        match={m} 
+                        teams={teams}
+                        onDeleteMatch={onDeleteMatch}
+                        startEditing={startEditing}
+                        handleGenerateStrategy={handleGenerateStrategy}
+                    />
+                  )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
               </div>
           </div>
       </div>
@@ -345,7 +341,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
             <div className="bg-white w-full h-full md:h-[90vh] md:max-w-4xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
                 <div className="bg-bvb-black p-3 md:p-4 flex justify-between items-center text-white shrink-0">
                     <div className="flex items-center gap-2 md:gap-3">
-                        <button onClick={() => setEditingMatch(null)} className="md:hidden"><ChevronLeft className="w-6 h-6" /></button>
+                        <button 
+                            onClick={() => {
+                                if (editingMatch) onUpdateMatch(editingMatch);
+                                setEditingMatch(null);
+                            }} 
+                            className="md:hidden"
+                        >
+                            <ChevronLeft className="w-6 h-6" />
+                        </button>
                         <div>
                             <h3 className="font-bold text-base md:text-lg leading-tight">比赛录入: VS {editingMatch.opponent}</h3>
                             <p className="text-[10px] md:text-xs text-gray-400 font-mono uppercase">{editingMatch.date} • {editingMatch.competition}</p>
@@ -354,7 +358,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                     <div className="flex items-center gap-4">
                          {saveStatus === 'saving' && <span className="text-[10px] md:text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 同步中</span>}
                          {saveStatus === 'saved' && <span className="text-[10px] md:text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 云端已存</span>}
-                         <button onClick={() => setEditingMatch(null)} className="hidden md:block hover:bg-gray-800 p-1 rounded"><X className="w-6 h-6" /></button>
+                         <button 
+                            onClick={() => {
+                                if (editingMatch) onUpdateMatch(editingMatch);
+                                setEditingMatch(null);
+                            }} 
+                            className="hidden md:block hover:bg-gray-800 p-1 rounded"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
                     </div>
                 </div>
 
@@ -394,12 +406,26 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                     </div>
                                     <div className="grid grid-cols-2 gap-3 md:gap-4">
                                         <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">天气</label>
-                                            <select className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" value={editingMatch.details?.weather} onChange={e => setEditingMatch({...editingMatch, details: {...editingMatch.details!, weather: e.target.value}})}>
+                                            <select 
+                                                className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" 
+                                                value={editingMatch.details?.weather || '晴朗'} 
+                                                onChange={e => {
+                                                    const current = ensureDetails(editingMatch);
+                                                    setEditingMatch({...current, details: {...current.details!, weather: e.target.value}});
+                                                }}
+                                            >
                                                 <option value="Sunny">晴朗</option><option value="Cloudy">多云</option><option value="Rainy">有雨</option><option value="Snow">雪天</option><option value="Windy">大风</option>
                                             </select>
                                         </div>
                                         <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">场地</label>
-                                            <select className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" value={editingMatch.details?.pitch} onChange={e => setEditingMatch({...editingMatch, details: {...editingMatch.details!, pitch: e.target.value}})}>
+                                            <select 
+                                                className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" 
+                                                value={editingMatch.details?.pitch || '天然草'} 
+                                                onChange={e => {
+                                                    const current = ensureDetails(editingMatch);
+                                                    setEditingMatch({...current, details: {...current.details!, pitch: e.target.value}});
+                                                }}
+                                            >
                                                 <option value="Natural Grass">天然草</option><option value="Artificial Turf">人造草</option><option value="Indoor">室内场</option>
                                             </select>
                                         </div>
@@ -494,7 +520,9 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                                         <p className="text-[8px] md:text-[10px] text-gray-400 font-black uppercase">{event.type === 'Goal' ? '进球' : event.type === 'Assist' ? '助攻' : event.type === 'YellowCard' ? '黄牌' : '事件'}</p>
                                                     </div>
                                                 </div>
-                                                <button onClick={() => removeEvent(event.id)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4"/></button>
+                                                <button onClick={() => removeEvent(event.id)} className="p-2 text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all">
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
@@ -504,20 +532,46 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                     )}
 
                     {activeTab === 'report' && (
-                        <div className="animate-in fade-in duration-300 space-y-4 md:space-y-6">
+                        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
                             <div className="space-y-3 md:space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h4 className="font-bold text-sm md:text-base text-gray-800 flex items-center"><PenTool className="w-4 h-4 mr-2 text-bvb-yellow" /> 教练赛后复盘</h4>
                                     <button onClick={() => handleGenerateStrategy(editingMatch)} className="text-[10px] md:text-xs bg-white border border-gray-300 px-2 md:px-3 py-1 md:py-1.5 rounded-lg font-bold flex items-center hover:bg-yellow-50 transition-colors"><Bot className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1 md:mr-1.5 text-bvb-yellow" /> AI 建议</button>
                                 </div>
-                                <textarea className="w-full h-48 md:h-64 p-3 md:p-5 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" placeholder="详细记录本场表现及个人球员点评..." value={editingMatch.details?.summary} onChange={e => setEditingMatch({...editingMatch, details: {...editingMatch.details!, summary: e.target.value}})} />
+                                <textarea 
+                                    key={`summary-${editingMatch.id}`}
+                                    className="w-full h-48 md:h-64 p-3 md:p-5 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" 
+                                    placeholder="详细记录本场表现及个人球员点评..." 
+                                    value={editingMatch.details?.summary || ''} 
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setEditingMatch(prev => {
+                                            if (!prev) return prev;
+                                            return {
+                                                ...prev,
+                                                details: {
+                                                    ...(prev.details || {}),
+                                                    summary: val
+                                                }
+                                            };
+                                        });
+                                    }} 
+                                />
                             </div>
                         </div>
                     )}
                 </div>
                 
                 <div className="bg-gray-50 p-3 md:p-4 border-t flex justify-end shrink-0 hidden md:flex">
-                    <button onClick={() => setEditingMatch(null)} className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm">
+                    <button 
+                        onClick={() => {
+                            if (editingMatch) {
+                                onUpdateMatch(editingMatch);
+                            }
+                            setEditingMatch(null);
+                        }} 
+                        className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm"
+                    >
                         确认并退出
                     </button>
                 </div>
@@ -540,3 +594,60 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
 };
 
 export default MatchPlanner;
+
+interface MatchCardProps {
+    match: Match;
+    teams: Team[];
+    onDeleteMatch: (id: string) => void;
+    startEditing: (match: Match) => void;
+    handleGenerateStrategy: (match: Match) => void;
+}
+
+const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, startEditing, handleGenerateStrategy }) => {
+    const team = teams.find(t => t.id === match.teamId);
+    
+    const getLocationLabel = (loc: string) => loc === 'Home' ? '主场' : '客场';
+    const getFullAddress = (m: Match) => {
+        if (m.location === 'Home') return '俱乐部主球场';
+        const parts = [m.province, m.city, m.district].filter(Boolean);
+        return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
+    };
+
+    return (
+        <div className={`bg-white rounded-xl shadow-sm border-l-4 p-3 md:p-5 transition-all hover:shadow-md relative group ${match.status === 'Completed' ? (
+            match.result && match.result.split('-')[0] > match.result.split('-')[1] ? 'border-green-500' : 
+            match.result && match.result.split('-')[0] < match.result.split('-')[1] ? 'border-red-500' : 'border-yellow-500'
+        ) : 'border-gray-300'}`}>
+            <div className="absolute top-2.5 md:top-3 right-2.5 md:right-3 flex gap-1.5 md:gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
+                <button onClick={(e) => { e.stopPropagation(); startEditing(match); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded">
+                    {match.status === 'Completed' ? <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />}
+                </button>
+            </div>
+            <div className="flex justify-between items-center mb-1.5 md:mb-2">
+                <span className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 flex items-center tracking-widest"><Calendar className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> {match.date} • {match.time}</span>
+                <div className="flex items-center gap-1.5 md:gap-2 pr-10 md:pr-0">
+                    <span className="text-[8px] md:text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 rounded border border-gray-200">{team?.level}</span>
+                    <span className={`px-1.5 py-0.5 text-[8px] md:text-[10px] font-black rounded uppercase tracking-tighter ${match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-200 text-gray-600'}`}>{getLocationLabel(match.location)}</span>
+                </div>
+            </div>
+            <div className="flex justify-between items-end">
+                <div>
+                    {match.title && <h4 className="text-[8px] md:text-[10px] font-bold text-gray-400 mb-0.5 uppercase truncate max-w-[150px] md:max-w-none">{match.title}</h4>}
+                    <h3 className="text-base md:text-xl font-black text-gray-900 flex items-center">VS {match.opponent}</h3>
+                    <div className="text-[10px] md:text-xs text-gray-500 mt-1 md:mt-1.5 flex items-center font-bold">
+                         <MapPin className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 text-gray-400" /> {getFullAddress(match)}
+                    </div>
+                </div>
+                {match.status === 'Completed' ? (
+                    <div className="text-xl md:text-3xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">{match.result || '-:-'}</div>
+                ) : (
+                    <div className="flex flex-col items-end gap-1.5 md:gap-2">
+                         <button onClick={() => startEditing(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-3 py-1 md:py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all">录入赛果 <PenTool className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1 md:ml-1.5" /></button>
+                         <button onClick={() => handleGenerateStrategy(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-black text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-gray-800 transition-all"><Bot className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> 助手</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};

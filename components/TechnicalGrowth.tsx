@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Player, Team, TechTestDefinition, User } from '../types';
-import { Activity, History, Plus, Target, CheckCircle, BarChart3, Medal, ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Save, Trash2, Download, Loader2, X, Search, Trophy, Star, FileDown, Settings, Gauge, ArrowRight, FileSpreadsheet, Upload, Clock } from 'lucide-react';
+import { Activity, History, Plus, Target, CheckCircle, BarChart3, Medal, ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Save, Trash2, Download, Loader2, X, Search, Trophy, Star, FileDown, Settings, Gauge, ArrowRight, FileSpreadsheet, Upload, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { exportToPDF } from '../services/pdfService';
 
 interface TechnicalGrowthProps {
@@ -36,7 +36,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
     const [activeTab, setActiveTab] = useState<'juggling' | 'home' | 'tests'>('juggling');
     const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
-        if (isCoach && managedTeams.length > 0) return managedTeams[0].id;
+        if (isDirector) return 'all';
+        if (managedTeams.length > 0) return managedTeams[0].id;
         return 'all';
     });
 
@@ -55,6 +56,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
     const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
     const [viewingJugglingPlayerId, setViewingJugglingPlayerId] = useState<string | null>(null);
+    const [showTestHistoryPlayerId, setShowTestHistoryPlayerId] = useState<string | null>(null);
 
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [newTestDef, setNewTestDef] = useState({ name: '', unit: '', description: '' });
@@ -120,7 +122,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             const count = counts.length;
 
             return { ...p, stats: { max: currentPeriodMax, lifetimeMax, avg, count } };
-        }).filter(p => p.stats.lifetimeMax > 0).sort((a, b) => b.stats.lifetimeMax - a.stats.lifetimeMax);
+        }).sort((a, b) => b.stats.lifetimeMax - a.stats.lifetimeMax);
     }, [displayPlayers, statPeriod, viewYear, viewMonth]);
 
     const handleBatchHomeCheckin = () => {
@@ -205,16 +207,12 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     };
 
     const handleExportTechPDF = async () => {
-        setIsExportingTech(true);
         const testName = techTests?.find(t => t.id === selectedTestId)?.name || '技术测评';
         try {
             await exportToPDF('tech-test-report-pdf', `${testName}_测评报告_${testEntryDate}`);
         } catch (error) {
-            // Comment: Cast error to any for safe logging in console.error
             console.error(error as any);
             alert('导出失败');
-        } finally {
-            setIsExportingTech(false);
         }
     };
 
@@ -243,7 +241,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             setTestScores({});
             alert('成绩保存成功！');
         } catch (error) {
-            // Comment: Cast error to any for safe debugging logging
             console.error(error as any);
             alert('保存失败');
         } finally {
@@ -260,7 +257,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             description: newTestDef.description
         };
         if (onUpdateTechTests) {
-            onUpdateTechTests([...techTests, newDef]);
+            onUpdateTechTests([...(techTests || []), newDef]);
         }
         setNewTestDef({ name: '', unit: '', description: '' });
     };
@@ -292,7 +289,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                         onChange={e => setSelectedTeamId(e.target.value)}
                         className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-white outline-none focus:ring-2 focus:ring-bvb-yellow flex-1 md:flex-none"
                     >
-                        {isDirector && <option value="all">所有梯队</option>}
+                        {(isDirector || isCoach) && <option value="all">{isDirector ? "所有梯队" : "全部梯队"}</option>}
                         {managedTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                 </div>
@@ -525,6 +522,67 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
             )}
 
             {/* Modals */}
+            {showTestHistoryPlayerId && (() => {
+                const player = players.find(p => p.id === showTestHistoryPlayerId);
+                const test = techTests.find(t => t.id === selectedTestId);
+                if (!player || !test) return null;
+                const history = [...(player.testResults || [])]
+                    .filter(r => r.testId === selectedTestId)
+                    .sort((a, b) => b.date.localeCompare(a.date));
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                        <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                            <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <img src={player.image} className="w-10 h-10 rounded-full object-cover border-2 border-bvb-yellow shadow-sm" />
+                                    <div>
+                                        <h3 className="font-bold text-lg">{player.name} - {test.name}</h3>
+                                        <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Technical Test History</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setShowTestHistoryPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto max-h-[50vh] space-y-2 custom-scrollbar">
+                                {history.length > 0 ? history.map(item => (
+                                    <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group hover:border-bvb-yellow/30 transition-all shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center font-black text-bvb-black border border-gray-100">
+                                                {item.value}<span className="text-[8px] ml-0.5">{test.unit}</span>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-0.5">测试日期</p>
+                                                <p className="font-bold text-gray-700 text-sm font-mono">{item.date}</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                if (confirm('确定要删除这条测试记录吗？')) {
+                                                    onUpdatePlayer({
+                                                        ...player,
+                                                        testResults: (player.testResults || []).filter(r => r.id !== item.id)
+                                                    });
+                                                }
+                                            }}
+                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                )) : (
+                                    <div className="py-20 text-center flex flex-col items-center gap-4 opacity-20">
+                                        <Target className="w-12 h-12" />
+                                        <p className="text-xs font-black uppercase tracking-widest">No history for this test</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="bg-gray-50 p-4 border-t flex justify-end">
+                                <button onClick={() => setShowTestHistoryPlayerId(null)} className="px-8 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 transition-colors shadow-lg uppercase italic text-xs tracking-widest">Close History</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
             {detailPlayerId && (() => {
                 const player = players.find(p => p.id === detailPlayerId);
                 if (!player) return null;
@@ -559,8 +617,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             onClick={() => {
                                                 if (confirm('确定要删除这条打卡记录吗？')) {
                                                     onUpdatePlayer({
-                                                        ...p,
-                                                        homeTrainingLogs: (p.homeTrainingLogs || []).filter(l => l.id !== log.id)
+                                                        ...player,
+                                                        homeTrainingLogs: (player.homeTrainingLogs || []).filter(l => l.id !== log.id)
                                                     });
                                                 }
                                             }}
@@ -626,8 +684,8 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                             onClick={() => {
                                                 if (confirm('确定要永久删除这条颠球记录吗？')) {
                                                     onUpdatePlayer({
-                                                        ...p,
-                                                        jugglingHistory: (p.jugglingHistory || []).filter(h => h.id !== item.id)
+                                                        ...player,
+                                                        jugglingHistory: (player.jugglingHistory || []).filter(h => h.id !== item.id)
                                                     });
                                                 }
                                             }}

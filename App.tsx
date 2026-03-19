@@ -161,7 +161,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -201,7 +201,7 @@ function App() {
   const handleAddPlayerReview = (playerId: string, review: PlayerReview) => setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, reviews: [...(p.reviews || []), review] } : p));
   const handleAddMatch = (match: Match) => setMatches(prev => [...prev, match]);
   const handleDeleteMatch = (matchId: string) => setMatches(prev => prev.filter(m => m.id !== matchId));
-  const handleUpdateMatch = (updatedMatch: Match) => setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
+  const handleUpdateMatch = React.useCallback((updatedMatch: Match) => setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m)), []);
   const handleAddUser = (user: User) => setUsers(prev => [...prev, user]);
   const handleUpdateUser = (updatedUser: User) => setUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
   const handleDeleteUser = (userId: string) => setUsers(prev => prev.filter(u => u.id !== userId));
