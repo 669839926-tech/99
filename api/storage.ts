@@ -11,7 +11,7 @@ export default async function handler(request, response) {
       try {
         const data = await fs.readFile(DB_PATH, 'utf-8');
         return response.status(200).json(JSON.parse(data));
-      } catch {
+      } catch (_error) {
         // If file doesn't exist, return null or empty object
         console.log('No local database found, returning null');
         return response.status(200).json(null);

@@ -420,6 +420,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('overview');
+    const [detailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -504,7 +505,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
          onDeleteRecharge(player.id, rechargeId);
          setEditedPlayer(prev => ({ ...prev, rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || [] }));
     };
-    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
+    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch (error) { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
     const handleStatChange = (category: keyof PlayerStats, key: string, value: number) => {
       setEditedPlayer(prev => ({ ...prev, stats: { ...prev.stats, [category]: { ...prev.stats[category], [key]: value } }, }));
     };
@@ -527,7 +528,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         try {
             const draft = await generatePlayerReview(player, newReview.quarter || 'Q1', newReview.year || new Date().getFullYear());
             setNewReview(prev => ({ ...prev, technicalTacticalImprovement: draft.tech, mentalDevelopment: draft.mental, summary: draft.summary }));
-        } catch { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
+        } catch (e) { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
     };
 
     const handleEditReview = (review: PlayerReview) => {
@@ -1271,7 +1272,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     try { 
         const exportTitle = selectedTeam ? `${selectedTeam.name}_球员档案登记表` : '全俱乐部球员档案库'; 
         await exportToPDF('player-list-export', exportTitle); 
-    } catch { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
+    } catch (e) { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
   };
 
   const handleExportPlayerExcel = () => {
@@ -1290,7 +1291,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         link.href = URL.createObjectURL(blob);
         link.download = `${selectedTeam?.name || '全部球员'}_完整档案明细_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
-    } catch {
+    } catch (e) {
         alert('Excel 导出失败');
     } finally {
         setIsExportingExcel(false);

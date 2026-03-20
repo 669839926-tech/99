@@ -10,7 +10,6 @@ interface TrainingPlannerProps {
   trainings: TrainingSession[];
   teams: Team[];
   players: Player[];
-  drillLibrary?: string[];
   trainingFoci?: string[];
   focusSubjects?: Record<string, string[]>;
   designs?: DrillDesign[];
@@ -20,8 +19,6 @@ interface TrainingPlannerProps {
   onDeleteTraining: (id: string) => void;
   periodizationPlans?: PeriodizationPlan[];
   onUpdatePeriodization?: (plan: PeriodizationPlan) => void;
-  initialFilter?: string;
-  appLogo?: string;
 }
 
 type TimeScope = 'month' | 'quarter' | 'year';
@@ -163,7 +160,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary = [], trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -448,16 +445,12 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                     {canEdit && (
                                         <div className="flex gap-2">
                                             <input 
-                                                list="drill-suggestions"
                                                 className="flex-1 p-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
                                                 placeholder="输入新的训练科目..." 
                                                 value={drillInput} 
                                                 onChange={e => setDrillInput(e.target.value)}
                                                 onKeyDown={e => e.key === 'Enter' && addDrill()}
                                             />
-                                            <datalist id="drill-suggestions">
-                                                {drillLibrary.map((d: string) => <option key={d} value={d} />)}
-                                            </datalist>
                                             <button onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110">
                                                 <Plus className="w-5 h-5"/>
                                             </button>
@@ -830,7 +823,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary = [], trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, initialFilter 
+    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -896,12 +889,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
       }
   }, [availableTeams, formData.teamId]);
-
-  useEffect(() => {
-      if (initialFilter === 'pending_logs') {
-          setViewType('focus');
-      }
-  }, [initialFilter]);
 
   const [drillInput, setDrillInput] = useState('');
 
@@ -1135,7 +1122,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             onClick={async () => {
                                                 setIsExporting(true);
                                                 try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch { alert('导出失败'); } finally { setIsExporting(false); }
+                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
                                             }}
                                             className="hidden md:flex items-center gap-2 px-4 py-2 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-[10px] italic uppercase tracking-widest"
                                         >
@@ -1455,7 +1442,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             } else {
                 await exportToPDF('training-plan-list-pdf', `训练计划明细报表_${dateLabel}`); 
             }
-        } catch { 
+        } catch (e) { 
             alert('导出失败'); 
         } finally { 
             setIsExporting(false); 
@@ -1729,16 +1716,12 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                           </div>
                           <div className="flex gap-2">
                             <input 
-                              list="drill-suggestions-create"
                               className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
                               placeholder="添加项目..." 
                               value={drillInput} 
                               onChange={e => setDrillInput(e.target.value)} 
                               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} 
                             />
-                            <datalist id="drill-suggestions-create">
-                                {drillLibrary.map((d: string) => <option key={d} value={d} />)}
-                            </datalist>
                             <button type="button" onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110 transition-all">
                               <Plus className="w-4 h-4"/>
                             </button>
