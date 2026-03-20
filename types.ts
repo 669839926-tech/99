@@ -219,10 +219,7 @@ export interface TrainingSession {
     technical: string; 
     mental: string;
     status?: 'Resolved' | 'Unresolved';
-    performanceRating?: number;
-    assistantReview?: string;
-    assistantReviewStatus?: 'Pending' | 'Approved' | 'Rejected';
-  }>;
+  }>; // 重点关注笔记
   // --- Structured Log Fields ---
   performanceRatings?: {
     technical: number;
@@ -231,7 +228,7 @@ export interface TrainingSession {
     discipline: number;
   };
   planReflection?: string;
-  requireAssistantReview?: boolean;
+  assistantCoachFeedback?: string;
 }
 
 // --- Periodization Plan Types ---

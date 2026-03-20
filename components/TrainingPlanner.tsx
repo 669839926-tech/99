@@ -1,15 +1,16 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Users, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, AlignLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search, AlignLeft } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
 interface TrainingPlannerProps {
   trainings: TrainingSession[];
   teams: Team[];
   players: Player[];
+  drillLibrary: string[];
   trainingFoci?: string[];
   focusSubjects?: Record<string, string[]>;
   designs?: DrillDesign[];
@@ -17,6 +18,8 @@ interface TrainingPlannerProps {
   onAddTraining: (session: TrainingSession) => void;
   onUpdateTraining: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
   onDeleteTraining: (id: string) => void;
+  initialFilter?: string;
+  appLogo?: string;
   periodizationPlans?: PeriodizationPlan[];
   onUpdatePeriodization?: (plan: PeriodizationPlan) => void;
 }
@@ -160,7 +163,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -194,38 +197,8 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
 
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
-    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector;
-
-    const unresolvedPreviousFocus = useMemo(() => {
-        if (!allSessions || !localSession.date) return [];
-        
-        const currentDate = new Date(localSession.date);
-        const lastWeekDate = new Date(currentDate);
-        lastWeekDate.setDate(lastWeekDate.getDate() - 7);
-
-        const previousSessions = allSessions.filter(s => {
-            const sDate = new Date(s.date);
-            return sDate < currentDate && sDate >= lastWeekDate && s.id !== localSession.id;
-        });
-
-        const unresolvedMap: Record<string, { playerId: string; lastNote: any; sessionDate: string }> = {};
-        const seenPlayers = new Set<string>();
-
-        previousSessions.sort((a, b) => b.date.localeCompare(a.date)).forEach(s => {
-            if (s.focusedPlayerNotes) {
-                Object.entries(s.focusedPlayerNotes).forEach(([pid, note]) => {
-                    if (!seenPlayers.has(pid)) {
-                        seenPlayers.add(pid);
-                        if (note.status === 'Unresolved') {
-                            unresolvedMap[pid] = { playerId: pid, lastNote: note, sessionDate: s.date };
-                        }
-                    }
-                });
-            }
-        });
-
-        return Object.values(unresolvedMap).filter(item => !localSession.focusedPlayerIds?.includes(item.playerId));
-    }, [allSessions, localSession.date, localSession.focusedPlayerIds, localSession.id]);
+    const isAssistantCoach = currentUser?.role === 'assistant_coach';
+    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector || (isAssistantCoach && currentUser?.teamIds?.includes(session.teamId));
     
     const getStatus = (playerId: string): AttendanceStatus => {
         const record = localSession.attendance?.find(r => r.playerId === playerId);
@@ -267,10 +240,10 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
         }
     };
 
-    const updateFocusNote = (playerId: string, field: string, value: string) => {
+    const updateFocusNote = (playerId: string, field: 'technical' | 'mental' | 'status', value: string) => {
         setLocalSession(prev => {
             const notes = { ...(prev.focusedPlayerNotes || {}) };
-            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '', status: 'Unresolved', assistantReviewStatus: 'Pending' };
+            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '', status: 'Unresolved' };
             (notes[playerId] as any)[field] = value;
             return { ...prev, focusedPlayerNotes: notes };
         });
@@ -388,20 +361,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                    <div className="flex items-center gap-2">
-                                        <ShieldCheck className="w-4 h-4 text-indigo-500" />
-                                        <span className="text-xs font-black text-gray-700 uppercase italic tracking-tighter">需要助教审核球员关注内容</span>
-                                    </div>
-                                    <button 
-                                        disabled={!canEdit}
-                                        onClick={() => setLocalSession({...localSession, requireAssistantReview: !localSession.requireAssistantReview})}
-                                        className={`w-10 h-5 rounded-full transition-all relative ${localSession.requireAssistantReview ? 'bg-indigo-600' : 'bg-gray-300'}`}
-                                    >
-                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${localSession.requireAssistantReview ? 'left-6' : 'left-1'}`} />
-                                    </button>
-                                </div>
-
                                 {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) && (
                                     <div className="bg-yellow-50/50 border border-yellow-100 p-4 rounded-xl">
                                         <label className="block text-[10px] font-black text-yellow-600 uppercase tracking-widest mb-2 flex items-center gap-1">
@@ -477,30 +436,30 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                                       const status = getStatus(player.id);
                                       const isFocused = localSession.focusedPlayerIds?.includes(player.id);
                                       return (
-                                          <div key={player.id} className={`flex items-center justify-between p-2 border rounded-xl shadow-sm transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-1 ring-yellow-100' : 'bg-white border-gray-100'}`}>
-                                              <div className="flex items-center gap-2">
-                                                  <div className="relative">
-                                                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border-2 ${status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' : status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                                                          {player.name.charAt(0)}
+                                          <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-sm transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-white border-gray-100'}`}>
+                                              <div className="flex items-center justify-between mb-3">
+                                                  <div className="flex items-center">
+                                                      <div className="relative">
+                                                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold mr-3 border-2 ${status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' : status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                                                              {player.name.charAt(0)}
+                                                          </div>
+                                                          {isFocused && <div className="absolute -top-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white shadow-sm"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>}
                                                       </div>
-                                                      {isFocused && <div className="absolute -top-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white shadow-sm"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>}
-                                                  </div>
-                                                  <div>
-                                                      <div className="flex items-center gap-1">
-                                                          <div className="font-black text-gray-800 text-xs">{player.name}</div>
-                                                          {isFocused && <span className="text-[7px] font-black uppercase text-bvb-black bg-bvb-yellow px-1 rounded-sm">F</span>}
+                                                      <div>
+                                                          <div className="flex items-center gap-1.5">
+                                                              <div className="font-black text-gray-800 text-sm">{player.name}</div>
+                                                              {isFocused && <span className="text-[8px] font-black uppercase text-bvb-black bg-bvb-yellow px-1.5 rounded-sm">Focused</span>}
+                                                          </div>
+                                                          <div className="text-[10px] text-gray-400 font-mono">#{player.number} • {player.position}</div>
                                                       </div>
-                                                      <div className="text-[9px] text-gray-400 font-mono">#{player.number} • {player.position}</div>
                                                   </div>
+                                                  <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
                                               </div>
-                                              
-                                              <div className="flex items-center gap-1">
-                                                  <div className="flex bg-gray-50 p-0.5 rounded-lg gap-0.5">
-                                                      <button onClick={() => setPlayerStatus(player.id, 'Present')} className={`p-1.5 rounded transition-all ${status === 'Present' ? 'bg-white shadow-sm text-green-600' : 'text-gray-300 hover:text-green-600'}`}><CheckCircle className="w-4 h-4" /></button>
-                                                      <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`p-1.5 rounded transition-all ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600' : 'text-gray-300 hover:text-yellow-600'}`}><Clock className="w-4 h-4" /></button>
-                                                      <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`p-1.5 rounded transition-all ${status === 'Injury' ? 'bg-white shadow-sm text-red-600' : 'text-gray-300 hover:text-red-600'}`}><AlertCircle className="w-4 h-4" /></button>
-                                                      <button onClick={() => setPlayerStatus(player.id, 'Absent')} className={`p-1.5 rounded transition-all ${status === 'Absent' ? 'bg-white shadow-sm text-gray-600' : 'text-gray-200 hover:text-gray-500'}`}><Ban className="w-4 h-4" /></button>
-                                                  </div>
+                                              <div className="flex bg-gray-50/50 p-1 rounded-lg gap-1">
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Present')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}><CheckCircle className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}><Clock className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-sm text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}><AlertCircle className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Absent')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-sm text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-200'}`}><Ban className="w-5 h-5" /></button>
                                               </div>
                                           </div>
                                       );
@@ -574,174 +533,77 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                                 </div>
                                 <textarea 
                                     disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
-                                    className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-indigo-400 outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner placeholder:text-gray-300"
-                                    placeholder="对教案执行过程中的优缺点进行反思..."
+                                    className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner placeholder:text-gray-300"
+                                    placeholder="反思教案难度是否合理、器械布置、组织流畅度及需要改进的细节..."
                                     value={localSession.planReflection || ''}
                                     onChange={e => setLocalSession({...localSession, planReflection: e.target.value})}
                                 />
                             </section>
 
-                            {/* 待续跟踪球员 (NEW) */}
-                            {unresolvedPreviousFocus.length > 0 && (
-                                <section className="space-y-4">
-                                    <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
-                                        <History className="w-5 h-5 text-indigo-400" />
-                                        <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">待续跟踪球员 (上周未解决)</h4>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {unresolvedPreviousFocus.map(item => {
-                                            const p = players.find(p => p.id === item.playerId);
-                                            if (!p) return null;
-                                            return (
-                                                <div key={item.playerId} className="flex items-center justify-between bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                        <div>
-                                                            <div className="font-black text-gray-800 text-sm">{p.name}</div>
-                                                            <div className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">上次关注: {item.sessionDate}</div>
-                                                        </div>
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => {
-                                                            const nextIds = [...(localSession.focusedPlayerIds || []), item.playerId];
-                                                            const nextNotes = { ...(localSession.focusedPlayerNotes || {}) };
-                                                            nextNotes[item.playerId] = { technical: '', mental: '', status: 'Unresolved', assistantReviewStatus: 'Pending' };
-                                                            setLocalSession({ ...localSession, focusedPlayerIds: nextIds, focusedPlayerNotes: nextNotes });
-                                                        }}
-                                                        className="bg-indigo-600 text-white text-[10px] font-black px-4 py-2 rounded-xl hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm uppercase italic"
-                                                    >
-                                                        <Plus className="w-3.5 h-3.5" /> 继续跟踪本周表现
-                                                    </button>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </section>
-                            )}
+                            {/* 助教反馈 (NEW) */}
+                            <section className="space-y-4">
+                                <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                                    <MessageSquare className="w-5 h-5 text-emerald-400" />
+                                    <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">助教反馈</h4>
+                                </div>
+                                <textarea 
+                                    disabled={!isAssistantCoach || localSession.submissionStatus === 'Reviewed'}
+                                    className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner placeholder:text-gray-300"
+                                    placeholder={isAssistantCoach ? "助教对本次训练及球员表现的反馈意见..." : "暂无助教反馈"}
+                                    value={localSession.assistantCoachFeedback || ''}
+                                    onChange={e => setLocalSession({...localSession, assistantCoachFeedback: e.target.value})}
+                                />
+                            </section>
 
-                            {/* 三、重点关注球员内容 */}
+                            {/* 三、重点关注球员内容 (保持现状) */}
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
                                     <Star className="w-5 h-5 text-bvb-yellow fill-current" />
                                     <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">三、重点球员成长反馈</h4>
                                 </div>
                                 {(localSession.focusedPlayerIds && localSession.focusedPlayerIds.length > 0) ? (
-                                    <div className="grid grid-cols-1 gap-4">
+                                    <div className="grid grid-cols-1 gap-6">
                                         {localSession.focusedPlayerIds.map(pid => {
                                             const p = players.find(p => p.id === pid);
                                             if (!p) return null;
-                                            const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '', status: 'Unresolved', assistantReviewStatus: 'Pending' };
-                                            
-                                            // 助教审核权限判断
-                                            const isAssistant = currentUser?.role === 'assistant_coach';
-                                            const isAssignedToTeam = currentUser?.teamIds?.includes(session.teamId);
-                                            const canAssistantReview = isAssistant && isAssignedToTeam && localSession.requireAssistantReview;
-
+                                            const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '' };
                                             return (
-                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-2xl p-3 shadow-sm space-y-2">
-                                                    <div className="flex items-center justify-between border-b border-yellow-100 pb-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <img src={p.image} className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                            <div>
-                                                                <div className="font-black text-gray-800 text-xs">{p.name}</div>
-                                                                <div className="text-[8px] text-gray-400 font-bold uppercase tracking-widest">Focused Tracking</div>
-                                                            </div>
-                                                        </div>
+                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-3xl p-6 shadow-sm space-y-4">
+                                                    <div className="flex items-center justify-between border-b border-yellow-100 pb-4">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <label className="text-[8px] font-black text-gray-400 uppercase">评分:</label>
-                                                                <div className="flex gap-0.5">
-                                                                    {[1, 2, 3, 4, 5].map(r => (
-                                                                        <button 
-                                                                            key={r}
-                                                                            disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
-                                                                            onClick={() => updateFocusNote(pid, 'performanceRating', r as any)}
-                                                                            className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black transition-all ${note.performanceRating === r ? 'bg-bvb-black text-bvb-yellow shadow-sm' : 'bg-white text-gray-300 border border-gray-100 hover:border-bvb-yellow/50'}`}
-                                                                        >
-                                                                            {r}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <label className="text-[8px] font-black text-gray-400 uppercase">状态:</label>
-                                                                <select 
-                                                                    disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
-                                                                    value={note.status || 'Unresolved'}
-                                                                    onChange={e => updateFocusNote(pid, 'status', e.target.value)}
-                                                                    className="text-[9px] font-bold bg-white border border-yellow-200 rounded-lg px-1.5 py-0.5 outline-none focus:ring-2 focus:ring-bvb-yellow"
-                                                                >
-                                                                    <option value="Unresolved">未解决 (持续跟踪)</option>
-                                                                    <option value="Resolved">已解决 (结束关注)</option>
-                                                                </select>
+                                                            <img src={p.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                            <div>
+                                                                <div className="font-black text-gray-800 text-base">{p.name}</div>
+                                                                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Focused Player Stats Tracking</div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                                <Target className="w-3 h-3 text-bvb-yellow" /> 技术表现反馈
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                                <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现反馈
                                                             </label>
                                                             <textarea 
                                                                 disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
-                                                                className="w-full h-16 p-2 bg-white border border-yellow-100 rounded-xl text-[10px] font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
+                                                                className="w-full h-28 p-4 bg-white border border-yellow-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
                                                                 placeholder="点评该球员的技术执行..."
                                                                 value={note.technical}
                                                                 onChange={e => updateFocusNote(pid, 'technical', e.target.value)}
                                                             />
                                                         </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                                <Brain className="w-3 h-3 text-indigo-400" /> 心理/态度反馈
+                                                        <div className="space-y-1.5">
+                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                                <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度反馈
                                                             </label>
                                                             <textarea 
                                                                 disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
-                                                                className="w-full h-16 p-2 bg-white border border-yellow-100 rounded-xl text-[10px] font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
-                                                                placeholder="评价球员的心理状态..."
+                                                                className="w-full h-28 p-4 bg-white border border-yellow-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
+                                                                placeholder="评价球员的心理状态、抗压能力和团队融入..."
                                                                 value={note.mental}
                                                                 onChange={e => updateFocusNote(pid, 'mental', e.target.value)}
                                                             />
                                                         </div>
                                                     </div>
-
-                                                    {/* 助教审核板块 */}
-                                                    {(canAssistantReview || note.assistantReview) && (
-                                                        <div className="mt-2 pt-2 border-t border-yellow-100 space-y-2">
-                                                            <div className="flex items-center justify-between">
-                                                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <ShieldCheck className="w-3 h-3 text-green-500" /> 助教审核意见
-                                                                </label>
-                                                                {canAssistantReview && (
-                                                                    <div className="flex gap-1">
-                                                                        {(['Pending', 'Approved', 'Rejected'] as const).map(s => (
-                                                                            <button
-                                                                                key={s}
-                                                                                onClick={() => updateFocusNote(pid, 'assistantReviewStatus', s)}
-                                                                                className={`text-[7px] px-1.5 py-0.5 rounded font-black uppercase tracking-tighter transition-all ${note.assistantReviewStatus === s ? 'bg-bvb-black text-white' : 'bg-white text-gray-400 border border-gray-100 hover:bg-gray-50'}`}
-                                                                            >
-                                                                                {s}
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {canAssistantReview ? (
-                                                                <textarea 
-                                                                    className="w-full h-16 p-2 bg-white border border-yellow-100 rounded-lg text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
-                                                                    placeholder="助教点评..."
-                                                                    value={note.assistantReview || ''}
-                                                                    onChange={e => updateFocusNote(pid, 'assistantReview', e.target.value)}
-                                                                />
-                                                            ) : note.assistantReview && (
-                                                                <div className="p-2 bg-white/50 border border-yellow-100 rounded-lg text-[11px] font-bold italic text-gray-600">
-                                                                    {note.assistantReview}
-                                                                    <div className="mt-1 text-[7px] text-gray-400 uppercase font-black">
-                                                                        Status: {note.assistantReviewStatus}
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -823,7 +685,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, drillLibrary, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -848,6 +710,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
 
   // 球员关注追踪子模块状态
+  const [focusSearchTerm, setFocusSearchTerm] = useState('');
   const [selectedFocusPlayerId, setSelectedFocusPlayerId] = useState<string | null>(null);
 
   const userManagedSessions = useMemo(() => {
@@ -867,7 +730,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setSelectedSession(updated);
         }
     }
-  }, [trainings, selectedSession]); 
+  }, [trainings]); 
 
   const [loading, setLoading] = useState(false);
   const [isAiMode, setIsAiMode] = useState(false);
@@ -888,7 +751,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       if (availableTeams.length > 0 && !availableTeams.find(t => t.id === formData.teamId)) {
           setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
       }
-  }, [availableTeams, formData.teamId]);
+  }, [availableTeams]);
 
   const [drillInput, setDrillInput] = useState('');
 
@@ -969,8 +832,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
     });
 
     return Object.values(focusMap)
+        .filter(entry => entry.player.name.includes(focusSearchTerm))
         .sort((a, b) => b.stats.year - a.stats.year);
-  }, [userManagedSessions, players, statsTeamFilter]);
+  }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
 
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
@@ -1027,73 +891,79 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       }
       const weekDays = isCompact ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
       return (
-          <div className="flex flex-col h-full">
-              <div className="grid grid-cols-7 border-b border-gray-200">
-                  {weekDays.map(d => (
-                      <div key={d} className={`text-center py-1 md:py-2 text-[10px] md:text-xs font-black uppercase tracking-widest text-gray-400 bg-gray-50/50`}>{d}</div>
-                  ))}
-              </div>
-              <div className="flex-1 grid grid-cols-7">
-                  {days}
-              </div>
-          </div>
+          <div className={`flex flex-col border-gray-200 overflow-hidden ${isCompact ? 'border rounded-lg' : 'border rounded-lg'}`}>{isCompact && <div className="text-center text-xs font-bold bg-gray-100 py-1 text-gray-600 border-b border-gray-200">{month + 1}月</div>}<div className="grid grid-cols-7 gap-px bg-gray-200">{weekDays.map((day, i) => (<div key={i} className={`bg-gray-100 text-center font-bold text-gray-500 uppercase ${isCompact ? 'text-[8px] py-0.5' : 'text-[10px] md:text-xs p-1 md:p-2'}`}>{day}</div>))}{days}</div></div>
       );
   };
 
-  const renderFocusView = (isCompact: boolean = false) => {
-      return (
-          <div className="flex gap-4 h-full">
-              <div className={`w-64 flex flex-col border-gray-200 overflow-hidden ${isCompact ? 'border rounded-lg' : 'border rounded-lg'}`}>
-                  {isCompact && <div className="text-center text-xs font-bold bg-gray-100 py-1 text-gray-600 border-b border-gray-200">重点关注球员</div>}
-                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 pb-20 md:pb-4">
-                      {focusedPlayersSummary.map(entry => {
-                          const isSelected = selectedFocusPlayerId === entry.player.id;
-                          return (
-                              <div 
-                                  key={entry.player.id} 
-                                  onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                  className={`p-1.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
-                              >
-                                  <div className="flex items-center gap-2">
-                                      <div className="relative">
-                                          <img src={entry.player.image} className="w-7 h-7 rounded-full object-cover border-2 border-white shadow-sm" />
-                                          <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-1.5 h-1.5 text-bvb-black fill-current" /></div>
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                          <h4 className="font-black text-[9px] truncate">{entry.player.name}</h4>
-                                          <p className={`text-[7px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
-                                      </div>
-                                      <ChevronRight className={`w-2.5 h-2.5 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
-                                  </div>
-                                  <div className={`grid grid-cols-3 gap-1 mt-1 pt-1 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
-                                      <div className="text-center">
-                                          <p className="text-[5px] font-black uppercase opacity-60">月</p>
-                                          <p className="text-[9px] font-black tabular-nums">{entry.stats.month}</p>
-                                      </div>
-                                      <div className="text-center border-x border-white/5">
-                                          <p className="text-[5px] font-black uppercase opacity-60">季</p>
-                                          <p className="text-[9px] font-black tabular-nums">{entry.stats.quarter}</p>
-                                      </div>
-                                      <div className="text-center">
-                                          <p className="text-[5px] font-black uppercase opacity-60">年</p>
-                                          <p className={`text-[9px] font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
-                                      </div>
-                                  </div>
-                              </div>
-                          );
-                      })}
-                      {focusedPlayersSummary.length === 0 && (
-                          <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-4">
-                              {/* Comment: Fixed name collision error by changing HistoryIcon to History */}
-                              <History className="w-12 h-12 opacity-10" />
-                              <p className="text-xs font-black uppercase tracking-widest">暂无重点关注球员记录</p>
-                          </div>
-                      )}
-                  </div>
-              </div>
+  const renderFocusView = () => {
+    return (
+        <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500">
+            {/* 球员关注列表 */}
+            <div className="w-full lg:w-72 flex flex-col gap-4 shrink-0">
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input 
+                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none shadow-sm"
+                        placeholder="搜索球员追踪成长..."
+                        value={focusSearchTerm}
+                        onChange={e => setFocusSearchTerm(e.target.value)}
+                    />
+                </div>
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-20 md:pb-4">
+                    {focusedPlayersSummary.map(entry => {
+                        const isSelected = selectedFocusPlayerId === entry.player.id;
+                        const latestHistory = [...entry.history].sort((a,b) => b.date.localeCompare(a.date))[0];
+                        const isResolved = latestHistory?.notes?.status === 'Resolved';
 
-              {/* 球员成长追踪时间轴 */}
-              <div className="flex-1 flex flex-col bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
+                        if (isResolved && !isSelected) return null; // Hide resolved players unless selected
+
+                        return (
+                            <div 
+                                key={entry.player.id} 
+                                onClick={() => setSelectedFocusPlayerId(entry.player.id)}
+                                className={`p-3 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <img src={entry.player.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
+                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                    </div>
+                                    {isResolved && <CheckCircle className="w-4 h-4 text-green-500" />}
+                                    <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
+                                </div>
+                                <div className={`grid grid-cols-3 gap-1 mt-3 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                    <div className="text-center">
+                                        <p className="text-[7px] font-black uppercase opacity-60">本月</p>
+                                        <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
+                                    </div>
+                                    <div className="text-center border-x border-white/5">
+                                        <p className="text-[7px] font-black uppercase opacity-60">本季</p>
+                                        <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[7px] font-black uppercase opacity-60">年度</p>
+                                        <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    {focusedPlayersSummary.length === 0 && (
+                        <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-4">
+                            {/* Comment: Fixed name collision error by changing HistoryIcon to History */}
+                            <History className="w-12 h-12 opacity-10" />
+                            <p className="text-xs font-black uppercase tracking-widest">暂无重点关注球员记录</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 球员成长追踪时间轴 */}
+            <div className="flex-1 flex flex-col bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
                 {selectedFocusPlayerId ? (
                     <React.Fragment>
                         {(() => {
@@ -1102,62 +972,94 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             const history = [...entry.history].sort((a,b) => b.date.localeCompare(a.date));
                             return (
                                 <React.Fragment>
-                                    <div className="p-4 md:p-6 bg-gray-50 border-b flex justify-between items-end shrink-0">
-                                        <div className="flex items-center gap-4">
-                                            <img src={entry.player.image} className="w-16 h-16 rounded-2xl object-cover border-4 border-white shadow-lg rotate-[-2deg]" />
+                                    <div className="p-6 md:p-8 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
+                                        <div className="flex items-center gap-5">
+                                            <img src={entry.player.image} className="w-20 h-20 rounded-3xl object-cover border-4 border-white shadow-xl rotate-[-2deg]" />
                                             <div>
-                                                <div className="flex items-center gap-2 mb-0.5">
-                                                    <h3 className="text-xl font-black text-gray-800">{entry.player.name}</h3>
-                                                    <Star className="w-4 h-4 text-bvb-yellow fill-current" />
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h3 className="text-2xl font-black text-gray-800">{entry.player.name}</h3>
+                                                    <Star className="w-5 h-5 text-bvb-yellow fill-current" />
                                                 </div>
-                                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Growth Tracking Portal</p>
-                                                <div className="flex gap-3 mt-2">
-                                                    <div className="flex flex-col"><span className="text-[7px] font-black text-gray-400 uppercase">年度频次</span><span className="text-sm font-black text-bvb-black">{entry.stats.year} 次</span></div>
-                                                    <div className="w-px h-6 bg-gray-200"></div>
-                                                    <div className="flex flex-col"><span className="text-[7px] font-black text-gray-400 uppercase">最后关注</span><span className="text-sm font-black text-gray-800">{history[0]?.date || '-'}</span></div>
+                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Growth & Psychological Tracking Portal</p>
+                                                <div className="flex gap-4 mt-4">
+                                                    <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">年度关注频次</span><span className="text-lg font-black text-bvb-black">{entry.stats.year} 次</span></div>
+                                                    <div className="w-px h-8 bg-gray-200"></div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-gray-400 uppercase">当前关注状态</span>
+                                                        <select 
+                                                            className={`text-sm font-black border-none bg-transparent outline-none cursor-pointer ${history[0]?.notes?.status === 'Resolved' ? 'text-green-600' : 'text-yellow-600'}`}
+                                                            value={history[0]?.notes?.status || 'Unresolved'}
+                                                            onChange={(e) => {
+                                                                const newStatus = e.target.value as 'Resolved' | 'Unresolved';
+                                                                const latestSession = trainings.find(s => s.id === history[0].id);
+                                                                if (latestSession) {
+                                                                    const updatedNotes = { ...(latestSession.focusedPlayerNotes || {}) };
+                                                                    if (!updatedNotes[entry.player.id]) {
+                                                                        updatedNotes[entry.player.id] = { technical: '', mental: '', status: 'Unresolved' };
+                                                                    }
+                                                                    updatedNotes[entry.player.id] = {
+                                                                        ...updatedNotes[entry.player.id],
+                                                                        status: newStatus
+                                                                    };
+                                                                    onUpdateTraining({
+                                                                        ...latestSession,
+                                                                        focusedPlayerNotes: updatedNotes
+                                                                    }, latestSession.attendance || []);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="Unresolved">未解决持续跟踪</option>
+                                                            <option value="Resolved">已解决</option>
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={async () => {
-                                                setIsExporting(true);
-                                                try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
-                                            }}
-                                            className="hidden md:flex items-center gap-2 px-4 py-2 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-[10px] italic uppercase tracking-widest"
-                                        >
-                                            {isExporting ? <Loader2 className="w-3 h-3 animate-spin"/> : <Download className="w-3 h-3 text-bvb-yellow"/>}
-                                            Export
-                                        </button>
+                                        <div className="flex gap-2 w-full md:w-auto">
+                                            <button 
+                                                onClick={async () => {
+                                                    setIsExporting(true);
+                                                    try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
+                                                    catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
+                                                }}
+                                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
+                                            >
+                                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4 text-bvb-yellow"/>}
+                                                Export Profile
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div id="focus-tracking-export" className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
-                                        <div className="relative space-y-6">
-                                            <div className="absolute left-[19px] top-4 bottom-4 w-1 bg-gray-100 rounded-full"></div>
+                                    <div id="focus-tracking-export" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
+                                        <div className="relative space-y-8">
+                                            <div className="absolute left-[23px] top-4 bottom-4 w-1 bg-gray-100 rounded-full"></div>
                                             {history.map((h, idx) => (
-                                                <div key={h.id} className="relative pl-12 animate-in slide-in-from-left-4" style={{ animationDelay: `${idx * 100}ms` }}>
-                                                    <div className="absolute left-0 top-0 w-10 h-10 bg-white rounded-xl border-4 border-gray-50 shadow-md flex items-center justify-center z-10">
-                                                        <span className="text-[9px] font-black text-gray-400 font-mono leading-none">{h.date.split('-').slice(1).join('/')}</span>
+                                                <div key={h.id} className="relative pl-14 animate-in slide-in-from-left-4" style={{ animationDelay: `${idx * 100}ms` }}>
+                                                    <div className="absolute left-0 top-0 w-12 h-12 bg-white rounded-2xl border-4 border-gray-50 shadow-md flex items-center justify-center z-10">
+                                                        <span className="text-[10px] font-black text-gray-400 font-mono leading-none">{h.date.split('-').slice(1).join('/')}</span>
                                                     </div>
-                                                    <div className="bg-gray-50/50 border border-gray-100 rounded-xl p-4 hover:bg-white hover:shadow-md transition-all group">
+                                                    <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 hover:bg-white hover:shadow-md transition-all group">
                                                         <div className="flex justify-between items-start mb-3">
                                                             <h5 className="font-black text-base text-gray-800 group-hover:text-bvb-black transition-colors">{h.title}</h5>
-                                                            <span className="text-[9px] font-black text-gray-400 uppercase bg-white px-2 py-0.5 rounded border border-gray-100">Record</span>
+                                                            <div className="flex items-center gap-2">
+                                                                {h.notes.status === 'Resolved' && <span className="text-[8px] font-black text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100 uppercase tracking-widest">Resolved</span>}
+                                                                <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
+                                                            </div>
                                                         </div>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                             <div className="space-y-1.5">
                                                                 <label className="text-[9px] font-black text-bvb-black uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <Target className="w-3 h-3 text-bvb-yellow" /> 技术表现
+                                                                    <Target className="w-3 h-3 text-bvb-yellow" /> 技术表现评价
                                                                 </label>
-                                                                <div className="text-xs text-gray-600 leading-relaxed italic bg-white p-2.5 rounded-lg border border-gray-50 min-h-[50px]">
-                                                                    {h.notes.technical || '-- 暂无记录 --'}
+                                                                <div className="text-xs text-gray-600 leading-relaxed italic bg-white p-2.5 rounded-xl border border-gray-50 min-h-[50px]">
+                                                                    {h.notes.technical || '-- 暂无技战术层反馈记录 --'}
                                                                 </div>
                                                             </div>
                                                             <div className="space-y-1.5">
                                                                 <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <Brain className="w-3 h-3 text-indigo-400" /> 心理/态度
+                                                                    <Brain className="w-3 h-3 text-indigo-400" /> 心理/态度评估
                                                                 </label>
-                                                                <div className="text-xs text-gray-600 leading-relaxed italic bg-white p-2.5 rounded-lg border border-gray-50 min-h-[50px]">
-                                                                    {h.notes.mental || '-- 暂无记录 --'}
+                                                                <div className="text-xs text-gray-600 leading-relaxed italic bg-white p-2.5 rounded-xl border border-gray-50 min-h-[50px]">
+                                                                    {h.notes.mental || '-- 暂无心理层面评估记录 --'}
                                                                 </div>
                                                             </div>
                                                         </div>
