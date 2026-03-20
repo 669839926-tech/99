@@ -202,14 +202,10 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    (['technical', 'tactical', 'physical', 'mental'] as const).forEach((category) => {
-        if (attributeConfig[category] && Array.isArray(attributeConfig[category])) {
-            attributeConfig[category].forEach(attr => { 
-                if (attr && attr.key) {
-                    stats[category][attr.key] = 5; 
-                }
-            });
-        }
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -1188,7 +1184,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }, 0);
   }, [selectedTeamId]);
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
-  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: undefined, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
+  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
   const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: 'U17', attribute: '兴趣', description: '' });
   
   const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1334,9 +1330,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || (selectedTeamId !== 'all' ? selectedTeamId : '');
-    
-    if (newPlayer.name && newPlayer.name.trim() && finalTeamId && finalTeamId !== 'all' && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
+    const finalTeamId = newPlayer.teamId || selectedTeamId;
+    if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
         nextYear.setFullYear(nextYear.getFullYear() + 1);
@@ -1380,7 +1375,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         
         onAddPlayer(p); 
         setShowAddModal(false); 
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: undefined, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
     } else {
         alert('请完整填写必填项：姓名、球衣号码及归属梯队。');
     }
@@ -1597,7 +1592,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名 (必填)</label><input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="输入球员姓名" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number === undefined ? '' : newPlayer.number} onChange={e => setNewPlayer({...newPlayer, number: e.target.value === '' ? undefined : parseInt(e.target.value)})}/></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number || ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
