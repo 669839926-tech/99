@@ -202,15 +202,10 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    const categories: (keyof PlayerStats)[] = ['technical', 'tactical', 'physical', 'mental'];
-    
-    categories.forEach((category) => {
-        const definitions = attributeConfig[category];
-        if (definitions && Array.isArray(definitions)) {
-            definitions.forEach(attr => { 
-                stats[category][attr.key] = 5; 
-            });
-        }
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -1335,8 +1330,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || (selectedTeamId !== 'all' ? selectedTeamId : 'unassigned');
-    if (newPlayer.name && newPlayer.name.trim() && finalTeamId && finalTeamId !== 'all' && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
+    const finalTeamId = newPlayer.teamId || selectedTeamId;
+    if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
         nextYear.setFullYear(nextYear.getFullYear() + 1);

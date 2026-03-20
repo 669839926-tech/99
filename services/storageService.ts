@@ -19,14 +19,14 @@ export interface AppData {
     accountingRecords?: any[];
 }
 
-export const loadDataFromCloud = async (): Promise<AppData | null | undefined> => {
+export const loadDataFromCloud = async (): Promise<AppData | null> => {
     try {
         console.log('Fetching data from cloud storage API...');
         const res = await fetch('/api/storage');
         if (!res.ok) {
             const errorText = await res.text();
             console.warn('API route error:', res.status, errorText);
-            return undefined; // Return undefined to indicate error
+            return null;
         }
         const data = await res.json();
         if (data) {
@@ -37,7 +37,7 @@ export const loadDataFromCloud = async (): Promise<AppData | null | undefined> =
         return data;
     } catch (error) {
         console.error('Failed to load data from cloud:', error);
-        return undefined; // Return undefined to indicate error
+        return null;
     }
 };
 
