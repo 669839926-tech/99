@@ -106,7 +106,7 @@ function App() {
             setPlayers(cloudData.players || MOCK_PLAYERS);
             setMatches(cloudData.matches || MOCK_MATCHES);
             setTrainings(cloudData.trainings || MOCK_TRAINING);
-            setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
+            setAttributeConfig({ ...DEFAULT_ATTRIBUTE_CONFIG, ...(cloudData.attributeConfig || {}) });
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
             if (cloudData.users) setUsers(cloudData.users);
