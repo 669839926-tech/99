@@ -13,7 +13,7 @@ import FinanceManager from './components/FinanceManager';
 import TechnicalGrowth from './components/TechnicalGrowth';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord } from './types';
-import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
+import { loadData, saveData } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
 function App() {
@@ -100,7 +100,7 @@ function App() {
   // Load Data on Mount
   useEffect(() => {
     const init = async () => {
-        const cloudData = await loadDataFromCloud();
+        const cloudData = await loadData();
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -135,7 +135,7 @@ function App() {
     const timer = setTimeout(async () => {
         setIsSyncing(true);
         try {
-            await saveDataToCloud({
+            await saveData({
                 players,
                 teams,
                 matches,
@@ -265,7 +265,7 @@ function App() {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
               <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
-              <p className="text-gray-500 font-bold">正在载入云端数据...</p>
+              <p className="text-gray-500 font-bold">正在载入本地数据...</p>
           </div>
       );
   }

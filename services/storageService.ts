@@ -19,9 +19,9 @@ export interface AppData {
     accountingRecords?: any[];
 }
 
-export const loadDataFromCloud = async (): Promise<AppData | null> => {
+export const loadData = async (): Promise<AppData | null> => {
     try {
-        console.log('Fetching data from cloud storage API...');
+        console.log('Fetching data from local storage API...');
         const res = await fetch('/api/storage');
         if (!res.ok) {
             const errorText = await res.text();
@@ -30,20 +30,20 @@ export const loadDataFromCloud = async (): Promise<AppData | null> => {
         }
         const data = await res.json();
         if (data) {
-            console.log('Data successfully loaded from cloud storage.');
+            console.log('Data successfully loaded from local storage.');
         } else {
-            console.log('Cloud storage is empty (new database).');
+            console.log('Local storage is empty (new database).');
         }
         return data;
     } catch (error) {
-        console.error('Failed to load data from cloud:', error);
+        console.error('Failed to load data from local storage:', error);
         return null;
     }
 };
 
-export const saveDataToCloud = async (data: AppData) => {
+export const saveData = async (data: AppData) => {
     try {
-        console.log('Saving data to cloud storage API...');
+        console.log('Saving data to local storage API...');
         const res = await fetch('/api/storage', {
             method: 'POST',
             body: JSON.stringify(data),
@@ -51,14 +51,14 @@ export const saveDataToCloud = async (data: AppData) => {
         });
         if (!res.ok) {
             const errorText = await res.text();
-            console.error('Failed to save data to cloud storage:', res.status, errorText);
+            console.error('Failed to save data to local storage:', res.status, errorText);
             throw new Error(`Save failed: ${res.status} ${errorText}`);
         }
         const result = await res.json();
-        console.log('Data successfully saved to cloud storage:', result.url);
+        console.log('Data successfully saved to local storage.');
         return result;
     } catch (error) {
-        console.error('Failed to save data to cloud:', error);
+        console.error('Failed to save data to local storage:', error);
         throw error;
     }
 };
