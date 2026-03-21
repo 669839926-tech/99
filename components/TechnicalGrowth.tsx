@@ -1,9 +1,8 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Player, Team, TechTestDefinition, User, TechTestResult } from '../types';
-import { Activity, History, Plus, Target, CheckCircle, BarChart3, Medal, ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Save, Trash2, Download, Loader2, X, Search, Trophy, Star, FileDown, Settings, Gauge, ArrowRight, FileSpreadsheet, Upload, Clock, TrendingUp, TrendingDown, LineChart } from 'lucide-react';
+import { Activity, History, Plus, Target, CheckCircle, BarChart3, Medal, ChevronLeft, ChevronRight as ChevronRightIcon, CheckSquare, Save, Trash2, Download, Loader2, X, Search, Trophy, Star, FileDown, Settings, Gauge, ArrowRight, FileSpreadsheet, Upload, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { exportToPDF } from '../services/pdfService';
-import { LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 
 interface TechnicalGrowthProps {
     players: Player[];
@@ -414,18 +413,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             <div className="p-4 md:p-6 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4">
                                 <h3 className="font-black text-gray-800 flex items-center uppercase italic text-sm md:text-lg"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 居家训练排行榜 (按年度频次排序)</h3>
                                 <div className="flex gap-2">
-                                    <button onClick={() => {
-                                        const headers = "排名,姓名,球衣,梯队,本周,本月,年度总计\n";
-                                        const rows = homeTrainingLeaderboard.map((p, idx) => {
-                                            const team = teams.find(t => t.id === p.teamId);
-                                            return `${idx + 1},${p.name},${p.number},${team?.name || ''},${p.stats.weekCount},${p.stats.monthCount},${p.stats.yearCount}`;
-                                        }).join('\n');
-                                        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
-                                        const link = document.createElement('a');
-                                        link.href = URL.createObjectURL(blob);
-                                        link.download = `居家训练排行榜_${viewYear}.csv`;
-                                        link.click();
-                                    }} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors"><FileSpreadsheet className="w-3 h-3" /> 导出CSV</button>
                                     <button onClick={async () => { setIsExportingHome(true); try { await exportToPDF('home-training-team-pdf', `居家训练年度报告_${viewYear}`); } catch { alert('导出失败'); } finally { setIsExportingHome(false); } }} disabled={isExportingHome} className="text-[9px] md:text-[10px] font-black text-gray-600 uppercase tracking-widest bg-white px-2 md:px-3 py-1 rounded-full border border-gray-200 flex items-center gap-1 hover:bg-gray-50 transition-colors disabled:opacity-50">{isExportingHome ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileDown className="w-3 h-3" />} 导出报告</button>
                                 </div>
                             </div>
@@ -497,27 +484,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                     }} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-xl text-[11px] font-black hover:bg-green-100 transition-all uppercase"><FileSpreadsheet className="w-3.5 h-3.5" /> 下载登记表</button>
                                     <button onClick={() => resultsFileInputRef.current?.click()} className="hidden md:flex items-center gap-1.5 px-4 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-[11px] font-black hover:bg-blue-100 transition-all uppercase"><Upload className="w-3.5 h-3.5" /> 导入成绩</button>
                                     <input type="file" ref={resultsFileInputRef} className="hidden" accept=".csv" onChange={handleImportResultsCSV} />
-                                    <button onClick={() => {
-                                        const test = techTests.find(t => t.id === selectedTestId);
-                                        if (!test) return;
-                                        const headers = "球衣,姓名,身份证号,日期,成绩(" + test.unit + "),教练\n";
-                                        const rows = displayPlayers.map(p => {
-                                            const latest = getPlayerLatestResult(p, selectedTestId);
-                                            return `${p.number},${p.name},'${p.idCard},${latest?.date || ''},${latest?.value || ''},${latest?.coachId || ''}`;
-                                        }).join('\n');
-                                        const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' });
-                                        const link = document.createElement('a');
-                                        link.href = URL.createObjectURL(blob);
-                                        link.download = `${test.name}_成绩导出_${testEntryDate}.csv`;
-                                        link.click();
-                                    }} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 rounded-xl text-[11px] font-black hover:bg-gray-50 transition-all uppercase"><FileSpreadsheet className="w-3.5 h-3.5" /> 导出数据</button>
-                                    <button 
-                                        onClick={handleExportTechPDF} 
-                                        disabled={isExportingTech}
-                                        className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 rounded-xl text-[11px] font-black hover:bg-gray-50 transition-all uppercase disabled:opacity-50"
-                                    >
-                                        {isExportingTech ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} 导出报告
-                                    </button>
+                                    <button onClick={handleExportTechPDF} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-300 rounded-xl text-[11px] font-black hover:bg-gray-50 transition-all uppercase"><Download className="w-3.5 h-3.5" /> 导出报告</button>
                                 </div>
                             </div>
                             <div className="overflow-x-auto" id="tech-test-report-pdf">
@@ -578,45 +545,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                 </div>
                                 <button onClick={() => setDetailPlayerId(null)} className="p-1 hover:bg-gray-100 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
                             </div>
-                            
-                            {/* Home Training Chart */}
-                            <div className="px-6 py-4 bg-gray-50 border-b">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                        <BarChart3 className="w-3 h-3" /> 近期打卡分布
-                                    </h4>
-                                    <span className="text-[10px] font-bold text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">
-                                        年度总计: {player.homeTrainingLogs?.length || 0} 次
-                                    </span>
-                                </div>
-                                <div className="h-32 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={(() => {
-                                            const last6Months = [];
-                                            const now = new Date();
-                                            for (let i = 5; i >= 0; i--) {
-                                                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                                                const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                                                const count = (player.homeTrainingLogs || []).filter(l => l.date.startsWith(monthKey)).length;
-                                                last6Months.push({ month: d.getMonth() + 1 + '月', count });
-                                            }
-                                            return last6Months;
-                                        })()}>
-                                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold'}} />
-                                            <Tooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '10px' }} />
-                                            <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                                                {(() => {
-                                                    return Array.from({length: 6}).map((_, index) => (
-                                                        <Cell key={`cell-${index}`} fill={index === 5 ? '#FFD700' : '#e5e7eb'} />
-                                                    ));
-                                                })()}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            <div className="p-6 overflow-y-auto max-h-[40vh] space-y-3 custom-scrollbar">
+                            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3 custom-scrollbar">
                                 {sortedLogs.length > 0 ? sortedLogs.map(log => (
                                     <div key={log.id} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl group hover:bg-white hover:border-bvb-yellow/30 transition-all">
                                         <div className="flex items-center gap-3">
@@ -683,25 +612,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                                      <span className="text-[10px] font-bold text-gray-400 uppercase">Counts</span>
                                  </div>
                             </div>
-                            
-                            {/* Juggling Chart */}
-                            <div className="px-6 py-4 bg-white border-b">
-                                <div className="h-40 w-full">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <RechartsLineChart data={history.slice().reverse().map(h => ({ date: h.date.split('-').slice(1).join('/'), count: h.count }))}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                            <XAxis dataKey="date" hide />
-                                            <YAxis hide domain={[0, 'auto']} />
-                                            <Tooltip 
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '10px' }}
-                                            />
-                                            <Line type="monotone" dataKey="count" stroke="#FFD700" strokeWidth={3} dot={false} activeDot={{ r: 4 }} />
-                                        </RechartsLineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            <div className="p-6 overflow-y-auto max-h-[40vh] space-y-2 custom-scrollbar">
+                            <div className="p-6 overflow-y-auto max-h-[50vh] space-y-2 custom-scrollbar">
                                 {history.length > 0 ? history.map(item => (
                                     <div key={item.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group hover:border-bvb-yellow/30 transition-all shadow-sm">
                                         <div className="flex items-center gap-4">
@@ -736,124 +647,6 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                             </div>
                             <div className="bg-gray-50 p-4 border-t flex justify-end">
                                 <button onClick={() => setViewingJugglingPlayerId(null)} className="px-8 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 transition-colors shadow-lg uppercase italic text-xs tracking-widest">Close Profile</button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {showTestHistoryPlayerId && (() => {
-                const player = players.find(p => p.id === showTestHistoryPlayerId);
-                if (!player) return null;
-                const test = techTests.find(t => t.id === selectedTestId);
-                if (!test) return null;
-
-                const results = [...(player.testResults || [])]
-                    .filter(r => r.testId === selectedTestId)
-                    .sort((a, b) => a.date.localeCompare(b.date));
-
-                const chartData = results.map(r => ({
-                    date: r.date.split('-').slice(1).join('/'),
-                    value: r.value
-                }));
-
-                const lowerBetter = isLowerBetter(test.unit);
-
-                return (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                        <div className="bg-white w-full max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                            <div className="bg-bvb-black p-6 flex justify-between items-center text-white shrink-0">
-                                <div className="flex items-center gap-4">
-                                    <img src={player.image} className="w-12 h-12 rounded-full object-cover border-2 border-bvb-yellow shadow-lg" />
-                                    <div>
-                                        <h3 className="font-black text-xl italic tracking-tight">{player.name} - {test.name}</h3>
-                                        <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest">Performance Growth Analytics</p>
-                                    </div>
-                                </div>
-                                <button onClick={() => setShowTestHistoryPlayerId(null)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
-                            </div>
-
-                            <div className="p-8 space-y-8 overflow-y-auto max-h-[75vh] custom-scrollbar">
-                                {/* Chart Section */}
-                                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h4 className="font-black text-gray-800 uppercase italic text-sm flex items-center gap-2">
-                                            <LineChart className="w-4 h-4 text-bvb-yellow" /> 进步曲线 Trend Analysis
-                                        </h4>
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase bg-white px-3 py-1 rounded-full border shadow-sm">
-                                            Unit: {test.unit}
-                                        </div>
-                                    </div>
-                                    <div className="h-64 w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <RechartsLineChart data={chartData}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
-                                                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#999'}} />
-                                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#999'}} domain={['auto', 'auto']} reversed={lowerBetter} />
-                                                <Tooltip 
-                                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontWeight: 'bold' }}
-                                                    itemStyle={{ color: '#000' }}
-                                                />
-                                                <Line type="monotone" dataKey="value" stroke="#FFD700" strokeWidth={4} dot={{ r: 6, fill: '#000', strokeWidth: 2, stroke: '#FFD700' }} activeDot={{ r: 8, strokeWidth: 0 }} />
-                                            </RechartsLineChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                </div>
-
-                                {/* History List */}
-                                <div className="space-y-4">
-                                    <h4 className="font-black text-gray-800 uppercase italic text-sm flex items-center gap-2">
-                                        <History className="w-4 h-4 text-bvb-yellow" /> 历史记录 Raw Data
-                                    </h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                        {results.slice().reverse().map((res, idx) => {
-                                            const prev = results.slice().reverse()[idx + 1];
-                                            let diff = 0;
-                                            if (prev) {
-                                                const d = res.value - prev.value;
-                                                diff = lowerBetter ? -d : d;
-                                            }
-                                            return (
-                                                <div key={res.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-2xl shadow-sm hover:border-bvb-yellow/50 transition-all group">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center font-black text-sm text-bvb-black group-hover:bg-bvb-yellow transition-colors">
-                                                            {res.value}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest leading-none mb-1">{res.date}</p>
-                                                            <p className="text-[9px] text-gray-300 font-bold">Coach ID: {res.coachId || 'System'}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col items-end">
-                                                        {diff !== 0 && (
-                                                            <span className={`text-[10px] font-black flex items-center gap-0.5 ${diff > 0 ? 'text-green-500' : 'text-red-400'}`}>
-                                                                {diff > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                                                                {Math.abs(diff).toFixed(1)}
-                                                            </span>
-                                                        )}
-                                                        <button 
-                                                            onClick={() => {
-                                                                if (confirm('确定要删除这条测评记录吗？')) {
-                                                                    onUpdatePlayer({
-                                                                        ...player,
-                                                                        testResults: (player.testResults || []).filter(r => r.id !== res.id)
-                                                                    });
-                                                                }
-                                                            }}
-                                                            className="p-1.5 text-gray-200 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
-                                                        >
-                                                            <Trash2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="bg-gray-50 p-6 border-t flex justify-end">
-                                <button onClick={() => setShowTestHistoryPlayerId(null)} className="px-10 py-3 bg-bvb-black text-bvb-yellow font-black rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all uppercase italic text-xs tracking-widest">Close History</button>
                             </div>
                         </div>
                     </div>
