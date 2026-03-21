@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Plus, Trash2, Save, Book, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet } from 'lucide-react';
+import { Plus, Trash2, Save, Book, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet, Database } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -22,6 +22,7 @@ interface SettingsProps {
   onUpdateFinanceCategories: (cats: FinanceCategoryDefinition[]) => void;
   salarySettings: SalarySettings;
   onUpdateSalarySettings: (settings: SalarySettings) => void;
+  storageInfo: { method: string; error?: string } | null;
 }
 
 const MODULES: { id: ModuleId; label: string }[] = [
@@ -53,7 +54,8 @@ const Settings: React.FC<SettingsProps> = ({
     onAddUser, onUpdateUser, onDeleteUser, onResetUserPassword, onUpdateUserPassword,
     appLogo, onUpdateAppLogo, teams = [], permissions, onUpdatePermissions,
     financeCategories, onUpdateFinanceCategories,
-    salarySettings, onUpdateSalarySettings
+    salarySettings, onUpdateSalarySettings,
+    storageInfo
 }) => {
   const isDirector = currentUser?.role === 'director';
 
@@ -62,7 +64,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
   const [localSalarySettings, setLocalSalarySettings] = useState<SalarySettings>(JSON.parse(JSON.stringify(salarySettings)));
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'drills' | 'foci' | 'branding'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'drills' | 'foci' | 'branding' | 'storage'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [newItemName, setNewItemName] = useState('');
   const [newSubjectName, setNewSubjectName] = useState<Record<string, string>>({});
@@ -314,6 +316,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <button onClick={() => setActiveTab('attributes')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Target className="w-4 h-4 mr-2" /> 球员能力模型</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
                 <button onClick={() => setActiveTab('branding')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ImageIcon className="w-4 h-4 mr-2" /> 品牌外观</button>
+                <button onClick={() => setActiveTab('storage')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'storage' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Database className="w-4 h-4 mr-2" /> 存储状态</button>
               </>
           )}
       </div>
@@ -463,7 +466,61 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
         )}
 
-        {/* 其他 Tab 的渲染代码省略，保持原样 */}
+        {activeTab === 'storage' && isDirector && (
+            <div className="flex-1 p-6 space-y-6">
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center"><Database className="w-5 h-5 mr-2 text-bvb-yellow" /> 数据存储状态</h3>
+                    <p className="text-sm text-gray-500 mt-1">查看当前系统数据的存储方式及状态。</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                        <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-4">当前存储引擎</h4>
+                        <div className="flex items-center gap-4">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${storageInfo?.method === 'blob' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                <Database className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <p className="font-black text-lg text-gray-800">
+                                    {storageInfo?.method === 'blob' ? 'Vercel Blob (云端)' : 'Local Filesystem (本地备份)'}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    {storageInfo?.method === 'blob' 
+                                        ? '数据已安全同步至 Vercel 云端存储。' 
+                                        : '由于未配置 Token 或访问受限，数据目前保存在服务器本地。'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                        <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-4">配置提示</h4>
+                        <div className="space-y-2">
+                            <p className="text-xs text-gray-600 leading-relaxed">
+                                要启用云端存储，请确保在环境变量中正确配置了 <code className="bg-gray-200 px-1 rounded">BLOB_READ_WRITE_TOKEN</code>。
+                            </p>
+                            {storageInfo?.method === 'local' && (
+                                <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-100 rounded-lg mt-2">
+                                    <ShieldAlert className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                                    <p className="text-[10px] text-yellow-700">
+                                        检测到当前处于本地存储模式。如果这是生产环境，请检查您的 Vercel Token 设置。
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100">
+                    <h4 className="font-black text-xs uppercase tracking-widest text-blue-600 mb-4">数据安全建议</h4>
+                    <ul className="list-disc list-inside text-xs text-blue-700 space-y-2">
+                        <li>系统会自动在每次更改后进行异步保存。</li>
+                        <li>本地存储模式下，数据保存在容器内部，重启容器可能会导致未同步到云端的数据丢失。</li>
+                        <li>建议定期检查此页面以确保云端同步正常。</li>
+                    </ul>
+                </div>
+            </div>
+        )}
         {activeTab === 'permissions' && isDirector && (
             <div className="flex-1 p-6">
                 <div className="flex justify-between items-end mb-6">

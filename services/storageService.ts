@@ -19,14 +19,15 @@ export interface AppData {
     accountingRecords?: any[];
 }
 
-export const loadDataFromCloud = async (): Promise<AppData | null> => {
+export const loadDataFromCloud = async (): Promise<{ data: AppData | null, method: string }> => {
     try {
-        console.log('Fetching data from cloud storage API...');
         const res = await fetch('/api/storage');
+        const storageMethod = res.headers.get('X-Storage-Method') || 'unknown';
+        console.log(`Fetching data from cloud storage API (Method: ${storageMethod})...`);
         if (!res.ok) {
             const errorText = await res.text();
             console.warn('API route error:', res.status, errorText);
-            return null;
+            return { data: null, method: storageMethod };
         }
         const data = await res.json();
         if (data) {
@@ -34,10 +35,10 @@ export const loadDataFromCloud = async (): Promise<AppData | null> => {
         } else {
             console.log('Cloud storage is empty (new database).');
         }
-        return data;
-    } catch (error) {
+        return { data, method: storageMethod };
+    } catch (error: any) {
         console.error('Failed to load data from cloud:', error);
-        return null;
+        return { data: null, method: 'error' };
     }
 };
 
@@ -54,7 +55,7 @@ export const saveDataToCloud = async (data: AppData) => {
             try {
                 const errorJson = await res.json();
                 errorDetails = errorJson.message || errorJson.error || '';
-            } catch (e) {
+            } catch (_e) {
                 errorDetails = await res.text();
             }
             console.error('Failed to save data to cloud storage:', res.status, errorDetails);
