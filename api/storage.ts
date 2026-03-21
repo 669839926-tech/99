@@ -1,77 +1,135 @@
 
 import { put, list } from '@vercel/blob';
-
-// Removing "runtime: 'edge'" defaults this function to standard Node.js Serverless Function
-// which supports the necessary modules (stream, net, etc.) that were causing the build error.
+import fs from 'fs';
+import path from 'path';
+import type { Request, Response } from 'express';
 
 const DB_FILENAME = 'football_manager_db.json';
-const DB_PREFIX = 'football_manager_db'; // Broader prefix to find files with or without suffixes
+const LOCAL_DATA_DIR = path.join(process.cwd(), 'data');
+const LOCAL_DB_PATH = path.join(LOCAL_DATA_DIR, DB_FILENAME);
 
-export default async function handler(request, response) {
+// Ensure data directory exists
+if (!fs.existsSync(LOCAL_DATA_DIR)) {
+  try {
+    fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create data directory:', err);
+  }
+}
+
+export default async function handler(request: Request, response: Response) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-
-  if (!token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE') {
-    console.error('BLOB_READ_WRITE_TOKEN is missing or invalid in environment variables.');
-    return response.status(500).json({ 
-      error: 'Storage configuration error', 
-      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables.' 
-    });
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error('BLOB_READ_WRITE_TOKEN is not defined in environment variables.');
-    return res.status(500).json({ 
-      error: 'Storage configuration missing', 
-      details: 'Please add BLOB_READ_WRITE_TOKEN to your environment variables in Settings -> Secrets.' 
-    });
-  }
+  // Consider token invalid if it's the placeholder or empty
+  const isTokenMissing = !token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE';
 
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
-      // Use prefix to find any matching files (including those with random suffixes from previous versions)
-      const { blobs } = await list({ prefix: DB_PREFIX, token });
+      console.log('Storage GET request received');
       
-      if (blobs.length === 0) {
-        console.log('No blobs found with prefix:', DB_PREFIX);
-        return response.status(200).json(null);
+      // If token is missing, strictly use local
+      if (isTokenMissing) {
+        console.log('Vercel Blob token missing, using local filesystem');
+        return serveLocalData(response);
       }
 
-      // Sort by uploadedAt descending to get the most recent version
-      const sortedBlobs = blobs.sort((a, b) => 
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
+      try {
+        console.log('Attempting to list blobs from Vercel...');
+        const { blobs } = await list({ prefix: 'football_manager_db', token });
+        
+        if (blobs.length === 0) {
+          console.log('No blobs found in Vercel, checking local fallback');
+          return serveLocalData(response);
+        }
+        
+        const sortedBlobs = blobs.sort((a, b) => 
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
 
-      const jsonUrl = sortedBlobs[0].url;
-      console.log('Loading data from:', jsonUrl, 'Uploaded at:', sortedBlobs[0].uploadedAt);
-
-      // Using global fetch (available in Node.js 18+)
-      const res = await fetch(jsonUrl, { cache: 'no-store' });
-      const data = await res.json();
-      
-      response.setHeader('Cache-Control', 'no-store, max-age=0');
-      return response.status(200).json(data);
+        console.log(`Found ${blobs.length} blobs, fetching latest from: ${sortedBlobs[0].url}`);
+        const res = await fetch(sortedBlobs[0].url, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Failed to fetch blob: ${res.statusText}`);
+        
+        const data = await res.json();
+        response.setHeader('X-Storage-Method', 'blob');
+        return response.status(200).json(data);
+      } catch (blobError: any) {
+        console.error('Vercel Blob GET error:', blobError.message);
+        // On any Vercel error (Access denied, network, etc.), fall back to local
+        console.warn('Falling back to local filesystem due to Vercel error');
+        return serveLocalData(response);
+      }
     }
 
     // POST Request: Save data
     if (request.method === 'POST') {
       const body = request.body;
+      if (!body) {
+        return response.status(400).json({ error: 'Empty request body' });
+      }
       
-      console.log('Saving data to blob storage...');
-      const { url } = await put(DB_FILENAME, JSON.stringify(body), {
-        access: 'public',
-        addRandomSuffix: false, // Keep file name constant for easier retrieval
-        allowOverwrite: true,   // Explicitly allow overwriting existing file
-        token,
-      });
+      const dataString = JSON.stringify(body);
 
-      console.log('Data saved successfully to:', url);
-      return response.status(200).json({ success: true, url });
+      // Always save locally as a reliable backup
+      try {
+        fs.writeFileSync(LOCAL_DB_PATH, dataString);
+        console.log('Data backed up to local filesystem');
+      } catch (fsError) {
+        console.error('Failed to write to local filesystem:', fsError);
+      }
+
+      if (isTokenMissing) {
+        console.log('Vercel Blob token missing, saved locally only');
+        return response.status(200).json({ success: true, method: 'local' });
+      }
+
+      try {
+        console.log('Attempting to save to Vercel Blob...');
+        const { url } = await put(DB_FILENAME, dataString, {
+          access: 'public',
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          token,
+        });
+        console.log('Data successfully saved to Vercel Blob:', url);
+        return response.status(200).json({ success: true, url, method: 'blob' });
+      } catch (blobError: any) {
+        console.error('Vercel Blob POST error:', blobError.message);
+        return response.status(200).json({ 
+          success: true, 
+          method: 'local', 
+          warning: `Vercel Blob save failed: ${blobError.message}. Data saved to local backup.` 
+        });
+      }
     }
 
-    return response.status(405).send('Method not allowed');
-  } catch (error) {
-    console.error('Storage API Error:', error);
-    return response.status(500).json({ error: 'Internal Server Error' });
+    // Handle other methods
+    return response.status(405).json({ error: 'Method Not Allowed' });
+
+  } catch (error: any) {
+    console.error('Global Storage API Error:', error);
+    return response.status(500).json({ 
+      error: 'Internal Server Error', 
+      details: error.message 
+    });
   }
 }
+
+/**
+ * Helper to serve data from local filesystem
+ */
+function serveLocalData(response: Response) {
+  response.setHeader('X-Storage-Method', 'local');
+  if (fs.existsSync(LOCAL_DB_PATH)) {
+    try {
+      const data = fs.readFileSync(LOCAL_DB_PATH, 'utf8');
+      return response.status(200).json(JSON.parse(data));
+    } catch (parseError) {
+      console.error('Failed to parse local DB file:', parseError);
+      return response.status(500).json({ error: 'Corrupted local data file' });
+    }
+  }
+  console.log('No local data file found');
+  return response.status(200).json(null);
+}
+

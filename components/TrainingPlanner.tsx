@@ -712,7 +712,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setSelectedSession(updated);
         }
     }
-  }, [trainings]); 
+  }, [trainings, selectedSession]); 
 
   const [loading, setLoading] = useState(false);
   const [isAiMode, setIsAiMode] = useState(false);
@@ -733,7 +733,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       if (availableTeams.length > 0 && !availableTeams.find(t => t.id === formData.teamId)) {
           setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
       }
-  }, [availableTeams]);
+  }, [availableTeams, formData.teamId]);
 
   const [drillInput, setDrillInput] = useState('');
 
