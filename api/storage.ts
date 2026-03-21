@@ -1,77 +1,101 @@
 
 import { put, list } from '@vercel/blob';
-
-// Removing "runtime: 'edge'" defaults this function to standard Node.js Serverless Function
-// which supports the necessary modules (stream, net, etc.) that were causing the build error.
+import fs from 'fs';
+import path from 'path';
 
 const DB_FILENAME = 'football_manager_db.json';
-const DB_PREFIX = 'football_manager_db'; // Broader prefix to find files with or without suffixes
+const LOCAL_DB_PATH = path.join(process.cwd(), 'data', DB_FILENAME);
+
+// Ensure data directory exists
+if (!fs.existsSync(path.join(process.cwd(), 'data'))) {
+  fs.mkdirSync(path.join(process.cwd(), 'data'), { recursive: true });
+}
 
 export default async function handler(request, response) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-
-  if (!token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE') {
-    console.error('BLOB_READ_WRITE_TOKEN is missing or invalid in environment variables.');
-    return response.status(500).json({ 
-      error: 'Storage configuration error', 
-      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables.' 
-    });
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error('BLOB_READ_WRITE_TOKEN is not defined in environment variables.');
-    return res.status(500).json({ 
-      error: 'Storage configuration missing', 
-      details: 'Please add BLOB_READ_WRITE_TOKEN to your environment variables in Settings -> Secrets.' 
-    });
-  }
+  const useLocalFallback = !token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE';
 
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
-      // Use prefix to find any matching files (including those with random suffixes from previous versions)
-      const { blobs } = await list({ prefix: DB_PREFIX, token });
-      
-      if (blobs.length === 0) {
-        console.log('No blobs found with prefix:', DB_PREFIX);
+      if (useLocalFallback) {
+        console.log('Using local filesystem fallback for GET');
+        if (fs.existsSync(LOCAL_DB_PATH)) {
+          const data = fs.readFileSync(LOCAL_DB_PATH, 'utf8');
+          return response.status(200).json(JSON.parse(data));
+        }
         return response.status(200).json(null);
       }
 
-      // Sort by uploadedAt descending to get the most recent version
-      const sortedBlobs = blobs.sort((a, b) => 
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
+      try {
+        const { blobs } = await list({ prefix: 'football_manager_db', token });
+        if (blobs.length === 0) return response.status(200).json(null);
+        
+        const sortedBlobs = blobs.sort((a, b) => 
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
 
-      const jsonUrl = sortedBlobs[0].url;
-      console.log('Loading data from:', jsonUrl, 'Uploaded at:', sortedBlobs[0].uploadedAt);
-
-      // Using global fetch (available in Node.js 18+)
-      const res = await fetch(jsonUrl, { cache: 'no-store' });
-      const data = await res.json();
-      
-      response.setHeader('Cache-Control', 'no-store, max-age=0');
-      return response.status(200).json(data);
+        const res = await fetch(sortedBlobs[0].url, { cache: 'no-store' });
+        const data = await res.json();
+        return response.status(200).json(data);
+      } catch (blobError: any) {
+        if (blobError.message && blobError.message.includes('Access denied')) {
+          console.warn('Vercel Blob Access Denied, falling back to local filesystem');
+          if (fs.existsSync(LOCAL_DB_PATH)) {
+            const data = fs.readFileSync(LOCAL_DB_PATH, 'utf8');
+            return response.status(200).json(JSON.parse(data));
+          }
+          return response.status(200).json(null);
+        }
+        throw blobError;
+      }
     }
 
     // POST Request: Save data
     if (request.method === 'POST') {
       const body = request.body;
-      
-      console.log('Saving data to blob storage...');
-      const { url } = await put(DB_FILENAME, JSON.stringify(body), {
-        access: 'public',
-        addRandomSuffix: false, // Keep file name constant for easier retrieval
-        allowOverwrite: true,   // Explicitly allow overwriting existing file
-        token,
-      });
+      const dataString = JSON.stringify(body);
 
-      console.log('Data saved successfully to:', url);
-      return response.status(200).json({ success: true, url });
+      // Always save locally as a backup
+      fs.writeFileSync(LOCAL_DB_PATH, dataString);
+
+      if (useLocalFallback) {
+        console.log('Using local filesystem fallback for POST');
+        return response.status(200).json({ success: true, method: 'local' });
+      }
+
+      try {
+        const { url } = await put(DB_FILENAME, dataString, {
+          access: 'public',
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          token,
+        });
+        return response.status(200).json({ success: true, url, method: 'blob' });
+      } catch (blobError: any) {
+        if (blobError.message && blobError.message.includes('Access denied')) {
+          console.warn('Vercel Blob Access Denied during POST, data saved locally only');
+          return response.status(200).json({ 
+            success: true, 
+            method: 'local', 
+            warning: 'Vercel Blob access denied. Data saved to local filesystem only.' 
+          });
+        }
+        throw blobError;
+      }
     }
 
-    return response.status(405).send('Method not allowed');
-  } catch (error) {
+    } catch (error: any) {
     console.error('Storage API Error:', error);
-    return response.status(500).json({ error: 'Internal Server Error' });
+    
+    // Check for Vercel Blob specific access error
+    if (error.message && error.message.includes('Access denied')) {
+      return response.status(403).json({ 
+        error: 'Blob Access Denied', 
+        message: 'The provided BLOB_READ_WRITE_TOKEN is invalid or does not have the required permissions. Please check your Vercel Blob configuration.' 
+      });
+    }
+    
+    return response.status(500).json({ error: 'Internal Server Error', details: error.message });
   }
 }

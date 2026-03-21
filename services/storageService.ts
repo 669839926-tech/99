@@ -50,9 +50,15 @@ export const saveDataToCloud = async (data: AppData) => {
             headers: { 'Content-Type': 'application/json' }
         });
         if (!res.ok) {
-            const errorText = await res.text();
-            console.error('Failed to save data to cloud storage:', res.status, errorText);
-            throw new Error(`Save failed: ${res.status} ${errorText}`);
+            let errorDetails = '';
+            try {
+                const errorJson = await res.json();
+                errorDetails = errorJson.message || errorJson.error || '';
+            } catch (e) {
+                errorDetails = await res.text();
+            }
+            console.error('Failed to save data to cloud storage:', res.status, errorDetails);
+            throw new Error(`Save failed (${res.status}): ${errorDetails}`);
         }
         const result = await res.json();
         console.log('Data successfully saved to cloud storage:', result.url);
