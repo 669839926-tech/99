@@ -14,21 +14,14 @@ export default async function handler(request, response) {
     console.error('BLOB_READ_WRITE_TOKEN is missing or invalid in environment variables.');
     return response.status(500).json({ 
       error: 'Storage configuration error', 
-      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables.' 
-    });
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error('BLOB_READ_WRITE_TOKEN is not defined in environment variables.');
-    return response.status(500).json({ 
-      error: 'Storage configuration missing', 
-      details: 'Please add BLOB_READ_WRITE_TOKEN to your environment variables in Settings -> Secrets.' 
+      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables in Settings -> Secrets.' 
     });
   }
 
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
+      console.log('Fetching blobs with prefix:', DB_PREFIX);
       // Use prefix to find any matching files (including those with random suffixes from previous versions)
       const { blobs } = await list({ prefix: DB_PREFIX, token });
       
@@ -36,6 +29,8 @@ export default async function handler(request, response) {
         console.log('No blobs found with prefix:', DB_PREFIX);
         return response.status(200).json(null);
       }
+
+      console.log(`Found ${blobs.length} blobs matching prefix.`);
 
       // Sort by uploadedAt descending to get the most recent version
       const sortedBlobs = blobs.sort((a, b) => 
