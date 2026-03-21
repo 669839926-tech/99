@@ -14,7 +14,7 @@ import TechnicalGrowth from './components/TechnicalGrowth';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Shield } from 'lucide-react';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -42,7 +42,9 @@ function App() {
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
   const isFirstRun = useRef(true);
+  const loadFailed = useRef(false);
 
   // Derived Players: 按时间轴模拟扣费逻辑，请假额度在充值时更新而非累加
   const derivedPlayers = useMemo(() => {
@@ -101,7 +103,11 @@ function App() {
   useEffect(() => {
     const init = async () => {
         const cloudData = await loadDataFromCloud();
-        if (cloudData) {
+        if (cloudData === undefined) {
+            console.error('Data loading failed. Auto-save disabled to prevent data loss.');
+            setStorageError('云端数据加载失败，请检查环境变量 BLOB_READ_WRITE_TOKEN 是否正确设置。');
+            loadFailed.current = true;
+        } else if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
             setMatches(cloudData.matches || MOCK_MATCHES);
@@ -126,7 +132,7 @@ function App() {
 
   // Auto-Save on Change
   useEffect(() => {
-    if (isInitializing) return;
+    if (isInitializing || loadFailed.current) return;
     if (isFirstRun.current) {
         isFirstRun.current = false;
         return;
@@ -266,11 +272,34 @@ function App() {
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
               <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
               <p className="text-gray-500 font-bold">正在载入云端数据...</p>
+              {storageError && (
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm font-bold animate-pulse">
+                  {storageError}
+                </div>
+              )}
           </div>
       );
   }
 
-  if (!currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
+  if (!currentUser) {
+    return (
+      <>
+        {storageError && (
+          <div className="fixed top-0 left-0 right-0 bg-red-600 text-white p-3 text-center z-[100] font-bold shadow-lg flex items-center justify-center gap-3">
+            <Shield className="w-5 h-5" />
+            <span>{storageError}</span>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-3 py-1 bg-white text-red-600 rounded-lg text-xs hover:bg-red-50 transition-colors"
+            >
+              刷新重试
+            </button>
+          </div>
+        )}
+        <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />
+      </>
+    );
+  }
 
   if (currentUser.role === 'parent' && currentUser.playerId) {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);

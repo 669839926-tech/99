@@ -104,7 +104,7 @@ const getOverallRating = (player: Player): string => {
 const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
   if (!player || !player.stats || !attributeConfig) return 0;
   const configItems = attributeConfig[category];
-  if (!configItems || configItems.length === 0) return 0;
+  if (!configItems || !Array.isArray(configItems) || configItems.length === 0) return 0;
   
   const catStats = player.stats[category];
   if (!catStats) return 0;
@@ -112,15 +112,17 @@ const getCategoryAvg = (player: Player, category: AttributeCategory, attributeCo
   let sum = 0;
   let count = 0;
   configItems.forEach(attr => {
-    const val = catStats[attr.key] || 0;
-    sum += val;
-    count++;
+    if (attr && attr.key) {
+        const val = catStats[attr.key] || 0;
+        sum += val;
+        count++;
+    }
   });
   return count === 0 ? 0 : parseFloat((sum / count).toFixed(1));
 };
 
 const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig || !attributeConfig[category]) return [];
+  if (!player || !player.stats || !attributeConfig || !attributeConfig[category] || !Array.isArray(attributeConfig[category])) return [];
   
   const catStats = player.stats[category];
   return attributeConfig[category].map(attr => ({
@@ -202,10 +204,16 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
-        const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
+    
+    categories.forEach((category) => {
+        if (attributeConfig[category] && Array.isArray(attributeConfig[category])) {
+            attributeConfig[category].forEach(attr => { 
+                if (attr && attr.key) {
+                    stats[category][attr.key] = 5; 
+                }
+            });
+        }
     });
     return stats;
 };
@@ -1030,7 +1038,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       </div>
                       <table className="w-full text-xs">
                         <tbody>
-                          {attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
+                          {Array.isArray(attributeConfig[section.category as AttributeCategory]) && attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
                             const val = editedPlayer.stats[section.category as AttributeCategory][attr.key] || 5;
                             const scaledVal = Math.min(4, Math.max(1, Math.ceil(val / 2.5)));
                             return (
@@ -1184,7 +1192,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }, 0);
   }, [selectedTeamId]);
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
-  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
+  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: undefined, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
   const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: 'U17', attribute: '兴趣', description: '' });
   
   const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1328,9 +1336,31 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
   };
   
+  const generateRandomPlayer = () => {
+    const surnames = ['张', '王', '李', '赵', '陈', '刘', '杨', '黄', '周', '吴', '徐', '孙', '胡', '朱', '高', '林', '何', '郭', '马', '罗'];
+    const names = ['伟', '芳', '娜', '秀英', '敏', '静', '丽', '强', '磊', '洋', '勇', '军', '杰', '娟', '涛', '明', '辉', '超', '霞', '平', '刚', '桂英'];
+    const randomName = surnames[Math.floor(Math.random() * surnames.length)] + names[Math.floor(Math.random() * names.length)];
+    const randomNumber = Math.floor(Math.random() * 99) + 1;
+    const randomAge = Math.floor(Math.random() * 8) + 7; // 7-14 years old
+    const positions = Object.values(Position).filter(p => p !== Position.TBD);
+    const randomPosition = positions[Math.floor(Math.random() * positions.length)];
+    
+    setNewPlayer(prev => ({
+        ...prev,
+        name: randomName,
+        number: randomNumber,
+        age: randomAge,
+        position: randomPosition,
+        gender: Math.random() > 0.1 ? '男' : '女',
+        preferredFoot: Math.random() > 0.2 ? '右' : '左',
+        birthDate: `${new Date().getFullYear() - randomAge}-01-01`,
+        joinDate: new Date().toISOString().split('T')[0]
+    }));
+  };
+
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || selectedTeamId;
+    const finalTeamId = newPlayer.teamId || selectedTeamId || (teams.length > 0 ? teams[0].id : 'unassigned');
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
@@ -1375,7 +1405,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         
         onAddPlayer(p); 
         setShowAddModal(false); 
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: undefined, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
     } else {
         alert('请完整填写必填项：姓名、球衣号码及归属梯队。');
     }
@@ -1592,7 +1622,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名 (必填)</label><input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="输入球员姓名" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number || ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="输入球衣号码" value={newPlayer.number ?? ''} onChange={e => setNewPlayer({...newPlayer, number: e.target.value === '' ? undefined : parseInt(e.target.value)})}/></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
@@ -1604,7 +1634,12 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         </div>
                     </div>
                 </div>
-                <button type="submit" className="w-full py-4 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 shadow-lg flex items-center justify-center text-lg"><Save className="w-6 h-6 mr-2 text-bvb-yellow" /> 保存球员信息</button>
+                <div className="p-6 pt-0 space-y-4">
+                    <button type="button" onClick={generateRandomPlayer} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-gray-400 font-bold hover:border-bvb-yellow hover:text-bvb-yellow transition-all flex items-center justify-center gap-2 text-sm">
+                        <Sparkles className="w-4 h-4" /> 随机生成球员信息
+                    </button>
+                    <button type="submit" className="w-full py-4 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 shadow-lg flex items-center justify-center text-lg"><Save className="w-6 h-6 mr-2 text-bvb-yellow" /> 保存球员信息</button>
+                </div>
             </form>
           </div>
         </div>
