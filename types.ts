@@ -215,11 +215,7 @@ export interface TrainingSession {
   linkedDesignId?: string;
   // --- New Focus Fields ---
   focusedPlayerIds?: string[]; // 1-2 重点关注球员
-  focusedPlayerNotes?: Record<string, { 
-    technical: string; 
-    mental: string;
-    status?: 'Resolved' | 'Unresolved';
-  }>; // 重点关注笔记
+  focusedPlayerNotes?: Record<string, { technical: string; mental: string }>; // 重点关注笔记
   // --- Structured Log Fields ---
   performanceRatings?: {
     technical: number;
@@ -228,7 +224,6 @@ export interface TrainingSession {
     discipline: number;
   };
   planReflection?: string;
-  assistantCoachFeedback?: string;
 }
 
 // --- Periodization Plan Types ---
