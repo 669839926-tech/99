@@ -1,14 +1,23 @@
 import { put, list } from '@vercel/blob';
 
 const DB_FILENAME = 'football_manager_db.json';
-const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN || 'vercel_blob_rw_UpvUlsKisME5Q77S_NAzNDtAxlP5FR8fIxtyMJ07dWF0lAQ';
 
 export default async function handler(request, response) {
+  const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN?.trim();
+  
+  if (!BLOB_TOKEN) {
+    console.error('BLOB_READ_WRITE_TOKEN is missing in environment variables');
+    return response.status(500).json({ error: 'Storage configuration error: Missing token' });
+  }
+
+  // Log masked token for debugging
+  console.log(`Using BLOB_TOKEN: ${BLOB_TOKEN.substring(0, 10)}... (length: ${BLOB_TOKEN.length})`);
+  
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
       try {
-        // List blobs to find the latest one with the prefix
+        console.log('Listing blobs with prefix:', DB_FILENAME);
         const { blobs } = await list({ prefix: DB_FILENAME, token: BLOB_TOKEN });
         
         if (blobs.length === 0) {
