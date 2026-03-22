@@ -42,6 +42,7 @@ function App() {
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<{ method: string; error?: string } | null>(null);
   const isFirstRun = useRef(true);
 
   // Derived Players: 按时间轴模拟扣费逻辑，请假额度在充值时更新而非累加
@@ -100,7 +101,8 @@ function App() {
   // Load Data on Mount
   useEffect(() => {
     const init = async () => {
-        const cloudData = await loadDataFromCloud();
+        const { data: cloudData, method } = await loadDataFromCloud();
+        setStorageInfo({ method });
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -296,7 +298,7 @@ function App() {
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':
-        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} />;
+        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} storageInfo={storageInfo} />;
       default:
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} appLogo={appLogo} />;
     }
