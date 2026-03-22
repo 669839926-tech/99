@@ -102,9 +102,9 @@ const getOverallRating = (player: Player): string => {
 };
 
 const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig || !Array.isArray(attributeConfig[category])) return 0;
+  if (!player || !player.stats || !attributeConfig) return 0;
   const configItems = attributeConfig[category];
-  if (configItems.length === 0) return 0;
+  if (!configItems || configItems.length === 0) return 0;
   
   const catStats = player.stats[category];
   if (!catStats) return 0;
@@ -120,7 +120,7 @@ const getCategoryAvg = (player: Player, category: AttributeCategory, attributeCo
 };
 
 const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig || !Array.isArray(attributeConfig[category])) return [];
+  if (!player || !player.stats || !attributeConfig || !attributeConfig[category]) return [];
   
   const catStats = player.stats[category];
   return attributeConfig[category].map(attr => ({
@@ -202,15 +202,10 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
-    categories.forEach((category) => {
-        if (attributeConfig && Array.isArray(attributeConfig[category])) {
-            attributeConfig[category].forEach(attr => { 
-                if (stats[category]) {
-                    stats[category][attr.key] = 5; 
-                }
-            });
-        }
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -632,7 +627,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const renderStatSliders = (category: AttributeCategory) => {
         const attributes = attributeConfig[category];
-        if (!Array.isArray(attributes) || attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
+        if (attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-1 content-start">
             {attributes.map(attr => {
@@ -1035,7 +1030,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       </div>
                       <table className="w-full text-xs">
                         <tbody>
-                          {Array.isArray(attributeConfig[section.category as AttributeCategory]) && attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
+                          {attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
                             const val = editedPlayer.stats[section.category as AttributeCategory][attr.key] || 5;
                             const scaledVal = Math.min(4, Math.max(1, Math.ceil(val / 2.5)));
                             return (
@@ -1336,7 +1331,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
     const finalTeamId = newPlayer.teamId || selectedTeamId;
-    console.log('Attempting to add player:', { name: newPlayer.name, number: newPlayer.number, teamId: finalTeamId });
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
@@ -1527,10 +1521,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </div>
           )}
           {isDirector && <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="批量导入"><Upload className="w-5 h-5" /></button>}
-          {isDirector && <button onClick={() => {
-              setNewPlayer(prev => ({ ...prev, teamId: selectedTeamId || (teams.length > 0 ? teams[0].id : 'unassigned') }));
-              setShowAddModal(true);
-          }} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-sm hover:brightness-105"><Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员</button>}
+          {isDirector && <button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-sm hover:brightness-105"><Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员</button>}
         </div></div>{(showDraftsOnly || isSelectionMode) && (<div className={`px-4 py-2 rounded-lg mb-4 text-sm flex items-center justify-between transition-all ${showDraftsOnly ? 'bg-blue-50 text-blue-700' : 'bg-bvb-black text-white'}`}>{showDraftsOnly && !isSelectionMode && (<><div className="flex items-center font-bold"><ClipboardCheck className="w-4 h-4 mr-2" />{isDirector ? '未发布草稿' : '本队草稿'} ({filteredPlayers.length})</div><button onClick={() => setShowDraftsOnly(false)} className="text-xs hover:underline">清除筛选</button></>)}{isSelectionMode && (<><div className="flex items-center space-x-3"><button onClick={handleSelectAll} className="text-xs font-bold text-gray-400">全选</button><span className="text-sm font-bold">已选: {selectedIds.size}</span></div><div className="flex space-x-2 items-center">{isBulkExporting ? (<div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded text-xs font-black text-bvb-yellow"><RefreshCw className="w-3 h-3 animate-spin" /> 导出中 ({bulkExportCurrentIdx}/{selectedIds.size})</div>) : (<button disabled={selectedIds.size === 0} onClick={handleBulkExportProfiles} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 transition-colors rounded text-xs font-bold disabled:opacity-50 flex items-center gap-1.5"><Files className="w-3.5 h-3.5" /> 导出档案</button>)}<button disabled={selectedIds.size === 0} onClick={() => setShowTransferModal(true)} className="px-3 py-1 bg-gray-700 rounded text-xs font-bold disabled:opacity-50">移交</button>{isDirector && <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 rounded text-xs font-bold disabled:opacity-50">充值</button>}{isDirector && <button disabled={selectedIds.size === 0} onClick={executeBulkDelete} className="px-3 py-1 bg-red-900 rounded text-xs font-bold disabled:opacity-50">删除</button>}<button onClick={() => setIsSelectionMode(false)} className="px-2 hover:bg-gray-800 rounded transition-colors"><X className="w-4 h-4" /></button></div></>)}</div>)}
         {viewMode === 'list' && (<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 overflow-y-auto custom-scrollbar"><table className="w-full text-left border-collapse"><thead className="bg-gray-50 sticky top-0 z-10"><tr><th className="px-2 py-3 md:px-4 md:py-4 border-b w-10 md:w-12 text-center">{isSelectionMode && <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.size > 0 && selectedIds.size === filteredPlayers.length} />}</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">球员信息</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">梯队/位置</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">出生年月</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">综合评分</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell w-32">出勤率</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">课时余额</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell">状态</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest text-right">操作</th></tr></thead><tbody className="divide-y divide-gray-100">{filteredPlayers.length > 0 ? filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const overallRating = getOverallRating(player); const ratingVal = parseFloat(overallRating); const attendanceRate = calculateAttendanceRate(player, trainings, attendanceScope); const isExpiredValid = isExpired(player.validUntil); const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted'); const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted'; const teamName = teams.find(t => t.id === player.teamId)?.name || (player.teamId === 'unassigned' ? '待分配' : '未知'); return (<tr key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`hover:bg-yellow-50/50 transition-colors cursor-pointer group ${isSelected ? 'bg-yellow-50' : ''}`}><td className="px-2 py-3 md:px-4 md:py-4 text-center" onClick={(e) => e.stopPropagation()}>{isSelectionMode && (<input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} />)}</td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><div className="relative w-8 h-8 md:w-10 md:h-10 shrink-0"><img src={player.image} alt={player.name} className="w-full h-full rounded-full object-cover border border-gray-200 bg-gray-100" />{player.isCaptain && <div className="absolute -top-1 -left-1 w-3.5 h-3.5 md:w-4 md:h-4 bg-yellow-400 text-bvb-black flex items-center justify-center rounded-sm font-black text-[7px] md:text-[9px] border border-white shadow-xs">C</div>}</div><div><div className="font-black text-gray-800 text-xs md:text-sm leading-tight flex items-center gap-1 truncate max-w-[60px] md:max-w-none">{player.name}{getBirthdayStatus(player.birthDate) && <Cake className={`w-2.5 h-2.5 md:w-3 md:h-3 ${getBirthdayStatus(player.birthDate)?.color.replace('bg-', 'text-')}`} />}</div><div className="text-[9px] md:text-[10px] text-gray-400 font-mono mt-0.5">#{player.number}</div></div></div></td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex flex-col"><span className="text-[10px] md:text-xs font-bold text-gray-600 truncate max-w-[70px] md:max-w-none">{teamName}</span><div className="flex flex-wrap items-center gap-0.5 mt-1"><span className={`px-1 py-0.5 rounded-[3px] text-[8px] md:text-[10px] font-black uppercase tracking-tighter ${getPosColor(player.position)}`}>{player.position}</span>{player.secondaryPosition && player.secondaryPosition !== Position.TBD && (<span className={`px-1 py-0.5 rounded-[3px] text-[8px] md:text-[10px] font-black uppercase tracking-tighter border ${getPosColorLight(player.secondaryPosition)}`}>{player.secondaryPosition}</span>)}</div></div></td><td className="p-4 hidden sm:table-cell text-xs font-bold text-gray-500"><div className="flex flex-col"><span>{player.birthDate || '未录入'}</span><span className="text-[10px] text-gray-400">{player.age} 岁</span></div></td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex items-center justify-center md:justify-start"><div className={`w-7 h-7 md:w-8 md:h-8 rounded-[6px] flex items-center justify-center text-[10px] md:text-xs font-black border transition-transform group-hover:scale-110 shadow-sm ${ratingVal >= 8 ? 'bg-green-50 text-green-700 border-green-200' : ratingVal >= 6 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>{overallRating}</div></div></td><td className="p-4 hidden md:table-cell"><div className="flex items-center gap-2 w-24"><div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${attendanceRate >= 80 ? 'bg-green-500' : attendanceRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${attendanceRate}%` }}></div></div><span className="text-[10px] font-mono font-bold text-gray-400">{attendanceRate}%</span></div></td><td className="p-4 hidden sm:table-cell"><div className="flex flex-col"><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500 animate-pulse' : 'text-gray-800'}`}>{player.credits} 节</span><span className={`text-[10px] font-bold ${isExpiredValid ? 'text-red-400' : 'text-gray-400'}`}>有效期: {player.validUntil}</span></div></td><td className="p-4 hidden md:table-cell">{(hasDraftReviews || hasDraftStats) ? (<span className="flex items-center text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter"><RefreshCw className="w-2.5 h-2.5 mr-1 animate-spin" /> 有草稿待审</span>) : (<span className="flex items-center text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-tighter"><CheckCircle className="w-2.5 h-2.5 mr-1" /> 数据已发布</span>)}</td><td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex justify-end gap-0.5 md:gap-1"><button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 md:p-2 text-gray-400 hover:text-green-600 transition-colors" title="充值"><CreditCard className="w-3.5 h-3.5 md:w-4 md:h-4" /></button><button onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); }} className="p-1.5 md:p-2 text-gray-400 hover:text-bvb-black transition-colors" title="详情"><MoreHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></div></td></tr>); }) : (<tr><td colSpan={9} className="p-12 text-center text-gray-400 font-bold italic">未找到匹配的球员</td></tr>)}</tbody></table>
         {/* PDF 模板保持不变 */}
@@ -1601,10 +1592,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名 (必填)</label><input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="输入球员姓名" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number === undefined || isNaN(newPlayer.number) ? '' : newPlayer.number} onChange={e => {
-                                const val = e.target.value === '' ? NaN : parseInt(e.target.value);
-                                setNewPlayer({...newPlayer, number: val});
-                            }}/></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number || ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>

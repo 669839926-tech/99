@@ -14,7 +14,15 @@ export default async function handler(request, response) {
     console.error('BLOB_READ_WRITE_TOKEN is missing or invalid in environment variables.');
     return response.status(500).json({ 
       error: 'Storage configuration error', 
-      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables in Settings -> Secrets.' 
+      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables.' 
+    });
+  }
+
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.error('BLOB_READ_WRITE_TOKEN is not defined in environment variables.');
+    return res.status(500).json({ 
+      error: 'Storage configuration missing', 
+      details: 'Please add BLOB_READ_WRITE_TOKEN to your environment variables in Settings -> Secrets.' 
     });
   }
 
