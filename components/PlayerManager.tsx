@@ -203,9 +203,12 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
     Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        if (cat === 'drillLibrary' || cat === 'trainingFoci' || cat === 'focusSubjects') return;
         const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+        const attributes = attributeConfig[category];
+        if (Array.isArray(attributes)) {
+            attributes.forEach(attr => { stats[category][attr.key] = 5; });
+        }
     });
     return stats;
 };
