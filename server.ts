@@ -1,11 +1,12 @@
 
 import express from 'express';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import multer from 'multer';
-import { put } from '@vercel/blob';
+import storageHandler from './api/storage.js';
 
-const upload = multer({ storage: multer.memoryStorage() });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
@@ -14,27 +15,12 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok' });
-  });
-
-  // Vercel Blob Upload Endpoint
-  app.post('/api/upload', upload.single('file'), async (req, res) => {
+  app.all('/api/storage', async (req, res) => {
     try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      const { buffer, originalname, mimetype } = req.file;
-      const blob = await put(originalname, buffer, {
-        contentType: mimetype,
-        access: 'public',
-      });
-
-      res.json(blob);
+      await storageHandler(req, res);
     } catch (error) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: 'Failed to upload file' });
+      console.error('API Error:', error);
+      res.status(500).json({ error: 'Internal Server Error' });
     }
   });
 

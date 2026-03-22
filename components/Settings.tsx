@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Plus, Trash2, Save, Book, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Trash2, Save, Book, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -261,34 +261,12 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
-  const [isUploading, setIsUploading] = useState(false);
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file && onUpdateAppLogo) {
-          setIsUploading(true);
-          try {
-              const formData = new FormData();
-              formData.append('file', file);
-
-              const response = await fetch('/api/upload', {
-                  method: 'POST',
-                  body: formData,
-              });
-
-              if (!response.ok) {
-                  throw new Error('Upload failed');
-              }
-
-              const blob = await response.json();
-              onUpdateAppLogo(blob.url);
-              alert('Logo 上传成功！');
-          } catch (error) {
-              console.error('Upload error:', error);
-              alert('Logo 上传失败，请检查网络或 Vercel Blob 配置。');
-          } finally {
-              setIsUploading(false);
-          }
+          const reader = new FileReader();
+          reader.onloadend = () => onUpdateAppLogo(reader.result as string);
+          reader.readAsDataURL(file);
       }
   };
 
@@ -853,35 +831,8 @@ const Settings: React.FC<SettingsProps> = ({
             <div className="flex-1 p-6 flex flex-col items-center justify-center">
                 <div className="w-full max-lg bg-gray-50 p-8 rounded-xl border border-gray-200 text-center">
                     <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center justify-center"><ImageIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 应用 Logo 设置</h3>
-                    <div className="mb-8 flex flex-col items-center">
-                        <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4 relative">
-                            {appLogo ? <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" /> : <span className="text-gray-300 font-bold">No Logo</span>}
-                            {isUploading && (
-                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                    <RotateCcw className="w-8 h-8 text-white animate-spin" />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div className="relative group w-full">
-                        <input 
-                            type="file" 
-                            accept="image/*" 
-                            onChange={handleLogoUpload} 
-                            disabled={isUploading}
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed" 
-                        />
-                        <div className={`border-2 border-dashed rounded-lg p-6 transition-colors flex flex-col items-center justify-center ${isUploading ? 'bg-gray-100 border-gray-200' : 'border-gray-300 hover:border-bvb-yellow hover:bg-yellow-50'}`}>
-                            {isUploading ? (
-                                <RotateCcw className="w-8 h-8 text-gray-400 mb-2 animate-spin" />
-                            ) : (
-                                <Upload className="w-8 h-8 text-gray-400 mb-2" />
-                            )}
-                            <span className="font-bold text-gray-600">
-                                {isUploading ? '正在上传...' : '点击上传新 Logo 图片'}
-                            </span>
-                        </div>
-                    </div>
+                    <div className="mb-8 flex flex-col items-center"><div className="w-32 h-32 bg-white rounded-full flex items-center justify-center border-4 border-white shadow-lg overflow-hidden mb-4">{appLogo ? <img src={appLogo} alt="App Logo" className="w-full h-full object-contain" /> : <span className="text-gray-300 font-bold">No Logo</span>}</div></div>
+                    <div className="relative group w-full"><input type="file" accept="image/*" onChange={handleLogoUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" /><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-bvb-yellow hover:bg-yellow-50 transition-colors flex flex-col items-center justify-center"><Upload className="w-8 h-8 text-gray-400 mb-2" /><span className="font-bold text-gray-600">点击上传新 Logo 图片</span></div></div>
                 </div>
             </div>
         )}
