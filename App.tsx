@@ -15,9 +15,12 @@ import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUT
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
+import { auth, signInWithGoogle, logout as firebaseLogout, onAuthStateChanged, User as FirebaseUser, testFirestoreConnection } from './firebase';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [navigationParams, setNavigationParams] = useState<{ filter?: string }>({});
   
@@ -42,7 +45,6 @@ function App() {
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [storageInfo, setStorageInfo] = useState<{ method: string; error?: string } | null>(null);
   const isFirstRun = useRef(true);
 
   // Derived Players: 按时间轴模拟扣费逻辑，请假额度在充值时更新而非累加
@@ -98,11 +100,31 @@ function App() {
       });
   }, [players, trainings]);
 
-  // Load Data on Mount
+  // Load Data on Auth Change
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      setAuthLoading(false);
+      if (user) {
+        console.log('Firebase user authenticated:', user.email);
+        testFirestoreConnection();
+      } else {
+        setCurrentUser(null);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    
     const init = async () => {
-        const { data: cloudData, method } = await loadDataFromCloud();
-        setStorageInfo({ method });
+        if (!firebaseUser) {
+            setIsInitializing(false);
+            return;
+        }
+
+        const cloudData = await loadDataFromCloud(firebaseUser.uid);
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -120,15 +142,38 @@ function App() {
             if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
+
+            // Map Firebase user to App User if not already set
+            const existingUser = (cloudData.users || MOCK_USERS).find(u => u.id === firebaseUser.uid);
+            if (existingUser) {
+                setCurrentUser(existingUser);
+            } else if (firebaseUser.email === 'haoyu19880511@gmail.com') {
+                setCurrentUser({
+                    id: firebaseUser.uid,
+                    username: 'admin',
+                    name: firebaseUser.displayName || '管理员',
+                    role: 'director'
+                });
+            }
+        } else {
+            // New user or no data
+            if (firebaseUser.email === 'haoyu19880511@gmail.com') {
+                setCurrentUser({
+                    id: firebaseUser.uid,
+                    username: 'admin',
+                    name: firebaseUser.displayName || '管理员',
+                    role: 'director'
+                });
+            }
         }
         setIsInitializing(false);
     };
     init();
-  }, []);
+  }, [firebaseUser, authLoading]);
 
   // Auto-Save on Change
   useEffect(() => {
-    if (isInitializing) return;
+    if (isInitializing || !firebaseUser) return;
     if (isFirstRun.current) {
         isFirstRun.current = false;
         return;
@@ -137,7 +182,7 @@ function App() {
     const timer = setTimeout(async () => {
         setIsSyncing(true);
         try {
-            await saveDataToCloud({
+            await saveDataToCloud(firebaseUser.uid, {
                 players,
                 teams,
                 matches,
@@ -163,7 +208,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing, firebaseUser]);
 
 
   const handleLogin = (user: User) => {
@@ -173,6 +218,7 @@ function App() {
   };
 
   const handleLogout = () => {
+    firebaseLogout();
     setCurrentUser(null);
     setNavigationParams({});
   };
@@ -263,7 +309,7 @@ function App() {
       });
   };
 
-  if (isInitializing) {
+  if (authLoading || (firebaseUser && isInitializing)) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
               <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
@@ -272,7 +318,7 @@ function App() {
       );
   }
 
-  if (!currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
+  if (!firebaseUser && !currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} onGoogleLogin={signInWithGoogle} appLogo={appLogo} />;
 
   if (currentUser.role === 'parent' && currentUser.playerId) {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
@@ -298,7 +344,7 @@ function App() {
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':
-        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} storageInfo={storageInfo} />;
+        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} />;
       default:
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} appLogo={appLogo} />;
     }

@@ -2,7 +2,8 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import storageHandler from './api/storage.js';
+
+
 
 async function startServer() {
   const app = express();
@@ -11,13 +12,8 @@ async function startServer() {
   app.use(express.json());
 
   // API Routes
-  app.all('/api/storage', async (req, res) => {
-    try {
-      await storageHandler(req, res);
-    } catch (error) {
-      console.error('API Error:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
-    }
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok' });
   });
 
   // Vite middleware for development

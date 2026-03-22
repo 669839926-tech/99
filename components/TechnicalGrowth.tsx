@@ -41,6 +41,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     });
 
     const [isExportingHome, setIsExportingHome] = useState(false);
+    const [, setIsExportingTech] = useState(false);
     const [jugglingPlayerId, setJugglingPlayerId] = useState<string>('');
     const [jugglingDate, setJugglingDate] = useState(new Date().toISOString().split('T')[0]);
     const [jugglingCount, setJugglingCount] = useState<string>('');
@@ -55,6 +56,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(new Set());
     const [detailPlayerId, setDetailPlayerId] = useState<string | null>(null);
     const [viewingJugglingPlayerId, setViewingJugglingPlayerId] = useState<string | null>(null);
+    const [, setShowTestHistoryPlayerId] = useState<string | null>(null);
 
     const [showConfigModal, setShowConfigModal] = useState(false);
     const [newTestDef, setNewTestDef] = useState({ name: '', unit: '', description: '' });
