@@ -165,13 +165,6 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
 
 const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
-
-    const handleTabChange = (tab: 'info' | 'attendance' | 'log') => {
-        setActiveTab(tab);
-        if (tab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
-            setLocalSession(prev => ({ ...prev, isReviewRead: true }));
-        }
-    };
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
 
@@ -188,15 +181,24 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
     useEffect(() => {
         const timer = setTimeout(() => {
             setSaveStatus('saving');
-            onUpdate(localSession, localSession.attendance);
+            onUpdate(localSession, localSession.attendance || []);
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1500);
         return () => clearTimeout(timer);
     }, [localSession, onUpdate]);
 
+    useEffect(() => {
+        if (activeTab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
+            setTimeout(() => {
+                setLocalSession(prev => ({ ...prev, isReviewRead: true }));
+            }, 0);
+        }
+    }, [activeTab, currentUser?.role, localSession.submissionStatus, localSession.isReviewRead]);
+
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
-    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector;
+    const isAssistantCoach = currentUser?.role === 'assistant_coach';
+    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector || (isAssistantCoach && currentUser?.teamIds?.includes(session.teamId));
     
     const getStatus = (playerId: string): AttendanceStatus => {
         const record = localSession.attendance?.find(r => r.playerId === playerId);
@@ -238,11 +240,11 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
         }
     };
 
-    const updateFocusNote = (playerId: string, field: 'technical' | 'mental', value: string) => {
+    const updateFocusNote = (playerId: string, field: 'technical' | 'mental' | 'status', value: string) => {
         setLocalSession(prev => {
             const notes = { ...(prev.focusedPlayerNotes || {}) };
-            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '' };
-            notes[playerId][field] = value;
+            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '', status: 'Unresolved' };
+            (notes[playerId] as any)[field] = value;
             return { ...prev, focusedPlayerNotes: notes };
         });
     };
@@ -282,9 +284,9 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                     </div>
                 </div>
                 <div className="flex border-b border-gray-200 shrink-0 sticky top-0 bg-white z-10 overflow-x-auto no-scrollbar">
-                    <button onClick={() => handleTabChange('info')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'info' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><Settings2 className="w-4 h-4 mr-2" /> 计划内容</button>
-                    <button onClick={() => handleTabChange('attendance')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><UserCheck className="w-4 h-4 mr-2" /> 考勤管理</button>
-                    <button onClick={() => handleTabChange('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors relative ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}>
+                    <button onClick={() => setActiveTab('info')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'info' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><Settings2 className="w-4 h-4 mr-2" /> 计划内容</button>
+                    <button onClick={() => setActiveTab('attendance')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors ${activeTab === 'attendance' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}><UserCheck className="w-4 h-4 mr-2" /> 考勤管理</button>
+                    <button onClick={() => setActiveTab('log')} className={`flex-1 min-w-[100px] py-3 text-sm font-bold flex items-center justify-center border-b-2 transition-colors relative ${activeTab === 'log' ? 'border-bvb-yellow text-bvb-black bg-gray-50' : 'border-transparent text-gray-500'}`}>
                         <FileText className="w-4 h-4 mr-2" /> 训练日志
                         {isCoach && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead && <span className="absolute top-2 right-4 w-2 h-2 bg-blue-500 rounded-full animate-ping"></span>}
                         {isDirector && localSession.submissionStatus === 'Submitted' && <span className="absolute top-2 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse border border-white"></span>}
@@ -538,6 +540,21 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                 />
                             </section>
 
+                            {/* 助教反馈 (NEW) */}
+                            <section className="space-y-4">
+                                <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
+                                    <MessageSquare className="w-5 h-5 text-emerald-400" />
+                                    <h4 className="font-black text-base text-gray-800 uppercase italic tracking-tighter">助教反馈</h4>
+                                </div>
+                                <textarea 
+                                    disabled={!isAssistantCoach || localSession.submissionStatus === 'Reviewed'}
+                                    className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner placeholder:text-gray-300"
+                                    placeholder={isAssistantCoach ? "助教对本次训练及球员表现的反馈意见..." : "暂无助教反馈"}
+                                    value={localSession.assistantCoachFeedback || ''}
+                                    onChange={e => setLocalSession({...localSession, assistantCoachFeedback: e.target.value})}
+                                />
+                            </section>
+
                             {/* 三、重点关注球员内容 (保持现状) */}
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
@@ -552,11 +569,13 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
                                             const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '' };
                                             return (
                                                 <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-3xl p-6 shadow-sm space-y-4">
-                                                    <div className="flex items-center gap-3 border-b border-yellow-100 pb-4">
-                                                        <img src={p.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                        <div>
-                                                            <div className="font-black text-gray-800 text-base">{p.name}</div>
-                                                            <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Focused Player Stats Tracking</div>
+                                                    <div className="flex items-center justify-between border-b border-yellow-100 pb-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={p.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                            <div>
+                                                                <div className="font-black text-gray-800 text-base">{p.name}</div>
+                                                                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Focused Player Stats Tracking</div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -880,7 +899,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
     return (
         <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500">
             {/* 球员关注列表 */}
-            <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0">
+            <div className="w-full lg:w-72 flex flex-col gap-4 shrink-0">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input 
@@ -893,35 +912,41 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-20 md:pb-4">
                     {focusedPlayersSummary.map(entry => {
                         const isSelected = selectedFocusPlayerId === entry.player.id;
+                        const latestHistory = [...entry.history].sort((a,b) => b.date.localeCompare(a.date))[0];
+                        const isResolved = latestHistory?.notes?.status === 'Resolved';
+
+                        if (isResolved && !isSelected) return null; // Hide resolved players unless selected
+
                         return (
                             <div 
                                 key={entry.player.id} 
                                 onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
+                                className={`p-3 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
                             >
                                 <div className="flex items-center gap-3">
                                     <div className="relative">
-                                        <img src={entry.player.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
-                                        <div className="absolute -bottom-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>
+                                        <img src={entry.player.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-sm truncate">{entry.player.name}</h4>
-                                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                        <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
+                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
                                     </div>
-                                    <ChevronRight className={`w-5 h-5 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
+                                    {isResolved && <CheckCircle className="w-4 h-4 text-green-500" />}
+                                    <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
                                 </div>
-                                <div className={`grid grid-cols-3 gap-2 mt-4 pt-3 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                <div className={`grid grid-cols-3 gap-1 mt-3 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
                                     <div className="text-center">
-                                        <p className="text-[8px] font-black uppercase opacity-60">本月关注</p>
-                                        <p className="text-sm font-black tabular-nums">{entry.stats.month}</p>
+                                        <p className="text-[7px] font-black uppercase opacity-60">本月</p>
+                                        <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
                                     </div>
                                     <div className="text-center border-x border-white/5">
-                                        <p className="text-[8px] font-black uppercase opacity-60">本季关注</p>
-                                        <p className="text-sm font-black tabular-nums">{entry.stats.quarter}</p>
+                                        <p className="text-[7px] font-black uppercase opacity-60">本季</p>
+                                        <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-[8px] font-black uppercase opacity-60">年度总计</p>
-                                        <p className={`text-sm font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                        <p className="text-[7px] font-black uppercase opacity-60">年度</p>
+                                        <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
                                     </div>
                                 </div>
                             </div>
@@ -947,7 +972,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             const history = [...entry.history].sort((a,b) => b.date.localeCompare(a.date));
                             return (
                                 <React.Fragment>
-                                    <div className="p-6 md:p-8 bg-gray-50 border-b flex justify-between items-end shrink-0">
+                                    <div className="p-6 md:p-8 bg-gray-50 border-b flex flex-col md:flex-row justify-between items-start md:items-end gap-4 shrink-0">
                                         <div className="flex items-center gap-5">
                                             <img src={entry.player.image} className="w-20 h-20 rounded-3xl object-cover border-4 border-white shadow-xl rotate-[-2deg]" />
                                             <div>
@@ -959,21 +984,50 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                 <div className="flex gap-4 mt-4">
                                                     <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">年度关注频次</span><span className="text-lg font-black text-bvb-black">{entry.stats.year} 次</span></div>
                                                     <div className="w-px h-8 bg-gray-200"></div>
-                                                    <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">最后关注日期</span><span className="text-lg font-black text-gray-800">{history[0]?.date || '-'}</span></div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[8px] font-black text-gray-400 uppercase">当前关注状态</span>
+                                                        <select 
+                                                            className={`text-sm font-black border-none bg-transparent outline-none cursor-pointer ${history[0]?.notes?.status === 'Resolved' ? 'text-green-600' : 'text-yellow-600'}`}
+                                                            value={history[0]?.notes?.status || 'Unresolved'}
+                                                            onChange={(e) => {
+                                                                const newStatus = e.target.value as 'Resolved' | 'Unresolved';
+                                                                const latestSession = trainings.find(s => s.id === history[0].id);
+                                                                if (latestSession) {
+                                                                    const updatedNotes = { ...(latestSession.focusedPlayerNotes || {}) };
+                                                                    if (!updatedNotes[entry.player.id]) {
+                                                                        updatedNotes[entry.player.id] = { technical: '', mental: '', status: 'Unresolved' };
+                                                                    }
+                                                                    updatedNotes[entry.player.id] = {
+                                                                        ...updatedNotes[entry.player.id],
+                                                                        status: newStatus
+                                                                    };
+                                                                    onUpdateTraining({
+                                                                        ...latestSession,
+                                                                        focusedPlayerNotes: updatedNotes
+                                                                    }, latestSession.attendance || []);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="Unresolved">未解决持续跟踪</option>
+                                                            <option value="Resolved">已解决</option>
+                                                        </select>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={async () => {
-                                                setIsExporting(true);
-                                                try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
-                                            }}
-                                            className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
-                                        >
-                                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4 text-bvb-yellow"/>}
-                                            Export Profile
-                                        </button>
+                                        <div className="flex gap-2 w-full md:w-auto">
+                                            <button 
+                                                onClick={async () => {
+                                                    setIsExporting(true);
+                                                    try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
+                                                    catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
+                                                }}
+                                                className="flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
+                                            >
+                                                {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4 text-bvb-yellow"/>}
+                                                Export Profile
+                                            </button>
+                                        </div>
                                     </div>
                                     <div id="focus-tracking-export" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
                                         <div className="relative space-y-8">
@@ -983,25 +1037,28 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                     <div className="absolute left-0 top-0 w-12 h-12 bg-white rounded-2xl border-4 border-gray-50 shadow-md flex items-center justify-center z-10">
                                                         <span className="text-[10px] font-black text-gray-400 font-mono leading-none">{h.date.split('-').slice(1).join('/')}</span>
                                                     </div>
-                                                    <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-6 hover:bg-white hover:shadow-md transition-all group">
-                                                        <div className="flex justify-between items-start mb-4">
-                                                            <h5 className="font-black text-lg text-gray-800 group-hover:text-bvb-black transition-colors">{h.title}</h5>
-                                                            <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
+                                                    <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-4 hover:bg-white hover:shadow-md transition-all group">
+                                                        <div className="flex justify-between items-start mb-3">
+                                                            <h5 className="font-black text-base text-gray-800 group-hover:text-bvb-black transition-colors">{h.title}</h5>
+                                                            <div className="flex items-center gap-2">
+                                                                {h.notes.status === 'Resolved' && <span className="text-[8px] font-black text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-100 uppercase tracking-widest">Resolved</span>}
+                                                                <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
+                                                            </div>
                                                         </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现评价
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[9px] font-black text-bvb-black uppercase tracking-widest flex items-center gap-1.5">
+                                                                    <Target className="w-3 h-3 text-bvb-yellow" /> 技术表现评价
                                                                 </label>
-                                                                <div className="text-sm text-gray-600 leading-relaxed italic bg-white p-3 rounded-xl border border-gray-50 min-h-[60px]">
+                                                                <div className="text-xs text-gray-600 leading-relaxed italic bg-white p-2.5 rounded-xl border border-gray-50 min-h-[50px]">
                                                                     {h.notes.technical || '-- 暂无技战术层反馈记录 --'}
                                                                 </div>
                                                             </div>
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度评估
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
+                                                                    <Brain className="w-3 h-3 text-indigo-400" /> 心理/态度评估
                                                                 </label>
-                                                                <div className="text-sm text-gray-600 leading-relaxed italic bg-white p-3 rounded-xl border border-gray-50 min-h-[60px]">
+                                                                <div className="text-xs text-gray-600 leading-relaxed italic bg-white p-2.5 rounded-xl border border-gray-50 min-h-[50px]">
                                                                     {h.notes.mental || '-- 暂无心理层面评估记录 --'}
                                                                 </div>
                                                             </div>
@@ -1492,32 +1549,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   <div className="space-y-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
-                      
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
-                        <select 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                          value={formData.focus} 
-                          onChange={e => {
-                            const newFocus = e.target.value;
-                            setFormData({
-                              ...formData, 
-                              focus: newFocus,
-                              title: '' // Reset title when focus changes to force selection from new list
-                            });
-                          }}
-                        >
-                          {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
-                          <option value="Custom">自定义...</option>
-                        </select>
-                        {formData.focus === 'Custom' && (
-                          <input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />
-                        )}
-                      </div>
-
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
                         {formData.focus !== 'Custom' && focusSubjects?.[formData.focus] && focusSubjects[formData.focus].length > 0 ? (
@@ -1542,37 +1573,64 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                           />
                         )}
                       </div>
-                    </div>
 
-                    {!isAiMode && (
-                      <div className="pt-2 border-t border-gray-100">
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
-                          <LayoutList className="w-3 h-3 text-bvb-yellow" /> 训练项目
-                        </label>
-                        <div className="space-y-2 mb-2">
-                          {formData.drills.map((drill, idx) => (
-                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-sm shadow-sm">
-                              <span className="font-bold text-gray-700">{drill}</span>
-                              <button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500">
-                                <X className="w-4 h-4"/>
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex gap-2">
-                          <input 
-                            className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
-                            placeholder="添加项目..." 
-                            value={drillInput} 
-                            onChange={e => setDrillInput(e.target.value)} 
-                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} 
-                          />
-                          <button type="button" onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110 transition-all">
-                            <Plus className="w-4 h-4"/>
-                          </button>
-                        </div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
+                        <select 
+                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
+                          value={formData.focus} 
+                          onChange={e => {
+                            const newFocus = e.target.value;
+                            setFormData({
+                              ...formData, 
+                              focus: newFocus,
+                              title: '' // Reset title when focus changes to force selection from new list
+                            });
+                          }}
+                        >
+                          {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
+                          <option value="Custom">自定义...</option>
+                        </select>
+                        {formData.focus === 'Custom' && (
+                          <input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />
+                        )}
                       </div>
-                    )}
+
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
+
+                      {!isAiMode && (
+                        <div className="md:col-span-2 pt-2 border-t border-gray-100">
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                            <LayoutList className="w-3 h-3 text-bvb-yellow" /> 训练项目
+                          </label>
+                          <div className="space-y-2 mb-2">
+                            {formData.drills.map((drill, idx) => (
+                              <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-sm shadow-sm">
+                                <span className="font-bold text-gray-700">{drill}</span>
+                                <button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500">
+                                  <X className="w-4 h-4"/>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-2">
+                            <input 
+                              className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                              placeholder="添加项目..." 
+                              value={drillInput} 
+                              onChange={e => setDrillInput(e.target.value)} 
+                              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} 
+                            />
+                            <button type="button" onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110 transition-all">
+                              <Plus className="w-4 h-4"/>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* 重点关注球员选择器 (NEW) */}
