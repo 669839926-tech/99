@@ -202,10 +202,11 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
-        const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
+    categories.forEach((category) => {
+        if (attributeConfig[category]) {
+            attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+        }
     });
     return stats;
 };
@@ -241,14 +242,13 @@ interface ImportPlayersModalProps {
     onClose: () => void;
 }
 const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attributeConfig, onImport, onClose }) => {
-    const [csvContent, setCsvContent] = useState('');
     const [parsedPlayers, setParsedPlayers] = useState<Partial<Player>[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id || '');
     const [step, setStep] = useState<'upload' | 'preview'>('upload');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const handleDownloadTemplate = () => {
-        const headers = "姓名,球衣号码,主位置,副位置,身份证号,入队时间,就读学校,家长姓名,联系电话,惯用脚(左/右)\n";
-        const example = "张三,10,中锋,左边锋,110101201001011234,2023-01-01,实验小学,张父,13800138000,右\n";
+        const headers = "姓名,球衣号码,身份证号,入队时间,就读学校,家长姓名,联系电话,惯用脚(左/右)\n";
+        const example = "张三,10,110101201001011234,2023-01-01,实验小学,张父,13800138000,右\n";
         const content = headers + example;
         const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -268,17 +268,12 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
             const line = lines[i].trim(); if (!line) continue;
             const cols = line.split(',').map(c => c.trim());
             if (cols.length >= 2) {
-                const name = cols[0]; const number = parseInt(cols[1]) || 0; const pos1Str = cols[2]; const pos2Str = cols[3];
-                const idCard = cols[4] || ''; const joinDate = cols[5] || ''; const school = cols[6] || '';
-                const parentName = cols[7] || ''; const parentPhone = cols[8] || ''; const foot = cols[9] === '左' ? '左' : '右';
+                const name = cols[0]; const number = parseInt(cols[1]) || 0;
+                const idCard = cols[2] || ''; const joinDate = cols[3] || ''; const school = cols[4] || '';
+                const parentName = cols[5] || ''; const parentPhone = cols[6] || ''; const foot = cols[7] === '左' ? '左' : '右';
                 
-                const parsePos = (s: string) => {
-                    if (s.includes('守门员')) return Position.GK_ATT; else if (s.includes('后卫')) return Position.CB; else if (s.includes('中场')) return Position.CM; else if (s.includes('锋') || s.includes('9')) return Position.ST;
-                    return Position.TBD;
-                };
-
-                const position = parsePos(pos1Str);
-                const secondaryPosition = parsePos(pos2Str);
+                const position = Position.TBD;
+                const secondaryPosition = Position.TBD;
 
                 let gender: '男' | '女' = '男'; let age = 10; let birthDate = '';
                 if (idCard.length === 18) {
@@ -314,7 +309,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                         <div className="space-y-4">
                             <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200"><div className="flex items-center"><CheckCircle className="w-5 h-5 text-green-500 mr-2" /><span className="font-bold text-sm">成功解析 {parsedPlayers.length} 名球员数据</span></div><button onClick={() => setStep('upload')} className="text-xs text-gray-500 hover:underline">重新上传</button></div>
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">选择导入梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold bg-white" value={selectedTeamId} onChange={e => setSelectedTeamId(e.target.value)}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                            <div className="max-h-[300px] overflow-y-auto border rounded-lg"><table className="w-full text-xs text-left"><thead className="bg-gray-100 font-bold text-gray-600 sticky top-0"><tr><th className="p-2 border-b">姓名</th><th className="p-2 border-b">号码</th><th className="p-2 border-b">主位置</th><th className="p-2 border-b">年龄</th><th className="p-2 border-b">惯用脚</th></tr></thead><tbody className="divide-y divide-gray-100">{parsedPlayers.map((p, i) => (<tr key={i} className="hover:bg-gray-50"><td className="p-2 font-bold">{p.name}</td><td className="p-2">{p.number}</td><td className="p-2">{p.position}</td><td className="p-2">{p.age}</td><td className="p-2">{p.preferredFoot}</td></tr>))}</tbody></table></div>
+                            <div className="max-h-[300px] overflow-y-auto border rounded-lg"><table className="w-full text-xs text-left"><thead className="bg-gray-100 font-bold text-gray-600 sticky top-0"><tr><th className="p-2 border-b">姓名</th><th className="p-2 border-b">号码</th><th className="p-2 border-b">年龄</th><th className="p-2 border-b">惯用脚</th></tr></thead><tbody className="divide-y divide-gray-100">{parsedPlayers.map((p, i) => (<tr key={i} className="hover:bg-gray-50"><td className="p-2 font-bold">{p.name}</td><td className="p-2">{p.number}</td><td className="p-2">{p.age}</td><td className="p-2">{p.preferredFoot}</td></tr>))}</tbody></table></div>
                         </div>
                     )}
                 </div>
@@ -1184,7 +1179,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }, 0);
   }, [selectedTeamId]);
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
-  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
+  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.TBD, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
   const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: 'U17', attribute: '兴趣', description: '' });
   
   const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1344,7 +1339,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             idCard: newPlayer.idCard || '', 
             birthDate: newPlayer.birthDate || '', 
             number: newPlayer.number, 
-            position: (newPlayer.position || Position.ST) as Position, 
+            position: (newPlayer.position || Position.TBD) as Position, 
             secondaryPosition: (newPlayer.secondaryPosition || Position.TBD) as Position,
             isCaptain: newPlayer.isCaptain || false, 
             age: newPlayer.age || 16, 
@@ -1375,7 +1370,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         
         onAddPlayer(p); 
         setShowAddModal(false); 
-        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
+        setSelectedPlayer(p); // 自动打开新球员档案
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.TBD, secondaryPosition: Position.TBD, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
     } else {
         alert('请完整填写必填项：姓名、球衣号码及归属梯队。');
     }
@@ -1597,10 +1593,6 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || selectedTeamId} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">主位置</label><PositionSelect value={newPlayer.position || Position.ST} onChange={val => setNewPlayer({...newPlayer, position: val})} className="border-gray-200 border"/></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">副位置</label><PositionSelect value={newPlayer.secondaryPosition || Position.TBD} onChange={val => setNewPlayer({...newPlayer, secondaryPosition: val})} className="border-gray-200 border"/></div>
                         </div>
                     </div>
                 </div>

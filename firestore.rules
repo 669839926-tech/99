@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: appData
+    // Document ID: {userId}
+    // Fields:
+    //   - teams: list (required)
+    //   - players: list (required)
+    //   - trainingPlans: list (required)
+    //   - playerGrowth: list (required)
+    //   - settings: map (required)
+    //   - lastUpdated: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "haoyu19880511@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidAppData(data) {
+      return data.keys().hasAll(['teams', 'players', 'trainingPlans', 'playerGrowth', 'settings']) &&
+             data.teams is list &&
+             data.players is list &&
+             data.trainingPlans is list &&
+             data.playerGrowth is list &&
+             data.settings is map;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /appData/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidAppData(request.resource.data);
+      allow update: if isOwner(userId) && isValidAppData(request.resource.data);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && request.resource.data.role == 'user';
+      allow update: if isOwner(userId) && request.resource.data.role == resource.data.role;
+      allow delete: if isAdmin();
+    }
+    
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
