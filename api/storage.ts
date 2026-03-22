@@ -1,65 +1,36 @@
 
-import { put, list } from '@vercel/blob';
-import fs from 'fs';
+import fs from 'fs/promises';
 import path from 'path';
 
-const DB_FILENAME = 'football_manager_db.json';
-const DB_PREFIX = 'football_manager_db';
+const DATA_DIR = path.join(process.cwd(), 'data');
+const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 export default async function handler(request, response) {
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  const isVercelBlobEnabled = token && token.trim() !== '' && token !== 'YOUR_BLOB_TOKEN_HERE';
-
   try {
-    // GET Request: Load data
-    if (request.method === 'GET') {
-      if (isVercelBlobEnabled) {
-        const { blobs } = await list({ prefix: DB_PREFIX, token });
-        
-        if (blobs.length > 0) {
-          const sortedBlobs = blobs.sort((a, b) => 
-            new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-          );
-          const jsonUrl = sortedBlobs[0].url;
-          const res = await fetch(jsonUrl, { cache: 'no-store' });
-          const data = await res.json();
-          response.setHeader('Cache-Control', 'no-store, max-age=0');
-          return response.status(200).json(data);
-        }
-      }
-      
-      // Fallback to local file if blob is disabled or no blobs found
-      const localPath = path.join(process.cwd(), DB_FILENAME);
-      if (fs.existsSync(localPath)) {
-        const data = JSON.parse(fs.readFileSync(localPath, 'utf-8'));
-        return response.status(200).json(data);
-      }
-      
-      return response.status(200).json(null);
+    // Ensure data directory exists
+    try {
+      await fs.access(DATA_DIR);
+    } catch (_e) {
+      await fs.mkdir(DATA_DIR, { recursive: true });
     }
 
-    // POST Request: Save data
+    if (request.method === 'GET') {
+      try {
+        const data = await fs.readFile(DB_FILE, 'utf-8');
+        return response.status(200).json(JSON.parse(data));
+      } catch (_e) {
+        // If file doesn't exist, return null (new database)
+        console.log('No local database found, returning null.');
+        return response.status(200).json(null);
+      }
+    }
+
     if (request.method === 'POST') {
       const body = request.body;
-      
-      if (isVercelBlobEnabled) {
-        try {
-          await put(DB_FILENAME, JSON.stringify(body), {
-            access: 'public',
-            addRandomSuffix: false,
-            allowOverwrite: true,
-            token,
-          });
-        } catch (blobError) {
-          console.error('Vercel Blob save failed, falling back to local:', blobError);
-        }
-      }
-
-      // Always save locally as well (or as fallback)
-      const localPath = path.join(process.cwd(), DB_FILENAME);
-      fs.writeFileSync(localPath, JSON.stringify(body, null, 2));
-      
-      return response.status(200).json({ success: true });
+      console.log('Saving data to local storage...');
+      await fs.writeFile(DB_FILE, JSON.stringify(body, null, 2), 'utf-8');
+      console.log('Data saved successfully to:', DB_FILE);
+      return response.status(200).json({ success: true, url: 'local-storage' });
     }
 
     return response.status(405).send('Method not allowed');
