@@ -2,8 +2,10 @@
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
+import multer from 'multer';
+import { put } from '@vercel/blob';
 
-
+const upload = multer({ storage: multer.memoryStorage() });
 
 async function startServer() {
   const app = express();
@@ -14,6 +16,26 @@ async function startServer() {
   // API Routes
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // Vercel Blob Upload Endpoint
+  app.post('/api/upload', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+
+      const { buffer, originalname, mimetype } = req.file;
+      const blob = await put(originalname, buffer, {
+        contentType: mimetype,
+        access: 'public',
+      });
+
+      res.json(blob);
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({ error: 'Failed to upload file' });
+    }
   });
 
   // Vite middleware for development
