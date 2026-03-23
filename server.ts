@@ -6,7 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import storageHandler from './api/storage.js';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
