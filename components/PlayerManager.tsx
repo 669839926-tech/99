@@ -202,10 +202,11 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
-        const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
+    categories.forEach((category) => {
+        if (Array.isArray(attributeConfig[category])) {
+            attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+        }
     });
     return stats;
 };
@@ -1330,7 +1331,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || selectedTeamId;
+    const finalTeamId = newPlayer.teamId || (selectedTeamId !== '' ? selectedTeamId : (teams.length > 0 ? teams[0].id : 'unassigned'));
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
@@ -1592,11 +1593,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名 (必填)</label><input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="输入球员姓名" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number || ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number !== undefined && !isNaN(newPlayer.number) ? newPlayer.number : ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
-                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || selectedTeamId} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
+                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || (selectedTeamId !== '' ? selectedTeamId : (teams.length > 0 ? teams[0].id : 'unassigned'))} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">主位置</label><PositionSelect value={newPlayer.position || Position.ST} onChange={val => setNewPlayer({...newPlayer, position: val})} className="border-gray-200 border"/></div>
