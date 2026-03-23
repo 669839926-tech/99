@@ -15,12 +15,9 @@ import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUT
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
-import { auth, signInWithGoogle, logout as firebaseLogout, onAuthStateChanged, User as FirebaseUser, testFirestoreConnection } from './firebase';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [navigationParams, setNavigationParams] = useState<{ filter?: string }>({});
   
@@ -100,31 +97,10 @@ function App() {
       });
   }, [players, trainings]);
 
-  // Load Data on Auth Change
+  // Load Data on Mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setAuthLoading(false);
-      if (user) {
-        console.log('Firebase user authenticated:', user.email);
-        testFirestoreConnection();
-      } else {
-        setCurrentUser(null);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (authLoading) return;
-    
     const init = async () => {
-        if (!firebaseUser) {
-            setIsInitializing(false);
-            return;
-        }
-
-        const cloudData = await loadDataFromCloud(firebaseUser.uid);
+        const cloudData = await loadDataFromCloud();
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -142,38 +118,15 @@ function App() {
             if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
-
-            // Map Firebase user to App User if not already set
-            const existingUser = (cloudData.users || MOCK_USERS).find(u => u.id === firebaseUser.uid);
-            if (existingUser) {
-                setCurrentUser(existingUser);
-            } else if (firebaseUser.email === 'haoyu19880511@gmail.com') {
-                setCurrentUser({
-                    id: firebaseUser.uid,
-                    username: 'admin',
-                    name: firebaseUser.displayName || '管理员',
-                    role: 'director'
-                });
-            }
-        } else {
-            // New user or no data
-            if (firebaseUser.email === 'haoyu19880511@gmail.com') {
-                setCurrentUser({
-                    id: firebaseUser.uid,
-                    username: 'admin',
-                    name: firebaseUser.displayName || '管理员',
-                    role: 'director'
-                });
-            }
         }
         setIsInitializing(false);
     };
     init();
-  }, [firebaseUser, authLoading]);
+  }, []);
 
   // Auto-Save on Change
   useEffect(() => {
-    if (isInitializing || !firebaseUser) return;
+    if (isInitializing) return;
     if (isFirstRun.current) {
         isFirstRun.current = false;
         return;
@@ -182,7 +135,7 @@ function App() {
     const timer = setTimeout(async () => {
         setIsSyncing(true);
         try {
-            await saveDataToCloud(firebaseUser.uid, {
+            await saveDataToCloud({
                 players,
                 teams,
                 matches,
@@ -208,7 +161,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing, firebaseUser]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -218,7 +171,6 @@ function App() {
   };
 
   const handleLogout = () => {
-    firebaseLogout();
     setCurrentUser(null);
     setNavigationParams({});
   };
@@ -309,7 +261,7 @@ function App() {
       });
   };
 
-  if (authLoading || (firebaseUser && isInitializing)) {
+  if (isInitializing) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
               <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
@@ -318,7 +270,7 @@ function App() {
       );
   }
 
-  if (!firebaseUser && !currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} onGoogleLogin={signInWithGoogle} appLogo={appLogo} />;
+  if (!currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
 
   if (currentUser.role === 'parent' && currentUser.playerId) {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
