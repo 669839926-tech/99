@@ -15,12 +15,9 @@ import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUT
 import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
-import { auth, signInWithGoogle, logout as firebaseLogout, onAuthStateChanged, User as FirebaseUser, testFirestoreConnection } from './firebase';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [navigationParams, setNavigationParams] = useState<{ filter?: string }>({});
   
@@ -100,31 +97,10 @@ function App() {
       });
   }, [players, trainings]);
 
-  // Load Data on Auth Change
+  // Load Data on Mount
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setFirebaseUser(user);
-      setAuthLoading(false);
-      if (user) {
-        console.log('Firebase user authenticated:', user.email);
-        testFirestoreConnection();
-      } else {
-        setCurrentUser(null);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (authLoading) return;
-    
     const init = async () => {
-        if (!firebaseUser) {
-            setIsInitializing(false);
-            return;
-        }
-
-        const cloudData = await loadDataFromCloud(firebaseUser.uid);
+        const cloudData = await loadDataFromCloud();
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -142,38 +118,15 @@ function App() {
             if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
-
-            // Map Firebase user to App User if not already set
-            const existingUser = (cloudData.users || MOCK_USERS).find(u => u.id === firebaseUser.uid);
-            if (existingUser) {
-                setCurrentUser(existingUser);
-            } else if (firebaseUser.email === 'haoyu19880511@gmail.com') {
-                setCurrentUser({
-                    id: firebaseUser.uid,
-                    username: 'admin',
-                    name: firebaseUser.displayName || '管理员',
-                    role: 'director'
-                });
-            }
-        } else {
-            // New user or no data
-            if (firebaseUser.email === 'haoyu19880511@gmail.com') {
-                setCurrentUser({
-                    id: firebaseUser.uid,
-                    username: 'admin',
-                    name: firebaseUser.displayName || '管理员',
-                    role: 'director'
-                });
-            }
         }
         setIsInitializing(false);
     };
     init();
-  }, [firebaseUser, authLoading]);
+  }, []);
 
   // Auto-Save on Change
   useEffect(() => {
-    if (isInitializing || !firebaseUser) return;
+    if (isInitializing) return;
     if (isFirstRun.current) {
         isFirstRun.current = false;
         return;
@@ -182,7 +135,7 @@ function App() {
     const timer = setTimeout(async () => {
         setIsSyncing(true);
         try {
-            await saveDataToCloud(firebaseUser.uid, {
+            await saveDataToCloud({
                 players,
                 teams,
                 matches,
@@ -208,7 +161,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing, firebaseUser]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -218,7 +171,6 @@ function App() {
   };
 
   const handleLogout = () => {
-    firebaseLogout();
     setCurrentUser(null);
     setNavigationParams({});
   };
@@ -259,7 +211,6 @@ function App() {
   const handleDeleteDesign = (id: string) => setDesigns(prev => prev.filter(d => d.id !== id));
   const handleAddAnnouncement = (announcement: Announcement) => setAnnouncements(prev => [announcement, ...prev]);
   const handleDeleteAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
-  const handleUpdateAnnouncement = (updatedAnnouncement: Announcement) => setAnnouncements(prev => prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a));
   const handleRechargePlayer = (playerId: string, amount: number, leaveQuota: number) => {
       const today = new Date();
       today.setFullYear(today.getFullYear() + 1);
@@ -309,7 +260,7 @@ function App() {
       });
   };
 
-  if (authLoading || (firebaseUser && isInitializing)) {
+  if (isInitializing) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
               <Loader2 className="w-10 h-10 text-bvb-yellow animate-spin mb-4" />
@@ -318,19 +269,19 @@ function App() {
       );
   }
 
-  if (!firebaseUser && !currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} onGoogleLogin={signInWithGoogle} appLogo={appLogo} />;
+  if (!currentUser) return <Login users={users} players={derivedPlayers} onLogin={handleLogin} appLogo={appLogo} />;
 
   if (currentUser.role === 'parent' && currentUser.playerId) {
     const childPlayer = derivedPlayers.find(p => p.id === currentUser.playerId);
     if (!childPlayer) return <div>Error: Player not found</div>;
     const childTeam = teams.find(t => t.id === childPlayer.teamId);
-    return <ParentPortal player={childPlayer} team={childTeam} attributeConfig={attributeConfig} trainings={trainings} onLogout={handleLogout} appLogo={appLogo} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} />;
+    return <ParentPortal player={childPlayer} team={childTeam} onLogout={handleLogout} appLogo={appLogo} onUpdatePlayer={handleUpdatePlayer} />;
   }
 
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} />;
+        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} appLogo={appLogo} />;
       case 'players':
         return <PlayerManager teams={teams} players={derivedPlayers} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} />;
       case 'growth':
@@ -342,7 +293,7 @@ function App() {
       case 'training':
         return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
       case 'matches':
-        return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
+        return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} />;
       case 'settings':
         return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} />;
       default:

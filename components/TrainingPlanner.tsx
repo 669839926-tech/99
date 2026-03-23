@@ -185,8 +185,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1500);
         return () => clearTimeout(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [localSession.title, localSession.date, localSession.duration, localSession.focus, localSession.intensity, localSession.drills, localSession.attendance, localSession.performanceRatings, localSession.coachFeedback, localSession.planReflection, localSession.focusedPlayerIds, localSession.focusedPlayerNotes, localSession.submissionStatus, localSession.isReviewRead, localSession.directorReview, onUpdate]);
+    }, [localSession, onUpdate]);
 
     useEffect(() => {
         if (activeTab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
@@ -668,7 +667,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, drillLibrary, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -1630,7 +1629,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} allSessions={userManagedSessions} />
         )}
     </div>
   );
