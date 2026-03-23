@@ -785,17 +785,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   // 球员关注追踪视图逻辑
   const focusedPlayersSummary = useMemo(() => {
-    const focusMap: Record<string, { player: Player; stats: any; history: any[]; isRecentlyFocused?: boolean }> = {};
+    const focusMap: Record<string, { player: Player; stats: any; history: any[] }> = {};
     const relevantTrainings = userManagedSessions.filter(s => statsTeamFilter === 'all' || s.teamId === statsTeamFilter);
     
-    const today = new Date();
-    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
     relevantTrainings.forEach(s => {
         if (s.focusedPlayerIds) {
-            const sessionDate = parseLocalDate(s.date);
-            const isLastWeek = sessionDate >= lastWeek && sessionDate <= today;
-
             s.focusedPlayerIds.forEach(pid => {
                 if (!focusMap[pid]) {
                     const p = players.find(p => p.id === pid);
@@ -803,13 +797,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         focusMap[pid] = { 
                             player: p, 
                             stats: calculateFocusStats(pid, userManagedSessions),
-                            history: [],
-                            isRecentlyFocused: false
+                            history: []
                         };
                     }
                 }
                 if (focusMap[pid]) {
-                    if (isLastWeek) focusMap[pid].isRecentlyFocused = true;
                     focusMap[pid].history.push({
                         id: s.id,
                         date: s.date,
@@ -823,11 +815,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
     return Object.values(focusMap)
         .filter(entry => entry.player.name.includes(focusSearchTerm))
-        .sort((a, b) => {
-            if (a.isRecentlyFocused && !b.isRecentlyFocused) return -1;
-            if (!a.isRecentlyFocused && b.isRecentlyFocused) return 1;
-            return b.stats.year - a.stats.year;
-        });
+        .sort((a, b) => b.stats.year - a.stats.year);
   }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
 
   const handlePrevPeriod = () => {
@@ -906,47 +894,35 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-20 md:pb-4">
                     {focusedPlayersSummary.map(entry => {
                         const isSelected = selectedFocusPlayerId === entry.player.id;
-                        const isRecent = (entry as any).isRecentlyFocused;
                         return (
                             <div 
                                 key={entry.player.id} 
                                 onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                className={`p-3 rounded-xl border-2 transition-all cursor-pointer relative group ${
-                                    isSelected 
-                                        ? 'bg-bvb-black border-bvb-black text-white shadow-xl' 
-                                        : isRecent 
-                                            ? 'bg-yellow-50 border-bvb-yellow/40 text-gray-800 shadow-sm' 
-                                            : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'
-                                }`}
+                                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
                             >
-                                {isRecent && !isSelected && (
-                                    <div className="absolute -top-2 -right-2 bg-bvb-yellow text-bvb-black text-[8px] font-black px-2 py-0.5 rounded-full shadow-sm z-10 animate-bounce">
-                                        近期关注
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2.5">
+                                <div className="flex items-center gap-3">
                                     <div className="relative">
-                                        <img src={entry.player.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                        <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
+                                        <img src={entry.player.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
-                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                        <h4 className="font-black text-sm truncate">{entry.player.name}</h4>
+                                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
                                     </div>
-                                    <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
+                                    <ChevronRight className={`w-5 h-5 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
                                 </div>
-                                <div className={`grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                <div className={`grid grid-cols-3 gap-2 mt-4 pt-3 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
                                     <div className="text-center">
-                                        <p className="text-[7px] font-black uppercase opacity-60">本月</p>
-                                        <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-60">本月关注</p>
+                                        <p className="text-sm font-black tabular-nums">{entry.stats.month}</p>
                                     </div>
                                     <div className="text-center border-x border-white/5">
-                                        <p className="text-[7px] font-black uppercase opacity-60">本季</p>
-                                        <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-60">本季关注</p>
+                                        <p className="text-sm font-black tabular-nums">{entry.stats.quarter}</p>
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-[7px] font-black uppercase opacity-60">年度</p>
-                                        <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-60">年度总计</p>
+                                        <p className={`text-sm font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
                                     </div>
                                 </div>
                             </div>

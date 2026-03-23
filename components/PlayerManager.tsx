@@ -201,15 +201,11 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 };
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
-    const stats: PlayerStats = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
-    
-    categories.forEach((category) => {
-        if (attributeConfig[category]) {
-            attributeConfig[category].forEach(attr => { 
-                stats[category][attr.key] = 5; 
-            });
-        }
+    const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -1277,7 +1273,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     try { 
         const exportTitle = selectedTeam ? `${selectedTeam.name}_球员档案登记表` : '全俱乐部球员档案库'; 
         await exportToPDF('player-list-export', exportTitle); 
-    } catch (_e) { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
+    } catch (e) { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
   };
 
   const handleExportPlayerExcel = () => {
@@ -1296,7 +1292,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         link.href = URL.createObjectURL(blob);
         link.download = `${selectedTeam?.name || '全部球员'}_完整档案明细_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
-    } catch (_e) {
+    } catch (e) {
         alert('Excel 导出失败');
     } finally {
         setIsExportingExcel(false);
@@ -1335,64 +1331,55 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
     const finalTeamId = newPlayer.teamId || selectedTeamId;
-    console.log('Attempting to add player:', { name: newPlayer.name, number: newPlayer.number, finalTeamId });
-    
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
-        try {
-            const defaultStats = generateDefaultStats(attributeConfig);
-            const nextYear = new Date();
-            nextYear.setFullYear(nextYear.getFullYear() + 1);
+        const defaultStats = generateDefaultStats(attributeConfig);
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
 
-            const p: Player = { 
-                id: Date.now().toString(), 
-                teamId: finalTeamId, 
-                name: newPlayer.name.trim(), 
-                gender: newPlayer.gender || '男', 
-                idCard: newPlayer.idCard || '', 
-                birthDate: newPlayer.birthDate || '', 
-                number: newPlayer.number, 
-                position: (newPlayer.position || Position.ST) as Position, 
-                secondaryPosition: (newPlayer.secondaryPosition || Position.TBD) as Position,
-                isCaptain: newPlayer.isCaptain || false, 
-                age: newPlayer.age || 16, 
-                goals: 0, 
-                assists: 0, 
-                appearances: 0, 
-                image: newPlayer.image || `https://picsum.photos/200/200?random=${Date.now()}`, 
-                stats: defaultStats, 
-                statsStatus: 'Published', 
-                lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), 
-                reviews: [], 
-                credits: 0, 
-                validUntil: nextYear.toISOString().split('T')[0], 
-                leaveQuota: 0, 
-                leavesUsed: 0, 
-                remainingLeaveQuota: 0,
-                rechargeHistory: [], 
-                joinDate: newPlayer.joinDate || new Date().toISOString().split('T')[0], 
-                school: newPlayer.school || '', 
-                parentName: newPlayer.parentName || '', 
-                parentPhone: newPlayer.parentPhone || '', 
-                gallery: [], 
-                preferredFoot: (newPlayer.preferredFoot || '右') as '左' | '右', 
-                height: newPlayer.height, 
-                weight: newPlayer.weight, 
-                nickname: newPlayer.nickname || '' 
-            };
-            
-            console.log('Saving player to state:', p);
-            onAddPlayer(p); 
-            setShowAddModal(false); 
-            setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
-        } catch (error) {
-            console.error('Error in handleAddPlayerSubmit:', error);
-            alert('保存失败，请检查数据格式。');
-        }
+        const p: Player = { 
+            id: Date.now().toString(), 
+            teamId: finalTeamId, 
+            name: newPlayer.name.trim(), 
+            gender: newPlayer.gender || '男', 
+            idCard: newPlayer.idCard || '', 
+            birthDate: newPlayer.birthDate || '', 
+            number: newPlayer.number, 
+            position: (newPlayer.position || Position.ST) as Position, 
+            secondaryPosition: (newPlayer.secondaryPosition || Position.TBD) as Position,
+            isCaptain: newPlayer.isCaptain || false, 
+            age: newPlayer.age || 16, 
+            goals: 0, 
+            assists: 0, 
+            appearances: 0, 
+            image: newPlayer.image || `https://picsum.photos/200/200?random=${Date.now()}`, 
+            stats: defaultStats, 
+            statsStatus: 'Published', 
+            lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), 
+            reviews: [], 
+            credits: 0, 
+            validUntil: nextYear.toISOString().split('T')[0], 
+            leaveQuota: 0, 
+            leavesUsed: 0, 
+            remainingLeaveQuota: 0,
+            rechargeHistory: [], 
+            joinDate: newPlayer.joinDate || new Date().toISOString().split('T')[0], 
+            school: newPlayer.school || '', 
+            parentName: newPlayer.parentName || '', 
+            parentPhone: newPlayer.parentPhone || '', 
+            gallery: [], 
+            preferredFoot: (newPlayer.preferredFoot || '右') as '左' | '右', 
+            height: newPlayer.height, 
+            weight: newPlayer.weight, 
+            nickname: newPlayer.nickname || '' 
+        };
+        
+        onAddPlayer(p); 
+        setShowAddModal(false); 
+        setNewPlayer({ name: '', gender: '男', idCard: '', birthDate: '', age: 0, position: Position.ST, secondaryPosition: Position.TBD, number: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', height: undefined, weight: undefined, nickname: '' });
     } else {
-        console.warn('Validation failed:', { name: !!newPlayer.name, finalTeamId, number: newPlayer.number });
         alert('请完整填写必填项：姓名、球衣号码及归属梯队。');
     }
-};
+  };
 
   const handleAddTeamSubmit = (e: React.FormEvent) => { e.preventDefault(); if (newTeam.name && newTeam.level) { const t: Team = { id: `t-${Date.now()}`, name: newTeam.name!, level: newTeam.level!, attribute: newTeam.attribute as any, description: newTeam.description || '新组建的梯队' }; onAddTeam(t); setSelectedTeamId(t.id); setShowAddTeamModal(false); setNewTeam({ name: '', level: 'U17', attribute: '兴趣', description: '' }); } };
   const handleUpdateTeamSubmit = (e: React.FormEvent) => {
@@ -1605,7 +1592,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名 (必填)</label><input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="输入球员姓名" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number === 0 ? '' : newPlayer.number} onChange={e => setNewPlayer({...newPlayer, number: e.target.value === '' ? 0 : parseInt(e.target.value)})}/></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number || ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
