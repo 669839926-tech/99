@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search, AlignLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Users, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, AlignLeft } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
 interface TrainingPlannerProps {
@@ -163,7 +163,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -185,7 +185,8 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1500);
         return () => clearTimeout(timer);
-    }, [localSession, onUpdate]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [localSession.title, localSession.date, localSession.duration, localSession.focus, localSession.intensity, localSession.drills, localSession.attendance, localSession.performanceRatings, localSession.coachFeedback, localSession.planReflection, localSession.focusedPlayerIds, localSession.focusedPlayerNotes, localSession.submissionStatus, localSession.isReviewRead, localSession.directorReview, onUpdate]);
 
     useEffect(() => {
         if (activeTab === 'log' && currentUser?.role === 'coach' && localSession.submissionStatus === 'Reviewed' && !localSession.isReviewRead) {
@@ -667,7 +668,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibra
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -712,7 +713,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setSelectedSession(updated);
         }
     }
-  }, [trainings]); 
+  }, [trainings, selectedSession]); 
 
   const [loading, setLoading] = useState(false);
   const [isAiMode, setIsAiMode] = useState(false);
@@ -733,7 +734,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       if (availableTeams.length > 0 && !availableTeams.find(t => t.id === formData.teamId)) {
           setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
       }
-  }, [availableTeams]);
+  }, [availableTeams, formData.teamId]);
 
   const [drillInput, setDrillInput] = useState('');
 
@@ -785,17 +786,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   // 球员关注追踪视图逻辑
   const focusedPlayersSummary = useMemo(() => {
-    const focusMap: Record<string, { player: Player; stats: any; history: any[]; isRecentlyFocused?: boolean }> = {};
+    const focusMap: Record<string, { player: Player; stats: any; history: any[] }> = {};
     const relevantTrainings = userManagedSessions.filter(s => statsTeamFilter === 'all' || s.teamId === statsTeamFilter);
     
-    const today = new Date();
-    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-
     relevantTrainings.forEach(s => {
         if (s.focusedPlayerIds) {
-            const sessionDate = parseLocalDate(s.date);
-            const isLastWeek = sessionDate >= lastWeek && sessionDate <= today;
-
             s.focusedPlayerIds.forEach(pid => {
                 if (!focusMap[pid]) {
                     const p = players.find(p => p.id === pid);
@@ -803,13 +798,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         focusMap[pid] = { 
                             player: p, 
                             stats: calculateFocusStats(pid, userManagedSessions),
-                            history: [],
-                            isRecentlyFocused: false
+                            history: []
                         };
                     }
                 }
                 if (focusMap[pid]) {
-                    if (isLastWeek) focusMap[pid].isRecentlyFocused = true;
                     focusMap[pid].history.push({
                         id: s.id,
                         date: s.date,
@@ -823,11 +816,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
     return Object.values(focusMap)
         .filter(entry => entry.player.name.includes(focusSearchTerm))
-        .sort((a, b) => {
-            if (a.isRecentlyFocused && !b.isRecentlyFocused) return -1;
-            if (!a.isRecentlyFocused && b.isRecentlyFocused) return 1;
-            return b.stats.year - a.stats.year;
-        });
+        .sort((a, b) => b.stats.year - a.stats.year);
   }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
 
   const handlePrevPeriod = () => {
@@ -906,47 +895,35 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-20 md:pb-4">
                     {focusedPlayersSummary.map(entry => {
                         const isSelected = selectedFocusPlayerId === entry.player.id;
-                        const isRecent = (entry as any).isRecentlyFocused;
                         return (
                             <div 
                                 key={entry.player.id} 
                                 onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                className={`p-3 rounded-xl border-2 transition-all cursor-pointer relative group ${
-                                    isSelected 
-                                        ? 'bg-bvb-black border-bvb-black text-white shadow-xl' 
-                                        : isRecent 
-                                            ? 'bg-yellow-50 border-bvb-yellow/40 text-gray-800 shadow-sm' 
-                                            : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'
-                                }`}
+                                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
                             >
-                                {isRecent && !isSelected && (
-                                    <div className="absolute -top-2 -right-2 bg-bvb-yellow text-bvb-black text-[8px] font-black px-2 py-0.5 rounded-full shadow-sm z-10 animate-bounce">
-                                        近期关注
-                                    </div>
-                                )}
-                                <div className="flex items-center gap-2.5">
+                                <div className="flex items-center gap-3">
                                     <div className="relative">
-                                        <img src={entry.player.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                        <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
+                                        <img src={entry.player.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
-                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                        <h4 className="font-black text-sm truncate">{entry.player.name}</h4>
+                                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
                                     </div>
-                                    <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
+                                    <ChevronRight className={`w-5 h-5 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
                                 </div>
-                                <div className={`grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                <div className={`grid grid-cols-3 gap-2 mt-4 pt-3 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
                                     <div className="text-center">
-                                        <p className="text-[7px] font-black uppercase opacity-60">本月</p>
-                                        <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-60">本月关注</p>
+                                        <p className="text-sm font-black tabular-nums">{entry.stats.month}</p>
                                     </div>
                                     <div className="text-center border-x border-white/5">
-                                        <p className="text-[7px] font-black uppercase opacity-60">本季</p>
-                                        <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-60">本季关注</p>
+                                        <p className="text-sm font-black tabular-nums">{entry.stats.quarter}</p>
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-[7px] font-black uppercase opacity-60">年度</p>
-                                        <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                        <p className="text-[8px] font-black uppercase opacity-60">年度总计</p>
+                                        <p className={`text-sm font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
                                     </div>
                                 </div>
                             </div>
@@ -992,7 +969,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             onClick={async () => {
                                                 setIsExporting(true);
                                                 try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
+                                                catch { alert('导出失败'); } finally { setIsExporting(false); }
                                             }}
                                             className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
                                         >
@@ -1312,7 +1289,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             } else {
                 await exportToPDF('training-plan-list-pdf', `训练计划明细报表_${dateLabel}`); 
             }
-        } catch (e) { 
+        } catch { 
             alert('导出失败'); 
         } finally { 
             setIsExporting(false); 
@@ -1653,7 +1630,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} drillLibrary={drillLibrary} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} allSessions={userManagedSessions} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
         )}
     </div>
   );
