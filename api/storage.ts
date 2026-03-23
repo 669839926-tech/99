@@ -38,8 +38,12 @@ export default async function handler(request, response) {
             response.setHeader('Cache-Control', 'no-store, max-age=0');
             return response.status(200).json(data);
           }
-        } catch (error) {
-          console.error('Vercel Blob GET Error, falling back to local file:', error);
+        } catch (error: any) {
+          if (error.message && error.message.includes('Access denied')) {
+            console.warn('Vercel Blob GET Error: Access denied. Falling back to local file.');
+          } else {
+            console.error('Vercel Blob GET Error, falling back to local file:', error);
+          }
         }
       }
       
@@ -70,8 +74,12 @@ export default async function handler(request, response) {
           });
           url = result.url;
           console.log('Data saved successfully to:', url);
-        } catch (error) {
-          console.error('Vercel Blob POST Error, falling back to local file:', error);
+        } catch (error: any) {
+          if (error.message && error.message.includes('Access denied')) {
+            console.warn('Vercel Blob POST Error: Access denied. Falling back to local file.');
+          } else {
+            console.error('Vercel Blob POST Error, falling back to local file:', error);
+          }
         }
       }
       
