@@ -342,9 +342,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const row = coachSalaries.find(s => s.coachId === coachId);
         if (!coach || !row) return;
         const records = coach.monthlySalaryRecords || [];
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
-        const existingIdx = records.findIndex(r => r.year === effectiveYear && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${effectiveYear}-${selectedMonth}-${coachId}`, year: effectiveYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
+        const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
+        const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
@@ -359,14 +358,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         if (row.totalSalary <= 0) { alert('薪资总额为0，无需发放。'); return; }
         if (row.isDisbursed && !confirm('该笔薪资已经发放过，确定要再次发放并记录支出吗？')) return;
         const records = coach.monthlySalaryRecords || [];
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
-        const existingIdx = records.findIndex(r => r.year === effectiveYear && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${effectiveYear}-${selectedMonth}-${coachId}`, year: effectiveYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
+        const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
+        const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const salaryExpenseCategory = financeCategories.find(c => c.label.includes('工资支出') || c.id === 'cat-4');
-        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${effectiveYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
+        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
         alert(`发放成功！已为 ${coach.name} 生成一笔 ¥${row.totalSalary} 的薪酬支出记录。`);
     };
 
@@ -384,11 +382,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const coach = users.find(u => u.id === coachId);
         if (!coach) return;
         const evaluations = coach.monthlyEvaluations || [];
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
-        const existingIdx = evaluations.findIndex(e => e.year === effectiveYear && e.month === selectedMonth);
+        const existingIdx = evaluations.findIndex(e => e.year === selectedYear && e.month === selectedMonth);
         const nextEvals = [...evaluations];
         if (existingIdx >= 0) nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
-        else nextEvals.push({ id: `eval-${Date.now()}`, year: effectiveYear, month: selectedMonth, score, comment: '' });
+        else nextEvals.push({ id: `eval-${Date.now()}`, year: selectedYear, month: selectedMonth, score, comment: '' });
         onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
     };
 
@@ -701,7 +698,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center uppercase italic tracking-tighter"><FileText className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
                         <div className="flex items-center gap-2 md:gap-4">
                             {Object.values(filters).some(v => v !== '') && (
-                                <button onClick={() => setFilters({ date: '', category: '', details: '', account: '', income: '', expense: '', balance: '' })} className="text-[10px] md:text-xs flex items-center bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100"><RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 重置筛选</button>
+                                <button onClick={() => setFilters({ date: '', category: '', details: '', income: '', expense: '', balance: '' })} className="text-[10px] md:text-xs flex items-center bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100"><RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 重置筛选</button>
                             )}
                             {selectedIds.size > 0 && <button onClick={() => onBulkDeleteTransactions(Array.from(selectedIds))} className="text-[10px] md:text-xs flex items-center bg-red-50 text-red-600 border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 删除({selectedIds.size})</button>}
                             <button onClick={() => { const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n"; const rows = journalWithBalance.map(t => { const catLabel = financeCategories.find(c => c.id === t.category)?.label || '未知分类'; return `${t.date},${catLabel},"${t.details.replace(/"/g, '""')}",${t.income || ''},${t.expense || ''},${t.account},${t.balance.toFixed(2)}`; }).join('\n'); const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`; link.click(); }} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100 shadow-sm"><Download className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 导出</button>
@@ -834,14 +831,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         onClick={(data) => {
                                             if (data && data.activeTooltipIndex !== undefined) {
                                                 if (selectedYear === 'all') {
-                                                    const item = monthlySummaryData[data.activeTooltipIndex as number] as any;
+                                                    const item = monthlySummaryData[data.activeTooltipIndex] as any;
                                                     if (item) {
                                                         const yearStr = item.year;
                                                         const year = parseInt(yearStr);
                                                         if (!isNaN(year)) setSelectedYear(year);
                                                     }
                                                 } else {
-                                                    setSelectedMonth(Number(data.activeTooltipIndex));
+                                                    setSelectedMonth(data.activeTooltipIndex);
                                                 }
                                             }
                                         }}

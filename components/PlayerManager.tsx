@@ -202,11 +202,10 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
-    categories.forEach((category) => {
-        if (Array.isArray(attributeConfig[category])) {
-            attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
-        }
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -242,6 +241,7 @@ interface ImportPlayersModalProps {
     onClose: () => void;
 }
 const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attributeConfig, onImport, onClose }) => {
+    const [csvContent, setCsvContent] = useState('');
     const [parsedPlayers, setParsedPlayers] = useState<Partial<Player>[]>([]);
     const [selectedTeamId, setSelectedTeamId] = useState(teams[0]?.id || '');
     const [step, setStep] = useState<'upload' | 'preview'>('upload');
@@ -418,6 +418,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('overview');
+    const [detailAttendanceScope, setDetailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -487,6 +488,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
       { subject: '心理', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig), fullMark: 10 },
     ];
 
+    const attendanceRate = calculateAttendanceRate(player, trainings, detailAttendanceScope);
     const handleSave = () => {
       if (!editedPlayer) return;
       const updatedPlayer = { 
@@ -502,7 +504,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
          onDeleteRecharge(player.id, rechargeId);
          setEditedPlayer(prev => ({ ...prev, rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || [] }));
     };
-    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
+    const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch (error) { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
     const handleStatChange = (category: keyof PlayerStats, key: string, value: number) => {
       setEditedPlayer(prev => ({ ...prev, stats: { ...prev.stats, [category]: { ...prev.stats[category], [key]: value } }, }));
     };
@@ -525,7 +527,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         try {
             const draft = await generatePlayerReview(player, newReview.quarter || 'Q1', newReview.year || new Date().getFullYear());
             setNewReview(prev => ({ ...prev, technicalTacticalImprovement: draft.tech, mentalDevelopment: draft.mental, summary: draft.summary }));
-        } catch { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
+        } catch (e) { alert('生成失败，请稍后重试'); } finally { setIsGeneratingReview(false); }
     };
 
     const handleEditReview = (review: PlayerReview) => {
@@ -1114,7 +1116,7 @@ interface PlayerManagerProps {
 
 // --- PlayerManager (Main Component) ---
 const PlayerManager: React.FC<PlayerManagerProps> = ({ 
-  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
+  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onAddPlayerReview, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -1152,7 +1154,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }, 0);
   }, [teams, currentUser, isCoach, selectedTeamId, initialFilter]);
 
-  const [attendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+  const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   useEffect(() => { 
     if (selectedPlayer) { 
@@ -1271,7 +1273,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     try { 
         const exportTitle = selectedTeam ? `${selectedTeam.name}_球员档案登记表` : '全俱乐部球员档案库'; 
         await exportToPDF('player-list-export', exportTitle); 
-    } catch { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
+    } catch (e) { alert('导出失败，请重试'); } finally { setIsExportingList(false); } 
   };
 
   const handleExportPlayerExcel = () => {
@@ -1290,7 +1292,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
         link.href = URL.createObjectURL(blob);
         link.download = `${selectedTeam?.name || '全部球员'}_完整档案明细_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
-    } catch {
+    } catch (e) {
         alert('Excel 导出失败');
     } finally {
         setIsExportingExcel(false);
@@ -1328,7 +1330,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || (selectedTeamId !== '' ? selectedTeamId : (teams.length > 0 ? teams[0].id : 'unassigned'));
+    const finalTeamId = newPlayer.teamId || selectedTeamId;
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
@@ -1590,11 +1592,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">姓名 (必填)</label><input required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" placeholder="输入球员姓名" value={newPlayer.name} onChange={e => setNewPlayer({...newPlayer, name: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number !== undefined && !isNaN(newPlayer.number) ? newPlayer.number : ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
+                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球衣号码 (必填)</label><input type="number" required className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-black" placeholder="0" value={newPlayer.number || ''} onChange={e => setNewPlayer({...newPlayer, number: parseInt(e.target.value)})}/></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                              <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">身份证号</label><input className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-mono text-sm" placeholder="18位身份证号" maxLength={18} value={newPlayer.idCard} onChange={handleIdCardChange} /></div>
-                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || (selectedTeamId !== '' ? selectedTeamId : (teams.length > 0 ? teams[0].id : 'unassigned'))} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
+                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={newPlayer.teamId || selectedTeamId} onChange={e => setNewPlayer({...newPlayer, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">主位置</label><PositionSelect value={newPlayer.position || Position.ST} onChange={val => setNewPlayer({...newPlayer, position: val})} className="border-gray-200 border"/></div>
