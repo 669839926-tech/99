@@ -14,6 +14,7 @@ interface MatchPlannerProps {
   onAddMatch: (match: Match) => void;
   onDeleteMatch: (id: string) => void;
   onUpdateMatch: (match: Match) => void;
+  appLogo?: string;
 }
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
@@ -547,11 +548,11 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                         const val = e.target.value;
                                         setEditingMatch(prev => {
                                             if (!prev) return prev;
-                                            const currentMatch = ensureDetails(prev);
+                                            const withDetails = ensureDetails(prev);
                                             return {
-                                                ...currentMatch,
+                                                ...withDetails,
                                                 details: {
-                                                    ...currentMatch.details!,
+                                                    ...withDetails.details!,
                                                     summary: val
                                                 }
                                             };

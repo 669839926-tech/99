@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Users, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, AlignLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Cpu, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, BarChart3, PieChart as PieChartIcon, List, FileText, Send, User as UserIcon, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Filter, ChevronDown, Users, UserMinus, Settings2, LayoutList, Calendar, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Shield, Star, Brain, History, MessageSquare, TrendingUp, Search, AlignLeft } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 
 interface TrainingPlannerProps {
@@ -163,7 +163,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, drillLibrary, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose, allSessions }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -667,7 +667,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, drillLibrary, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, drillLibrary, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, appLogo, periodizationPlans = [], onUpdatePeriodization 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -712,7 +712,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             setSelectedSession(updated);
         }
     }
-  }, [trainings, selectedSession]); 
+  }, [trainings]); 
 
   const [loading, setLoading] = useState(false);
   const [isAiMode, setIsAiMode] = useState(false);
@@ -733,7 +733,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       if (availableTeams.length > 0 && !availableTeams.find(t => t.id === formData.teamId)) {
           setFormData(prev => ({ ...prev, teamId: availableTeams[0].id }));
       }
-  }, [availableTeams, formData.teamId]);
+  }, [availableTeams]);
 
   const [drillInput, setDrillInput] = useState('');
 
@@ -968,7 +968,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             onClick={async () => {
                                                 setIsExporting(true);
                                                 try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch { alert('导出失败'); } finally { setIsExporting(false); }
+                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
                                             }}
                                             className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
                                         >
@@ -1197,7 +1197,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                         <td className="px-3 md:px-6 py-4">
                                             <div className="flex items-center gap-1.5 md:gap-2">
                                                 <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread || isPendingDirector ? 'text-blue-700' : 'text-bvb-black'}`}>{s.title}</span>
-                                                {s.linkedDesignId && <PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" title="关联教案" />}
+                                                {s.linkedDesignId && <span title="关联教案"><PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" /></span>}
                                             </div>
                                         </td>
                                         <td className="px-3 md:px-6 py-4 text-sm text-gray-500 hidden md:table-cell">{s.duration} min</td>
@@ -1288,7 +1288,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             } else {
                 await exportToPDF('training-plan-list-pdf', `训练计划明细报表_${dateLabel}`); 
             }
-        } catch { 
+        } catch (e) { 
             alert('导出失败'); 
         } finally { 
             setIsExporting(false); 
@@ -1445,7 +1445,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             <div className="flex items-center gap-1.5">
                                                 {s.focusedPlayerIds && s.focusedPlayerIds.length > 0 && <Star className="w-3 h-3 text-bvb-yellow fill-current" />}
                                                 {s.linkedDesignId && <PenTool className="w-3 h-3 text-purple-500" />}
-                                                {s.submissionStatus === 'Submitted' && <FileText className="w-3 h-3 text-blue-600 animate-pulse" title="日志待审核" />}
+                                                {s.submissionStatus === 'Submitted' && <span title="日志待审核"><FileText className="w-3 h-3 text-blue-600 animate-pulse" /></span>}
                                                 {s.submissionStatus === 'Reviewed' && <ShieldCheck className={`w-3 h-3 ${isUnread ? 'text-blue-600' : 'text-green-600'}`} />}
                                                 <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
                                                     s.intensity === 'High' ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'

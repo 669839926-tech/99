@@ -338,13 +338,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleSavePayroll = (coachId: string) => {
+        if (selectedYear === 'all') { alert('请选择具体年份进行保存'); return; }
+        const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
         const row = coachSalaries.find(s => s.coachId === coachId);
         if (!coach || !row) return;
         const records = coach.monthlySalaryRecords || [];
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
-        const existingIdx = records.findIndex(r => r.year === effectiveYear && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${effectiveYear}-${selectedMonth}-${coachId}`, year: effectiveYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
+        const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
+        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
@@ -353,20 +354,21 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleDisburseSalary = (coachId: string) => {
+        if (selectedYear === 'all') { alert('请选择具体年份进行发放'); return; }
+        const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
         const row = coachSalaries.find(s => s.coachId === coachId);
         if (!coach || !row) return;
         if (row.totalSalary <= 0) { alert('薪资总额为0，无需发放。'); return; }
         if (row.isDisbursed && !confirm('该笔薪资已经发放过，确定要再次发放并记录支出吗？')) return;
         const records = coach.monthlySalaryRecords || [];
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
-        const existingIdx = records.findIndex(r => r.year === effectiveYear && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${effectiveYear}-${selectedMonth}-${coachId}`, year: effectiveYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
+        const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
+        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const salaryExpenseCategory = financeCategories.find(c => c.label.includes('工资支出') || c.id === 'cat-4');
-        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${effectiveYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
+        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${yearNum}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
         alert(`发放成功！已为 ${coach.name} 生成一笔 ¥${row.totalSalary} 的薪酬支出记录。`);
     };
 
@@ -381,14 +383,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     }, [transactions]);
 
     const handleUpdateEvaluation = (coachId: string, score: number) => {
+        if (selectedYear === 'all') { alert('请选择具体年份进行评价'); return; }
+        const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
         if (!coach) return;
         const evaluations = coach.monthlyEvaluations || [];
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
-        const existingIdx = evaluations.findIndex(e => e.year === effectiveYear && e.month === selectedMonth);
+        const existingIdx = evaluations.findIndex(e => e.year === yearNum && e.month === selectedMonth);
         const nextEvals = [...evaluations];
         if (existingIdx >= 0) nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
-        else nextEvals.push({ id: `eval-${Date.now()}`, year: effectiveYear, month: selectedMonth, score, comment: '' });
+        else nextEvals.push({ id: `eval-${Date.now()}`, year: yearNum, month: selectedMonth, score, comment: '' });
         onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
     };
 
@@ -834,7 +837,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         onClick={(data) => {
                                             if (data && data.activeTooltipIndex !== undefined) {
                                                 if (selectedYear === 'all') {
-                                                    const item = monthlySummaryData[data.activeTooltipIndex as number] as any;
+                                                    const item = monthlySummaryData[data.activeTooltipIndex] as any;
                                                     if (item) {
                                                         const yearStr = item.year;
                                                         const year = parseInt(yearStr);
