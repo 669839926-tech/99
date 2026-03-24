@@ -48,7 +48,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [showImportModal, setShowImportModal] = useState(false);
     const [showAccountingModal, setShowAccountingModal] = useState(false);
     const [editingAccountingRecord, setEditingAccountingRecord] = useState<AccountingRecord | null>(null);
-    const [selectedYear, setSelectedYear] = useState<number | 'all'>(new Date().getFullYear());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [journalSortField, setJournalSortField] = useState<'date' | 'income' | 'expense' | 'category'>('date');
@@ -57,6 +57,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [editPayroll, setEditPayroll] = useState<Record<string, Partial<MonthlySalaryRecord>>>({});
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
     const [activeType, setActiveType] = useState<'income' | 'expense'>('income');
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        date: '',
+        category: '',
+        details: '',
+        income: '',
+        expense: '',
+        balance: ''
+    });
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], details: '', category: '', amount: '', account: '黔农云', attachment: '' as string });
     const [accountingFormData, setAccountingFormData] = useState<Partial<AccountingRecord>>({ type: 'receivable', date: new Date().toISOString().split('T')[0], entity: '', details: '', amount: 0, status: 'pending', category: '' });
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -75,7 +84,21 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
             return { ...t, balance };
         });
-        return recordsWithBalance.sort((a, b) => {
+
+        // Apply filters
+        const filtered = recordsWithBalance.filter(t => {
+            const cat = financeCategories.find(c => c.id === t.category);
+            const dateMatch = !filters.date || t.date.includes(filters.date);
+            const categoryMatch = !filters.category || (cat?.label || '').includes(filters.category);
+            const detailsMatch = !filters.details || t.details.toLowerCase().includes(filters.details.toLowerCase());
+            const incomeMatch = !filters.income || (t.income > 0 && t.income.toString().includes(filters.income));
+            const expenseMatch = !filters.expense || (t.expense > 0 && t.expense.toString().includes(filters.expense));
+            const balanceMatch = !filters.balance || t.balance.toString().includes(filters.balance);
+            
+            return dateMatch && categoryMatch && detailsMatch && incomeMatch && expenseMatch && balanceMatch;
+        });
+
+        return filtered.sort((a, b) => {
             let valA: any = a[journalSortField];
             let valB: any = b[journalSortField];
             if (journalSortField === 'date') { valA = new Date(valA).getTime(); valB = new Date(valB).getTime(); }
@@ -93,36 +116,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const annualStats = useMemo(() => {
-        const yearTransactions = selectedYear === 'all' 
-            ? transactions 
-            : transactions.filter(t => parseDateInfo(t.date).year === selectedYear);
+        const yearTransactions = transactions.filter(t => parseDateInfo(t.date).year === selectedYear);
         const income = yearTransactions.reduce((sum, t) => sum + (Number(t.income) || 0), 0);
         const expense = yearTransactions.reduce((sum, t) => sum + (Number(t.expense) || 0), 0);
         return { income, expense, profit: income - expense };
     }, [transactions, selectedYear]);
 
-    const totalStats = useMemo(() => {
-        const income = transactions.reduce((sum, t) => sum + (Number(t.income) || 0), 0);
-        const expense = transactions.reduce((sum, t) => sum + (Number(t.expense) || 0), 0);
-        return { income, expense, balance: income - expense };
-    }, [transactions]);
-
     const monthlySummaryData = useMemo(() => {
-        if (selectedYear === 'all') {
-            // Group by year if "All Time" is selected
-            const yearMap: Record<string, { year: string, income: number, expense: number, profit: number }> = {};
-            transactions.forEach(t => {
-                const { year } = parseDateInfo(t.date);
-                if (year > 0) {
-                    if (!yearMap[year]) yearMap[year] = { year: `${year}年`, income: 0, expense: 0, profit: 0 };
-                    yearMap[year].income += (Number(t.income) || 0);
-                    yearMap[year].expense += (Number(t.expense) || 0);
-                    yearMap[year].profit = yearMap[year].income - yearMap[year].expense;
-                }
-            });
-            return Object.values(yearMap).sort((a, b) => a.year.localeCompare(b.year));
-        }
-
         const data = Array.from({ length: 12 }, (_, i) => ({ month: `${i + 1}月`, income: 0, expense: 0, profit: 0 }));
         transactions.forEach(t => {
             const { year, month } = parseDateInfo(t.date);
@@ -140,7 +140,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const expenseMap: Record<string, number> = {};
         transactions.forEach(t => {
             const { year } = parseDateInfo(t.date);
-            if (selectedYear === 'all' || year === selectedYear) {
+            if (year === selectedYear) {
                 const cat = financeCategories.find(c => c.id === t.category);
                 if (cat) {
                     if (cat.type === 'income') incomeMap[cat.label] = (incomeMap[cat.label] || 0) + (Number(t.income) || 0);
@@ -155,10 +155,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     }, [transactions, selectedYear, financeCategories, annualStats]);
 
     const monthlyAnalysis = useMemo(() => {
-        const monthTransactions = transactions.filter(t => { 
-            const info = parseDateInfo(t.date); 
-            return (selectedYear === 'all' || info.year === selectedYear) && info.month === selectedMonth; 
-        });
+        const monthTransactions = transactions.filter(t => { const info = parseDateInfo(t.date); return info.year === selectedYear && info.month === selectedMonth; });
         const income = monthTransactions.reduce((sum, t) => sum + (Number(t.income) || 0), 0);
         const expense = monthTransactions.reduce((sum, t) => sum + (Number(t.expense) || 0), 0);
         const incomeMap: Record<string, number> = {};
@@ -663,6 +660,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center uppercase italic tracking-tighter"><FileText className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
                         <div className="flex items-center gap-2 md:gap-4">
+                            <button onClick={() => setShowFilters(!showFilters)} className={`text-[10px] md:text-xs flex items-center px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold border transition-all ${showFilters ? 'bg-bvb-yellow border-bvb-black text-bvb-black' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-100'}`}><ListFilter className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> {showFilters ? '隐藏筛选' : '筛选'}</button>
                             {selectedIds.size > 0 && <button onClick={() => onBulkDeleteTransactions(Array.from(selectedIds))} className="text-[10px] md:text-xs flex items-center bg-red-50 text-red-600 border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 删除({selectedIds.size})</button>}
                             <button onClick={() => { const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n"; const rows = journalWithBalance.map(t => { const catLabel = financeCategories.find(c => c.id === t.category)?.label || '未知分类'; return `${t.date},${catLabel},"${t.details.replace(/"/g, '""')}",${t.income || ''},${t.expense || ''},${t.account},${t.balance.toFixed(2)}`; }).join('\n'); const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`; link.click(); }} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100 shadow-sm"><Download className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 导出</button>
                         </div>
@@ -680,6 +678,20 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right font-black">结余</th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-center">操作</th>
                                 </tr>
+                                {showFilters && (
+                                    <tr className="bg-gray-50 border-b border-gray-200">
+                                        <th className="px-3 py-2 text-center">
+                                            <button onClick={() => setFilters({ date: '', category: '', details: '', income: '', expense: '', balance: '' })} className="text-[8px] text-red-500 font-black uppercase tracking-tighter hover:underline">重置</button>
+                                        </th>
+                                        <th className="px-3 py-2"><input type="text" placeholder="搜索日期..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[9px] md:text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} /></th>
+                                        <th className="px-3 py-2"><input type="text" placeholder="搜索分类..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[9px] md:text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow" value={filters.category} onChange={e => setFilters({...filters, category: e.target.value})} /></th>
+                                        <th className="px-3 py-2"><input type="text" placeholder="搜索备注..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[9px] md:text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow" value={filters.details} onChange={e => setFilters({...filters, details: e.target.value})} /></th>
+                                        <th className="px-3 py-2"><input type="text" placeholder="搜索收入..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[9px] md:text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow text-right" value={filters.income} onChange={e => setFilters({...filters, income: e.target.value})} /></th>
+                                        <th className="px-3 py-2"><input type="text" placeholder="搜索支出..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[9px] md:text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow text-right" value={filters.expense} onChange={e => setFilters({...filters, expense: e.target.value})} /></th>
+                                        <th className="px-3 py-2"><input type="text" placeholder="搜索结余..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[9px] md:text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow text-right" value={filters.balance} onChange={e => setFilters({...filters, balance: e.target.value})} /></th>
+                                        <th className="px-3 py-2"></th>
+                                    </tr>
+                                )}
                             </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {journalWithBalance.map((t) => { const cat = financeCategories.find(c => c.id === t.category); const isSelected = selectedIds.has(t.id); return ( <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}> <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td> <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td> <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td> </tr> ); })}
@@ -691,68 +703,23 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 <div className="space-y-6 animate-in slide-in-from-bottom-4">
                     {/* 统计视图保持不变... */}
                     <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 md:p-5 rounded-2xl shadow-sm border border-gray-200 gap-4">
-                        <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center uppercase italic tracking-tighter shrink-0"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 财务统计与深度分析</h3>
+                        <h3 className="font-black text-base md:text-lg text-gray-800 flex items-center uppercase italic tracking-tighter shrink-0"><BarChart3 className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 年度趋势与深度分析</h3>
                         <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto justify-end">
-                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
-                                <button onClick={() => { if (selectedYear !== 'all') setSelectedYear(v => (v as number) - 1); }} className="p-1 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30" disabled={selectedYear === 'all'}><ChevronLeft className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400"/></button>
-                                <button onClick={() => setSelectedYear(selectedYear === 'all' ? new Date().getFullYear() : 'all')} className="px-2 py-0.5 bg-white border rounded-lg text-[10px] font-black hover:bg-gray-50 transition-all">
-                                    {selectedYear === 'all' ? '切换至年度' : '查看全部年度'}
-                                </button>
-                                <span className="font-black text-sm md:text-base min-w-[50px] md:min-w-[60px] text-center">{selectedYear === 'all' ? '全部' : selectedYear}</span>
-                                <button onClick={() => { if (selectedYear !== 'all') setSelectedYear(v => (v as number) + 1); }} className="p-1 hover:bg-gray-200 rounded-lg transition-colors disabled:opacity-30" disabled={selectedYear === 'all'}><ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400"/></button>
-                            </div>
+                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100"><button onClick={() => setSelectedYear(v => v - 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronLeft className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400"/></button><span className="font-black text-sm md:text-base min-w-[50px] md:min-w-[60px] text-center">{selectedYear}</span><button onClick={() => setSelectedYear(v => v + 1)} className="p-1 hover:bg-gray-200 rounded-lg transition-colors"><ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400"/></button></div>
                             <span className="text-gray-200 hidden md:block">/</span>
-                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
-                                <select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer">
-                                    {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月 (深度分析)</option>)}
-                                </select>
-                            </div>
+                            <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100"><select value={selectedMonth} onChange={e => setSelectedMonth(parseInt(e.target.value))} className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer">{Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月 (深度分析)</option>)}</select></div>
                         </div>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">总体累计收入</p>
-                            <h4 className="text-xl font-black text-green-600">¥{totalStats.income.toLocaleString()}</h4>
-                        </div>
-                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">总体累计支出</p>
-                            <h4 className="text-xl font-black text-red-500">¥{totalStats.expense.toLocaleString()}</h4>
-                        </div>
-                        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">账目当前结余</p>
-                            <h4 className={`text-xl font-black ${totalStats.balance >= 0 ? 'text-bvb-black' : 'text-red-600'}`}>¥{totalStats.balance.toLocaleString()}</h4>
-                        </div>
-                        <div className="bg-bvb-yellow p-5 rounded-2xl shadow-sm border border-bvb-black/10">
-                            <p className="text-[10px] font-black text-bvb-black/60 uppercase tracking-widest mb-1">{selectedYear === 'all' ? '全部年度利润' : `${selectedYear}年度利润`}</p>
-                            <h4 className="text-xl font-black text-bvb-black">¥{annualStats.profit.toLocaleString()}</h4>
-                        </div>
-                    </div>
-
                     <div className="grid grid-cols-1 gap-6">
                         <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-gray-200 min-h-[400px] md:min-h-[500px] flex flex-col">
                             <div className="flex justify-between items-start mb-4 md:mb-8">
-                                <h4 className="text-[10px] md:text-sm font-black text-gray-400 uppercase tracking-widest leading-none">
-                                    {selectedYear === 'all' ? '历年收支趋势' : `年度收支对比 (${selectedYear})`}
-                                </h4>
+                                <h4 className="text-[10px] md:text-sm font-black text-gray-400 uppercase tracking-widest leading-none">年度收支对比 ({selectedYear})</h4>
                                 <div className="flex gap-4 md:gap-6">
                                     <div className="text-right"><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase">收入</p><p className="text-sm md:text-lg font-black text-green-600">¥{annualStats.income.toLocaleString()}</p></div>
                                     <div className="text-right"><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase">支出</p><p className="text-sm md:text-lg font-black text-red-500">¥{annualStats.expense.toLocaleString()}</p></div>
                                 </div>
                             </div>
-                            <div className="flex-1 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={monthlySummaryData} margin={{ top: 10, right: 0, left: -20, bottom: 20 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis dataKey={selectedYear === 'all' ? 'year' : 'month'} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
-                                        <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} />
-                                        <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{ paddingBottom: '10px' }} formatter={(value) => <span className="text-[11px] font-black uppercase tracking-wider text-gray-600 mr-4 ml-1">{value}</span>} />
-                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} />
-                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <div className="flex-1 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlySummaryData} margin={{ top: 10, right: 0, left: -20, bottom: 20 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" /><XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} /><YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} /><Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} /><Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{ paddingBottom: '10px' }} formatter={(value) => <span className="text-[11px] font-black uppercase tracking-wider text-gray-600 mr-4 ml-1">{value}</span>} /><Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} /><Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={12} md:barSize={32} /></BarChart></ResponsiveContainer></div>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
