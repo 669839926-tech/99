@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, Gauge, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
+import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, History, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
     transactions: FinanceTransaction[];
@@ -31,7 +31,7 @@ const parseDateInfo = (dateStr: string) => {
         return { year: d.getFullYear(), month: d.getMonth() };
     }
     const yMatch = dateStr.match(/(\d{4})/);
-    const mMatch = dateStr.match(/(?:-|年|\/)(\d{1,2})(?:-|月|\/)?/);
+    const mMatch = dateStr.match(/(?:\-|年|\/)(\d{1,2})(?:\-|月|\/)?/);
     return {
         year: yMatch ? parseInt(yMatch[1]) : 0,
         month: mMatch ? parseInt(mMatch[1]) - 1 : -1
@@ -39,7 +39,7 @@ const parseDateInfo = (dateStr: string) => {
 };
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ 
-    transactions, financeCategories, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
+    transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
     users, players, teams, trainings, salarySettings, onUpdateUser,
     accountingRecords, onAddAccountingRecord, onUpdateAccountingRecord, onDeleteAccountingRecord
 }) => {
@@ -70,22 +70,19 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleTypeChange = (type: 'income' | 'expense') => {
-        setActiveType(type);
-        const categoriesForType = financeCategories.filter(c => c.type === type);
-        if (categoriesForType.length > 0) {
-            setFormData(prev => ({ ...prev, category: categoriesForType[0].id }));
-        }
-    };
+    useEffect(() => {
+        const categoriesForType = financeCategories.filter(c => c.type === activeType);
+        setFormData(prev => ({ ...prev, category: categoriesForType.length > 0 ? categoriesForType[0].id : '' }));
+    }, [activeType, financeCategories]);
+
+    const isDirector = currentUser?.role === 'director';
 
     const journalWithBalance = useMemo(() => {
         const baseSorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        const recordsWithBalance: any[] = [];
-        let runningBalance = 0;
-        baseSorted.forEach(t => {
-            runningBalance += (Number(t.income) || 0) - (Number(t.expense) || 0);
-            recordsWithBalance.push({ ...t, balance: runningBalance });
+        let balance = 0;
+        const recordsWithBalance = baseSorted.map(t => {
+            balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
+            return { ...t, balance };
         });
 
         const filtered = recordsWithBalance.filter(t => {
@@ -206,7 +203,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const coachSalaries = useMemo(() => {
         const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
 
         return staff.map(coach => {
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
@@ -264,8 +260,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let renewalFormula = "非季末月份";
                 if (isDistributionMonth) {
                     const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
-                    const qStart = new Date(effectiveYear, quarterMonths[0], 1).toISOString();
-                    const qEnd = new Date(effectiveYear, quarterMonths[2] + 1, 0).toISOString();
+                    const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
+                    const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
                     const renewedCount = teamPlayers.filter(p => {
                         const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
                         const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
@@ -344,7 +340,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
         const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
-        const nextRecords = [...records];
+        let nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const nextEdit = { ...editPayroll }; delete nextEdit[coachId]; setEditPayroll(nextEdit);
@@ -360,7 +356,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
         const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
-        const nextRecords = [...records];
+        let nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const salaryExpenseCategory = financeCategories.find(c => c.label.includes('工资支出') || c.id === 'cat-4');
@@ -383,7 +379,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         if (!coach) return;
         const evaluations = coach.monthlyEvaluations || [];
         const existingIdx = evaluations.findIndex(e => e.year === selectedYear && e.month === selectedMonth);
-        const nextEvals = [...evaluations];
+        let nextEvals = [...evaluations];
         if (existingIdx >= 0) nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
         else nextEvals.push({ id: `eval-${Date.now()}`, year: selectedYear, month: selectedMonth, score, comment: '' });
         onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
@@ -401,13 +397,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleSettleAccountingRecord = (record: AccountingRecord) => {
+        if (!confirm(`确定要结算这笔${record.type === 'receivable' ? '应收' : '应付'}账款吗？结算后将自动生成一笔财务流水。`)) return;
+        
         const settledDate = new Date().toISOString().split('T')[0];
         onUpdateAccountingRecord({ ...record, status: 'settled', settledDate });
         
         // Generate transaction
-        const transactionId = `settle-${new Date().getTime()}`;
         onAddTransaction({
-            id: transactionId,
+            id: `settle-${Date.now()}`,
             date: settledDate,
             details: `[账款结算] ${record.entity}: ${record.details}`,
             category: record.category,
@@ -415,6 +412,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             expense: record.type === 'payable' ? record.amount : 0,
             account: '黔农云 (结算入账)'
         });
+        
+        alert('结算成功，已同步至财务流水。');
     };
 
     const toggleSelectAll = () => setSelectedIds(selectedIds.size === journalWithBalance.length ? new Set() : new Set(journalWithBalance.map(t => t.id)));
@@ -832,11 +831,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             if (data && data.activeTooltipIndex !== undefined) {
                                                 if (selectedYear === 'all') {
                                                     const item = monthlySummaryData[data.activeTooltipIndex] as any;
-                                                    if (item) {
-                                                        const yearStr = item.year;
-                                                        const year = parseInt(yearStr);
-                                                        if (!isNaN(year)) setSelectedYear(year);
-                                                    }
+                                                    const yearStr = item.year;
+                                                    const year = parseInt(yearStr);
+                                                    if (!isNaN(year)) setSelectedYear(year);
                                                 } else {
                                                     setSelectedMonth(data.activeTooltipIndex);
                                                 }
@@ -848,8 +845,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
                                         <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} />
                                         <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{ paddingBottom: '10px' }} formatter={(value) => <span className="text-[11px] font-black uppercase tracking-wider text-gray-600 mr-4 ml-1">{value}</span>} />
-                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} cursor="pointer" />
-                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} cursor="pointer" />
+                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} cursor="pointer" />
+                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} cursor="pointer" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
@@ -1095,7 +1092,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50 flex-1 overflow-y-auto pb-24 md:pb-8">
-                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => handleTypeChange('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => handleTypeChange('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
+                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => setActiveType('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => setActiveType('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">发生日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label><select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>

@@ -53,7 +53,6 @@ export interface AttributeConfig {
     mental: AttributeDefinition[];
     drillLibrary: string[];
     trainingFoci: string[];
-    focusSubjects?: Record<string, string[]>;
 }
 
 export interface PlayerStats {
@@ -365,19 +364,6 @@ export interface MonthlySalaryRecord {
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;
-}
-
-// --- Accounting Types ---
-export interface AccountingRecord {
-    id: string;
-    type: 'receivable' | 'payable';
-    date: string;
-    entity: string;
-    details: string;
-    amount: number;
-    status: 'pending' | 'settled' | 'cancelled';
-    category: string;
-    settledDate?: string;
 }
 
 // --- RBAC Types ---
