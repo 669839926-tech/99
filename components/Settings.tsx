@@ -103,7 +103,7 @@ const Settings: React.FC<SettingsProps> = ({
     const key = newItemName.trim().toLowerCase().replace(/\s+/g, '_') + '_' + Date.now().toString().slice(-4);
     setLocalConfig(prev => ({
       ...prev,
-      [activeCategory]: [ ...prev[activeCategory], { key, label: newItemName.trim() } ]
+      [activeCategory]: [ ...(Array.isArray(prev[activeCategory]) ? prev[activeCategory] : []), { key, label: newItemName.trim() } ]
     }));
     setNewItemName('');
   };
@@ -195,7 +195,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteAttribute = (category: AttributeCategory, keyToDelete: string) => {
     if (confirm('确定要删除这个能力项吗？')) {
-      setLocalConfig(prev => ({ ...prev, [category]: prev[category].filter(attr => attr.key !== keyToDelete) }));
+      setLocalConfig(prev => ({ ...prev, [category]: (Array.isArray(prev[category]) ? prev[category] : []).filter((attr: any) => attr.key !== keyToDelete) }));
     }
   };
 
@@ -665,7 +665,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {localConfig.trainingFoci.map(focus => (
+                    {(localConfig.trainingFoci || []).map(focus => (
                         <div key={focus} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
                             <div className="bg-gray-50 p-3 border-b border-gray-100 flex justify-between items-center">
                                 <span className="font-black text-sm text-bvb-black uppercase tracking-tight">{focus}</span>
@@ -746,7 +746,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {localConfig[activeCategory].map(attr => (
+                    {(Array.isArray(localConfig[activeCategory]) ? localConfig[activeCategory] : []).map((attr: any) => (
                         <div key={attr.key} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm group hover:border-bvb-yellow transition-all">
                             <span className="font-bold text-gray-700">{attr.label}</span>
                             <button onClick={() => handleDeleteAttribute(activeCategory, attr.key)} className="text-gray-200 hover:text-red-500 transition-colors">
@@ -782,7 +782,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {localConfig.drillLibrary.map(drill => (
+                    {(localConfig.drillLibrary || []).map(drill => (
                         <div key={drill} className="flex justify-between items-center p-3 bg-white border border-gray-100 rounded-lg shadow-sm group hover:bg-gray-50 transition-colors">
                             <span className="text-sm font-bold text-gray-700">{drill}</span>
                             <button onClick={() => handleDeleteDrill(drill)} className="text-gray-200 hover:text-red-500 transition-colors">

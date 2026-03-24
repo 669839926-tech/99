@@ -106,10 +106,16 @@ function App() {
             setPlayers(cloudData.players || MOCK_PLAYERS);
             setMatches(cloudData.matches || MOCK_MATCHES);
             setTrainings(cloudData.trainings || MOCK_TRAINING);
-            setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
+            setAttributeConfig({ ...DEFAULT_ATTRIBUTE_CONFIG, ...(cloudData.attributeConfig || {}) });
             setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
             if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
-            if (cloudData.users) setUsers(cloudData.users);
+            
+            if (cloudData.users && cloudData.users.length > 0) {
+                setUsers(cloudData.users);
+            } else {
+                setUsers(MOCK_USERS);
+            }
+            
             if (cloudData.designs) setDesigns(cloudData.designs);
             if (cloudData.transactions) setTransactions(cloudData.transactions);
             if (cloudData.permissions) setPermissions(cloudData.permissions);
