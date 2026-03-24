@@ -104,14 +104,14 @@ const getOverallRating = (player: Player): string => {
 const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
   if (!player || !player.stats || !attributeConfig) return 0;
   const configItems = attributeConfig[category];
-  if (!Array.isArray(configItems) || configItems.length === 0) return 0;
+  if (!configItems || configItems.length === 0) return 0;
   
   const catStats = player.stats[category];
   if (!catStats) return 0;
 
   let sum = 0;
   let count = 0;
-  configItems.forEach((attr: any) => {
+  configItems.forEach(attr => {
     const val = catStats[attr.key] || 0;
     sum += val;
     count++;
@@ -120,10 +120,10 @@ const getCategoryAvg = (player: Player, category: AttributeCategory, attributeCo
 };
 
 const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig || !Array.isArray(attributeConfig[category])) return [];
+  if (!player || !player.stats || !attributeConfig || !attributeConfig[category]) return [];
   
   const catStats = player.stats[category];
-  return attributeConfig[category].map((attr: any) => ({
+  return attributeConfig[category].map(attr => ({
     subject: attr.label,
     value: (catStats && catStats[attr.key]) || 0,
     fullMark: 10
@@ -202,11 +202,10 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
-    const categories: AttributeCategory[] = ['technical', 'tactical', 'physical', 'mental'];
-    categories.forEach((category) => {
-        if (Array.isArray(attributeConfig[category])) {
-            attributeConfig[category].forEach((attr: any) => { stats[category][attr.key] = 5; });
-        }
+    Object.keys(attributeConfig).forEach((cat) => {
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
+        const category = cat as AttributeCategory;
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -628,7 +627,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const renderStatSliders = (category: AttributeCategory) => {
         const attributes = attributeConfig[category];
-        if (!Array.isArray(attributes) || attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
+        if (attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-1 content-start">
             {attributes.map(attr => {
@@ -1031,7 +1030,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       </div>
                       <table className="w-full text-xs">
                         <tbody>
-                          {(Array.isArray(attributeConfig[section.category as AttributeCategory]) ? attributeConfig[section.category as AttributeCategory] : []).map((attr: any, aIdx: number) => {
+                          {attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
                             const val = editedPlayer.stats[section.category as AttributeCategory][attr.key] || 5;
                             const scaledVal = Math.min(4, Math.max(1, Math.ceil(val / 2.5)));
                             return (
