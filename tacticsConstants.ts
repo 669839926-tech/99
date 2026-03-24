@@ -1,11 +1,5 @@
 
-import { GameFormat } from './types';
-
-export interface FormationTemplate {
-    name: string;
-    format: GameFormat;
-    positions: { label: string; x: number; y: number }[];
-}
+import { GameFormat, FormationTemplate } from './types';
 
 export const FORMATIONS: FormationTemplate[] = [
     // 11v11

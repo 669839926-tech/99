@@ -264,9 +264,10 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
     };
     const parseCSV = (text: string) => {
         const lines = text.split('\n'); const players: Partial<Player>[] = [];
-        for (let i = 1; i < lines.length; i++) {
+        for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim(); if (!line) continue;
-            const cols = line.split(',').map(c => c.trim());
+            if (i === 0 && line.includes('姓名')) continue;
+            const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
             if (cols.length >= 2) {
                 const name = cols[0]; const number = parseInt(cols[1]) || 0; const pos1Str = cols[2]; const pos2Str = cols[3];
                 const idCard = cols[4] || ''; const joinDate = cols[5] || ''; const school = cols[6] || '';
