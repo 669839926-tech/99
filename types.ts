@@ -170,45 +170,6 @@ export interface MatchEvent {
     description?: string;
 }
 
-export type GameFormat = '11v11' | '9v9' | '8v8' | '7v7' | '5v5' | '11' | '9' | '8' | '7' | '5';
-
-export interface TacticsPlayer {
-    id: string;
-    playerId?: string;
-    label: string;
-    name?: string;
-    number?: number;
-    positionLabel?: string;
-    x: number;
-    y: number;
-    color?: string;
-}
-
-export interface TacticsDrawing {
-    id: string;
-    type: 'line' | 'arrow' | 'curve' | 'text' | 'highlight' | 'run' | 'pass';
-    points?: number[];
-    x?: number;
-    y?: number;
-    text?: string;
-    color: string;
-    width?: number;
-}
-
-export interface TacticsBoardData {
-    players: TacticsPlayer[];
-    drawings: TacticsDrawing[];
-    format?: GameFormat;
-    formation?: string;
-}
-
-export interface FormationTemplate {
-    id?: string;
-    name: string;
-    format: GameFormat;
-    positions: { label: string; x: number; y: number }[];
-}
-
 export interface MatchDetails {
     weather: string;
     pitch: string;
