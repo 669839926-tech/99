@@ -203,9 +203,11 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
     Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary' || cat === 'trainingFoci' || cat === 'focusSubjects') return;
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
         const category = cat as AttributeCategory;
-        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+        if (Array.isArray(attributeConfig[category])) {
+            attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
+        }
     });
     return stats;
 };
@@ -418,7 +420,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
     const [activeTab, setActiveTab] = useState<'overview' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('overview');
-    const [detailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
+    const [detailAttendanceScope, setDetailAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -1330,8 +1332,8 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || selectedTeamId;
-    if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number) && newPlayer.number > 0) {
+    const finalTeamId = newPlayer.teamId || selectedTeamId || 'unassigned';
+    if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
         nextYear.setFullYear(nextYear.getFullYear() + 1);
