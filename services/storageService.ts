@@ -1,3 +1,4 @@
+import { db, doc, getDoc, setDoc } from '../firebase';
 
 export interface AppData {
     players: any[];
@@ -11,54 +12,44 @@ export interface AppData {
     users?: any[];
     transactions?: any[];
     permissions?: any;
-    financeCategories?: any[]; // New: Finance Categories
+    financeCategories?: any[];
     techTests?: any[];
     salarySettings?: any;
-    // Comment: Added periodizationPlans to AppData interface to fix build errors in App.tsx
     periodizationPlans?: any[];
     accountingRecords?: any[];
 }
 
-export const loadDataFromCloud = async (): Promise<AppData | null> => {
+export const loadDataFromCloud = async (userId: string): Promise<AppData | null> => {
     try {
-        console.log('Fetching data from cloud storage API...');
-        const res = await fetch('/api/storage');
-        if (!res.ok) {
-            const errorText = await res.text();
-            console.warn('API route error:', res.status, errorText);
+        console.log('Fetching data from Firestore for user:', userId);
+        const docRef = doc(db, 'appData', userId);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+            console.log('Data successfully loaded from Firestore.');
+            return docSnap.data() as AppData;
+        } else {
+            console.log('No data found in Firestore for this user.');
             return null;
         }
-        const data = await res.json();
-        if (data) {
-            console.log('Data successfully loaded from cloud storage.');
-        } else {
-            console.log('Cloud storage is empty (new database).');
-        }
-        return data;
     } catch (error) {
-        console.error('Failed to load data from cloud:', error);
+        console.error('Failed to load data from Firestore:', error);
         return null;
     }
 };
 
-export const saveDataToCloud = async (data: AppData) => {
+export const saveDataToCloud = async (userId: string, data: AppData) => {
     try {
-        console.log('Saving data to cloud storage API...');
-        const res = await fetch('/api/storage', {
-            method: 'POST',
-            body: JSON.stringify(data),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        if (!res.ok) {
-            const errorText = await res.text();
-            console.error('Failed to save data to cloud storage:', res.status, errorText);
-            throw new Error(`Save failed: ${res.status} ${errorText}`);
-        }
-        const result = await res.json();
-        console.log('Data successfully saved to cloud storage:', result.url);
-        return result;
+        console.log('Saving data to Firestore for user:', userId);
+        const docRef = doc(db, 'appData', userId);
+        await setDoc(docRef, {
+            ...data,
+            lastUpdated: new Date().toISOString()
+        }, { merge: true });
+        console.log('Data successfully saved to Firestore.');
+        return { success: true };
     } catch (error) {
-        console.error('Failed to save data to cloud:', error);
+        console.error('Failed to save data to Firestore:', error);
         throw error;
     }
 };
