@@ -17,7 +17,6 @@ interface DashboardProps {
   onNavigate?: (tab: string, filter?: string) => void;
   onAddAnnouncement?: (announcement: Announcement) => void;
   onDeleteAnnouncement?: (id: string) => void;
-  onUpdateAnnouncement?: (announcement: Announcement) => void;
   appLogo?: string;
 }
 
@@ -33,7 +32,7 @@ const parseLocalDate = (dateStr: string) => {
 
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
-    announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, onUpdateAnnouncement, appLogo
+    announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, appLogo
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
