@@ -9,12 +9,9 @@ interface ParentPortalProps {
     onLogout: () => void;
     appLogo?: string;
     onUpdatePlayer: (player: Player) => void;
-    attributeConfig?: any;
-    trainings?: any[];
-    techTests?: any[];
 }
 
-const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, onLogout, appLogo, onUpdatePlayer, attributeConfig, trainings, techTests }) => {
+const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, onLogout, appLogo, onUpdatePlayer }) => {
     
     const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'history'>('overview');
     
