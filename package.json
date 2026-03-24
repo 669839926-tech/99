@@ -4,16 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
     "@vercel/blob": "^2.0.0",
     "express": "^5.2.1",
-    "firebase": "^12.11.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "lucide-react": "^0.555.0",
@@ -30,9 +29,7 @@
     "eslint": "^9.39.3",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
-    "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "typescript-eslint": "^8.57.1",
     "vite": "^6.2.0"
   }
 }

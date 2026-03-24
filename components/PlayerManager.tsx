@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
+import { Search, Plus, Shield, ChevronRight, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, Calendar as CalendarIcon, CreditCard, Cake, MoreHorizontal, Star, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, AlertTriangle, History, Filter, CheckCircle, Send, Globe, AlertCircle, ClipboardCheck, XCircle, FileSpreadsheet, Cloud, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -81,38 +81,24 @@ const calculateTenure = (dateStr?: string) => {
 };
 
 const getOverallRating = (player: Player): string => {
-  if (!player) return '0.0';
   const sourceStats = player.lastPublishedStats || player.stats;
-  if (!sourceStats) return '0.0';
-  
   let total = 0;
   let count = 0;
   (['technical', 'tactical', 'physical', 'mental'] as AttributeCategory[]).forEach(cat => {
-    const catStats = sourceStats[cat];
-    if (catStats) {
-      Object.values(catStats).forEach(val => { 
-        if (typeof val === 'number') {
-          total += val; 
-          count++; 
-        }
-      });
+    if (sourceStats[cat]) {
+      Object.values(sourceStats[cat]).forEach(val => { total += val; count++; });
     }
   });
   return count === 0 ? '0.0' : (total / count).toFixed(1);
 };
 
 const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig) return 0;
   const configItems = attributeConfig[category];
   if (!configItems || configItems.length === 0) return 0;
-  
-  const catStats = player.stats[category];
-  if (!catStats) return 0;
-
   let sum = 0;
   let count = 0;
   configItems.forEach(attr => {
-    const val = catStats[attr.key] || 0;
+    const val = player.stats[category][attr.key] || 0;
     sum += val;
     count++;
   });
@@ -120,12 +106,9 @@ const getCategoryAvg = (player: Player, category: AttributeCategory, attributeCo
 };
 
 const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig || !attributeConfig[category]) return [];
-  
-  const catStats = player.stats[category];
   return attributeConfig[category].map(attr => ({
     subject: attr.label,
-    value: (catStats && catStats[attr.key]) || 0,
+    value: player.stats[category][attr.key] || 0,
     fullMark: 10
   }));
 };
@@ -133,7 +116,7 @@ const getCategoryRadarData = (player: Player, category: AttributeCategory, attri
 const calculateAttendanceRate = (player: Player, trainings: TrainingSession[], scope: 'month' | 'quarter' | 'year') => {
     if (!trainings || trainings.length === 0) return 0;
     const now = new Date();
-    const startDate = new Date();
+    let startDate = new Date();
     if (scope === 'month') { startDate.setMonth(now.getMonth() - 1); } 
     else if (scope === 'quarter') { startDate.setMonth(now.getMonth() - 3); } 
     else { startDate.setFullYear(now.getFullYear() - 1); }
@@ -152,7 +135,7 @@ const getBirthdayStatus = (dateStr: string) => {
   today.setHours(0,0,0,0);
   const [y, m, d] = dateStr.split('-').map(Number);
   if (!y || !m || !d) return null;
-  const nextBirthday = new Date(today.getFullYear(), m - 1, d);
+  let nextBirthday = new Date(today.getFullYear(), m - 1, d);
   if (nextBirthday < today) { nextBirthday.setFullYear(today.getFullYear() + 1); }
   const diffTime = nextBirthday.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -203,7 +186,7 @@ const getStatusLabel = (status?: ApprovalStatus) => {
 const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => {
     const stats: any = { technical: {}, tactical: {}, physical: {}, mental: {} };
     Object.keys(attributeConfig).forEach((cat) => {
-        if (cat === 'drillLibrary' || cat === 'trainingFoci' || cat === 'focusSubjects') return;
+        if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
         const category = cat as AttributeCategory;
         attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
@@ -268,7 +251,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
             const line = lines[i].trim(); if (!line) continue;
             const cols = line.split(',').map(c => c.trim());
             if (cols.length >= 2) {
-                const name = cols[0]; const number = parseInt(cols[1]) || 0; const pos1Str = cols[2]; const pos2Str = cols[3];
+                const name = cols[0]; const number = parseInt(cols[1]) || 0; let pos1Str = cols[2]; let pos2Str = cols[3];
                 const idCard = cols[4] || ''; const joinDate = cols[5] || ''; const school = cols[6] || '';
                 const parentName = cols[7] || ''; const parentPhone = cols[8] || ''; const foot = cols[9] === '左' ? '左' : '右';
                 
@@ -277,8 +260,8 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
                     return Position.TBD;
                 };
 
-                const position = parsePos(pos1Str);
-                const secondaryPosition = parsePos(pos2Str);
+                let position = parsePos(pos1Str);
+                let secondaryPosition = parsePos(pos2Str);
 
                 let gender: '男' | '女' = '男'; let age = 10; let birthDate = '';
                 if (idCard.length === 18) {
@@ -292,7 +275,7 @@ const ImportPlayersModal: React.FC<ImportPlayersModalProps> = ({ teams, attribut
         setParsedPlayers(players); setStep('preview');
     };
     const handleConfirmImport = () => {
-        if (!selectedTeamId) { return; }
+        if (!selectedTeamId) { alert('请选择归属梯队'); return; }
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date(); nextYear.setFullYear(nextYear.getFullYear() + 1);
         const newPlayers: Player[] = parsedPlayers.map(p => ({
@@ -432,41 +415,31 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const isDirector = currentUser?.role === 'director';
 
     useEffect(() => {
-        if (!isEditing && player && editedPlayer) {
+        if (!isEditing && player) {
              if (player.id === editedPlayer.id && JSON.stringify(editedPlayer) !== JSON.stringify(player)) {
-                 try {
-                    setTimeout(() => {
-                        setEditedPlayer(JSON.parse(JSON.stringify(player)));
-                    }, 0);
-                 } catch (e) {
-                    console.error("Failed to sync editedPlayer", e);
-                 }
+                 setEditedPlayer(JSON.parse(JSON.stringify(player)));
              }
         }
-    }, [player, isEditing, editedPlayer]);
+    }, [player, isEditing]);
 
     useEffect(() => {
-        if (!isEditing || !editedPlayer) return;
+        if (!isEditing) return;
         const timer = setTimeout(() => {
             setSaveStatus('saving');
             const updatedPlayer = {
                 ...editedPlayer,
                 statsStatus: 'Published' as ApprovalStatus,
-                lastPublishedStats: editedPlayer.stats ? JSON.parse(JSON.stringify(editedPlayer.stats)) : undefined
+                lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats))
             };
             onUpdatePlayer(updatedPlayer);
             setTimeout(() => setSaveStatus('saved'), 800);
         }, 1200);
         return () => clearTimeout(timer);
-    }, [editedPlayer, isEditing, onUpdatePlayer]);
+    }, [editedPlayer, isEditing]);
 
     useEffect(() => {
-        if (initialFilter === 'pending_reviews') { 
-            setTimeout(() => setActiveTab('reviews'), 0);
-        } 
-        else if (initialFilter === 'pending_stats') { 
-            setTimeout(() => setActiveTab('overview'), 0);
-        }
+        if (initialFilter === 'pending_reviews') { setActiveTab('reviews'); } 
+        else if (initialFilter === 'pending_stats') { setActiveTab('overview'); }
     }, [initialFilter]);
 
     const [newReview, setNewReview] = useState<Partial<PlayerReview>>({
@@ -490,14 +463,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const attendanceRate = calculateAttendanceRate(player, trainings, detailAttendanceScope);
     const handleSave = () => {
-      if (!editedPlayer) return;
-      const updatedPlayer = { 
-        ...editedPlayer, 
-        statsStatus: 'Published' as ApprovalStatus, 
-        lastPublishedStats: editedPlayer.stats ? JSON.parse(JSON.stringify(editedPlayer.stats)) : undefined 
-      };
-      onUpdatePlayer(updatedPlayer); 
-      setSaveStatus('saved');
+      const updatedPlayer = { ...editedPlayer, statsStatus: 'Published' as ApprovalStatus, lastPublishedStats: JSON.parse(JSON.stringify(editedPlayer.stats)) };
+      onUpdatePlayer(updatedPlayer); setSaveStatus('saved');
     };
     const handleDelete = () => { if (confirm('确定要删除这名球员吗？此操作不可撤销。')) { onDeletePlayer(player.id); onClose(); } };
     const handleDeleteRechargeAction = (rechargeId: string) => {
@@ -958,134 +925,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
              {activeTab === 'records' && renderRecords()}
              {activeTab === 'gallery' && renderGallery()}
           </div>
-            {/* HIDDEN PDF TEMPLATE - UPDATED TO MATCH IMAGE LAYOUT */}
-            <div id="player-profile-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
-              <div className="w-full h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white">
-                {/* Header */}
-                <div className="flex justify-between items-start mb-6">
-                  <h1 className="text-3xl font-bold text-gray-800 tracking-tight">个人报告</h1>
-                  <div className="flex items-center gap-2">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">WSZG FOOTBALL CLUB</div>
-                      <div className="text-sm font-black text-gray-800 uppercase italic">顽石之光足球俱乐部</div>
-                    </div>
-                    <img src={appLogo} alt="Club Logo" className="w-12 h-12 object-contain" />
-                  </div>
-                </div>
-
-                {/* Basic Info Section */}
-                <div className="border-2 border-gray-800 rounded-sm overflow-hidden flex mb-6 h-48">
-                  {/* Photo */}
-                  <div className="w-40 h-full border-r-2 border-gray-800 bg-gray-50 flex items-center justify-center overflow-hidden">
-                    <img src={editedPlayer.image} alt={editedPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                  </div>
-                  {/* Info Grid */}
-                  <div className="flex-1 grid grid-cols-2 border-r-2 border-gray-800">
-                    {[
-                      { label: '姓名', value: editedPlayer.name },
-                      { label: '出生日期', value: editedPlayer.birthDate },
-                      { label: '年级', value: editedPlayer.school || '二年级' },
-                      { label: '民族', value: '汉' },
-                      { label: '球衣号码', value: editedPlayer.number },
-                      { label: '球员类型', value: '全能型前锋' },
-                      { label: '惯用脚', value: `${editedPlayer.preferredFoot} 5/左 2` },
-                      { label: '比赛位置', value: editedPlayer.position }
-                    ].map((item, idx) => (
-                      <div key={idx} className={`flex items-center border-b border-gray-300 last:border-b-0 ${idx % 2 === 0 ? 'border-r border-gray-300' : ''}`}>
-                        <div className="w-20 px-3 py-2 text-xs font-bold text-gray-500 border-r border-gray-300 h-full flex items-center">{item.label}:</div>
-                        <div className="flex-1 px-3 py-2 text-sm font-bold text-gray-800">{item.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* Pitch Diagram */}
-                  <div className="w-48 h-full p-2 flex items-center justify-center bg-gray-50">
-                    <div className="w-full h-full border-2 border-gray-400 rounded-sm relative overflow-hidden">
-                      {/* Pitch Lines */}
-                      <div className="absolute inset-0 border-b-2 border-gray-400 top-1/2 -translate-y-1/2"></div>
-                      <div className="absolute w-12 h-12 border-2 border-gray-400 rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-                      <div className="absolute w-16 h-8 border-2 border-gray-400 border-t-0 top-0 left-1/2 -translate-x-1/2"></div>
-                      <div className="absolute w-16 h-8 border-2 border-gray-400 border-b-0 bottom-0 left-1/2 -translate-x-1/2"></div>
-                      <div className="absolute w-8 h-4 border-2 border-gray-400 border-t-0 top-0 left-1/2 -translate-x-1/2"></div>
-                      <div className="absolute w-8 h-4 border-2 border-gray-400 border-b-0 bottom-0 left-1/2 -translate-x-1/2"></div>
-                      {/* Player Marker */}
-                      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm">10</div>
-                      <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-red-400 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white opacity-60">6</div>
-                      <div className="absolute top-1/2 right-1/4 translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-gray-400 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white opacity-40">7</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Skills Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  {/* Technical & Match Ability */}
-                  {[
-                    { title: '技术能力', category: 'technical', color: 'bg-[#E8F1F8]' },
-                    { title: '比赛能力', category: 'tactical', color: 'bg-[#E8F1F8]' },
-                    { title: '身体能力', category: 'physical', color: 'bg-[#FDF2E9]' },
-                    { title: '心理', category: 'mental', color: 'bg-[#FDF2E9]' }
-                  ].map((section, sIdx) => (
-                    <div key={sIdx} className="border-2 border-gray-800 rounded-sm overflow-hidden">
-                      <div className={`${section.color} border-b-2 border-gray-800 px-4 py-2 text-center font-bold text-sm tracking-widest`}>
-                        {section.title}
-                      </div>
-                      <table className="w-full text-xs">
-                        <tbody>
-                          {attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
-                            const val = editedPlayer.stats[section.category as AttributeCategory][attr.key] || 5;
-                            const scaledVal = Math.min(4, Math.max(1, Math.ceil(val / 2.5)));
-                            return (
-                              <tr key={aIdx} className="border-b border-gray-300 last:border-b-0">
-                                <td className="px-3 py-2 font-bold text-gray-600 border-r border-gray-300 w-1/2">{attr.label}</td>
-                                <td className="px-1 py-1">
-                                  <div className="flex justify-around items-center h-full">
-                                    {[1, 2, 3, 4].map(num => (
-                                      <div key={num} className={`w-6 h-6 flex items-center justify-center rounded-sm border border-gray-300 text-[10px] font-bold ${scaledVal === num ? 'bg-[#F9D5D3] text-red-700 border-red-300' : 'text-gray-400'}`}>
-                                        {num}
-                                      </div>
-                                    ))}
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Bottom Section */}
-                <div className="flex-1 border-2 border-gray-800 rounded-sm overflow-hidden flex">
-                  {/* Evaluation suggestions */}
-                  <div className="flex-1 p-4 border-r-2 border-gray-800 flex flex-col">
-                    <h3 className="text-lg font-bold text-gray-800 mb-3">评价建议</h3>
-                    <div className="flex-1 text-sm text-gray-700 leading-relaxed overflow-hidden">
-                      {editedPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => b.date.localeCompare(a.date))[0]?.summary || 
-                       "该球员表现稳定，在训练中展现出良好的学习态度和竞技状态。技术动作规范，团队配合意识强。建议在接下来的训练中重点加强身体对抗能力和比赛中的决策果断性。"}
-                    </div>
-                  </div>
-                  {/* Radar Chart */}
-                  <div className="w-72 h-full p-4 flex flex-col items-center justify-center bg-gray-50">
-                    <div className="w-full h-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={overviewRadarData}>
-                          <PolarGrid stroke="#e5e7eb" />
-                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#6b7280', fontSize: 10, fontWeight: 'bold' }} />
-                          <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
-                          <Radar name="能力值" dataKey="A" stroke="#000" strokeWidth={1} fill="#000" fillOpacity={0.05} isAnimationActive={false} />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="mt-4 flex justify-between items-center text-[10px] text-gray-400 font-mono uppercase tracking-widest">
-                  <span>WSZG CLUB • INDIVIDUAL REPORT</span>
-                  <span>GENERATED ON {new Date().toLocaleDateString()}</span>
-                </div>
-              </div>
-            </div>
+           {/* HIDDEN PDF TEMPLATE */}
+           <div id="player-profile-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans"><div className="w-full h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white"><div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-4 mb-8"><div className="flex items-center gap-4"><img src={appLogo} alt="Club Logo" className="w-20 h-20 object-contain" /><div><h1 className="text-3xl font-black uppercase tracking-tighter text-bvb-black">顽石之光足球俱乐部</h1><p className="text-sm font-bold text-gray-400 tracking-widest uppercase">青少年精英梯队年度报告</p></div></div><div className="text-right"><div className="text-5xl font-black text-bvb-yellow text-outline">{exportYear}</div><div className="text-sm font-bold text-gray-500 uppercase">Season Report</div></div></div><div className="flex-1 flex flex-col gap-5"><div className="flex gap-8 bg-gray-50 rounded-lg p-6 border border-gray-100 relative overflow-hidden"><div className="w-32 h-32 rounded-full overflow-hidden border-4 border-bvb-yellow shadow-lg bg-white relative z-10 shrink-0"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" /></div><div className="relative z-10 flex-1 flex flex-col justify-center"><h2 className="text-3xl font-black text-gray-900 mb-1">{editedPlayer.name}</h2><p className="text-sm font-bold text-gray-500 mb-4 uppercase">#{editedPlayer.number} • {editedPlayer.position}{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD ? ` / ${editedPlayer.secondaryPosition}` : ''} • {teams.find(t => t.id === editedPlayer.teamId)?.name}</p><div className="grid grid-cols-4 gap-4 text-sm w-full"><div><span className="block text-gray-400 text-xs">年龄</span><span className="font-bold">{editedPlayer.age}岁</span></div><div><span className="block text-gray-400 text-xs">球龄</span><span className="font-bold">{calculateTenure(editedPlayer.joinDate) || '-'}</span></div><div><span className="block text-gray-400 text-xs">惯用脚</span><span className="font-bold">{editedPlayer.preferredFoot}脚</span></div><div><span className="block text-gray-400 text-xs">综合评分</span><span className="font-black text-bvb-yellow bg-black px-2 rounded">{getOverallRating(editedPlayer)}</span></div></div></div><div className="absolute top-0 right-0 w-64 h-64 bg-bvb-yellow/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div></div><div className="grid grid-cols-3 gap-6"><div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden"><div className="absolute left-0 top-0 bottom-0 w-1.5 bg-bvb-yellow"></div><span className="text-xs font-bold text-gray-400 uppercase mb-1">出场 (Apps)</span><span className="text-3xl font-black text-gray-800">{editedPlayer.appearances}</span></div><div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden"><div className="absolute left-0 top-0 bottom-0 w-1.5 bg-black"></div><span className="text-xs font-bold text-gray-400 uppercase mb-1">进球 (Goals)</span><span className="text-3xl font-black text-gray-800">{editedPlayer.goals}</span></div><div className="bg-white border border-gray-200 p-4 rounded-lg shadow-sm flex flex-col items-center justify-center relative overflow-hidden"><div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gray-400"></div><span className="text-xs font-bold text-gray-400 uppercase mb-1">助攻 (Assists)</span><span className="text-3xl font-black text-gray-800">{editedPlayer.assists}</span></div></div><div><h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-6 uppercase">四维能力深度分析</h3><div className="grid grid-cols-2 gap-x-8 gap-y-8">{(['technical', 'tactical', 'physical', 'mental'] as AttributeCategory[]).map(cat => (<div key={cat} className="flex flex-col items-center"><div className="w-full h-[220px] relative border border-gray-100 rounded-xl p-2 bg-gray-50/30"><span className="absolute top-2 left-3 text-xs font-black text-gray-400 uppercase tracking-wider">{categoryLabels[cat]}</span><div className="absolute top-2 right-3 text-xl font-black text-gray-800">{getCategoryAvg(editedPlayer, cat, attributeConfig)}</div><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="55%" outerRadius="70%" data={getCategoryRadarData(editedPlayer, cat, attributeConfig)}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#6b7280', fontSize: 9, fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name={categoryLabels[cat]} dataKey="value" stroke="#000" strokeWidth={2} fill="#FDE100" fillOpacity={0.6} isAnimationActive={false} /></RadarChart></ResponsiveContainer></div></div>))}</div></div><div className="flex-1 flex flex-col min-h-0"><h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-4 uppercase">年度考评记录</h3><div className="grid grid-cols-2 gap-4 flex-1">{editedPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review, idx) => (<div key={review.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-xs h-full"><div className="flex justify-between items-center mb-2 border-b border-gray-200 pb-2"><span className="font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className="text-gray-400 font-mono">{review.date}</span></div><div className="space-y-2"><div><span className="font-bold text-gray-500 uppercase block mb-0.5">技战术表现</span><p className="text-gray-800 leading-snug">{review.technicalTacticalImprovement || '-'}</p></div><div><span className="font-bold text-gray-500 uppercase block mb-0.5">心理成长</span><p className="text-gray-800导致-snug">{review.mentalDevelopment || '-'}</p></div><div className="pt-2 mt-2 border-t border-gray-100"><p className="text-gray-600 italic font-medium">"{review.summary}"</p></div></div></div>))}{(!editedPlayer.reviews?.some(r => r.year === exportYear)) && (<div className="col-span-2 text-center text-gray-400 italic py-8 border border-dashed border-gray-300 rounded-lg">本年度暂无考评记录</div>)}</div></div></div><div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 font-mono"><span>CONFIDENTIAL REPORT</span><span>GENERATED ON {new Date().toLocaleDateString()}</span></div></div>{editedPlayer.gallery && editedPlayer.gallery.some(p => p.date.startsWith(String(exportYear))) && (<div className="w-full h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white break-before-page"><div className="flex justify-between items-end border-b-4 border-bvb-yellow pb-4 mb-8"><div><h1 className="text-2xl font-black uppercase tracking-tighter text-bvb-black">{editedPlayer.name}</h1><p className="text-sm font-bold text-gray-400 tracking-widest uppercase">年度精彩瞬间 / Gallery</p></div><div className="text-right"><div className="text-3xl font-black text-bvb-yellow text-outline">{exportYear}</div></div></div><div className="grid grid-cols-2 gap-6 auto-rows-max">{editedPlayer.gallery.filter(p => p.date.startsWith(String(exportYear))).slice(0, 6).map(photo => (<div key={photo.id} className="break-inside-avoid"><div className="aspect-[4/3] w-full rounded-lg overflow-hidden border border-gray-200 shadow-sm bg-gray-50"><img src={photo.url} className="w-full h-full object-cover" crossOrigin="anonymous"/></div><div className="mt-2 flex justify-between items-center text-xs"><span className="font-bold text-gray-600">{photo.caption || '训练瞬间'}</span><span className="font-mono text-gray-400">{photo.date}</span></div></div>))}</div><div className="mt-auto pt-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 font-mono"><span>WSZG CLUB</span><span>PAGE 2</span></div></div>)}</div>
         </div>
       </div>
     );
@@ -1136,34 +977,23 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [exportingPlayerId, setExportingPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
-    setTimeout(() => {
-      if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') { setShowDraftsOnly(true); } 
-      else { const isTeamId = teams.some(t => t.id === initialFilter) || initialFilter === 'unassigned'; if (isTeamId) { setSelectedTeamId(initialFilter as string); setShowDraftsOnly(false); } }
-    }, 0);
+    if (initialFilter === 'pending_reviews' || initialFilter === 'pending_stats') { setShowDraftsOnly(true); } 
+    else { const isTeamId = teams.some(t => t.id === initialFilter) || initialFilter === 'unassigned'; if (isTeamId) { setSelectedTeamId(initialFilter as string); setShowDraftsOnly(false); } }
   }, [initialFilter, teams]);
 
   useEffect(() => {
-    setTimeout(() => {
-      if (isCoach && currentUser?.teamIds && currentUser.teamIds.length > 0) {
-          if (!selectedTeamId || !currentUser.teamIds.includes(selectedTeamId)) {
-               if (!(teams.some(t => t.id === initialFilter) && currentUser.teamIds.includes(initialFilter as string))) { setSelectedTeamId(currentUser.teamIds[0]); }
-          } return;
-      }
-      const teamExists = teams.some(t => t.id === selectedTeamId); const isUnassigned = selectedTeamId === 'unassigned';
-      if (!teamExists && !isUnassigned) { if (teams.length > 0) { setSelectedTeamId(teams[0].id); } else { setSelectedTeamId('unassigned'); } } else if (!selectedTeamId && teams.length > 0) { setSelectedTeamId(teams[0].id); }
-    }, 0);
-  }, [teams, currentUser, isCoach, selectedTeamId, initialFilter]);
+    if (isCoach && currentUser?.teamIds && currentUser.teamIds.length > 0) {
+        if (!selectedTeamId || !currentUser.teamIds.includes(selectedTeamId)) {
+             if (!(teams.some(t => t.id === initialFilter) && currentUser.teamIds.includes(initialFilter as string))) { setSelectedTeamId(currentUser.teamIds[0]); }
+        } return;
+    }
+    const teamExists = teams.some(t => t.id === selectedTeamId); const isUnassigned = selectedTeamId === 'unassigned';
+    if (!teamExists && !isUnassigned) { if (teams.length > 0) { setSelectedTeamId(teams[0].id); } else { setSelectedTeamId('unassigned'); } } else if (!selectedTeamId && teams.length > 0) { setSelectedTeamId(teams[0].id); }
+  }, [teams, currentUser, isCoach, selectedTeamId]);
 
   const [attendanceScope, setAttendanceScope] = useState<'month' | 'quarter' | 'year'>('month');
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  useEffect(() => { 
-    if (selectedPlayer) { 
-      const updated = players.find(p => p.id === selectedPlayer.id); 
-      if (updated && updated !== selectedPlayer) { 
-        setTimeout(() => setSelectedPlayer(updated), 0); 
-      } 
-    } 
-  }, [players, selectedPlayer]);
+  useEffect(() => { if (selectedPlayer) { const updated = players.find(p => p.id === selectedPlayer.id); if (updated && updated !== selectedPlayer) { setSelectedPlayer(updated); } } }, [players]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1177,12 +1007,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const [showBulkRechargeModal, setShowBulkRechargeModal] = useState(false);
   const [rechargePlayerId, setRechargePlayerId] = useState<string | null>(null);
 
-  useEffect(() => { 
-    setTimeout(() => {
-      setSelectedIds(new Set()); 
-      setIsSelectionMode(false); 
-    }, 0);
-  }, [selectedTeamId]);
+  useEffect(() => { setSelectedIds(new Set()); setIsSelectionMode(false); }, [selectedTeamId]);
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
   const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
   const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: 'U17', attribute: '兴趣', description: '' });
@@ -1212,54 +1037,20 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     } 
   };
   const filteredPlayers = players.filter(p => {
-    if (!p || !p.name) return false;
-    const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; 
-    const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
+    const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const posVal = (p.position || '').toString(); 
-    const isFwd = posVal.includes('锋') || posVal.includes('9'); 
-    const isMid = posVal.includes('中场'); 
-    const isDef = posVal.includes('后卫') || posVal.includes('翼卫'); 
-    const isGk = posVal.includes('守门员');
+    const posVal = p.position.toString(); const isFwd = posVal.includes('锋') || posVal.includes('9'); const isMid = posVal.includes('中场'); const isDef = posVal.includes('后卫') || posVal.includes('翼卫'); const isGk = posVal.includes('守门员');
     const matchesPos = filterPos === '全部' || (filterPos === '前锋' && isFwd) || (filterPos === '中场' && isMid) || (filterPos === '后卫' && isDef) || (filterPos === '门将' && isGk);
-    if (showDraftsOnly) { 
-      const hasDraftReviews = p.reviews?.some(r => r && (r.status === 'Draft' || r.status === 'Submitted')); 
-      const hasDraftStats = p.statsStatus === 'Draft' || p.statsStatus === 'Submitted'; 
-      if (!hasDraftReviews && !hasDraftStats) return false; 
-    }
+    if (showDraftsOnly) { const hasDraftReviews = p.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted'); const hasDraftStats = p.statsStatus === 'Draft' || p.statsStatus === 'Submitted'; if (!hasDraftReviews && !hasDraftStats) return false; }
     return matchesTeam && matchesSearch && matchesPos;
   }).sort((a, b) => {
-    if (sortField === 'age') { 
-      const dateA = a.birthDate || '0000-00-00'; 
-      const dateB = b.birthDate || '0000-00-00'; 
-      return sortDirection === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA); 
-    }
-    if (sortField === 'rating') { 
-      const rateA = parseFloat(getOverallRating(a)); 
-      const rateB = parseFloat(getOverallRating(b)); 
-      return sortDirection === 'asc' ? rateA - rateB : rateB - rateA; 
-    }
-    if (sortField === 'attendance') { 
-      const attA = calculateAttendanceRate(a, trainings, 'year'); 
-      const attB = calculateAttendanceRate(b, trainings, 'year'); 
-      return sortDirection === 'asc' ? attA - attB : attB - attA; 
-    }
-    if (sortField === 'credits') { 
-      return sortDirection === 'asc' ? (a.credits || 0) - (b.credits || 0) : (b.credits || 0) - (a.credits || 0); 
-    }
-    if (sortField === 'position') { 
-      const orderA = POSITION_ORDER[a.position] || 999; 
-      const orderB = POSITION_ORDER[b.position] || 999; 
-      return sortDirection === 'asc' ? orderA - orderB : orderB - orderA; 
-    }
-    const joinA = a.joinDate || '9999-99-99'; 
-    const joinB = b.joinDate || '9999-99-99'; 
-    if (joinA !== joinB) { 
-      return sortDirection === 'asc' ? joinA.localeCompare(joinB) : joinB.localeCompare(joinA); 
-    }
-    if (a.isCaptain && !b.isCaptain) return -1; 
-    if (!a.isCaptain && b.isCaptain) return 1; 
-    return (a.number || 0) - (b.number || 0);
+    if (sortField === 'age') { const dateA = a.birthDate || '0000-00-00'; const dateB = b.birthDate || '0000-00-00'; return sortDirection === 'asc' ? dateA.localeCompare(dateB) : dateB.localeCompare(dateA); }
+    if (sortField === 'rating') { const rateA = parseFloat(getOverallRating(a)); const rateB = parseFloat(getOverallRating(b)); return sortDirection === 'asc' ? rateA - rateB : rateB - rateA; }
+    if (sortField === 'attendance') { const attA = calculateAttendanceRate(a, trainings, 'year'); const attB = calculateAttendanceRate(b, trainings, 'year'); return sortDirection === 'asc' ? attA - attB : attB - attA; }
+    if (sortField === 'credits') { return sortDirection === 'asc' ? a.credits - b.credits : b.credits - a.credits; }
+    if (sortField === 'position') { const orderA = POSITION_ORDER[a.position] || 999; const orderB = POSITION_ORDER[b.position] || 999; return sortDirection === 'asc' ? orderA - orderB : orderB - orderA; }
+    const joinA = a.joinDate || '9999-99-99'; const joinB = b.joinDate || '9999-99-99'; if (joinA !== joinB) { return joinA.localeCompare(joinB); }
+    if (a.isCaptain && !b.isCaptain) return -1; if (!a.isCaptain && b.isCaptain) return 1; return (a.number || 0) - (b.number || 0);
   });
 
   const toggleSelection = (id: string) => { const newSet = new Set(selectedIds); if (newSet.has(id)) { newSet.delete(id); } else { newSet.add(id); } setSelectedIds(newSet); };
@@ -1328,28 +1119,10 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
   };
   
-  const handleAddPlayerSubmit = async (e: React.FormEvent) => {
+  const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
     const finalTeamId = newPlayer.teamId || selectedTeamId;
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
-        let imageUrl = newPlayer.image;
-        if (imageUrl && imageUrl.startsWith('data:image/')) {
-            try {
-                const res = await fetch('/api/upload', {
-                    method: 'POST',
-                    body: JSON.stringify({ filename: `player_${Date.now()}.jpg`, data: imageUrl }),
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                if (!res.ok) throw new Error('Upload failed');
-                const { url } = await res.json();
-                imageUrl = url;
-            } catch (error) {
-                console.error('Upload failed', error);
-                alert('图片上传失败，请重试。');
-                return;
-            }
-        }
-
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
         nextYear.setFullYear(nextYear.getFullYear() + 1);
@@ -1369,7 +1142,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             goals: 0, 
             assists: 0, 
             appearances: 0, 
-            image: imageUrl || `https://picsum.photos/200/200?random=${Date.now()}`, 
+            image: newPlayer.image || `https://picsum.photos/200/200?random=${Date.now()}`, 
             stats: defaultStats, 
             statsStatus: 'Published', 
             lastPublishedStats: JSON.parse(JSON.stringify(defaultStats)), 
@@ -1481,7 +1254,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                     <div className="flex-1 flex flex-col min-h-0">
                         <h3 className="text-lg font-black text-gray-800 border-l-4 border-bvb-yellow pl-3 mb-4 uppercase">年度考评记录</h3>
                         <div className="grid grid-cols-2 gap-4 flex-1">
-                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review) => (
+                            {exportingPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => a.quarter.localeCompare(b.quarter)).map((review, idx) => (
                                 <div key={review.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-xs">
                                     <div className="flex justify-between items-center mb-2 border-b border-gray-200 pb-2"><span className="font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className="text-gray-400 font-mono">{review.date}</span></div>
                                     <div className="space-y-2">
@@ -1541,7 +1314,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
           {isDirector && <button onClick={() => setShowImportModal(true)} className="p-2 rounded-lg border border-gray-300 text-gray-500" title="批量导入"><Upload className="w-5 h-5" /></button>}
           {isDirector && <button onClick={() => setShowAddModal(true)} className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-sm hover:brightness-105"><Plus className="w-4 h-4 mr-1" /> <span className="hidden sm:inline">录入</span>球员</button>}
         </div></div>{(showDraftsOnly || isSelectionMode) && (<div className={`px-4 py-2 rounded-lg mb-4 text-sm flex items-center justify-between transition-all ${showDraftsOnly ? 'bg-blue-50 text-blue-700' : 'bg-bvb-black text-white'}`}>{showDraftsOnly && !isSelectionMode && (<><div className="flex items-center font-bold"><ClipboardCheck className="w-4 h-4 mr-2" />{isDirector ? '未发布草稿' : '本队草稿'} ({filteredPlayers.length})</div><button onClick={() => setShowDraftsOnly(false)} className="text-xs hover:underline">清除筛选</button></>)}{isSelectionMode && (<><div className="flex items-center space-x-3"><button onClick={handleSelectAll} className="text-xs font-bold text-gray-400">全选</button><span className="text-sm font-bold">已选: {selectedIds.size}</span></div><div className="flex space-x-2 items-center">{isBulkExporting ? (<div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded text-xs font-black text-bvb-yellow"><RefreshCw className="w-3 h-3 animate-spin" /> 导出中 ({bulkExportCurrentIdx}/{selectedIds.size})</div>) : (<button disabled={selectedIds.size === 0} onClick={handleBulkExportProfiles} className="px-3 py-1 bg-gray-700 hover:bg-gray-600 transition-colors rounded text-xs font-bold disabled:opacity-50 flex items-center gap-1.5"><Files className="w-3.5 h-3.5" /> 导出档案</button>)}<button disabled={selectedIds.size === 0} onClick={() => setShowTransferModal(true)} className="px-3 py-1 bg-gray-700 rounded text-xs font-bold disabled:opacity-50">移交</button>{isDirector && <button disabled={selectedIds.size === 0} onClick={() => setShowBulkRechargeModal(true)} className="px-3 py-1 bg-gray-700 rounded text-xs font-bold disabled:opacity-50">充值</button>}{isDirector && <button disabled={selectedIds.size === 0} onClick={executeBulkDelete} className="px-3 py-1 bg-red-900 rounded text-xs font-bold disabled:opacity-50">删除</button>}<button onClick={() => setIsSelectionMode(false)} className="px-2 hover:bg-gray-800 rounded transition-colors"><X className="w-4 h-4" /></button></div></>)}</div>)}
-        {viewMode === 'list' && (<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 overflow-y-auto custom-scrollbar"><table className="w-full text-left border-collapse"><thead className="bg-gray-50 sticky top-0 z-10"><tr><th className="px-2 py-3 md:px-4 md:py-4 border-b w-10 md:w-12 text-center">{isSelectionMode && <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.size > 0 && selectedIds.size === filteredPlayers.length} />}</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">球员信息</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">梯队/位置</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">出生年月</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">综合评分</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell w-32">出勤率</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">课时余额</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell">状态</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest text-right">操作</th></tr></thead><tbody className="divide-y divide-gray-100">{filteredPlayers.length > 0 ? filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const overallRating = getOverallRating(player); const ratingVal = parseFloat(overallRating); const attendanceRate = calculateAttendanceRate(player, trainings, attendanceScope); const isExpiredValid = isExpired(player.validUntil); const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted'); const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted'; const teamName = teams.find(t => t.id === player.teamId)?.name || (player.teamId === 'unassigned' ? '待分配' : '未知'); return (<tr key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`hover:bg-yellow-50/50 transition-colors cursor-pointer group ${isSelected ? 'bg-yellow-50' : ''}`}><td className="px-2 py-3 md:px-4 md:py-4 text-center" onClick={(e) => e.stopPropagation()}>{isSelectionMode && (<input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} />)}</td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><div className="relative w-8 h-8 md:w-10 md:h-10 shrink-0"><img src={player.image} alt={player.name} className="w-full h-full rounded-full object-cover border border-gray-200 bg-gray-100" onError={(e) => (e.currentTarget.src = 'https://picsum.photos/200/200?random=default')} />{player.isCaptain && <div className="absolute -top-1 -left-1 w-3.5 h-3.5 md:w-4 md:h-4 bg-yellow-400 text-bvb-black flex items-center justify-center rounded-sm font-black text-[7px] md:text-[9px] border border-white shadow-xs">C</div>}</div><div><div className="font-black text-gray-800 text-xs md:text-sm leading-tight flex items-center gap-1 truncate max-w-[60px] md:max-w-none">{player.name}{getBirthdayStatus(player.birthDate) && <Cake className={`w-2.5 h-2.5 md:w-3 md:h-3 ${getBirthdayStatus(player.birthDate)?.color.replace('bg-', 'text-')}`} />}</div><div className="text-[9px] md:text-[10px] text-gray-400 font-mono mt-0.5">#{player.number}</div></div></div></td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex flex-col"><span className="text-[10px] md:text-xs font-bold text-gray-600 truncate max-w-[70px] md:max-w-none">{teamName}</span><div className="flex flex-wrap items-center gap-0.5 mt-1"><span className={`px-1 py-0.5 rounded-[3px] text-[8px] md:text-[10px] font-black uppercase tracking-tighter ${getPosColor(player.position)}`}>{player.position}</span>{player.secondaryPosition && player.secondaryPosition !== Position.TBD && (<span className={`px-1 py-0.5 rounded-[3px] text-[8px] md:text-[10px] font-black uppercase tracking-tighter border ${getPosColorLight(player.secondaryPosition)}`}>{player.secondaryPosition}</span>)}</div></div></td><td className="p-4 hidden sm:table-cell text-xs font-bold text-gray-500"><div className="flex flex-col"><span>{player.birthDate || '未录入'}</span><span className="text-[10px] text-gray-400">{player.age} 岁</span></div></td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex items-center justify-center md:justify-start"><div className={`w-7 h-7 md:w-8 md:h-8 rounded-[6px] flex items-center justify-center text-[10px] md:text-xs font-black border transition-transform group-hover:scale-110 shadow-sm ${ratingVal >= 8 ? 'bg-green-50 text-green-700 border-green-200' : ratingVal >= 6 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>{overallRating}</div></div></td><td className="p-4 hidden md:table-cell"><div className="flex items-center gap-2 w-24"><div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${attendanceRate >= 80 ? 'bg-green-500' : attendanceRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${attendanceRate}%` }}></div></div><span className="text-[10px] font-mono font-bold text-gray-400">{attendanceRate}%</span></div></td><td className="p-4 hidden sm:table-cell"><div className="flex flex-col"><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500 animate-pulse' : 'text-gray-800'}`}>{player.credits} 节</span><span className={`text-[10px] font-bold ${isExpiredValid ? 'text-red-400' : 'text-gray-400'}`}>有效期: {player.validUntil}</span></div></td><td className="p-4 hidden md:table-cell">{(hasDraftReviews || hasDraftStats) ? (<span className="flex items-center text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter"><RefreshCw className="w-2.5 h-2.5 mr-1 animate-spin" /> 有草稿待审</span>) : (<span className="flex items-center text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-tighter"><CheckCircle className="w-2.5 h-2.5 mr-1" /> 数据已发布</span>)}</td><td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex justify-end gap-0.5 md:gap-1"><button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 md:p-2 text-gray-400 hover:text-green-600 transition-colors" title="充值"><CreditCard className="w-3.5 h-3.5 md:w-4 md:h-4" /></button><button onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); }} className="p-1.5 md:p-2 text-gray-400 hover:text-bvb-black transition-colors" title="详情"><MoreHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></div></td></tr>); }) : (<tr><td colSpan={9} className="p-12 text-center text-gray-400 font-bold italic">未找到匹配的球员</td></tr>)}</tbody></table>
+        {viewMode === 'list' && (<div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex-1 overflow-y-auto custom-scrollbar"><table className="w-full text-left border-collapse"><thead className="bg-gray-50 sticky top-0 z-10"><tr><th className="px-2 py-3 md:px-4 md:py-4 border-b w-10 md:w-12 text-center">{isSelectionMode && <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.size > 0 && selectedIds.size === filteredPlayers.length} />}</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">球员信息</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">梯队/位置</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">出生年月</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest">综合评分</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell w-32">出勤率</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden sm:table-cell">课时余额</th><th className="px-4 py-4 border-b text-xs font-bold text-gray-500 uppercase hidden md:table-cell">状态</th><th className="px-2 py-3 md:px-4 md:py-4 border-b text-[9px] md:text-xs font-black text-gray-400 uppercase tracking-tighter md:tracking-widest text-right">操作</th></tr></thead><tbody className="divide-y divide-gray-100">{filteredPlayers.length > 0 ? filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const overallRating = getOverallRating(player); const ratingVal = parseFloat(overallRating); const attendanceRate = calculateAttendanceRate(player, trainings, attendanceScope); const isExpiredValid = isExpired(player.validUntil); const hasDraftReviews = player.reviews?.some(r => r.status === 'Draft' || r.status === 'Submitted'); const hasDraftStats = player.statsStatus === 'Draft' || player.statsStatus === 'Submitted'; const teamName = teams.find(t => t.id === player.teamId)?.name || (player.teamId === 'unassigned' ? '待分配' : '未知'); return (<tr key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`hover:bg-yellow-50/50 transition-colors cursor-pointer group ${isSelected ? 'bg-yellow-50' : ''}`}><td className="px-2 py-3 md:px-4 md:py-4 text-center" onClick={(e) => e.stopPropagation()}>{isSelectionMode && (<input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} />)}</td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex items-center gap-1.5 md:gap-3"><div className="relative w-8 h-8 md:w-10 md:h-10 shrink-0"><img src={player.image} alt={player.name} className="w-full h-full rounded-full object-cover border border-gray-200 bg-gray-100" />{player.isCaptain && <div className="absolute -top-1 -left-1 w-3.5 h-3.5 md:w-4 md:h-4 bg-yellow-400 text-bvb-black flex items-center justify-center rounded-sm font-black text-[7px] md:text-[9px] border border-white shadow-xs">C</div>}</div><div><div className="font-black text-gray-800 text-xs md:text-sm leading-tight flex items-center gap-1 truncate max-w-[60px] md:max-w-none">{player.name}{getBirthdayStatus(player.birthDate) && <Cake className={`w-2.5 h-2.5 md:w-3 md:h-3 ${getBirthdayStatus(player.birthDate)?.color.replace('bg-', 'text-')}`} />}</div><div className="text-[9px] md:text-[10px] text-gray-400 font-mono mt-0.5">#{player.number}</div></div></div></td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex flex-col"><span className="text-[10px] md:text-xs font-bold text-gray-600 truncate max-w-[70px] md:max-w-none">{teamName}</span><div className="flex flex-wrap items-center gap-0.5 mt-1"><span className={`px-1 py-0.5 rounded-[3px] text-[8px] md:text-[10px] font-black uppercase tracking-tighter ${getPosColor(player.position)}`}>{player.position}</span>{player.secondaryPosition && player.secondaryPosition !== Position.TBD && (<span className={`px-1 py-0.5 rounded-[3px] text-[8px] md:text-[10px] font-black uppercase tracking-tighter border ${getPosColorLight(player.secondaryPosition)}`}>{player.secondaryPosition}</span>)}</div></div></td><td className="p-4 hidden sm:table-cell text-xs font-bold text-gray-500"><div className="flex flex-col"><span>{player.birthDate || '未录入'}</span><span className="text-[10px] text-gray-400">{player.age} 岁</span></div></td><td className="px-2 py-3 md:px-4 md:py-4"><div className="flex items-center justify-center md:justify-start"><div className={`w-7 h-7 md:w-8 md:h-8 rounded-[6px] flex items-center justify-center text-[10px] md:text-xs font-black border transition-transform group-hover:scale-110 shadow-sm ${ratingVal >= 8 ? 'bg-green-50 text-green-700 border-green-200' : ratingVal >= 6 ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-700 border-gray-200'}`}>{overallRating}</div></div></td><td className="p-4 hidden md:table-cell"><div className="flex items-center gap-2 w-24"><div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className={`h-full ${attendanceRate >= 80 ? 'bg-green-500' : attendanceRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${attendanceRate}%` }}></div></div><span className="text-[10px] font-mono font-bold text-gray-400">{attendanceRate}%</span></div></td><td className="p-4 hidden sm:table-cell"><div className="flex flex-col"><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500 animate-pulse' : 'text-gray-800'}`}>{player.credits} 节</span><span className={`text-[10px] font-bold ${isExpiredValid ? 'text-red-400' : 'text-gray-400'}`}>有效期: {player.validUntil}</span></div></td><td className="p-4 hidden md:table-cell">{(hasDraftReviews || hasDraftStats) ? (<span className="flex items-center text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 uppercase tracking-tighter"><RefreshCw className="w-2.5 h-2.5 mr-1 animate-spin" /> 有草稿待审</span>) : (<span className="flex items-center text-[10px] font-black text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 uppercase tracking-tighter"><CheckCircle className="w-2.5 h-2.5 mr-1" /> 数据已发布</span>)}</td><td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex justify-end gap-0.5 md:gap-1"><button onClick={(e) => openRechargeModal(e, player.id)} className="p-1.5 md:p-2 text-gray-400 hover:text-green-600 transition-colors" title="充值"><CreditCard className="w-3.5 h-3.5 md:w-4 md:h-4" /></button><button onClick={(e) => { e.stopPropagation(); setSelectedPlayer(player); }} className="p-1.5 md:p-2 text-gray-400 hover:text-bvb-black transition-colors" title="详情"><MoreHorizontal className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></div></td></tr>); }) : (<tr><td colSpan={9} className="p-12 text-center text-gray-400 font-bold italic">未找到匹配的球员</td></tr>)}</tbody></table>
         {/* PDF 模板保持不变 */}
         <div id="player-list-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
             <div className="w-full p-[15mm] flex flex-col bg-white">
@@ -1595,7 +1368,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </div>
         </div>
         </div>)}
-        {viewMode === 'grid' && (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-10 custom-scrollbar pr-2 flex-1">{filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const ratingVal = parseFloat(getOverallRating(player)); const birthday = getBirthdayStatus(player.birthDate); return (<div key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`bg-white rounded-2xl p-4 shadow-sm border-2 transition-all relative group cursor-pointer hover:shadow-md ${isSelected ? 'border-bvb-yellow ring-2 ring-bvb-yellow/20 translate-y-[-4px]' : 'border-transparent hover:border-gray-200'}`}>{isSelectionMode && (<div className="absolute top-3 left-3 z-10"><input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded text-bvb-black" /></div>)}<div className="absolute top-4 right-4 flex flex-col items-end gap-1.5"><div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${ratingVal >= 8 ? 'bg-green-100 text-green-700' : ratingVal >= 6 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>OVR: {getOverallRating(player)}</div>{player.isCaptain && <Crown className="w-4 h-4 text-bvb-yellow fill-current" />}</div><div className="flex flex-col items-center mt-2 mb-4"><div className="relative"><img src={player.image} alt={player.name} className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg bg-gray-50" onError={(e) => (e.currentTarget.src = 'https://picsum.photos/200/200?random=default')} />{birthday && <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border-2 border-white shadow-md ${birthday.color}`}><Cake className="w-3 h-3 text-white" /></div>}</div><h3 className="mt-3 font-black text-gray-800 text-lg flex items-center gap-1.5">{player.name}</h3><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">#{player.number} • {teams.find(t => t.id === player.teamId)?.level || '待分配'}</p>{player.birthDate && <p className="text-[9px] text-gray-400 font-mono mt-1">{player.birthDate}</p>}</div><div className="grid grid-cols-2 gap-2"><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">主位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded text-white ${getPosColor(player.position)}`}>{player.position}</span></div><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">第二位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded border ${getPosColorLight(player.secondaryPosition || Position.TBD)}`}>{player.secondaryPosition || Position.TBD}</span></div></div><div className="mt-4 flex justify-between items-center"><div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase">剩余课时</span><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500' : 'text-gray-800'}`}>{player.credits} 节</span></div><button onClick={(e) => openRechargeModal(e, player.id)} className="p-2 bg-gray-50 rounded-xl hover:bg-yellow-50 text-gray-400 hover:text-bvb-black transition-colors"><Plus className="w-4 h-4" /></button></div></div>); })}</div>)}
+        {viewMode === 'grid' && (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-10 custom-scrollbar pr-2 flex-1">{filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const ratingVal = parseFloat(getOverallRating(player)); const birthday = getBirthdayStatus(player.birthDate); return (<div key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`bg-white rounded-2xl p-4 shadow-sm border-2 transition-all relative group cursor-pointer hover:shadow-md ${isSelected ? 'border-bvb-yellow ring-2 ring-bvb-yellow/20 translate-y-[-4px]' : 'border-transparent hover:border-gray-200'}`}>{isSelectionMode && (<div className="absolute top-3 left-3 z-10"><input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded text-bvb-black" /></div>)}<div className="absolute top-4 right-4 flex flex-col items-end gap-1.5"><div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${ratingVal >= 8 ? 'bg-green-100 text-green-700' : ratingVal >= 6 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>OVR: {getOverallRating(player)}</div>{player.isCaptain && <Crown className="w-4 h-4 text-bvb-yellow fill-current" />}</div><div className="flex flex-col items-center mt-2 mb-4"><div className="relative"><img src={player.image} alt={player.name} className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg bg-gray-50" />{birthday && <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border-2 border-white shadow-md ${birthday.color}`}><Cake className="w-3 h-3 text-white" /></div>}</div><h3 className="mt-3 font-black text-gray-800 text-lg flex items-center gap-1.5">{player.name}</h3><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">#{player.number} • {teams.find(t => t.id === player.teamId)?.level || '待分配'}</p>{player.birthDate && <p className="text-[9px] text-gray-400 font-mono mt-1">{player.birthDate}</p>}</div><div className="grid grid-cols-2 gap-2"><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">主位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded text-white ${getPosColor(player.position)}`}>{player.position}</span></div><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">第二位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded border ${getPosColorLight(player.secondaryPosition || Position.TBD)}`}>{player.secondaryPosition || Position.TBD}</span></div></div><div className="mt-4 flex justify-between items-center"><div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase">剩余课时</span><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500' : 'text-gray-800'}`}>{player.credits} 节</span></div><button onClick={(e) => openRechargeModal(e, player.id)} className="p-2 bg-gray-50 rounded-xl hover:bg-yellow-50 text-gray-400 hover:text-bvb-black transition-colors"><Plus className="w-4 h-4" /></button></div></div>); })}</div>)}
       </div>
 
       {/* Modals */}

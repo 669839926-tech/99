@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useRef } from 'react';
-import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, Gauge, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, MonthlyEvaluation, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
+import { Wallet, Plus, Trash2, FileText, Download, TrendingUp, TrendingDown, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, Target, ImageIcon, Paperclip, Eye, AlertCircle, Info, CheckSquare, RefreshCw, ListFilter, TableProperties, Users, Star, Gauge, ClipboardCheck, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, History, Clock, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, AreaChart, Area, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
     transactions: FinanceTransaction[];
@@ -31,7 +31,7 @@ const parseDateInfo = (dateStr: string) => {
         return { year: d.getFullYear(), month: d.getMonth() };
     }
     const yMatch = dateStr.match(/(\d{4})/);
-    const mMatch = dateStr.match(/(?:-|年|\/)(\d{1,2})(?:-|月|\/)?/);
+    const mMatch = dateStr.match(/(?:\-|年|\/)(\d{1,2})(?:\-|月|\/)?/);
     return {
         year: yMatch ? parseInt(yMatch[1]) : 0,
         month: mMatch ? parseInt(mMatch[1]) - 1 : -1
@@ -39,7 +39,7 @@ const parseDateInfo = (dateStr: string) => {
 };
 
 const FinanceManager: React.FC<FinanceManagerProps> = ({ 
-    transactions, financeCategories, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
+    transactions, financeCategories, currentUser, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
     users, players, teams, trainings, salarySettings, onUpdateUser,
     accountingRecords, onAddAccountingRecord, onUpdateAccountingRecord, onDeleteAccountingRecord
 }) => {
@@ -59,49 +59,23 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [activeType, setActiveType] = useState<'income' | 'expense'>('income');
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], details: '', category: '', amount: '', account: '黔农云', attachment: '' as string });
     const [accountingFormData, setAccountingFormData] = useState<Partial<AccountingRecord>>({ type: 'receivable', date: new Date().toISOString().split('T')[0], entity: '', details: '', amount: 0, status: 'pending', category: '' });
-    const [filters, setFilters] = useState({
-        date: '',
-        category: '',
-        details: '',
-        account: '',
-        income: '',
-        expense: '',
-        balance: ''
-    });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleTypeChange = (type: 'income' | 'expense') => {
-        setActiveType(type);
-        const categoriesForType = financeCategories.filter(c => c.type === type);
-        if (categoriesForType.length > 0) {
-            setFormData(prev => ({ ...prev, category: categoriesForType[0].id }));
-        }
-    };
+    useEffect(() => {
+        const categoriesForType = financeCategories.filter(c => c.type === activeType);
+        setFormData(prev => ({ ...prev, category: categoriesForType.length > 0 ? categoriesForType[0].id : '' }));
+    }, [activeType, financeCategories]);
+
+    const isDirector = currentUser?.role === 'director';
 
     const journalWithBalance = useMemo(() => {
         const baseSorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-        const recordsWithBalance: any[] = [];
-        let runningBalance = 0;
-        baseSorted.forEach(t => {
-            runningBalance += (Number(t.income) || 0) - (Number(t.expense) || 0);
-            recordsWithBalance.push({ ...t, balance: runningBalance });
+        let balance = 0;
+        const recordsWithBalance = baseSorted.map(t => {
+            balance += (Number(t.income) || 0) - (Number(t.expense) || 0);
+            return { ...t, balance };
         });
-
-        const filtered = recordsWithBalance.filter(t => {
-            const catLabel = financeCategories.find(c => c.id === t.category)?.label || '';
-            return (
-                t.date.includes(filters.date) &&
-                catLabel.includes(filters.category) &&
-                t.details.toLowerCase().includes(filters.details.toLowerCase()) &&
-                t.account.toLowerCase().includes(filters.account.toLowerCase()) &&
-                (filters.income === '' || String(t.income).includes(filters.income)) &&
-                (filters.expense === '' || String(t.expense).includes(filters.expense)) &&
-                (filters.balance === '' || String(t.balance.toFixed(2)).includes(filters.balance))
-            );
-        });
-
-        return filtered.sort((a, b) => {
+        return recordsWithBalance.sort((a, b) => {
             let valA: any = a[journalSortField];
             let valB: any = b[journalSortField];
             if (journalSortField === 'date') { valA = new Date(valA).getTime(); valB = new Date(valB).getTime(); }
@@ -111,7 +85,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             if (valA > valB) return journalSortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [transactions, journalSortField, journalSortOrder, financeCategories, filters]);
+    }, [transactions, journalSortField, journalSortOrder, financeCategories]);
 
     const toggleSort = (field: 'date' | 'income' | 'expense' | 'category') => {
         if (journalSortField === field) setJournalSortOrder(journalSortOrder === 'asc' ? 'desc' : 'asc');
@@ -206,7 +180,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const coachSalaries = useMemo(() => {
         const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
-        const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
 
         return staff.map(coach => {
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
@@ -264,8 +237,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let renewalFormula = "非季末月份";
                 if (isDistributionMonth) {
                     const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
-                    const qStart = new Date(effectiveYear, quarterMonths[0], 1).toISOString();
-                    const qEnd = new Date(effectiveYear, quarterMonths[2] + 1, 0).toISOString();
+                    const qStart = new Date(selectedYear, quarterMonths[0], 1).toISOString();
+                    const qEnd = new Date(selectedYear, quarterMonths[2] + 1, 0).toISOString();
                     const renewedCount = teamPlayers.filter(p => {
                         const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
                         const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
@@ -338,15 +311,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleSavePayroll = (coachId: string) => {
-        if (selectedYear === 'all') { alert('请选择具体年份进行保存'); return; }
-        const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
         const row = coachSalaries.find(s => s.coachId === coachId);
         if (!coach || !row) return;
         const records = coach.monthlySalaryRecords || [];
-        const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
-        const nextRecords = [...records];
+        const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
+        const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
+        let nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const nextEdit = { ...editPayroll }; delete nextEdit[coachId]; setEditPayroll(nextEdit);
@@ -354,44 +325,30 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleDisburseSalary = (coachId: string) => {
-        if (selectedYear === 'all') { alert('请选择具体年份进行发放'); return; }
-        const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
         const row = coachSalaries.find(s => s.coachId === coachId);
         if (!coach || !row) return;
         if (row.totalSalary <= 0) { alert('薪资总额为0，无需发放。'); return; }
         if (row.isDisbursed && !confirm('该笔薪资已经发放过，确定要再次发放并记录支出吗？')) return;
         const records = coach.monthlySalaryRecords || [];
-        const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
-        const nextRecords = [...records];
+        const existingIdx = records.findIndex(r => r.year === selectedYear && r.month === selectedMonth);
+        const newRecord: MonthlySalaryRecord = { id: `sal-${selectedYear}-${selectedMonth}-${coachId}`, year: selectedYear, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
+        let nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const salaryExpenseCategory = financeCategories.find(c => c.label.includes('工资支出') || c.id === 'cat-4');
-        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${yearNum}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
+        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${selectedYear}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
         alert(`发放成功！已为 ${coach.name} 生成一笔 ¥${row.totalSalary} 的薪酬支出记录。`);
     };
 
-    const uniqueAccounts = useMemo(() => {
-        const accounts = new Set(transactions.map(t => t.account).filter(Boolean));
-        return Array.from(accounts).sort();
-    }, [transactions]);
-
-    const uniqueDetails = useMemo(() => {
-        const details = new Set(transactions.map(t => t.details).filter(Boolean));
-        return Array.from(details).sort();
-    }, [transactions]);
-
     const handleUpdateEvaluation = (coachId: string, score: number) => {
-        if (selectedYear === 'all') { alert('请选择具体年份进行评价'); return; }
-        const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
         if (!coach) return;
         const evaluations = coach.monthlyEvaluations || [];
-        const existingIdx = evaluations.findIndex(e => e.year === yearNum && e.month === selectedMonth);
-        const nextEvals = [...evaluations];
+        const existingIdx = evaluations.findIndex(e => e.year === selectedYear && e.month === selectedMonth);
+        let nextEvals = [...evaluations];
         if (existingIdx >= 0) nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
-        else nextEvals.push({ id: `eval-${Date.now()}`, year: yearNum, month: selectedMonth, score, comment: '' });
+        else nextEvals.push({ id: `eval-${Date.now()}`, year: selectedYear, month: selectedMonth, score, comment: '' });
         onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
     };
 
@@ -407,13 +364,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     };
 
     const handleSettleAccountingRecord = (record: AccountingRecord) => {
+        if (!confirm(`确定要结算这笔${record.type === 'receivable' ? '应收' : '应付'}账款吗？结算后将自动生成一笔财务流水。`)) return;
+        
         const settledDate = new Date().toISOString().split('T')[0];
         onUpdateAccountingRecord({ ...record, status: 'settled', settledDate });
         
         // Generate transaction
-        const transactionId = `settle-${new Date().getTime()}`;
         onAddTransaction({
-            id: transactionId,
+            id: `settle-${Date.now()}`,
             date: settledDate,
             details: `[账款结算] ${record.entity}: ${record.details}`,
             category: record.category,
@@ -421,6 +379,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             expense: record.type === 'payable' ? record.amount : 0,
             account: '黔农云 (结算入账)'
         });
+        
+        alert('结算成功，已同步至财务流水。');
     };
 
     const toggleSelectAll = () => setSelectedIds(selectedIds.size === journalWithBalance.length ? new Set() : new Set(journalWithBalance.map(t => t.id)));
@@ -703,9 +663,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     <div className="p-4 md:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                         <h3 className="font-black text-sm md:text-base text-gray-800 flex items-center uppercase italic tracking-tighter"><FileText className="w-4 h-4 md:w-5 md:h-5 mr-2 text-bvb-yellow" /> 现金日记账流水明细</h3>
                         <div className="flex items-center gap-2 md:gap-4">
-                            {Object.values(filters).some(v => v !== '') && (
-                                <button onClick={() => setFilters({ date: '', category: '', details: '', account: '', income: '', expense: '', balance: '' })} className="text-[10px] md:text-xs flex items-center bg-gray-50 text-gray-600 border border-gray-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100"><RefreshCw className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 重置筛选</button>
-                            )}
                             {selectedIds.size > 0 && <button onClick={() => onBulkDeleteTransactions(Array.from(selectedIds))} className="text-[10px] md:text-xs flex items-center bg-red-50 text-red-600 border border-red-200 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold"><Trash2 className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 删除({selectedIds.size})</button>}
                             <button onClick={() => { const headers = "日期,项目分类,摘要备注,收入金额,支出金额,结算账户,结余\n"; const rows = journalWithBalance.map(t => { const catLabel = financeCategories.find(c => c.id === t.category)?.label || '未知分类'; return `${t.date},${catLabel},"${t.details.replace(/"/g, '""')}",${t.income || ''},${t.expense || ''},${t.account},${t.balance.toFixed(2)}`; }).join('\n'); const blob = new Blob(["\ufeff" + headers + rows], { type: 'text/csv;charset=utf-8;' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `现金日记账_${new Date().toISOString().split('T')[0]}.csv`; link.click(); }} className="text-[10px] md:text-xs flex items-center bg-white border border-gray-300 px-2 py-1 md:px-3 md:py-1.5 rounded-lg font-bold hover:bg-gray-100 shadow-sm"><Download className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> 导出</button>
                         </div>
@@ -718,60 +675,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                     <th className="px-3 py-3 md:px-6 md:py-4"><button onClick={() => toggleSort('date')} className="flex items-center gap-1 hover:text-bvb-black transition-colors">日期 {journalSortField === 'date' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4"><button onClick={() => toggleSort('category')} className="flex items-center gap-1 hover:text-bvb-black transition-colors">分类 {journalSortField === 'category' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4">备注/摘要</th>
-                                    <th className="px-3 py-3 md:px-6 md:py-4">账户</th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right"><button onClick={() => toggleSort('income')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">收入 {journalSortField === 'income' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right"><button onClick={() => toggleSort('expense')} className="flex items-center justify-end gap-1 ml-auto hover:text-bvb-black transition-colors">支出 {journalSortField === 'expense' ? (journalSortOrder === 'asc' ? <ArrowUp className="w-2.5 h-2.5 text-bvb-yellow" /> : <ArrowDown className="w-2.5 h-2.5 text-bvb-yellow" />) : <ArrowUpDown className="w-2.5 h-2.5 opacity-30" />}</button></th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-right font-black">结余</th>
                                     <th className="px-3 py-3 md:px-6 md:py-4 text-center">操作</th>
                                 </tr>
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                    <td className="px-3 py-2 md:px-6 md:py-3"></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选日期..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" value={filters.date} onChange={e => setFilters({...filters, date: e.target.value})} /></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3">
-                                        <select 
-                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
-                                            value={filters.category} 
-                                            onChange={e => setFilters({...filters, category: e.target.value})}
-                                        >
-                                            <option value="">全部分类</option>
-                                            {financeCategories.map(c => (
-                                                <option key={c.id} value={c.label}>{c.label}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3">
-                                        <input 
-                                            list="details-list"
-                                            type="text" 
-                                            placeholder="筛选备注..." 
-                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
-                                            value={filters.details} 
-                                            onChange={e => setFilters({...filters, details: e.target.value})} 
-                                        />
-                                        <datalist id="details-list">
-                                            {uniqueDetails.map((d, i) => <option key={i} value={d} />)}
-                                        </datalist>
-                                    </td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3">
-                                        <select 
-                                            className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow" 
-                                            value={filters.account} 
-                                            onChange={e => setFilters({...filters, account: e.target.value})}
-                                        >
-                                            <option value="">全部账户</option>
-                                            {uniqueAccounts.map((acc, i) => (
-                                                <option key={i} value={acc}>{acc}</option>
-                                            ))}
-                                        </select>
-                                    </td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选收入..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow text-right" value={filters.income} onChange={e => setFilters({...filters, income: e.target.value})} /></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选支出..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow text-right" value={filters.expense} onChange={e => setFilters({...filters, expense: e.target.value})} /></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"><input type="text" placeholder="筛选结余..." className="w-full bg-white border border-gray-200 rounded px-2 py-1 text-[10px] font-bold outline-none focus:border-bvb-yellow text-right" value={filters.balance} onChange={e => setFilters({...filters, balance: e.target.value})} /></td>
-                                    <td className="px-3 py-2 md:px-6 md:py-3"></td>
-                                </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {journalWithBalance.map((t) => { const cat = financeCategories.find(c => c.id === t.category); const isSelected = selectedIds.has(t.id); return ( <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}> <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td> <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td> <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-400 text-[10px] md:text-xs">{t.account}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td> </tr> ); })}
+                                {journalWithBalance.map((t) => { const cat = financeCategories.find(c => c.id === t.category); const isSelected = selectedIds.has(t.id); return ( <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}> <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td> <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td> <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td> </tr> ); })}
                             </tbody>
                         </table>
                     </div>
@@ -831,263 +742,22 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             </div>
                             <div className="flex-1 w-full">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart 
-                                        data={monthlySummaryData} 
-                                        margin={{ top: 10, right: 0, left: -20, bottom: 20 }}
-                                        onClick={(data) => {
-                                            if (data && data.activeTooltipIndex !== undefined) {
-                                                if (selectedYear === 'all') {
-                                                    const item = monthlySummaryData[data.activeTooltipIndex] as any;
-                                                    if (item) {
-                                                        const yearStr = item.year;
-                                                        const year = parseInt(yearStr);
-                                                        if (!isNaN(year)) setSelectedYear(year);
-                                                    }
-                                                } else {
-                                                    setSelectedMonth(Number(data.activeTooltipIndex));
-                                                }
-                                            }
-                                        }}
-                                    >
+                                    <BarChart data={monthlySummaryData} margin={{ top: 10, right: 0, left: -20, bottom: 20 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                                         <XAxis dataKey={selectedYear === 'all' ? 'year' : 'month'} axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6b7280' }} />
                                         <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#9ca3af' }} />
                                         <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: '11px' }} />
                                         <Legend iconType="circle" align="center" verticalAlign="bottom" wrapperStyle={{ paddingBottom: '10px' }} formatter={(value) => <span className="text-[11px] font-black uppercase tracking-wider text-gray-600 mr-4 ml-1">{value}</span>} />
-                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} cursor="pointer" />
-                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} cursor="pointer" />
+                                        <Bar dataKey="income" name="收入" fill="#22C55E" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} />
+                                        <Bar dataKey="expense" name="支出" fill="#EF4444" radius={[4, 4, 0, 0]} barSize={selectedYear === 'all' ? 40 : 12} md:barSize={selectedYear === 'all' ? 60 : 32} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                        {/* 年度收入分析 */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30">
-                                <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700">
-                                    <ArrowUpRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 
-                                    {selectedYear === 'all' ? '历年收入分析' : '年度收入分析'}
-                                </h4>
-                                <span className="text-[8px] md:text-[10px] font-black text-green-600 bg-white px-1.5 py-0.5 rounded border border-green-100">
-                                    ¥{annualStats.income.toLocaleString()}
-                                </span>
-                            </div>
-                            <div className="p-4 md:p-6">
-                                {annualCategoryAnalysis.incomeData.length > 0 ? (
-                                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="w-full sm:w-1/2 h-[240px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={annualCategoryAnalysis.incomeData}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                    >
-                                                        {annualCategoryAnalysis.incomeData.map((_, index) => (
-                                                            <Cell key={`cell-${index}`} fill={['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][index % 5]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="w-full sm:w-1/2 space-y-2.5 max-h-[240px] overflow-y-auto custom-scrollbar pr-2">
-                                            {annualCategoryAnalysis.incomeData.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1.5 last:border-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
-                                                        <span className="text-xs font-bold text-gray-600 truncate max-w-[100px]">{item.name}</span>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                        <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 年度支出分析 */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30">
-                                <h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700">
-                                    <ArrowDownRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 
-                                    {selectedYear === 'all' ? '历年支出分析' : '年度支出分析'}
-                                </h4>
-                                <span className="text-[8px] md:text-[10px] font-black text-red-600 bg-white px-1.5 py-0.5 rounded border border-red-100">
-                                    ¥{annualStats.expense.toLocaleString()}
-                                </span>
-                            </div>
-                            <div className="p-4 md:p-6">
-                                {annualCategoryAnalysis.expenseData.length > 0 ? (
-                                    <div className="flex flex-col sm:flex-row items-center gap-4">
-                                        <div className="w-full sm:w-1/2 h-[240px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={annualCategoryAnalysis.expenseData}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                    >
-                                                        {annualCategoryAnalysis.expenseData.map((_, index) => (
-                                                            <Cell key={`cell-${index}`} fill={['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][index % 5]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                        <div className="w-full sm:w-1/2 space-y-2.5 max-h-[240px] overflow-y-auto custom-scrollbar pr-2">
-                                            {annualCategoryAnalysis.expenseData.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1.5 last:border-0">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
-                                                        <span className="text-xs font-bold text-gray-600 truncate max-w-[100px]">{item.name}</span>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-xs font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                        <p className="text-[9px] text-gray-400 font-bold">{item.percent}%</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 月度深度分析 */}
-                    <div className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200">
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                            <div>
-                                <h4 className="text-base md:text-lg font-black text-gray-800 uppercase italic tracking-tighter flex items-center">
-                                    <PieChartIcon className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 
-                                    {selectedYear === 'all' ? `历年 ${selectedMonth + 1}月 深度分析` : `${selectedYear}年 ${selectedMonth + 1}月 深度分析`}
-                                </h4>
-                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Monthly Category Breakdown & Distribution</p>
-                            </div>
-                            <div className="flex flex-wrap gap-4 md:gap-8">
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase">月收入</p>
-                                    <p className="text-lg md:text-2xl font-black text-green-600">¥{monthlyAnalysis.income.toLocaleString()}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase">月支出</p>
-                                    <p className="text-lg md:text-2xl font-black text-red-500">¥{monthlyAnalysis.expense.toLocaleString()}</p>
-                                </div>
-                                <div className="text-right border-l pl-4 md:pl-8 border-gray-100">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase">月利润</p>
-                                    <p className={`text-lg md:text-2xl font-black ${monthlyAnalysis.profit >= 0 ? 'text-bvb-black' : 'text-red-600'}`}>¥{monthlyAnalysis.profit.toLocaleString()}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12">
-                            {/* 收入饼图与列表 */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-50">
-                                    <div className="w-2 h-4 bg-green-500 rounded-full"></div>
-                                    <h5 className="text-xs font-black text-gray-700 uppercase tracking-wider">月度收入构成</h5>
-                                </div>
-                                <div className="flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-full md:w-1/2 h-[160px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={monthlyAnalysis.incomeData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={40}
-                                                    outerRadius={65}
-                                                    paddingAngle={5}
-                                                    dataKey="value"
-                                                >
-                                                    {monthlyAnalysis.incomeData.map((_, index) => (
-                                                        <Cell key={`cell-${index}`} fill={['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][index % 5]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="w-full md:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
-                                        {monthlyAnalysis.incomeData.length > 0 ? monthlyAnalysis.incomeData.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1 last:border-0">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#22C55E', '#4ADE80', '#86EFAC', '#BBF7D0', '#DCFCE7'][idx % 5] }}></div>
-                                                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors truncate max-w-[80px]">{item.name}</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                    <p className="text-[8px] text-gray-400 font-bold">{item.percent}%</p>
-                                                </div>
-                                            </div>
-                                        )) : <p className="text-xs text-gray-300 italic text-center py-8">本月无收入数据</p>}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 支出饼图与列表 */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-2 pb-2 border-b border-gray-50">
-                                    <div className="w-2 h-4 bg-red-500 rounded-full"></div>
-                                    <h5 className="text-xs font-black text-gray-700 uppercase tracking-wider">月度支出构成</h5>
-                                </div>
-                                <div className="flex flex-col md:flex-row gap-6 items-center">
-                                    <div className="w-full md:w-1/2 h-[160px]">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={monthlyAnalysis.expenseData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={40}
-                                                    outerRadius={65}
-                                                    paddingAngle={5}
-                                                    dataKey="value"
-                                                >
-                                                    {monthlyAnalysis.expenseData.map((_, index) => (
-                                                        <Cell key={`cell-${index}`} fill={['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][index % 5]} />
-                                                    ))}
-                                                </Pie>
-                                                <Tooltip formatter={(value: number) => `¥${value.toLocaleString()}`} />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </div>
-                                    <div className="w-full md:w-1/2 space-y-2 max-h-[160px] overflow-y-auto custom-scrollbar pr-2">
-                                        {monthlyAnalysis.expenseData.length > 0 ? monthlyAnalysis.expenseData.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-center group border-b border-gray-50 pb-1 last:border-0">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ['#EF4444', '#F87171', '#FCA5A5', '#FECACA', '#FEE2E2'][idx % 5] }}></div>
-                                                    <span className="text-[10px] font-bold text-gray-600 group-hover:text-gray-900 transition-colors truncate max-w-[80px]">{item.name}</span>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-[10px] font-black text-gray-800">¥{item.value.toLocaleString()}</p>
-                                                    <p className="text-[8px] text-gray-400 font-bold">{item.percent}%</p>
-                                                </div>
-                                            </div>
-                                        )) : <p className="text-xs text-gray-300 italic text-center py-8">本月无支出数据</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-3 md:p-5 border-b flex justify-between items-center bg-green-50/30"><h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-green-700"><ArrowUpRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度收入分析</h4><span className="text-[8px] md:text-[10px] font-black text-green-600 bg-white px-1.5 py-0.5 rounded border border-green-100">¥{annualStats.income.toLocaleString()}</span></div><div className="p-4 md:p-6 space-y-4 md:space-y-5">{annualCategoryAnalysis.incomeData.length > 0 ? annualCategoryAnalysis.incomeData.map((item, idx) => ( <div key={idx} className="space-y-1"> <div className="flex justify-between items-center text-[10px] md:text-xs"> <span className="font-bold text-gray-600">{item.name}</span> <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span> </div> <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden"> <div className="h-full bg-green-500 rounded-full" style={{ width: `${item.percent}%` }}></div> </div> </div> )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}</div></div>
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden"><div className="p-3 md:p-5 border-b flex justify-between items-center bg-red-50/30"><h4 className="font-black text-[11px] md:text-sm uppercase tracking-tighter md:tracking-widest flex items-center text-red-700"><ArrowDownRight className="w-4 h-4 md:w-5 md:h-5 mr-1.5 md:mr-2" /> 年度支出分析</h4><span className="text-[8px] md:text-[10px] font-black text-red-600 bg-white px-1.5 py-0.5 rounded border border-red-100">¥{annualStats.expense.toLocaleString()}</span></div><div className="p-4 md:p-6 space-y-4 md:space-y-5">{annualCategoryAnalysis.expenseData.length > 0 ? annualCategoryAnalysis.expenseData.map((item, idx) => ( <div key={idx} className="space-y-1"> <div className="flex justify-between items-center text-[10px] md:text-xs"> <span className="font-bold text-gray-600">{item.name}</span> <span className="font-black text-gray-800">¥{item.value.toLocaleString()} <span className="text-[8px] md:text-[10px] text-gray-400 font-normal">({item.percent}%)</span></span> </div> <div className="w-full h-1 md:h-2 bg-gray-100 rounded-full overflow-hidden"> <div className="h-full bg-red-500 rounded-full" style={{ width: `${item.percent}%` }}></div> </div> </div> )) : <div className="py-10 text-center text-gray-300 italic text-[11px]">暂无记录</div>}</div></div>
                     </div>
                 </div>
             )}
@@ -1101,7 +771,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors"><X className="w-6 h-6" /></button>
                         </div>
                         <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4 md:space-y-6 bg-gray-50/50 flex-1 overflow-y-auto pb-24 md:pb-8">
-                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => handleTypeChange('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => handleTypeChange('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
+                            <div className="grid grid-cols-2 bg-gray-200 p-1 rounded-2xl mb-2"><button type="button" onClick={() => setActiveType('income')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'income' ? 'bg-white text-green-600 shadow-md scale-105' : 'text-gray-500'}`}>收入</button><button type="button" onClick={() => setActiveType('expense')} className={`py-2.5 md:py-3 rounded-xl text-xs md:text-sm font-black transition-all ${activeType === 'expense' ? 'bg-white text-red-600 shadow-md scale-105' : 'text-gray-500'}`}>支出</button></div>
                             <div className="grid grid-cols-2 gap-3 md:gap-4">
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">发生日期</label><input type="date" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
                                 <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label><select required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm outline-none" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})}>{financeCategories.filter(c => c.type === activeType).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</select></div>
