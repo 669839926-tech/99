@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, ShieldAlert, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp } from 'lucide-react';
 import { User as UserType, RolePermissions, ModuleId } from '../types';
 
 interface LayoutProps {

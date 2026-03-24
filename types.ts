@@ -53,6 +53,7 @@ export interface AttributeConfig {
     mental: AttributeDefinition[];
     drillLibrary: string[];
     trainingFoci: string[];
+    focusSubjects?: Record<string, string[]>;
 }
 
 export interface PlayerStats {
@@ -167,6 +168,45 @@ export interface MatchEvent {
     relatedPlayerId?: string;
     relatedPlayerName?: string;
     description?: string;
+}
+
+export type GameFormat = '11v11' | '9v9' | '8v8' | '7v7' | '5v5' | '11' | '9' | '8' | '7' | '5';
+
+export interface TacticsPlayer {
+    id: string;
+    playerId?: string;
+    label: string;
+    name?: string;
+    number?: number;
+    positionLabel?: string;
+    x: number;
+    y: number;
+    color?: string;
+}
+
+export interface TacticsDrawing {
+    id: string;
+    type: 'line' | 'arrow' | 'curve' | 'text' | 'highlight' | 'run' | 'pass';
+    points?: number[];
+    x?: number;
+    y?: number;
+    text?: string;
+    color: string;
+    width?: number;
+}
+
+export interface TacticsBoardData {
+    players: TacticsPlayer[];
+    drawings: TacticsDrawing[];
+    format?: GameFormat;
+    formation?: string;
+}
+
+export interface FormationTemplate {
+    id?: string;
+    name: string;
+    format: GameFormat;
+    positions: { label: string; x: number; y: number }[];
 }
 
 export interface MatchDetails {
@@ -364,6 +404,19 @@ export interface MonthlySalaryRecord {
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;
+}
+
+// --- Accounting Types ---
+export interface AccountingRecord {
+    id: string;
+    type: 'receivable' | 'payable';
+    date: string;
+    entity: string;
+    details: string;
+    amount: number;
+    status: 'pending' | 'settled' | 'cancelled';
+    category: string;
+    settledDate?: string;
 }
 
 // --- RBAC Types ---
