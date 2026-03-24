@@ -20,7 +20,7 @@ export default async function handler(request, response) {
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     console.error('BLOB_READ_WRITE_TOKEN is not defined in environment variables.');
-    return res.status(500).json({ 
+    return response.status(500).json({ 
       error: 'Storage configuration missing', 
       details: 'Please add BLOB_READ_WRITE_TOKEN to your environment variables in Settings -> Secrets.' 
     });
@@ -29,44 +29,60 @@ export default async function handler(request, response) {
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
-      // Use prefix to find any matching files (including those with random suffixes from previous versions)
-      const { blobs } = await list({ prefix: DB_PREFIX, token });
-      
-      if (blobs.length === 0) {
-        console.log('No blobs found with prefix:', DB_PREFIX);
-        return response.status(200).json(null);
+      try {
+        // Use prefix to find any matching files (including those with random suffixes from previous versions)
+        const { blobs } = await list({ prefix: DB_PREFIX, token });
+        
+        if (blobs.length === 0) {
+          console.log('No blobs found with prefix:', DB_PREFIX);
+          return response.status(200).json(null);
+        }
+
+        // Sort by uploadedAt descending to get the most recent version
+        const sortedBlobs = blobs.sort((a: any, b: any) => 
+          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        );
+
+        const jsonUrl = sortedBlobs[0].url;
+        console.log('Loading data from:', jsonUrl, 'Uploaded at:', sortedBlobs[0].uploadedAt);
+
+        // Using global fetch (available in Node.js 18+)
+        const res = await fetch(jsonUrl, { cache: 'no-store' });
+        const data = await res.json();
+        
+        response.setHeader('Cache-Control', 'no-store, max-age=0');
+        return response.status(200).json(data);
+      } catch (error: any) {
+        if (error.name === 'BlobAccessError' || (error.message && error.message.includes('Access denied'))) {
+          console.warn('Vercel Blob access denied (invalid token). Returning null data.');
+          return response.status(200).json(null);
+        }
+        throw error;
       }
-
-      // Sort by uploadedAt descending to get the most recent version
-      const sortedBlobs = blobs.sort((a, b) => 
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
-
-      const jsonUrl = sortedBlobs[0].url;
-      console.log('Loading data from:', jsonUrl, 'Uploaded at:', sortedBlobs[0].uploadedAt);
-
-      // Using global fetch (available in Node.js 18+)
-      const res = await fetch(jsonUrl, { cache: 'no-store' });
-      const data = await res.json();
-      
-      response.setHeader('Cache-Control', 'no-store, max-age=0');
-      return response.status(200).json(data);
     }
 
     // POST Request: Save data
     if (request.method === 'POST') {
-      const body = request.body;
-      
-      console.log('Saving data to blob storage...');
-      const { url } = await put(DB_FILENAME, JSON.stringify(body), {
-        access: 'public',
-        addRandomSuffix: false, // Keep file name constant for easier retrieval
-        allowOverwrite: true,   // Explicitly allow overwriting existing file
-        token,
-      });
+      try {
+        const body = request.body;
+        
+        console.log('Saving data to blob storage...');
+        const { url } = await put(DB_FILENAME, JSON.stringify(body), {
+          access: 'public',
+          addRandomSuffix: false, // Keep file name constant for easier retrieval
+          allowOverwrite: true,   // Explicitly allow overwriting existing file
+          token,
+        });
 
-      console.log('Data saved successfully to:', url);
-      return response.status(200).json({ success: true, url });
+        console.log('Data saved successfully to:', url);
+        return response.status(200).json({ success: true, url });
+      } catch (error: any) {
+        if (error.name === 'BlobAccessError' || (error.message && error.message.includes('Access denied'))) {
+          console.warn('Vercel Blob access denied (invalid token). Cannot save data.');
+          return response.status(403).json({ error: 'Access denied', message: 'Invalid BLOB_READ_WRITE_TOKEN' });
+        }
+        throw error;
+      }
     }
 
     return response.status(405).send('Method not allowed');

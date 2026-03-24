@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User } from '../types';
+import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails } from '../types';
 // Comment: Added 'Info' to the lucide-react imports
 import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -14,6 +14,7 @@ interface MatchPlannerProps {
   onAddMatch: (match: Match) => void;
   onDeleteMatch: (id: string) => void;
   onUpdateMatch: (match: Match) => void;
+  appLogo?: string;
 }
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
@@ -547,10 +548,11 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                                         const val = e.target.value;
                                         setEditingMatch(prev => {
                                             if (!prev) return prev;
+                                            const withDetails = ensureDetails(prev);
                                             return {
-                                                ...prev,
+                                                ...withDetails,
                                                 details: {
-                                                    ...(prev.details || {}),
+                                                    ...withDetails.details!,
                                                     summary: val
                                                 }
                                             };
