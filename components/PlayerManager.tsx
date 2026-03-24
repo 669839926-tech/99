@@ -205,9 +205,7 @@ const generateDefaultStats = (attributeConfig: AttributeConfig): PlayerStats => 
     Object.keys(attributeConfig).forEach((cat) => {
         if (cat === 'drillLibrary' || cat === 'trainingFoci') return;
         const category = cat as AttributeCategory;
-        if (Array.isArray(attributeConfig[category])) {
-            attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
-        }
+        attributeConfig[category].forEach(attr => { stats[category][attr.key] = 5; });
     });
     return stats;
 };
@@ -1332,7 +1330,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || selectedTeamId || 'unassigned';
+    const finalTeamId = newPlayer.teamId || selectedTeamId;
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();

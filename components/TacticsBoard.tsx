@@ -2,7 +2,7 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { Stage, Layer, Image as KonvaImage, Circle, Text, Line, Arrow, Group, Rect } from 'react-konva';
 import useImage from 'use-image';
-import { Player, TacticsBoardData, TacticsPlayer, TacticsDrawing, FormationTemplate, GameFormat } from '../types';
+import { Player, TacticsBoardData, TacticsPlayer, TacticsDrawing, FormationTemplate } from '../types';
 import { Trash2, Undo, RotateCcw, Save, Download, Users, Layout as LayoutIcon, MousePointer2, Type, ArrowUpRight, Spline, Highlighter, Copy, Plus } from 'lucide-react';
 
 interface TacticsBoardProps {
@@ -70,7 +70,7 @@ const FORMATIONS_5V5 = [
 ];
 
 const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialData, onSave, formationTemplates, onSaveTemplate, onCopyPrevious }) => {
-  const [format, setFormat] = useState<GameFormat>(initialData?.format || '11v11');
+  const [format, setFormat] = useState<'11v11' | '8v8' | '5v5'>(initialData?.format || '11v11');
   const [formation, setFormation] = useState(initialData?.formation || '4-3-3');
   const [tacticsPlayers, setTacticsPlayers] = useState<TacticsPlayer[]>(initialData?.players || []);
   const [drawings, setDrawings] = useState<TacticsDrawing[]>(initialData?.drawings || []);
