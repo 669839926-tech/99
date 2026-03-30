@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { Stage, Layer, Image as KonvaImage, Circle, Text, Line, Arrow, Group, Rect } from 'react-konva';
 import useImage from 'use-image';
 import { Player, TacticsBoardData, TacticsPlayer, TacticsDrawing, FormationTemplate, GameFormat } from '../types';
-import { Trash2, Undo, RotateCcw, Save, Download, Users, Layout as LayoutIcon, MousePointer2, Type, ArrowUpRight, Spline, Highlighter, Copy, Plus } from 'lucide-react';
+import { Trash2, Undo, RotateCcw, Save, Download, Users as UsersIcon, Layout as LayoutIcon, MousePointer2, Type, ArrowUpRight, Spline, Highlighter, Copy, Plus } from 'lucide-react';
 
 interface TacticsBoardProps {
   matchId: string;
@@ -403,7 +403,7 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
         <div className="w-64 bg-white border-l flex flex-col shrink-0">
           <div className="p-4 border-b bg-gray-50">
             <h4 className="font-black text-xs text-gray-800 flex items-center uppercase tracking-widest">
-              <Users className="w-4 h-4 mr-2 text-bvb-yellow" /> 待分配球员 ({unassignedPlayers.length})
+              <UsersIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 待分配球员 ({unassignedPlayers.length})
             </h4>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">

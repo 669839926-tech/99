@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Plus, Trash2, Save, Book, Target, CheckSquare, Users, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet } from 'lucide-react';
+import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -307,7 +307,7 @@ const Settings: React.FC<SettingsProps> = ({
           {isDirector && (
               <>
                 <button onClick={() => setActiveTab('permissions')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'permissions' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ShieldAlert className="w-4 h-4 mr-2" /> 角色权限设置</button>
-                <button onClick={() => setActiveTab('users')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Users className="w-4 h-4 mr-2" /> 用户账号管理</button>
+                <button onClick={() => setActiveTab('users')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><UsersIcon className="w-4 h-4 mr-2" /> 用户账号管理</button>
                 <button onClick={() => setActiveTab('salary')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'salary' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Calculator className="w-4 h-4 mr-2" /> 薪酬规则配置</button>
                 <button onClick={() => setActiveTab('finance_cats')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'finance_cats' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Wallet className="w-4 h-4 mr-2" /> 财务科目管理</button>
                 <button onClick={() => setActiveTab('foci')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'foci' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Zap className="w-4 h-4 mr-2" /> 训练重点预设</button>
@@ -383,7 +383,7 @@ const Settings: React.FC<SettingsProps> = ({
 
                         {/* 助理教练薪酬规则 (New) */}
                         <div className="mt-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100 border-dashed">
-                            <h4 className="font-black text-xs uppercase tracking-widest text-blue-600 mb-4 flex items-center"><Users className="w-4 h-4 mr-2" /> 助理教练薪酬规则</h4>
+                            <h4 className="font-black text-xs uppercase tracking-widest text-blue-600 mb-4 flex items-center"><UsersIcon className="w-4 h-4 mr-2" /> 助理教练薪酬规则</h4>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">助教基础工资 (¥)</label>
@@ -527,7 +527,7 @@ const Settings: React.FC<SettingsProps> = ({
 
         {activeTab === 'users' && isDirector && (
              <div className="flex-1 p-6">
-                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><Users className="w-5 h-5 mr-2 text-bvb-yellow" /> 用户与角色管理</h3>
+                 <h3 className="text-xl font-bold text-gray-800 mb-6 flex items-center"><UsersIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 用户与角色管理</h3>
                 <div className={`p-6 rounded-2xl border transition-all ${editingUserId ? 'bg-yellow-50 border-bvb-yellow shadow-inner' : 'bg-gray-50 border-gray-200'}`}>
                     <div className="flex justify-between items-center mb-5">
                         <h4 className="font-black text-sm text-gray-700 flex items-center uppercase tracking-widest">{editingUserId ? <><Edit2 className="w-4 h-4 mr-2 text-bvb-yellow" /> 编辑账户信息</> : <><Plus className="w-4 h-4 mr-2 text-bvb-yellow" /> 创建新账户</>}</h4>
@@ -602,7 +602,7 @@ const Settings: React.FC<SettingsProps> = ({
                             <div key={u.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-all group relative overflow-hidden">
                                 <div className="flex items-center gap-6 z-10 w-full">
                                     <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0 border-2 border-white shadow-sm">
-                                        <Users className="w-6 h-6 text-gray-400" />
+                                        <UsersIcon className="w-6 h-6 text-gray-400" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">

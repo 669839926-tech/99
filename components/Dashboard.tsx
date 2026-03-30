@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users, Trophy, Calendar, Cake, Activity, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, ClipboardCheck, Edit2, ArrowRight, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, Sparkles, Camera, FileDown, FileSpreadsheet, Quote, ShieldCheck, PartyPopper, Star, Triangle, Pencil } from 'lucide-react';
+import { Users as UsersIcon, Trophy, Calendar, Cake, Activity, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, ClipboardCheck, Edit2, ArrowRight, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, Sparkles, Camera, FileDown, FileSpreadsheet, Quote, ShieldCheck, PartyPopper, Star, Triangle, Pencil } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -860,7 +860,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div className="flex flex-wrap gap-2 items-center justify-end w-full lg:w-auto">
                     {attendancePlayerId === 'all' && (
                         <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner shrink-0">
-                            <button onClick={() => setAnalysisView('player')} className={`px-2.5 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><Users className="w-3 h-3 mr-1" /> 按球员</button>
+                            <button onClick={() => setAnalysisView('player')} className={`px-2.5 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all flex items-center ${analysisView === 'player' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><UsersIcon className="w-3 h-3 mr-1" /> 按球员</button>
                             <button onClick={() => setAnalysisView('session')} className={`px-2.5 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all flex items-center ${analysisView === 'session' ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}><LayoutList className="w-3 h-3 mr-1" /> 按课次</button>
                         </div>
                     )}

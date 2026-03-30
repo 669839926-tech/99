@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails } from '../types';
 // Comment: Added 'Info' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 
@@ -374,7 +374,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                 <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto no-scrollbar shrink-0">
                     {[
                         { id: 'info', label: '比分', icon: Activity },
-                        { id: 'lineup', label: '阵容', icon: Users },
+                        { id: 'lineup', label: '阵容', icon: UsersIcon },
                         { id: 'events', label: '事件', icon: Tag },
                         { id: 'report', label: '总结', icon: ClipboardList }
                     ].map(tab => (

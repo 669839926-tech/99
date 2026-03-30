@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, AlignLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, AlignLeft, Users as UsersIcon } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -1018,7 +1018,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </React.Fragment>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-gray-300 p-10">
-                        <Users className="w-20 h-20 opacity-10 mb-6" />
+                        <UsersIcon className="w-20 h-20 opacity-10 mb-6" />
                         <h4 className="text-xl font-black text-gray-400 uppercase italic tracking-tighter mb-2">Focus Player Analytics</h4>
                         <p className="text-sm font-bold text-center max-w-xs uppercase tracking-widest opacity-60">请从左侧列表中选择一名关注球员查看其历史成长轨迹及反馈。</p>
                     </div>
@@ -1384,7 +1384,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             
             <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
                 <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl p-1.5 shadow-sm shrink-0 flex-1 md:flex-none">
-                    <Users className="w-4 h-4 text-gray-400 ml-1" />
+                    <UsersIcon className="w-4 h-4 text-gray-400 ml-1" />
                     <select 
                         value={statsTeamFilter} 
                         onChange={e => setStatsTeamFilter(e.target.value)}
