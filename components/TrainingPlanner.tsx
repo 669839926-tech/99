@@ -785,28 +785,48 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   // 球员关注追踪视图逻辑
   const focusedPlayersSummary = useMemo(() => {
-    const focusMap: Record<string, { player: Player; stats: any; history: any[] }> = {};
+    const focusMap: Record<string, { player: Player; stats: any; history: any[]; isLastWeekFocused: boolean; hasUnresolved: boolean }> = {};
     const relevantTrainings = userManagedSessions.filter(s => statsTeamFilter === 'all' || s.teamId === statsTeamFilter);
     
+    // 计算上周的时间范围
+    const today = new Date();
+    const day = today.getDay();
+    const diffToLastMonday = (day === 0 ? 6 : day - 1) + 7;
+    const lastMonday = new Date(today);
+    lastMonday.setDate(today.getDate() - diffToLastMonday);
+    lastMonday.setHours(0, 0, 0, 0);
+    const lastSunday = new Date(lastMonday);
+    lastSunday.setDate(lastMonday.getDate() + 6);
+    lastSunday.setHours(23, 59, 59, 999);
+
     relevantTrainings.forEach(s => {
         if (s.focusedPlayerIds) {
+            const sessionDate = parseLocalDate(s.date);
+            const inLastWeek = sessionDate >= lastMonday && sessionDate <= lastSunday;
+
             s.focusedPlayerIds.forEach(pid => {
+                const notes = s.focusedPlayerNotes?.[pid] || { technical: '', mental: '', resolved: false };
                 if (!focusMap[pid]) {
                     const p = players.find(p => p.id === pid);
                     if (p) {
                         focusMap[pid] = { 
                             player: p, 
                             stats: calculateFocusStats(pid, userManagedSessions),
-                            history: []
+                            history: [],
+                            isLastWeekFocused: false,
+                            hasUnresolved: false
                         };
                     }
                 }
                 if (focusMap[pid]) {
+                    if (inLastWeek) focusMap[pid].isLastWeekFocused = true;
+                    if (!notes.resolved) focusMap[pid].hasUnresolved = true;
                     focusMap[pid].history.push({
                         id: s.id,
                         date: s.date,
                         title: s.title,
-                        notes: s.focusedPlayerNotes?.[pid] || { technical: '', mental: '' }
+                        notes: notes,
+                        session: s
                     });
                 }
             });
@@ -815,7 +835,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
     return Object.values(focusMap)
         .filter(entry => entry.player.name.includes(focusSearchTerm))
-        .sort((a, b) => b.stats.year - a.stats.year);
+        .sort((a, b) => {
+            if (a.isLastWeekFocused !== b.isLastWeekFocused) return a.isLastWeekFocused ? -1 : 1;
+            if (a.hasUnresolved !== b.hasUnresolved) return a.hasUnresolved ? -1 : 1;
+            return b.stats.year - a.stats.year;
+        });
   }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
 
   const handlePrevPeriod = () => {
@@ -891,38 +915,48 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         onChange={e => setFocusSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pb-20 md:pb-4">
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pb-20 md:pb-4">
                     {focusedPlayersSummary.map(entry => {
                         const isSelected = selectedFocusPlayerId === entry.player.id;
                         return (
                             <div 
                                 key={entry.player.id} 
                                 onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-xl' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
+                                className={`p-2.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'} ${entry.isLastWeekFocused && !isSelected ? 'ring-1 ring-green-400 ring-offset-1' : ''}`}
                             >
-                                <div className="flex items-center gap-3">
+                                {entry.isLastWeekFocused && (
+                                    <div className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce">
+                                        上周关注
+                                    </div>
+                                )}
+                                {entry.hasUnresolved && (
+                                    <div className={`absolute -top-1.5 left-2 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 ${isSelected ? 'bg-red-600 ring-1 ring-white' : 'bg-red-500'}`}>
+                                        未解决
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
                                     <div className="relative">
-                                        <img src={entry.player.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
-                                        <div className="absolute -bottom-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>
+                                        <img src={entry.player.image} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" />
+                                        <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-sm truncate">{entry.player.name}</h4>
-                                        <p className={`text-[10px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                        <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
+                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
                                     </div>
-                                    <ChevronRight className={`w-5 h-5 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
+                                    <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
                                 </div>
-                                <div className={`grid grid-cols-3 gap-2 mt-4 pt-3 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                <div className={`grid grid-cols-3 gap-1 mt-2 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
                                     <div className="text-center">
-                                        <p className="text-[8px] font-black uppercase opacity-60">本月关注</p>
-                                        <p className="text-sm font-black tabular-nums">{entry.stats.month}</p>
+                                        <p className="text-[7px] font-black uppercase opacity-60">本月</p>
+                                        <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
                                     </div>
                                     <div className="text-center border-x border-white/5">
-                                        <p className="text-[8px] font-black uppercase opacity-60">本季关注</p>
-                                        <p className="text-sm font-black tabular-nums">{entry.stats.quarter}</p>
+                                        <p className="text-[7px] font-black uppercase opacity-60">本季</p>
+                                        <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
                                     </div>
                                     <div className="text-center">
-                                        <p className="text-[8px] font-black uppercase opacity-60">年度总计</p>
-                                        <p className={`text-sm font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                        <p className="text-[7px] font-black uppercase opacity-60">年度</p>
+                                        <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
                                     </div>
                                 </div>
                             </div>
@@ -987,7 +1021,35 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                     <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-6 hover:bg-white hover:shadow-md transition-all group">
                                                         <div className="flex justify-between items-start mb-4">
                                                             <h5 className="font-black text-lg text-gray-800 group-hover:text-bvb-black transition-colors">{h.title}</h5>
-                                                            <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
+                                                            <div className="flex items-center gap-2">
+                                                                {!h.notes.resolved && (
+                                                                    <span className="flex items-center gap-1 text-[10px] font-black text-red-600 uppercase bg-red-50 px-2 py-1 rounded border border-red-100">
+                                                                        <AlertCircle className="w-3 h-3" /> 未解决
+                                                                    </span>
+                                                                )}
+                                                                {h.notes.resolved ? (
+                                                                    <span className="flex items-center gap-1 text-[10px] font-black text-green-600 uppercase bg-green-50 px-2 py-1 rounded border border-green-100">
+                                                                        <CheckCircle className="w-3 h-3" /> 已解决
+                                                                    </span>
+                                                                ) : (
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            const updatedSession = { ...h.session };
+                                                                            if (updatedSession.focusedPlayerNotes && updatedSession.focusedPlayerNotes[entry.player.id]) {
+                                                                                updatedSession.focusedPlayerNotes[entry.player.id] = {
+                                                                                    ...updatedSession.focusedPlayerNotes[entry.player.id],
+                                                                                    resolved: true
+                                                                                };
+                                                                                onUpdateTraining(updatedSession, updatedSession.attendance);
+                                                                            }
+                                                                        }}
+                                                                        className="flex items-center gap-1 text-[10px] font-black text-bvb-black uppercase bg-bvb-yellow px-2 py-1 rounded border border-bvb-black/10 hover:bg-yellow-400 transition-colors"
+                                                                    >
+                                                                        标记已解决
+                                                                    </button>
+                                                                )}
+                                                                <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
+                                                            </div>
                                                         </div>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                             <div className="space-y-2">
