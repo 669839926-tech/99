@@ -16,6 +16,7 @@ interface DashboardProps {
   currentUser: User | null;
   onNavigate?: (tab: string, filter?: string) => void;
   onAddAnnouncement?: (announcement: Announcement) => void;
+  onUpdateAnnouncement?: (announcement: Announcement) => void;
   onDeleteAnnouncement?: (id: string) => void;
   appLogo?: string;
 }

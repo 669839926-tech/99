@@ -100,7 +100,7 @@ function App() {
   // Load Data on Mount
   useEffect(() => {
     const init = async () => {
-        const cloudData = await loadDataFromCloud();
+        const cloudData = await loadDataFromCloud(currentUser?.id);
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -122,7 +122,7 @@ function App() {
         setIsInitializing(false);
     };
     init();
-  }, []);
+  }, [currentUser]);
 
   // Auto-Save on Change
   useEffect(() => {
@@ -135,7 +135,7 @@ function App() {
     const timer = setTimeout(async () => {
         setIsSyncing(true);
         try {
-            await saveDataToCloud({
+            await saveDataToCloud(currentUser?.id, {
                 players,
                 teams,
                 matches,
@@ -161,7 +161,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing, currentUser]);
 
 
   const handleLogin = (user: User) => {
@@ -292,7 +292,7 @@ function App() {
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
-        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
+        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':

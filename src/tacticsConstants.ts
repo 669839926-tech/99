@@ -56,6 +56,24 @@ export const DEFAULT_FORMATIONS: FormationTemplate[] = [
             { label: 'ST', x: 50, y: 10 },
         ]
     },
+    {
+        id: '11-352',
+        name: '3-5-2',
+        format: '11',
+        positions: [
+            { label: 'GK', x: 50, y: 90 },
+            { label: 'CB', x: 25, y: 75 },
+            { label: 'CB', x: 50, y: 80 },
+            { label: 'CB', x: 75, y: 75 },
+            { label: 'LM', x: 10, y: 50 },
+            { label: 'CM', x: 35, y: 50 },
+            { label: 'CM', x: 50, y: 40 },
+            { label: 'CM', x: 65, y: 50 },
+            { label: 'RM', x: 90, y: 50 },
+            { label: 'ST', x: 40, y: 20 },
+            { label: 'ST', x: 60, y: 20 },
+        ]
+    },
     // 8-a-side
     {
         id: '8-331',
