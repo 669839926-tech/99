@@ -693,6 +693,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   // 球员关注追踪子模块状态
   const [focusSearchTerm, setFocusSearchTerm] = useState('');
+  const [focusListMode, setFocusListMode] = useState<'focused' | 'unfocused'>('focused');
   const [selectedFocusPlayerId, setSelectedFocusPlayerId] = useState<string | null>(null);
 
   const userManagedSessions = useMemo(() => {
@@ -842,6 +843,46 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         });
   }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
 
+  const focusedPlayerIdsThisMonth = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const focused = new Set<string>();
+    userManagedSessions.forEach(s => {
+      const sessionDate = parseLocalDate(s.date);
+      if (sessionDate >= startOfMonth && sessionDate <= endOfMonth && s.focusedPlayerIds) {
+        s.focusedPlayerIds.forEach(pid => focused.add(pid));
+      }
+    });
+    return focused;
+  }, [userManagedSessions]);
+
+  const monthlyFocusStats = useMemo(() => {
+    const teamPlayers = players.filter(p => statsTeamFilter === 'all' || p.teamId === statsTeamFilter);
+    if (teamPlayers.length === 0) return { coverage: 0, focusedCount: 0, totalCount: 0, unfocusedPlayers: [] };
+
+    const focusedInMonthForTeam = new Set<string>();
+    teamPlayers.forEach(p => {
+        if (focusedPlayerIdsThisMonth.has(p.id)) {
+            focusedInMonthForTeam.add(p.id);
+        }
+    });
+
+    const unfocusedPlayers = teamPlayers.filter(p => !focusedInMonthForTeam.has(p.id))
+        .filter(p => p.name.includes(focusSearchTerm));
+    const focusedCount = focusedInMonthForTeam.size;
+    const totalCount = teamPlayers.length;
+    const coverage = totalCount > 0 ? (focusedCount / totalCount) * 100 : 0;
+
+    return {
+      coverage,
+      focusedCount,
+      totalCount,
+      unfocusedPlayers
+    };
+  }, [players, statsTeamFilter, focusSearchTerm, focusedPlayerIdsThisMonth]);
+
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
         if (timeScope === 'month') d.setMonth(d.getMonth() - 1);
@@ -906,6 +947,41 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500">
             {/* 球员关注列表 */}
             <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0">
+                {/* Monthly Coverage Stat */}
+                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+                    <div className="flex justify-between items-end mb-2">
+                        <div>
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">本月关注覆盖率</p>
+                            <h3 className="text-2xl font-black text-bvb-black">{monthlyFocusStats.coverage.toFixed(0)}%</h3>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">已关注 / 总人数</p>
+                            <p className="text-sm font-black text-gray-600">{monthlyFocusStats.focusedCount} / {monthlyFocusStats.totalCount}</p>
+                        </div>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                            className="h-full bg-bvb-yellow transition-all duration-1000 ease-out" 
+                            style={{ width: `${monthlyFocusStats.coverage}%` }}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex bg-gray-100 p-1 rounded-xl">
+                    <button 
+                        onClick={() => setFocusListMode('focused')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${focusListMode === 'focused' ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        关注历史 ({focusedPlayersSummary.length})
+                    </button>
+                    <button 
+                        onClick={() => setFocusListMode('unfocused')}
+                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${focusListMode === 'unfocused' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        本月未关注 ({monthlyFocusStats.unfocusedPlayers.length})
+                    </button>
+                </div>
+
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input 
@@ -916,57 +992,87 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     />
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pb-20 md:pb-4">
-                    {focusedPlayersSummary.map(entry => {
-                        const isSelected = selectedFocusPlayerId === entry.player.id;
-                        return (
-                            <div 
-                                key={entry.player.id} 
-                                onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                className={`p-2.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'} ${entry.isLastWeekFocused && !isSelected ? 'ring-1 ring-green-400 ring-offset-1' : ''}`}
-                            >
-                                {entry.isLastWeekFocused && (
-                                    <div className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce">
-                                        上周关注
+                    {focusListMode === 'focused' ? (
+                        focusedPlayersSummary.map(entry => {
+                            const isSelected = selectedFocusPlayerId === entry.player.id;
+                            return (
+                                <div 
+                                    key={entry.player.id} 
+                                    onClick={() => setSelectedFocusPlayerId(entry.player.id)}
+                                    className={`p-2.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'} ${entry.isLastWeekFocused && !isSelected ? 'ring-1 ring-green-400 ring-offset-1' : ''}`}
+                                >
+                                    {entry.isLastWeekFocused && (
+                                        <div className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce">
+                                            上周关注
+                                        </div>
+                                    )}
+                                    {entry.hasUnresolved && (
+                                        <div className={`absolute -top-1.5 left-2 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 ${isSelected ? 'bg-red-600 ring-1 ring-white' : 'bg-red-500'}`}>
+                                            未解决
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <img src={entry.player.image} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" />
+                                            <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
+                                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
+                                        </div>
+                                        <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
                                     </div>
-                                )}
-                                {entry.hasUnresolved && (
-                                    <div className={`absolute -top-1.5 left-2 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 ${isSelected ? 'bg-red-600 ring-1 ring-white' : 'bg-red-500'}`}>
-                                        未解决
+                                    <div className={`grid grid-cols-3 gap-1 mt-2 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
+                                        <div className="text-center">
+                                            <p className="text-[7px] font-black uppercase opacity-60">本月</p>
+                                            <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
+                                        </div>
+                                        <div className="text-center border-x border-white/5">
+                                            <p className="text-[7px] font-black uppercase opacity-60">本季</p>
+                                            <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-[7px] font-black uppercase opacity-60">年度</p>
+                                            <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                                        </div>
                                     </div>
-                                )}
-                                <div className="flex items-center gap-2">
-                                    <div className="relative">
-                                        <img src={entry.player.image} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" />
-                                        <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
-                                        <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.level}</p>
-                                    </div>
-                                    <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
                                 </div>
-                                <div className={`grid grid-cols-3 gap-1 mt-2 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
-                                    <div className="text-center">
-                                        <p className="text-[7px] font-black uppercase opacity-60">本月</p>
-                                        <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
-                                    </div>
-                                    <div className="text-center border-x border-white/5">
-                                        <p className="text-[7px] font-black uppercase opacity-60">本季</p>
-                                        <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-[7px] font-black uppercase opacity-60">年度</p>
-                                        <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
+                            );
+                        })
+                    ) : (
+                        monthlyFocusStats.unfocusedPlayers.map(player => {
+                            const isSelected = selectedFocusPlayerId === player.id;
+                            return (
+                                <div 
+                                    key={player.id} 
+                                    onClick={() => setSelectedFocusPlayerId(player.id)}
+                                    className={`p-2.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative">
+                                            <img src={player.image} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" />
+                                            <div className="absolute -bottom-1 -right-1 p-0.5 bg-gray-200 rounded-full border border-white"><UsersIcon className="w-2 h-2 text-gray-500" /></div>
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h4 className="font-black text-xs truncate">{player.name}</h4>
+                                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{player.number} • {teams.find(t => t.id === player.teamId)?.level}</p>
+                                        </div>
+                                        <div className="text-[8px] font-black uppercase text-red-500 bg-red-50 px-1.5 py-0.5 rounded">本月未关注</div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
-                    {focusedPlayersSummary.length === 0 && (
+                            );
+                        })
+                    )}
+                    {focusListMode === 'focused' && focusedPlayersSummary.length === 0 && (
                         <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-4">
-                            {/* Comment: Fixed name collision error by changing HistoryIcon to History */}
                             <History className="w-12 h-12 opacity-10" />
                             <p className="text-xs font-black uppercase tracking-widest">暂无重点关注球员记录</p>
+                        </div>
+                    )}
+                    {focusListMode === 'unfocused' && monthlyFocusStats.unfocusedPlayers.length === 0 && (
+                        <div className="py-20 text-center text-green-500 flex flex-col items-center gap-4">
+                            <CheckCircle className="w-12 h-12 opacity-20" />
+                            <p className="text-xs font-black uppercase tracking-widest">本月已完成全员关注覆盖</p>
                         </div>
                     )}
                 </div>
@@ -1648,6 +1754,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                           {players.filter(p => p.teamId === formData.teamId).map(p => {
                               const isSelected = formData.focusedPlayerIds.includes(p.id);
                               const stats = calculateFocusStats(p.id, userManagedSessions);
+                              const isUnfocusedThisMonth = !focusedPlayerIdsThisMonth.has(p.id);
                               return (
                                   <button 
                                       key={p.id}
@@ -1662,11 +1769,17 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                               return { ...prev, focusedPlayerIds: [...prev.focusedPlayerIds, p.id] };
                                           });
                                       }}
-                                      className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all text-left ${isSelected ? 'bg-white border-bvb-black shadow-md ring-2 ring-bvb-yellow/20' : 'bg-white border-transparent grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:border-gray-200'}`}
+                                      className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all text-left relative ${isSelected ? 'bg-white border-bvb-black shadow-md ring-2 ring-bvb-yellow/20' : 'bg-white border-transparent grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:border-gray-200'}`}
                                   >
+                                      {isUnfocusedThisMonth && !isSelected && (
+                                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white shadow-sm z-10" title="本月尚未关注" />
+                                      )}
                                       <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-gray-100" />
                                       <div className="flex-1 min-w-0">
-                                          <div className="text-[11px] font-black text-gray-800 truncate">{p.name}</div>
+                                          <div className="flex items-center gap-1">
+                                              <div className="text-[11px] font-black text-gray-800 truncate">{p.name}</div>
+                                              {isUnfocusedThisMonth && <span className="text-[7px] font-black text-red-500 bg-red-50 px-1 rounded-sm shrink-0">待关注</span>}
+                                          </div>
                                           <div className="flex gap-1 text-[8px] font-bold text-gray-400 mt-0.5">
                                               <span title="本月被关注次数">M:{stats.month}</span>
                                               <span title="本季被关注次数">Q:{stats.quarter}</span>
