@@ -1,4 +1,5 @@
 
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -17,11 +18,15 @@ async function startServer() {
 
   // API Routes
   app.all('/api/storage', async (req, res) => {
+    console.log(`[API] ${req.method} /api/storage`);
     try {
       await storageHandler(req, res);
     } catch (error) {
-      console.error('API Error:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+      console.error('[API Error] /api/storage:', error);
+      res.status(500).json({ 
+        error: 'Internal Server Error', 
+        message: error instanceof Error ? error.message : 'Unknown error' 
+      });
     }
   });
 

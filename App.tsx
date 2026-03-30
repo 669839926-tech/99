@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import PlayerManager from './components/PlayerManager';
@@ -42,6 +42,7 @@ function App() {
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [cloudError, setCloudError] = useState<string | null>(null);
   const isFirstRun = useRef(true);
 
   // Derived Players: 按时间轴模拟扣费逻辑，请假额度在充值时更新而非累加
@@ -98,9 +99,11 @@ function App() {
   }, [players, trainings]);
 
   // Load Data on Mount
-  useEffect(() => {
-    const init = async () => {
-        const cloudData = await loadDataFromCloud(currentUser?.id);
+  const initializeCloudData = useCallback(async () => {
+    setIsInitializing(true);
+    setCloudError(null);
+    try {
+        const cloudData = await loadDataFromCloud();
         if (cloudData) {
             setTeams(cloudData.teams || MOCK_TEAMS);
             setPlayers(cloudData.players || MOCK_PLAYERS);
@@ -118,11 +121,19 @@ function App() {
             if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
+            setCloudError(null);
         }
+    } catch (err: any) {
+        console.error("Failed to initialize cloud data", err);
+        setCloudError(err.message || "无法连接到云端存储");
+    } finally {
         setIsInitializing(false);
-    };
-    init();
-  }, [currentUser]);
+    }
+  }, []);
+
+  useEffect(() => {
+    initializeCloudData();
+  }, [initializeCloudData]);
 
   // Auto-Save on Change
   useEffect(() => {
@@ -135,7 +146,7 @@ function App() {
     const timer = setTimeout(async () => {
         setIsSyncing(true);
         try {
-            await saveDataToCloud(currentUser?.id, {
+            await saveDataToCloud({
                 players,
                 teams,
                 matches,
@@ -153,15 +164,17 @@ function App() {
                 periodizationPlans,
                 accountingRecords
             });
-        } catch (e) {
+            setCloudError(null);
+        } catch (e: any) {
             console.error("Auto-save failed", e);
+            setCloudError(e.message || "自动保存失败");
         } finally {
             setIsSyncing(false);
         }
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing, currentUser]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -292,7 +305,7 @@ function App() {
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
-        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
+        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
       case 'matches':
         return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
       case 'settings':
@@ -304,6 +317,25 @@ function App() {
 
   return (
     <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} isSyncing={isSyncing} hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} appLogo={appLogo} permissions={permissions}>
+      {cloudError && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg flex justify-between items-center shadow-sm animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center">
+            <div className="bg-red-500 p-1.5 rounded-full mr-3">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            </div>
+            <div>
+              <p className="text-sm font-black text-red-800 uppercase tracking-tight">云端同步异常</p>
+              <p className="text-xs text-red-600 font-bold">{cloudError}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => initializeCloudData()}
+            className="px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 transition-colors shadow-sm active:scale-95"
+          >
+            重试连接
+          </button>
+        </div>
+      )}
       {renderContent()}
     </Layout>
   );

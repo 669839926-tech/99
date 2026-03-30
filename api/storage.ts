@@ -10,16 +10,10 @@ const DB_PREFIX = 'football_manager_db'; // Broader prefix to find files with or
 export default async function handler(request, response) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  if (!token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE') {
-    console.error('BLOB_READ_WRITE_TOKEN is missing or invalid in environment variables.');
-    return response.status(500).json({ 
-      error: 'Storage configuration error', 
-      message: 'BLOB_READ_WRITE_TOKEN is missing or invalid. Please check your environment variables.' 
-    });
-  }
+  console.log(`[Storage API] Method: ${request.method}, Token present: ${!!token}`);
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    console.error('BLOB_READ_WRITE_TOKEN is not defined in environment variables.');
+  if (!token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE') {
+    console.error('[Storage API] BLOB_READ_WRITE_TOKEN is missing or invalid.');
     return response.status(500).json({ 
       error: 'Storage configuration missing', 
       details: 'Please add BLOB_READ_WRITE_TOKEN to your environment variables in Settings -> Secrets.' 
@@ -29,11 +23,11 @@ export default async function handler(request, response) {
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
-      // Use prefix to find any matching files (including those with random suffixes from previous versions)
+      console.log('[Storage API] Listing blobs with prefix:', DB_PREFIX);
       const { blobs } = await list({ prefix: DB_PREFIX, token });
       
       if (blobs.length === 0) {
-        console.log('No blobs found with prefix:', DB_PREFIX);
+        console.log('[Storage API] No blobs found. Returning null.');
         return response.status(200).json(null);
       }
 
@@ -43,7 +37,7 @@ export default async function handler(request, response) {
       );
 
       const jsonUrl = sortedBlobs[0].url;
-      console.log('Loading data from:', jsonUrl, 'Uploaded at:', sortedBlobs[0].uploadedAt);
+      console.log('[Storage API] Loading data from:', jsonUrl);
 
       // Using global fetch (available in Node.js 18+)
       const res = await fetch(jsonUrl, { cache: 'no-store' });
@@ -57,7 +51,11 @@ export default async function handler(request, response) {
     if (request.method === 'POST') {
       const body = request.body;
       
-      console.log('Saving data to blob storage...');
+      if (!body || Object.keys(body).length === 0) {
+        console.warn('[Storage API] Received empty body for POST request.');
+      }
+
+      console.log('[Storage API] Saving data to blob storage...');
       const { url } = await put(DB_FILENAME, JSON.stringify(body), {
         access: 'public',
         addRandomSuffix: false, // Keep file name constant for easier retrieval
@@ -65,13 +63,16 @@ export default async function handler(request, response) {
         token,
       });
 
-      console.log('Data saved successfully to:', url);
+      console.log('[Storage API] Data saved successfully to:', url);
       return response.status(200).json({ success: true, url });
     }
 
     return response.status(405).send('Method not allowed');
-  } catch (error) {
-    console.error('Storage API Error:', error);
-    return response.status(500).json({ error: 'Internal Server Error' });
+  } catch (error: any) {
+    console.error('[Storage API Error]:', error);
+    return response.status(500).json({ 
+      error: 'Internal Server Error', 
+      message: error.message || 'An unknown error occurred during storage operation.' 
+    });
   }
 }
