@@ -384,25 +384,45 @@ const Settings: React.FC<SettingsProps> = ({
                         {/* 助理教练薪酬规则 (New) */}
                         <div className="mt-8 bg-blue-50/50 p-5 rounded-xl border border-blue-100 border-dashed">
                             <h4 className="font-black text-xs uppercase tracking-widest text-blue-600 mb-4 flex items-center"><UsersIcon className="w-4 h-4 mr-2" /> 助理教练薪酬规则</h4>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">助教基础工资 (¥)</label>
-                                    <input 
-                                        type="number" className="w-full p-2 border rounded font-black text-sm bg-white"
-                                        value={localSalarySettings.assistantCoachBaseSalary}
-                                        onChange={e => setLocalSalarySettings({...localSalarySettings, assistantCoachBaseSalary: parseInt(e.target.value) || 0})}
-                                    />
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">助教基础工资 (¥)</label>
+                                        <input 
+                                            type="number" className="w-full p-2 border rounded font-black text-sm bg-white"
+                                            value={localSalarySettings.assistantCoachBaseSalary}
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, assistantCoachBaseSalary: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">助教基础课酬 (¥)</label>
+                                        <input 
+                                            type="number" className="w-full p-2 border rounded font-black text-sm bg-white"
+                                            value={localSalarySettings.assistantCoachSessionBaseFee}
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, assistantCoachSessionBaseFee: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">人数补贴 (¥ / 每人每课)</label>
-                                    <input 
-                                        type="number" className="w-full p-2 border rounded font-black text-sm bg-white"
-                                        value={localSalarySettings.assistantCoachPlayerRate}
-                                        onChange={e => setLocalSalarySettings({...localSalarySettings, assistantCoachPlayerRate: parseInt(e.target.value) || 0})}
-                                    />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">起算基准人数</label>
+                                        <input 
+                                            type="number" className="w-full p-2 border rounded font-black text-sm bg-white"
+                                            value={localSalarySettings.assistantCoachMinPlayersForCalculation}
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, assistantCoachMinPlayersForCalculation: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block mb-1">每超1人增加 (¥)</label>
+                                        <input 
+                                            type="number" className="w-full p-2 border rounded font-black text-sm bg-white"
+                                            value={localSalarySettings.assistantCoachIncrementalPlayerFee}
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, assistantCoachIncrementalPlayerFee: parseInt(e.target.value) || 0})}
+                                        />
+                                    </div>
                                 </div>
                             </div>
-                            <p className="mt-3 text-[10px] text-blue-400 italic leading-tight">注：助教总课酬 = 班级在册人数 × 人数补贴单价 × 月度实际课次。如管理30人，单价5元，则每节课补助150元。</p>
+                            <p className="mt-3 text-[10px] text-blue-400 italic leading-tight">注：助教课酬计算逻辑现与主教练一致：基础课酬 + (实际人数 - 基准人数) × 增量单价。</p>
                         </div>
                     </div>
 
@@ -426,10 +446,22 @@ const Settings: React.FC<SettingsProps> = ({
                             <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> 公共绩效奖励阈值设置</h4>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">月度参训率奖励 (≥ X% 奖 Y元)</label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block">月度参训率奖励 (≥ X% 奖 Y元)</label>
+                                        <button 
+                                            onClick={() => {
+                                                const next = { ...localSalarySettings };
+                                                next.monthlyAttendanceRewards.push({ threshold: 0, amount: 0 });
+                                                setLocalSalarySettings(next);
+                                            }}
+                                            className="text-[10px] text-blue-500 hover:text-blue-700 font-bold flex items-center"
+                                        >
+                                            <Plus className="w-3 h-3 mr-1" /> 添加梯度
+                                        </button>
+                                    </div>
                                     <div className="space-y-2">
                                         {localSalarySettings.monthlyAttendanceRewards.map((r, i) => (
-                                            <div key={i} className="flex gap-2 items-center">
+                                            <div key={i} className="flex gap-2 items-center group">
                                                 <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={r.threshold} onChange={e => {
                                                     const next = { ...localSalarySettings };
                                                     next.monthlyAttendanceRewards[i].threshold = parseInt(e.target.value) || 0;
@@ -441,19 +473,29 @@ const Settings: React.FC<SettingsProps> = ({
                                                     next.monthlyAttendanceRewards[i].amount = parseInt(e.target.value) || 0;
                                                     setLocalSalarySettings(next);
                                                 }} />
-                                                <span className="text-xs font-bold text-gray-400">元</span>
+                                                <span className="text-xs font-bold text-gray-400 mr-2">元</span>
+                                                <button 
+                                                    onClick={() => {
+                                                        const next = { ...localSalarySettings };
+                                                        next.monthlyAttendanceRewards.splice(i, 1);
+                                                        setLocalSalarySettings(next);
+                                                    }}
+                                                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="pt-2 border-t border-gray-200">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度续费率奖励 (≥ X% 奖 Y元)</label>
-                                    <p className="text-[9px] text-blue-500 font-bold mb-2">注：助教与主教练享受同样的续费奖励逻辑。</p>
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度续费率奖励 (≥ X% 奖 Y元/人)</label>
+                                    <p className="text-[9px] text-blue-500 font-bold mb-2">注：达到阈值后，按实际续费人数发放奖励（每人 Y 元）。</p>
                                     <div className="flex gap-2 items-center">
                                         <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.threshold} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, threshold: parseInt(e.target.value) || 0}})} />
                                         <span className="text-xs font-bold text-gray-400">%</span>
                                         <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.amount} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, amount: parseInt(e.target.value) || 0}})} />
-                                        <span className="text-xs font-bold text-gray-400">元</span>
+                                        <span className="text-xs font-bold text-gray-400">元/人</span>
                                     </div>
                                 </div>
                             </div>

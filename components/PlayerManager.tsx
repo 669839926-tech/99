@@ -1122,7 +1122,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
   const availableTeams = isCoach ? teams.filter(t => currentUser?.teamIds?.includes(t.id)) : teams;
-  const [selectedTeamId, setSelectedTeamId] = useState<string>('');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPos, setFilterPos] = useState<string>('全部');
   const [showDraftsOnly, setShowDraftsOnly] = useState(false);
@@ -1146,12 +1146,21 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   useEffect(() => {
     setTimeout(() => {
       if (isCoach && currentUser?.teamIds && currentUser.teamIds.length > 0) {
-          if (!selectedTeamId || !currentUser.teamIds.includes(selectedTeamId)) {
-               if (!(teams.some(t => t.id === initialFilter) && currentUser.teamIds.includes(initialFilter as string))) { setSelectedTeamId(currentUser.teamIds[0]); }
+          if (!selectedTeamId || (selectedTeamId !== 'all' && selectedTeamId !== 'unassigned' && !currentUser.teamIds.includes(selectedTeamId))) {
+               if (!(teams.some(t => t.id === initialFilter) && currentUser.teamIds.includes(initialFilter as string))) { 
+                 // Default to 'all' for coaches too, but filtered by their teams
+                 setSelectedTeamId('all'); 
+               }
           } return;
       }
-      const teamExists = teams.some(t => t.id === selectedTeamId); const isUnassigned = selectedTeamId === 'unassigned';
-      if (!teamExists && !isUnassigned) { if (teams.length > 0) { setSelectedTeamId(teams[0].id); } else { setSelectedTeamId('unassigned'); } } else if (!selectedTeamId && teams.length > 0) { setSelectedTeamId(teams[0].id); }
+      const teamExists = teams.some(t => t.id === selectedTeamId); 
+      const isUnassigned = selectedTeamId === 'unassigned';
+      const isAll = selectedTeamId === 'all';
+      if (!teamExists && !isUnassigned && !isAll) { 
+        setSelectedTeamId('all');
+      } else if (!selectedTeamId) {
+        setSelectedTeamId('all');
+      }
     }, 0);
   }, [teams, currentUser, isCoach, selectedTeamId, initialFilter]);
 
@@ -1215,7 +1224,9 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   const filteredPlayers = players.filter(p => {
     if (!p || !p.name) return false;
     const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; 
-    const matchesTeam = shouldIgnoreTeamFilter || p.teamId === selectedTeamId;
+    const matchesTeam = selectedTeamId === 'all' 
+      ? (isDirector ? true : availableTeams.some(t => t.id === p.teamId))
+      : (shouldIgnoreTeamFilter || p.teamId === selectedTeamId);
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
     const posVal = (p.position || '').toString(); 
     const isFwd = posVal.includes('锋') || posVal.includes('9'); 
@@ -1331,7 +1342,11 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   
   const handleAddPlayerSubmit = (e: React.FormEvent) => {
     e.preventDefault(); 
-    const finalTeamId = newPlayer.teamId || selectedTeamId;
+    let finalTeamId = newPlayer.teamId || selectedTeamId;
+    if (finalTeamId === 'all') {
+        finalTeamId = availableTeams[0]?.id || 'unassigned';
+    }
+    
     if (newPlayer.name && newPlayer.name.trim() && finalTeamId && newPlayer.number !== undefined && !isNaN(newPlayer.number as number)) {
         const defaultStats = generateDefaultStats(attributeConfig);
         const nextYear = new Date();
@@ -1502,8 +1517,22 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
 
       <div className="w-full md:w-64 flex-shrink-0 flex flex-col space-y-4">
         <div className="flex justify-between items-center md:block"><h2 className="text-3xl font-black text-bvb-black uppercase hidden md:block mb-4">球队管理</h2>{isDirector && <button onClick={() => setShowAddTeamModal(true)} className="text-xs flex items-center text-gray-500 hover:text-bvb-black font-bold border border-gray-300 rounded-full px-3 py-1 md:w-full md:justify-center md:py-2 md:border-2 md:border-dashed md:hover:border-bvb-yellow md:hover:bg-yellow-50"><Plus className="w-3 h-3 mr-1" /> 新建梯队</button>}</div>
-        <div className="md:hidden overflow-x-auto pb-2 flex space-x-2 no-scrollbar">{availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === team.id ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{team.name}</button>)}<button onClick={() => setSelectedTeamId('unassigned')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'unassigned' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>待分配</button></div>
-        <div className="hidden md:flex flex-col space-y-2">{availableTeams.map(team => (<div key={team.id} className="relative group"><button onClick={() => setSelectedTeamId(team.id)} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 ${selectedTeamId === team.id ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}><div className="flex items-center gap-2">
+        <div className="md:hidden overflow-x-auto pb-2 flex space-x-2 no-scrollbar">
+          <button onClick={() => setSelectedTeamId('all')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'all' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>全部球员</button>
+          {availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === team.id ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{team.name}</button>)}
+          <button onClick={() => setSelectedTeamId('unassigned')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'unassigned' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>待分配</button>
+        </div>
+        <div className="hidden md:flex flex-col space-y-2">
+          <button onClick={() => setSelectedTeamId('all')} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 mb-2 ${selectedTeamId === 'all' ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}>
+            <div className="flex justify-between items-center">
+              <h3 className={`font-bold ${selectedTeamId === 'all' ? 'text-bvb-black' : ''}`}>全部球员</h3>
+              <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                {isDirector ? players.length : players.filter(p => availableTeams.some(t => t.id === p.teamId)).length}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">{isDirector ? '俱乐部所有在册球员' : '您负责的所有梯队球员'}</p>
+          </button>
+          {availableTeams.map(team => (<div key={team.id} className="relative group"><button onClick={() => setSelectedTeamId(team.id)} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 ${selectedTeamId === team.id ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}><div className="flex items-center gap-2">
             <h3 className={`font-bold ${selectedTeamId === team.id ? 'text-bvb-black' : ''}`}>{team.name}</h3>
             {team.attribute && (
                 <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded leading-none ${team.attribute === '竞技' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>

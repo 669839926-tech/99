@@ -1,106 +1,49 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { Stage, Layer, Image as KonvaImage, Circle, Text, Line, Arrow, Group, Rect } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Circle, Text, Line, Arrow, Group, Rect, Arc } from 'react-konva';
 import useImage from 'use-image';
-import { Player, TacticsBoardData, TacticsPlayer, TacticsDrawing, FormationTemplate, GameFormat } from '../types';
-import { Trash2, Undo, RotateCcw, Save, Download, Users as UsersIcon, Layout as LayoutIcon, MousePointer2, Type, ArrowUpRight, Spline, Highlighter, Copy, Plus } from 'lucide-react';
+import { Player, TacticsBoardData, TacticsPlayer, TacticsDrawing, FormationTemplate, GameFormat, Team } from '../types';
+import { Trash2, Undo, RotateCcw, Save, Download, Users as UsersIcon, Layout as LayoutIcon, MousePointer2, Type, ArrowUpRight, Spline, Highlighter, Target, Info } from 'lucide-react';
+import { FORMATIONS } from '../tacticsConstants';
 
 interface TacticsBoardProps {
-  matchId: string;
   players: Player[];
+  teams: Team[];
   initialData?: TacticsBoardData;
-  onSave: (data: TacticsBoardData) => void;
-  formationTemplates: FormationTemplate[];
-  onSaveTemplate: (template: FormationTemplate) => void;
-  onCopyPrevious: () => void;
+  onSave: (data: TacticsBoardData, title: string) => void;
 }
 
 const PITCH_WIDTH = 800;
 const PITCH_HEIGHT = 600;
 
-const FORMATIONS_11V11 = [
-  { name: '4-3-3', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'LB', x: 100, y: 450 }, { label: 'CB', x: 300, y: 450 }, { label: 'CB', x: 500, y: 450 }, { label: 'RB', x: 700, y: 450 },
-    { label: 'CM', x: 200, y: 300 }, { label: 'DM', x: 400, y: 350 }, { label: 'CM', x: 600, y: 300 },
-    { label: 'LW', x: 150, y: 150 }, { label: 'ST', x: 400, y: 100 }, { label: 'RW', x: 650, y: 150 }
-  ]},
-  { name: '4-4-2', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'LB', x: 100, y: 450 }, { label: 'CB', x: 300, y: 450 }, { label: 'CB', x: 500, y: 450 }, { label: 'RB', x: 700, y: 450 },
-    { label: 'LM', x: 100, y: 250 }, { label: 'CM', x: 300, y: 300 }, { label: 'CM', x: 500, y: 300 }, { label: 'RM', x: 700, y: 250 },
-    { label: 'ST', x: 300, y: 100 }, { label: 'ST', x: 500, y: 100 }
-  ]},
-  { name: '4-2-3-1', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'LB', x: 100, y: 450 }, { label: 'CB', x: 300, y: 450 }, { label: 'CB', x: 500, y: 450 }, { label: 'RB', x: 700, y: 450 },
-    { label: 'DM', x: 300, y: 350 }, { label: 'DM', x: 500, y: 350 },
-    { label: 'LW', x: 150, y: 200 }, { label: 'AM', x: 400, y: 200 }, { label: 'RW', x: 650, y: 200 },
-    { label: 'ST', x: 400, y: 80 }
-  ]}
-];
-
-const FORMATIONS_8V8 = [
-  { name: '3-3-1', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'DF', x: 150, y: 450 }, { label: 'DF', x: 400, y: 450 }, { label: 'DF', x: 650, y: 450 },
-    { label: 'MF', x: 150, y: 250 }, { label: 'MF', x: 400, y: 300 }, { label: 'MF', x: 650, y: 250 },
-    { label: 'FW', x: 400, y: 100 }
-  ]},
-  { name: '2-4-1', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'DF', x: 300, y: 450 }, { label: 'DF', x: 500, y: 450 },
-    { label: 'MF', x: 100, y: 250 }, { label: 'MF', x: 300, y: 250 }, { label: 'MF', x: 500, y: 250 }, { label: 'MF', x: 700, y: 250 },
-    { label: 'FW', x: 400, y: 100 }
-  ]}
-];
-
-const FORMATIONS_5V5 = [
-  { name: '1-2-1', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'DF', x: 400, y: 450 },
-    { label: 'MF', x: 200, y: 300 }, { label: 'MF', x: 600, y: 300 },
-    { label: 'FW', x: 400, y: 100 }
-  ]},
-  { name: '2-0-2', positions: [
-    { label: 'GK', x: 400, y: 550 },
-    { label: 'DF', x: 250, y: 450 }, { label: 'DF', x: 550, y: 450 },
-    { label: 'FW', x: 250, y: 150 }, { label: 'FW', x: 550, y: 150 }
-  ]}
-];
-
-const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialData, onSave, formationTemplates, onSaveTemplate, onCopyPrevious }) => {
+const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teams, initialData, onSave }) => {
   const [format, setFormat] = useState<GameFormat>(initialData?.format || '11v11');
   const [formation, setFormation] = useState(initialData?.formation || '4-3-3');
   const [tacticsPlayers, setTacticsPlayers] = useState<TacticsPlayer[]>(initialData?.players || []);
   const [drawings, setDrawings] = useState<TacticsDrawing[]>(initialData?.drawings || []);
-  const [tool, setTool] = useState<'select' | 'arrow' | 'curve' | 'run' | 'pass' | 'highlight' | 'text'>('select');
+  const [tool, setTool] = useState<'select' | 'arrow' | 'curve' | 'run' | 'pass' | 'shot' | 'dribble' | 'highlight' | 'text'>('select');
   const [color, setColor] = useState('#FDE100');
+  const [title, setTitle] = useState(initialData?.formation ? `${initialData.formation} 战术` : '新建战术');
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id || '');
   
   const stageRef = useRef<any>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   // Load pitch image
-  const [pitchImage] = useImage('https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=1000');
+  const [pitchImage] = useImage('https://images.unsplash.com/photo-1556056504-5c7696c4c28d?auto=format&fit=crop&q=80&w=1000');
 
   const availableFormations = useMemo(() => {
-    if (format === '11v11') return FORMATIONS_11V11;
-    if (format === '8v8') return FORMATIONS_8V8;
-    return FORMATIONS_5V5;
+    const formatStr = format.includes('v') ? format : `${format}v${format}`;
+    return FORMATIONS.filter(f => f.format === formatStr || f.format === format);
   }, [format]);
 
-  const customTemplates = useMemo(() => {
-    return formationTemplates.filter(t => t.format === format);
-  }, [formationTemplates, format]);
-
-  const applyFormation = (f: any) => {
+  const applyFormation = (f: FormationTemplate) => {
     setFormation(f.name);
     const newPlayers = f.positions.map((pos: any, index: number) => ({
-      id: `pos-${index}`,
+      id: `pos-${index}-${Date.now()}`,
       positionLabel: pos.label,
-      x: pos.x,
-      y: pos.y,
-      isStarting: true
+      x: (pos.x / 100) * PITCH_WIDTH,
+      y: (pos.y / 100) * PITCH_HEIGHT,
     }));
     setTacticsPlayers(newPlayers);
   };
@@ -145,7 +88,7 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
       const newDrawings = [...prev];
       const lastDrawing = { ...newDrawings[newDrawings.length - 1] };
       
-      if (tool === 'arrow' || tool === 'run' || tool === 'pass') {
+      if (['arrow', 'run', 'pass', 'shot', 'dribble'].includes(tool)) {
         lastDrawing.points = [lastDrawing.points[0], lastDrawing.points[1], point.x, point.y];
       } else if (tool === 'curve' || tool === 'highlight') {
         lastDrawing.points = lastDrawing.points.concat([point.x, point.y]);
@@ -177,19 +120,23 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
   };
 
   const handleSave = () => {
+    if (!title) {
+        alert('请输入战术名称');
+        return;
+    }
     onSave({
       format,
       formation,
       players: tacticsPlayers,
       drawings
-    });
+    }, title);
   };
 
   const handleExport = async () => {
     if (stageRef.current) {
       const uri = stageRef.current.toDataURL();
       const link = document.createElement('a');
-      link.download = `tactics-${matchId}.png`;
+      link.download = `${title || 'tactics'}.png`;
       link.href = uri;
       document.body.appendChild(link);
       link.click();
@@ -197,30 +144,50 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
     }
   };
 
-  const handleSaveAsTemplate = () => {
-    const name = prompt('请输入模板名称:');
-    if (name) {
-      onSaveTemplate({
-        id: Date.now().toString(),
-        name,
-        format,
-        positions: tacticsPlayers.map(p => ({ label: p.positionLabel, x: p.x, y: p.y }))
-      });
-    }
-  };
+  const teamPlayers = useMemo(() => {
+    return players.filter(p => p.teamId === selectedTeamId);
+  }, [players, selectedTeamId]);
 
-  const startingPlayersIds = tacticsPlayers.map(p => p.playerId).filter(Boolean);
-  const unassignedPlayers = players.filter(p => !startingPlayersIds.includes(p.id));
+  const assignedPlayerIds = tacticsPlayers.map(p => p.playerId).filter(Boolean);
+  const unassignedPlayers = teamPlayers.filter(p => !assignedPlayerIds.includes(p.id));
 
   return (
-    <div className="flex flex-col h-full bg-gray-100 overflow-hidden">
-      {/* Toolbar */}
-      <div className="bg-white p-3 border-b flex flex-wrap items-center justify-between gap-4 shrink-0">
+    <div className="flex flex-col h-full bg-gray-100 overflow-hidden rounded-2xl shadow-xl border border-gray-200">
+      {/* Header & Main Toolbar */}
+      <div className="bg-bvb-black p-4 flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-lg">
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">赛制</span>
+            <div className="bg-bvb-yellow p-2 rounded-xl">
+                <LayoutIcon className="w-6 h-6 text-bvb-black" />
+            </div>
+            <div>
+                <input 
+                    type="text" 
+                    value={title} 
+                    onChange={e => setTitle(e.target.value)}
+                    className="bg-transparent text-white font-black text-lg outline-none border-b border-transparent focus:border-bvb-yellow transition-all placeholder:text-gray-600"
+                    placeholder="输入战术名称..."
+                />
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Tactical Demonstration Board</p>
+            </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-xl font-bold text-xs hover:bg-gray-700 transition-all">
+            <Download className="w-4 h-4 text-bvb-yellow" /> 导出图片
+          </button>
+          <button onClick={handleSave} className="flex items-center gap-2 px-6 py-2 bg-bvb-yellow text-bvb-black rounded-xl font-black text-xs shadow-lg hover:brightness-105 active:scale-95 transition-all">
+            <Save className="w-4 h-4" /> 保存战术
+          </button>
+        </div>
+      </div>
+
+      {/* Secondary Toolbar */}
+      <div className="bg-white p-3 border-b flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-100">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">赛制</span>
             <select 
-              className="p-1.5 border rounded-lg text-xs font-bold"
+              className="bg-transparent p-1.5 text-xs font-bold outline-none cursor-pointer"
               value={format}
               onChange={(e) => setFormat(e.target.value as any)}
             >
@@ -229,72 +196,53 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
               <option value="5v5">5人制</option>
             </select>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">阵型</span>
+          <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-xl border border-gray-100">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">阵型</span>
             <select 
-              className="p-1.5 border rounded-lg text-xs font-bold"
+              className="bg-transparent p-1.5 text-xs font-bold outline-none cursor-pointer"
+              value={formation}
               onChange={(e) => {
-                const f = availableFormations.find(form => form.name === e.target.value) || customTemplates.find(t => t.name === e.target.value);
+                const f = availableFormations.find(form => form.name === e.target.value);
                 if (f) applyFormation(f);
               }}
             >
-              <option value="">选择阵型...</option>
-              <optgroup label="标准阵型">
-                {availableFormations.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
-              </optgroup>
-              {customTemplates.length > 0 && (
-                <optgroup label="自定义模板">
-                  {customTemplates.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                </optgroup>
-              )}
+              <option value="">选择阵型模板...</option>
+              {availableFormations.map(f => <option key={f.name} value={f.name}>{f.name}</option>)}
             </select>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={() => setTool('select')} className={`p-2 rounded-lg transition-all ${tool === 'select' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="选择/移动">
+        <div className="flex items-center gap-1.5 bg-gray-50 p-1 rounded-xl border border-gray-100">
+          <button onClick={() => setTool('select')} className={`p-2 rounded-lg transition-all ${tool === 'select' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="选择/移动">
             <MousePointer2 className="w-4 h-4" />
           </button>
-          <button onClick={() => setTool('arrow')} className={`p-2 rounded-lg transition-all ${tool === 'arrow' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="直线箭头">
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <button onClick={() => setTool('pass')} className={`p-2 rounded-lg transition-all ${tool === 'pass' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="传球路线">
             <ArrowUpRight className="w-4 h-4" />
           </button>
-          <button onClick={() => setTool('curve')} className={`p-2 rounded-lg transition-all ${tool === 'curve' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="曲线箭头">
-            <Spline className="w-4 h-4" />
+          <button onClick={() => setTool('run')} className={`p-2 rounded-lg transition-all ${tool === 'run' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="跑动路线">
+             <div className="w-4 h-4 border-b-2 border-dashed border-current rotate-[-45deg]" />
           </button>
-          <button onClick={() => setTool('run')} className={`p-2 rounded-lg transition-all ${tool === 'run' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="跑动路线">
-            <div className="w-4 h-4 border-b-2 border-dashed border-current rotate-[-45deg]" />
+          <button onClick={() => setTool('dribble')} className={`p-2 rounded-lg transition-all ${tool === 'dribble' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="带球路线">
+             <Spline className="w-4 h-4" />
           </button>
-          <button onClick={() => setTool('pass')} className={`p-2 rounded-lg transition-all ${tool === 'pass' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="传球路线">
-            <div className="w-4 h-4 border-b-2 border-current rotate-[-45deg]" />
+          <button onClick={() => setTool('shot')} className={`p-2 rounded-lg transition-all ${tool === 'shot' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="射门路线">
+            <Target className="w-4 h-4" />
           </button>
-          <button onClick={() => setTool('highlight')} className={`p-2 rounded-lg transition-all ${tool === 'highlight' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="空间高亮">
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <button onClick={() => setTool('highlight')} className={`p-2 rounded-lg transition-all ${tool === 'highlight' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="空间高亮">
             <Highlighter className="w-4 h-4" />
           </button>
-          <button onClick={() => setTool('text')} className={`p-2 rounded-lg transition-all ${tool === 'text' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`} title="文本备注">
+          <button onClick={() => setTool('text')} className={`p-2 rounded-lg transition-all ${tool === 'text' ? 'bg-bvb-black text-bvb-yellow shadow-md' : 'text-gray-400 hover:bg-gray-200'}`} title="文本备注">
             <Type className="w-4 h-4" />
           </button>
-          <div className="w-px h-6 bg-gray-200 mx-1" />
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer" />
-          <button onClick={() => setDrawings(prev => prev.slice(0, -1))} className="p-2 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200" title="撤销">
+          <div className="w-px h-4 bg-gray-200 mx-1" />
+          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-6 h-6 rounded-full cursor-pointer border-2 border-white shadow-sm" />
+          <button onClick={() => setDrawings(prev => prev.slice(0, -1))} className="p-2 text-gray-400 hover:text-bvb-black transition-colors" title="撤销">
             <Undo className="w-4 h-4" />
           </button>
-          <button onClick={() => { if(confirm('确定清空所有标注吗？')) setDrawings([]); }} className="p-2 bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200" title="清空">
+          <button onClick={() => { if(confirm('确定清空所有标注吗？')) setDrawings([]); }} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="清空">
             <RotateCcw className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button onClick={onCopyPrevious} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-xs hover:bg-gray-200">
-            <Copy className="w-3.5 h-3.5" /> 复制上一场
-          </button>
-          <button onClick={handleSaveAsTemplate} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg font-bold text-xs hover:bg-gray-200">
-            <Plus className="w-3.5 h-3.5" /> 存为模板
-          </button>
-          <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 bg-bvb-black text-white rounded-lg font-bold text-xs hover:bg-gray-800">
-            <Download className="w-3.5 h-3.5 text-bvb-yellow" /> 导出图片
-          </button>
-          <button onClick={handleSave} className="flex items-center gap-1.5 px-4 py-1.5 bg-bvb-yellow text-bvb-black rounded-lg font-black text-xs shadow-lg hover:brightness-105">
-            <Save className="w-3.5 h-3.5" /> 保存战术
           </button>
         </div>
       </div>
@@ -302,7 +250,7 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
       <div className="flex-1 flex overflow-hidden">
         {/* Pitch Area */}
         <div className="flex-1 bg-gray-200 p-4 flex items-center justify-center overflow-auto custom-scrollbar">
-          <div className="bg-white shadow-2xl rounded-lg overflow-hidden" style={{ width: PITCH_WIDTH, height: PITCH_HEIGHT }}>
+          <div className="bg-white shadow-2xl rounded-lg overflow-hidden border-4 border-white" style={{ width: PITCH_WIDTH, height: PITCH_HEIGHT }}>
             <Stage
               width={PITCH_WIDTH}
               height={PITCH_HEIGHT}
@@ -318,34 +266,62 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
                     image={pitchImage}
                     width={PITCH_WIDTH}
                     height={PITCH_HEIGHT}
-                    opacity={0.8}
+                    opacity={1}
                   />
                 )}
                 
-                {/* Pitch Lines (Simplified) */}
+                {/* Pitch Lines */}
                 <Rect width={PITCH_WIDTH} height={PITCH_HEIGHT} stroke="white" strokeWidth={2} />
                 <Line points={[PITCH_WIDTH/2, 0, PITCH_WIDTH/2, PITCH_HEIGHT]} stroke="white" strokeWidth={2} />
-                <Circle x={PITCH_WIDTH/2} y={PITCH_HEIGHT/2} radius={60} stroke="white" strokeWidth={2} />
+                <Circle x={PITCH_WIDTH/2} y={PITCH_HEIGHT/2} radius={70} stroke="white" strokeWidth={2} />
+                <Circle x={PITCH_WIDTH/2} y={PITCH_HEIGHT/2} radius={3} fill="white" />
+                
+                {/* Left Side */}
+                <Rect x={0} y={PITCH_HEIGHT * 0.2} width={PITCH_WIDTH * 0.18} height={PITCH_HEIGHT * 0.6} stroke="white" strokeWidth={2} />
+                <Rect x={0} y={PITCH_HEIGHT * 0.38} width={PITCH_WIDTH * 0.06} height={PITCH_HEIGHT * 0.24} stroke="white" strokeWidth={2} />
+                <Circle x={PITCH_WIDTH * 0.12} y={PITCH_HEIGHT/2} radius={3} fill="white" />
+                <Arc 
+                  x={PITCH_WIDTH * 0.18} 
+                  y={PITCH_HEIGHT/2} 
+                  innerRadius={70} 
+                  outerRadius={70} 
+                  angle={100} 
+                  rotation={-50} 
+                  stroke="white" 
+                  strokeWidth={2} 
+                />
+
+                {/* Right Side */}
+                <Rect x={PITCH_WIDTH * 0.82} y={PITCH_HEIGHT * 0.2} width={PITCH_WIDTH * 0.18} height={PITCH_HEIGHT * 0.6} stroke="white" strokeWidth={2} />
+                <Rect x={PITCH_WIDTH * 0.94} y={PITCH_HEIGHT * 0.38} width={PITCH_WIDTH * 0.06} height={PITCH_HEIGHT * 0.24} stroke="white" strokeWidth={2} />
+                <Circle x={PITCH_WIDTH * 0.88} y={PITCH_HEIGHT/2} radius={3} fill="white" />
+                <Arc 
+                  x={PITCH_WIDTH * 0.82} 
+                  y={PITCH_HEIGHT/2} 
+                  innerRadius={70} 
+                  outerRadius={70} 
+                  angle={100} 
+                  rotation={130} 
+                  stroke="white" 
+                  strokeWidth={2} 
+                />
                 
                 {/* Drawings */}
                 {drawings.map((d) => {
-                  if (d.type === 'arrow') {
-                    return <Arrow key={d.id} points={d.points} stroke={d.color} fill={d.color} strokeWidth={3} pointerLength={10} pointerWidth={10} />;
+                  if (d.type === 'arrow' || d.type === 'pass' || d.type === 'shot') {
+                    return <Arrow key={d.id} points={d.points} stroke={d.color} fill={d.color} strokeWidth={d.type === 'shot' ? 4 : 3} pointerLength={10} pointerWidth={10} />;
                   }
                   if (d.type === 'run') {
                     return <Arrow key={d.id} points={d.points} stroke={d.color} fill={d.color} strokeWidth={3} dash={[10, 5]} pointerLength={10} pointerWidth={10} />;
                   }
-                  if (d.type === 'pass') {
-                    return <Arrow key={d.id} points={d.points} stroke={d.color} fill={d.color} strokeWidth={3} pointerLength={10} pointerWidth={10} />;
-                  }
-                  if (d.type === 'curve') {
+                  if (d.type === 'dribble' || d.type === 'curve') {
                     return <Line key={d.id} points={d.points} stroke={d.color} strokeWidth={3} tension={0.5} lineCap="round" lineJoin="round" />;
                   }
                   if (d.type === 'highlight') {
                     return <Line key={d.id} points={d.points} fill={d.color} opacity={0.3} closed tension={0.5} />;
                   }
                   if (d.type === 'text') {
-                    return <Text key={d.id} x={d.points[0]} y={d.points[1]} text={d.text} fill={d.color} fontSize={14} fontStyle="bold" />;
+                    return <Text key={d.id} x={d.points[0]} y={d.points[1]} text={d.text} fill={d.color} fontSize={16} fontStyle="bold" shadowBlur={2} shadowColor="black" />;
                   }
                   return null;
                 })}
@@ -360,37 +336,46 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
                     onDragEnd={(e) => handlePlayerDrop(e, p.id)}
                   >
                     <Circle
-                      radius={20}
-                      fill={p.playerId ? '#FDE100' : 'rgba(255, 255, 255, 0.2)'}
+                      radius={22}
+                      fill={p.playerId ? '#FDE100' : 'rgba(255, 255, 255, 0.15)'}
                       stroke={p.playerId ? '#000' : '#fff'}
                       strokeWidth={2}
-                      shadowBlur={5}
+                      shadowBlur={p.playerId ? 8 : 0}
+                      shadowColor="black"
+                      shadowOpacity={0.5}
                     />
                     <Text
                       text={p.number?.toString() || p.positionLabel}
-                      fontSize={12}
-                      fontStyle="bold"
+                      fontSize={14}
+                      fontStyle="black"
                       fill={p.playerId ? '#000' : '#fff'}
                       align="center"
                       verticalAlign="middle"
-                      width={40}
-                      height={40}
-                      offsetX={20}
-                      offsetY={20}
+                      width={44}
+                      height={44}
+                      offsetX={22}
+                      offsetY={22}
                     />
                     {p.name && (
-                      <Text
-                        text={p.name}
-                        y={25}
-                        fontSize={10}
-                        fontStyle="bold"
-                        fill="#fff"
-                        align="center"
-                        width={60}
-                        offsetX={30}
-                        shadowBlur={2}
-                        shadowColor="black"
-                      />
+                      <Group y={28}>
+                        <Rect 
+                            x={-30} 
+                            width={60} 
+                            height={14} 
+                            fill="rgba(0,0,0,0.6)" 
+                            cornerRadius={4} 
+                        />
+                        <Text
+                            text={p.name}
+                            fontSize={10}
+                            fontStyle="bold"
+                            fill="#fff"
+                            align="center"
+                            width={60}
+                            offsetX={30}
+                            y={2}
+                        />
+                      </Group>
                     )}
                   </Group>
                 ))}
@@ -400,52 +385,82 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ matchId, players, initialDa
         </div>
 
         {/* Player List Sidebar */}
-        <div className="w-64 bg-white border-l flex flex-col shrink-0">
-          <div className="p-4 border-b bg-gray-50">
+        <div className="w-96 bg-white border-l flex flex-col shrink-0 shadow-xl z-10">
+          <div className="p-4 border-b bg-gray-50 space-y-3">
             <h4 className="font-black text-xs text-gray-800 flex items-center uppercase tracking-widest">
-              <UsersIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 待分配球员 ({unassignedPlayers.length})
+              <UsersIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 球队布阵
             </h4>
+            <select 
+                value={selectedTeamId} 
+                onChange={e => setSelectedTeamId(e.target.value)}
+                className="w-full p-2 border rounded-xl text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow"
+            >
+                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-            {unassignedPlayers.length === 0 ? (
-              <div className="py-8 text-center text-gray-400 text-xs italic">所有球员已分配</div>
-            ) : (
-              unassignedPlayers.map(p => (
-                <div 
-                  key={p.id}
-                  className="p-2 border rounded-lg flex items-center gap-2 bg-white hover:border-bvb-yellow cursor-pointer transition-all group"
-                  onClick={() => {
-                    const targetPos = tacticsPlayers.find(tp => !tp.playerId);
-                    if (targetPos) assignPlayer(targetPos.id, p.id);
-                  }}
-                >
-                  <img src={p.image} className="w-8 h-8 rounded-full object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-gray-800 truncate">{p.name}</p>
-                    <p className="text-[10px] text-gray-400 font-mono">#{p.number} {p.position}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          
-          <div className="p-4 border-t bg-gray-50">
-            <h4 className="font-black text-xs text-gray-800 flex items-center uppercase tracking-widest mb-2">
-              <LayoutIcon className="w-4 h-4 mr-2 text-bvb-yellow" /> 已分配位置
-            </h4>
-            <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar">
-              {tacticsPlayers.map(p => (
-                <div key={p.id} className="flex items-center justify-between p-1.5 bg-white border rounded text-[10px] font-bold">
-                  <span className="text-gray-400 w-8">{p.positionLabel}</span>
-                  <span className="flex-1 truncate px-2">{p.name || <span className="text-gray-300 italic">未分配</span>}</span>
-                  {p.playerId && (
-                    <button onClick={() => removePlayerAssignment(p.id)} className="text-gray-300 hover:text-red-500">
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
+
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="p-3 bg-gray-50 border-b">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">待分配球员 ({unassignedPlayers.length})</span>
             </div>
+            <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2 custom-scrollbar content-start">
+                {unassignedPlayers.length === 0 ? (
+                <div className="col-span-3 py-8 text-center text-gray-400 text-xs italic bg-gray-50 rounded-xl border border-dashed">所有球员已分配</div>
+                ) : (
+                unassignedPlayers.map(p => (
+                    <div 
+                    key={p.id}
+                    className="p-1.5 border rounded-xl flex flex-col items-center text-center gap-1 bg-white hover:border-bvb-yellow cursor-pointer transition-all group shadow-sm hover:shadow-md"
+                    onClick={() => {
+                        const targetPos = tacticsPlayers.find(tp => !tp.playerId);
+                        if (targetPos) assignPlayer(targetPos.id, p.id);
+                    }}
+                    >
+                    <div className="relative">
+                        <img src={p.image} className="w-10 h-10 rounded-full object-cover border-2 border-gray-100" />
+                        <span className="absolute -bottom-1 -right-1 bg-bvb-black text-bvb-yellow text-[7px] font-black px-1 rounded-full border border-white">#{p.number}</span>
+                    </div>
+                    <div className="w-full">
+                        <p className="text-[9px] font-black text-gray-800 truncate leading-tight">{p.name}</p>
+                        <p className="text-[7px] text-gray-400 font-bold uppercase tracking-tighter">{p.position}</p>
+                    </div>
+                    </div>
+                ))
+                )}
+            </div>
+            
+            <div className="p-3 bg-gray-50 border-t border-b">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">首发阵容 ({assignedPlayerIds.length})</span>
+            </div>
+            <div className="p-3 space-y-1.5 max-h-64 overflow-y-auto custom-scrollbar bg-gray-50/50">
+                {tacticsPlayers.length === 0 ? (
+                    <div className="text-center py-4 text-gray-400 text-[10px] italic">请先选择阵型</div>
+                ) : (
+                    tacticsPlayers.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-2 bg-white border rounded-xl text-[11px] font-bold shadow-sm">
+                        <span className="text-bvb-yellow bg-black px-1.5 py-0.5 rounded text-[9px] w-8 text-center">{p.positionLabel}</span>
+                        <span className="flex-1 truncate px-3">{p.name || <span className="text-gray-300 italic font-normal">未分配球员</span>}</span>
+                        {p.playerId && (
+                            <button onClick={() => removePlayerAssignment(p.id)} className="text-gray-300 hover:text-red-500 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                        </div>
+                    ))
+                )}
+            </div>
+          </div>
+
+          <div className="p-4 bg-yellow-50 border-t border-yellow-100">
+              <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-yellow-800 leading-relaxed">
+                      <b>操作提示:</b><br/>
+                      1. 点击左侧待分配球员可快速填入空位。<br/>
+                      2. 在战术板上拖拽圆圈可调整位置。<br/>
+                      3. 使用上方工具栏绘制战术线条。
+                  </p>
+              </div>
           </div>
         </div>
       </div>

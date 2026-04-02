@@ -54,7 +54,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         training: 'edit',
         matches: 'edit',
         growth: 'edit',
-        settings: 'edit'
+        settings: 'edit',
+        tactics: 'edit'
     },
     coach: {
         dashboard: 'view',
@@ -64,7 +65,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         training: 'edit',
         matches: 'view',
         growth: 'edit',
-        settings: 'view'
+        settings: 'view',
+        tactics: 'edit'
     },
     assistant_coach: {
         dashboard: 'view',
@@ -74,7 +76,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         training: 'view',
         matches: 'view',
         growth: 'view',
-        settings: 'view'
+        settings: 'view',
+        tactics: 'view'
     },
     parent: {
         dashboard: 'view',
@@ -84,7 +87,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         training: 'view',
         matches: 'view',
         growth: 'view',
-        settings: 'view'
+        settings: 'view',
+        tactics: 'view'
     }
 };
 
@@ -97,12 +101,15 @@ export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
     incrementalPlayerFee: 5,
     minPlayersForCalculation: 6,
     assistantCoachBaseSalary: 2000,
-    assistantCoachPlayerRate: 5,
+    assistantCoachSessionBaseFee: 40,
+    assistantCoachMinPlayersForCalculation: 6,
+    assistantCoachIncrementalPlayerFee: 5,
     monthlyAttendanceRewards: [
         { threshold: 80, amount: 100 },
+        { threshold: 85, amount: 150 },
         { threshold: 90, amount: 200 },
     ],
-    quarterlyRenewalReward: { threshold: 80, amount: 300 },
+    quarterlyRenewalReward: { threshold: 80, amount: 100 },
     monthlyPerformanceRewards: [
         { minScore: 8, maxScore: 8.9, amount: 100 },
         { minScore: 9, maxScore: 10, amount: 200 },

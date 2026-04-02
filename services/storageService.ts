@@ -17,6 +17,7 @@ export interface AppData {
     // Comment: Added periodizationPlans to AppData interface to fix build errors in App.tsx
     periodizationPlans?: any[];
     accountingRecords?: any[];
+    tactics?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

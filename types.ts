@@ -186,13 +186,25 @@ export interface TacticsPlayer {
 
 export interface TacticsDrawing {
     id: string;
-    type: 'line' | 'arrow' | 'curve' | 'text' | 'highlight' | 'run' | 'pass';
-    points?: number[];
+    type: 'line' | 'arrow' | 'curve' | 'text' | 'highlight' | 'run' | 'pass' | 'shot' | 'dribble';
+    points: number[];
     x?: number;
     y?: number;
     text?: string;
     color: string;
     width?: number;
+}
+
+export interface Tactic {
+    id: string;
+    title: string;
+    description?: string;
+    format: GameFormat;
+    formation: string;
+    data: TacticsBoardData;
+    createdAt: string;
+    updatedAt: string;
+    authorId?: string;
 }
 
 export interface TacticsBoardData {
@@ -378,9 +390,11 @@ export interface SalarySettings {
     incrementalPlayerFee: number; // 5
     minPlayersForCalculation: number; // 6
     assistantCoachBaseSalary: number; // 助教底薪
-    assistantCoachPlayerRate: number; // 助教人数补贴单价，如5元
+    assistantCoachSessionBaseFee: number; // 助教基础课酬
+    assistantCoachMinPlayersForCalculation: number; // 助教起算基准人数
+    assistantCoachIncrementalPlayerFee: number; // 助教每超1人增加金额
     monthlyAttendanceRewards: { threshold: number; amount: number }[]; // 参训率改为月度
-    quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，但仅季末发放
+    quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，amount 为达标后每人奖励金额
     monthlyPerformanceRewards: { minScore: number; maxScore: number; amount: number }[]; // [{8, 8.9, 100}, {9, 10, 200}]
 }
 
@@ -420,7 +434,7 @@ export interface AccountingRecord {
 }
 
 // --- RBAC Types ---
-export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings';
+export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings' | 'tactics';
 export type PermissionLevel = 'none' | 'view' | 'edit';
 
 export type RolePermissions = Record<UserRole, Record<ModuleId, PermissionLevel>>;

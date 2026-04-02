@@ -1108,7 +1108,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             onClick={async () => {
                                                 setIsExporting(true);
                                                 try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch(e) { alert('导出失败'); } finally { setIsExporting(false); }
+                                                catch { alert('导出失败'); } finally { setIsExporting(false); }
                                             }}
                                             className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
                                         >
@@ -1456,7 +1456,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             } else {
                 await exportToPDF('training-plan-list-pdf', `训练计划明细报表_${dateLabel}`); 
             }
-        } catch (e) { 
+        } catch { 
             alert('导出失败'); 
         } finally { 
             setIsExporting(false); 

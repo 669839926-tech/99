@@ -19,6 +19,7 @@ interface DashboardProps {
   onUpdateAnnouncement?: (announcement: Announcement) => void;
   onDeleteAnnouncement?: (id: string) => void;
   appLogo?: string;
+  tactics?: Tactic[];
 }
 
 type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
@@ -33,7 +34,8 @@ const parseLocalDate = (dateStr: string) => {
 
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
-    announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, appLogo
+    announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, appLogo,
+    tactics = []
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
@@ -642,6 +644,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 </div>
             )}
+
+            <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-black p-4 md:p-6 flex flex-col justify-between cursor-pointer hover:shadow-lg transition-all" onClick={() => onNavigate?.('tactics')}>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="font-black text-sm md:text-lg text-gray-800 flex items-center">
+                        <LayoutList className="w-4 h-4 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-black" /> 战术板
+                    </h3>
+                    <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest">设计与演示</span>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 flex-1">
+                        <p className="text-[10px] text-gray-400 font-black uppercase mb-1">已存方案</p>
+                        <p className="text-xl font-black text-bvb-black leading-none">{tactics.length} <span className="text-xs font-bold text-gray-400">个</span></p>
+                    </div>
+                    <div className="bg-bvb-yellow/10 p-3 rounded-xl border border-bvb-yellow/20 flex-1">
+                        <p className="text-[10px] text-bvb-black font-black uppercase mb-1">快速进入</p>
+                        <div className="flex items-center text-bvb-black font-black text-xs">
+                            立即绘图 <ArrowRight className="w-3 h-3 ml-1" />
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             {isCoach && unreadReviews.length > 0 && (
                 <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6 animate-in slide-in-from-right-4">

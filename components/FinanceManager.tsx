@@ -231,9 +231,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 });
 
                 if (isAssistant) {
-                    // 助教新规则: 人数 * 配置单价 (5元)
-                    singleSessionFee = teamSize * salarySettings.assistantCoachPlayerRate;
-                    sessionFeeFormula = `助教补助: ${teamSize}人 * ¥${salarySettings.assistantCoachPlayerRate} * ${monthlySessions.length}课`;
+                    // 助教新规则: 基础 + 超额 (与主教练一致)
+                    const extraPlayers = Math.max(0, teamSize - salarySettings.assistantCoachMinPlayersForCalculation);
+                    singleSessionFee = salarySettings.assistantCoachSessionBaseFee + (extraPlayers * salarySettings.assistantCoachIncrementalPlayerFee);
+                    sessionFeeFormula = `(¥${salarySettings.assistantCoachSessionBaseFee} + (${teamSize}人 - ${salarySettings.assistantCoachMinPlayersForCalculation}基准) * ¥${salarySettings.assistantCoachIncrementalPlayerFee}) * ${monthlySessions.length}课`;
                 } else {
                     // 主教练规则: 基础 + 超额
                     const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
@@ -264,16 +265,27 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let renewalFormula = "非季末月份";
                 if (isDistributionMonth) {
                     const quarterMonths = [Math.floor(selectedMonth / 3) * 3, Math.floor(selectedMonth / 3) * 3 + 1, Math.floor(selectedMonth / 3) * 3 + 2];
-                    const qStart = new Date(effectiveYear, quarterMonths[0], 1).toISOString();
-                    const qEnd = new Date(effectiveYear, quarterMonths[2] + 1, 0).toISOString();
-                    const renewedCount = teamPlayers.filter(p => {
-                        const rechargedInQ = p.rechargeHistory?.some(r => r.date >= qStart && r.date <= qEnd);
-                        const joinedInQ = p.joinDate && p.joinDate >= qStart && p.joinDate <= qEnd;
-                        return rechargedInQ || joinedInQ;
+                    const renewedCount = teamPlayers.filter(p => 
+                        p.rechargeHistory?.some(r => {
+                            const { year, month } = parseDateInfo(r.date);
+                            return year === effectiveYear && quarterMonths.includes(month);
+                        })
+                    ).length;
+                    
+                    const expiredCount = teamPlayers.filter(p => {
+                        if (!p.validUntil) return false;
+                        const { year, month } = parseDateInfo(p.validUntil);
+                        const hasRenewed = p.rechargeHistory?.some(r => {
+                            const { year: rYear, month: rMonth } = parseDateInfo(r.date);
+                            return rYear === effectiveYear && quarterMonths.includes(rMonth);
+                        });
+                        return !hasRenewed && year === effectiveYear && quarterMonths.includes(month);
                     }).length;
-                    renewalRate = teamSize > 0 ? (renewedCount / teamSize) * 100 : 0;
-                    renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? salarySettings.quarterlyRenewalReward.amount : 0;
-                    renewalFormula = `${renewedCount}续费 / ${teamSize}总人数 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖¥${renewalReward})`;
+
+                    const dueForRenewalCount = renewedCount + expiredCount;
+                    renewalRate = dueForRenewalCount > 0 ? (renewedCount / dueForRenewalCount) * 100 : (teamSize > 0 ? 100 : 0);
+                    renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0;
+                    renewalFormula = `${renewedCount}实续 / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`;
                 }
 
                 return { 
