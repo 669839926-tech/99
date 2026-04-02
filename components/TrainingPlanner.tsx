@@ -197,8 +197,20 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
 
     const isDirector = currentUser?.role === 'director';
     const isCoach = currentUser?.role === 'coach';
-    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector;
+    const isAssistant = currentUser?.role === 'assistant_coach';
+    const canEdit = (isCoach && currentUser?.teamIds?.includes(session.teamId)) || isDirector || (isAssistant && currentUser?.teamIds?.includes(session.teamId));
     
+    const handleAssistantCheckIn = () => {
+        if (!currentUser) return;
+        setLocalSession(prev => {
+            const currentIds = prev.assistantCheckInIds || [];
+            if (currentIds.includes(currentUser.id)) {
+                return { ...prev, assistantCheckInIds: currentIds.filter(id => id !== currentUser.id) };
+            } else {
+                return { ...prev, assistantCheckInIds: [...currentIds, currentUser.id] };
+            }
+        });
+    };
     const getStatus = (playerId: string): AttendanceStatus => {
         const record = localSession.attendance?.find(r => r.playerId === playerId);
         return record ? record.status : 'Absent';
@@ -425,6 +437,28 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                               <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">重点</span><div className="font-bold text-sm truncate">{localSession.focus}</div></div>
                               <div className="bg-gray-50 p-2 rounded border border-gray-100"><span className="text-xs text-gray-500 uppercase font-bold">强度</span><div className={`font-bold text-sm ${localSession.intensity === 'High' ? 'text-red-600' : 'text-green-600'}`}>{localSession.intensity === 'High' ? '高' : localSession.intensity === 'Medium' ? '中' : '低'}</div></div>
                           </div>
+
+                          {/* 助教签到区 */}
+                          {(isAssistant || isDirector) && (
+                              <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${localSession.assistantCheckInIds?.includes(currentUser?.id || '') ? 'bg-blue-100 border-blue-300 text-blue-700' : 'bg-white border-gray-200 text-gray-400'}`}>
+                                          <UsersIcon className="w-5 h-5" />
+                                      </div>
+                                      <div>
+                                          <div className="text-sm font-black text-gray-800">助教签到 (打卡)</div>
+                                          <p className="text-[10px] text-gray-500">签到后该课时将计入助教薪酬计算</p>
+                                      </div>
+                                  </div>
+                                  <button 
+                                      onClick={handleAssistantCheckIn}
+                                      className={`px-4 py-2 rounded-lg font-black text-xs transition-all ${localSession.assistantCheckInIds?.includes(currentUser?.id || '') ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white border border-blue-200 text-blue-600 hover:bg-blue-50'}`}
+                                  >
+                                      {localSession.assistantCheckInIds?.includes(currentUser?.id || '') ? '已签到' : '立即签到'}
+                                  </button>
+                              </div>
+                          )}
+
                           <div>
                               <div className="flex justify-between items-center mb-4">
                                   <h4 className="font-bold text-gray-800 flex items-center"><UserCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 考勤列表</h4>
@@ -932,7 +966,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               );
           } else {
               days.push(
-                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2.5 md:h-2.5 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)] border border-white" title="待审核日志"></div>}{hasUnreadReview && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 shadow-sm" title="有新审核建议"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-sm ring-1 ring-blue-100' : s.submissionStatus === 'Reviewed' ? (s.isReviewRead ? 'bg-green-50 border-green-500 text-green-700' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm') : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <FileText className="w-2 md:w-3 h-2 md:h-3 text-blue-600 ml-1 flex-shrink-0 animate-pulse" />}</div>); })}</div></div>
+                  <div key={d} onClick={() => setSelectedDate(dateStr)} onDoubleClick={() => { setSelectedDate(dateStr); setFormData(prev => ({ ...prev, date: dateStr })); setShowAddModal(true); }} className={`h-16 md:h-32 border-r border-b border-gray-200 p-1 md:p-2 relative cursor-pointer hover:bg-yellow-50 transition-colors ${isSelected ? 'bg-yellow-50 ring-2 ring-inset ring-bvb-yellow' : 'bg-white'}`}><div className="flex justify-between items-start"><div className="flex items-center"><span className={`text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-bvb-black text-bvb-yellow' : 'text-gray-700'}`}>{d}</span>{hasPending && <div className="ml-1 w-1.5 h-1.5 md:w-2.5 md:h-2.5 rounded-full bg-blue-500 animate-pulse shadow-[0_0_8px_rgba(59,130,246,0.5)] border border-white" title="待审核日志"></div>}{hasUnreadReview && <div className="ml-1 w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-blue-500 shadow-sm" title="有新审核建议"></div>}</div></div><div className="mt-1 space-y-0.5 md:space-y-1 overflow-y-auto max-h-[calc(100%-18px)] custom-scrollbar">{sessionsOnDay.map(s => { const team = teams.find(t => t.id === s.teamId); return (<div key={s.id} onClick={(e) => { e.stopPropagation(); setSelectedSession(s); }} className={`text-[8px] md:text-[10px] px-1 py-0.5 md:py-1 rounded font-bold truncate border-l-2 cursor-pointer hover:brightness-95 flex justify-between items-center ${s.submissionStatus === 'Submitted' ? 'bg-blue-50 border-blue-500 text-blue-800 shadow-sm ring-1 ring-blue-100' : s.submissionStatus === 'Reviewed' ? (s.isReviewRead ? 'bg-green-50 border-green-500 text-green-700' : 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm') : s.intensity === 'High' ? 'bg-red-50 border-red-500 text-red-700' : s.intensity === 'Medium' ? 'bg-yellow-50 border-yellow-500 text-yellow-800' : s.intensity === 'Low' ? 'bg-green-50 border-green-500 text-green-700' : s.intensity === 'None' ? 'bg-gray-100 border-gray-300 text-gray-500' : 'bg-gray-50 border-gray-300 text-gray-500'}`}><span className="truncate flex-1">{team?.level}</span>
+{s.assistantCheckInIds && s.assistantCheckInIds.length > 0 && <UserCheck className="w-2 md:w-3 h-2 md:h-3 text-blue-600 ml-1 flex-shrink-0" title="助教已签到" />}
+{s.submissionStatus === 'Reviewed' && <ShieldCheck className="w-2 md:w-3 h-2 md:h-3 text-bvb-black ml-1 flex-shrink-0" />}{s.submissionStatus === 'Submitted' && <FileText className="w-2 md:w-3 h-2 md:h-3 text-blue-600 ml-1 flex-shrink-0 animate-pulse" />}</div>); })}</div></div>
               );
           }
       }
@@ -1366,6 +1402,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             <div className="flex items-center gap-1.5 md:gap-2">
                                                 <span className={`font-bold text-xs md:text-sm group-hover:underline truncate max-w-[100px] md:max-w-none ${isUnread || isPendingDirector ? 'text-blue-700' : 'text-bvb-black'}`}>{s.title}</span>
                                                 {s.linkedDesignId && <PenTool className="w-3 md:w-3.5 h-3 md:h-3.5 text-purple-500 shrink-0" title="关联教案" />}
+                                                {s.assistantCheckInIds && s.assistantCheckInIds.length > 0 && <UserCheck className="w-3 md:w-3.5 h-3 md:h-3.5 text-blue-600 shrink-0" title="助教已签到" />}
                                             </div>
                                         </td>
                                         <td className="px-3 md:px-6 py-4 text-sm text-gray-500 hidden md:table-cell">{s.duration} min</td>
@@ -1488,6 +1525,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 attendance: [], 
                 submissionStatus: 'Planned', 
                 isReviewRead: true, 
+                coachId: currentUser?.id,
                 linkedDesignId: formData.linkedDesignId,
                 focusedPlayerIds: formData.focusedPlayerIds,
                 focusedPlayerNotes: {},
@@ -1514,7 +1552,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const handleDuplicateConfirm = () => {
       if (!sessionToDuplicate) return;
-      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', isReviewRead: true, attendance: [], coachFeedback: '', directorReview: '', focusedPlayerNotes: {} };
+      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', isReviewRead: true, coachId: currentUser?.id, attendance: [], coachFeedback: '', directorReview: '', focusedPlayerNotes: {} };
       onAddTraining(copy);
       setSessionToDuplicate(null);
       alert('已成功复制训练计划到 ' + duplicateDate);

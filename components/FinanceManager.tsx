@@ -227,14 +227,18 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
                 const monthlySessions = trainings.filter(t => {
                     const { year, month } = parseDateInfo(t.date);
-                    return t.teamId === teamId && year === selectedYear && month === selectedMonth;
+                    const isTeamSession = t.teamId === teamId && year === selectedYear && month === selectedMonth;
+                    if (isAssistant) {
+                        return isTeamSession && (t.assistantCheckInIds?.includes(coach.id));
+                    }
+                    return isTeamSession;
                 });
 
                 if (isAssistant) {
                     // 助教新规则: 基础 + 超额 (与主教练一致)
                     const extraPlayers = Math.max(0, teamSize - salarySettings.assistantCoachMinPlayersForCalculation);
                     singleSessionFee = salarySettings.assistantCoachSessionBaseFee + (extraPlayers * salarySettings.assistantCoachIncrementalPlayerFee);
-                    sessionFeeFormula = `(¥${salarySettings.assistantCoachSessionBaseFee} + (${teamSize}人 - ${salarySettings.assistantCoachMinPlayersForCalculation}基准) * ¥${salarySettings.assistantCoachIncrementalPlayerFee}) * ${monthlySessions.length}课`;
+                    sessionFeeFormula = `(¥${salarySettings.assistantCoachSessionBaseFee} + (${teamSize}人 - ${salarySettings.assistantCoachMinPlayersForCalculation}基准) * ¥${salarySettings.assistantCoachIncrementalPlayerFee}) * ${monthlySessions.length}课 (仅计已打卡课时)`;
                 } else {
                     // 主教练规则: 基础 + 超额
                     const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);

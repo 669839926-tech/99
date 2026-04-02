@@ -264,6 +264,8 @@ export interface TrainingSession {
   coachFeedback?: string; // Repurposed as Overall Evaluation
   directorReview?: string;
   linkedDesignId?: string;
+  coachId?: string; // 创建该计划的教练ID
+  assistantCheckInIds?: string[]; // 助教签到ID列表
   // --- New Focus Fields ---
   focusedPlayerIds?: string[]; // 1-2 重点关注球员
   focusedPlayerNotes?: Record<string, { technical: string; mental: string; resolved?: boolean }>; // 重点关注笔记
