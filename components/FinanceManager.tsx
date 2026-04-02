@@ -314,9 +314,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             calcRenewalReward = teamBreakdown.reduce((sum, b) => sum + b.renewalReward, 0);
 
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
-            const performanceConfig = salarySettings.monthlyPerformanceRewards.find(r => evaluation && evaluation.score >= r.minScore && evaluation.score <= r.maxScore);
-            const calcPerformanceReward = performanceConfig?.amount || 0;
-            const performanceFormula = evaluation ? `评分 ${evaluation.score} (${performanceConfig ? '奖¥'+performanceConfig.amount : '未达标'})` : "未评分";
+            
+            // 修改：评分 > 8 分获得配置的评价绩效金额，取消原有的分段奖励
+            const evaluationSalary = (evaluation && !isNaN(evaluation.score) && evaluation.score > 8) ? salarySettings.evaluationAllocation : 0;
+            const calcPerformanceReward = evaluationSalary;
+            
+            const performanceFormula = (evaluation && !isNaN(evaluation.score))
+                ? `评分 ${evaluation.score} (评价绩效¥${evaluationSalary})` 
+                : "未评分";
 
             const currentEdit = editPayroll[coach.id] || {};
             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : (isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary));
@@ -339,7 +344,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 performanceReward,
                 totalSalary,
                 performanceFormula,
-                evaluationScore: evaluation?.score,
+                evaluationScore: evaluation?.score || 0,
+                evaluationDetails: evaluation,
                 isSaved: !!savedRecord,
                 isDisbursed: savedRecord?.isDisbursed || false,
                 isModified: Object.keys(currentEdit).length > 0,
@@ -398,7 +404,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         return Array.from(details).sort();
     }, [transactions]);
 
-    const handleUpdateEvaluation = (coachId: string, score: number) => {
+    const handleUpdateEvaluation = (coachId: string, field: 'trainingScore' | 'attentionScore' | 'synergyScore', value: number) => {
         if (selectedYear === 'all') { alert('请选择具体年份进行评价'); return; }
         const yearNum = selectedYear as number;
         const coach = users.find(u => u.id === coachId);
@@ -406,8 +412,31 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const evaluations = coach.monthlyEvaluations || [];
         const existingIdx = evaluations.findIndex(e => e.year === yearNum && e.month === selectedMonth);
         const nextEvals = [...evaluations];
-        if (existingIdx >= 0) nextEvals[existingIdx] = { ...nextEvals[existingIdx], score };
-        else nextEvals.push({ id: `eval-${Date.now()}`, year: yearNum, month: selectedMonth, score, comment: '' });
+        
+        let currentEval = existingIdx >= 0 ? { ...nextEvals[existingIdx] } : { 
+            id: `eval-${Date.now()}`, 
+            year: yearNum, 
+            month: selectedMonth, 
+            score: 0, 
+            trainingScore: 0, 
+            attentionScore: 0, 
+            synergyScore: 0, 
+            comment: '' 
+        };
+        
+        // Ensure values are between 0 and 10, handle NaN
+        const numValue = isNaN(value) ? 0 : value;
+        const safeValue = Math.max(0, Math.min(10, numValue));
+        currentEval = { ...currentEval, [field]: safeValue };
+        
+        // Calculate average
+        const scores = [currentEval.trainingScore || 0, currentEval.attentionScore || 0, currentEval.synergyScore || 0];
+        const avg = scores.reduce((a, b) => a + b, 0) / 3;
+        currentEval.score = parseFloat(avg.toFixed(1)) || 0;
+        
+        if (existingIdx >= 0) nextEvals[existingIdx] = currentEval;
+        else nextEvals.push(currentEval);
+        
         onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
     };
 
@@ -536,12 +565,45 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                         <div className="flex items-center gap-1.5 mt-0.5"><span className={`text-[8px] font-black uppercase px-1 rounded border leading-tight ${sal.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>{sal.role === 'coach' ? '主教练' : '助教'}</span><span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span></div>
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className={`w-12 md:w-20 p-1 border rounded text-right font-black text-[10px] md:text-xs bg-transparent focus:bg-white outline-none ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`} value={sal.baseSalary} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'baseSalary', e.target.value)} /></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} />{sal.teamBreakdown.length > 0 && <span className="text-[7px] md:text-[8px] text-gray-400 italic">按课计费</span>}</div></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.attendanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} />{sal.attendanceReward > 0 && <span className="text-[7px] md:text-[8px] text-green-500 font-black uppercase">达标奖</span>}</div></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.renewalReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-center"><input type="number" min="0" max="10" step="0.1" className="w-8 md:w-14 p-1 text-center border rounded font-black text-[10px] md:text-xs bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" value={sal.evaluationScore || ''} onChange={e => handleUpdateEvaluation(sal.coachId, parseFloat(e.target.value))} placeholder="0" /></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.performanceReward} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'performanceReward', e.target.value)} />{sal.performanceReward > 0 && <span className="text-[7px] md:text-[8px] text-blue-500 font-black">绩效奖</span>}</div></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className={`w-12 md:w-20 p-1 border rounded text-right font-black text-[10px] md:text-xs bg-transparent focus:bg-white outline-none ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`} value={sal.baseSalary || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'baseSalary', e.target.value)} /></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} />{sal.teamBreakdown.length > 0 && <span className="text-[7px] md:text-[8px] text-gray-400 italic">按课计费</span>}</div></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.attendanceReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} />{sal.attendanceReward > 0 && <span className="text-[7px] md:text-[8px] text-green-500 font-black uppercase">达标奖</span>}</div></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.renewalReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-center">
+                                                    <div className="flex flex-col gap-1 items-center min-w-[80px] md:min-w-[100px]">
+                                                        <div className="flex items-center gap-1 w-full justify-between">
+                                                            <span className="text-[8px] md:text-[9px] text-gray-400 font-bold">训练:</span>
+                                                            <input 
+                                                                type="number" min="0" max="10" step="1" 
+                                                                className="w-8 md:w-10 p-0.5 text-center border rounded font-black text-[10px] bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" 
+                                                                value={sal.evaluationDetails?.trainingScore || 0} 
+                                                                onChange={e => handleUpdateEvaluation(sal.coachId, 'trainingScore', parseFloat(e.target.value))} 
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center gap-1 w-full justify-between">
+                                                            <span className="text-[8px] md:text-[9px] text-gray-400 font-bold">关注:</span>
+                                                            <input 
+                                                                type="number" min="0" max="10" step="1" 
+                                                                className="w-8 md:w-10 p-0.5 text-center border rounded font-black text-[10px] bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" 
+                                                                value={sal.evaluationDetails?.attentionScore || 0} 
+                                                                onChange={e => handleUpdateEvaluation(sal.coachId, 'attentionScore', parseFloat(e.target.value))} 
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center gap-1 w-full justify-between">
+                                                            <span className="text-[8px] md:text-[9px] text-gray-400 font-bold">协同:</span>
+                                                            <input 
+                                                                type="number" min="0" max="10" step="1" 
+                                                                className="w-8 md:w-10 p-0.5 text-center border rounded font-black text-[10px] bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" 
+                                                                value={sal.evaluationDetails?.synergyScore || 0} 
+                                                                onChange={e => handleUpdateEvaluation(sal.coachId, 'synergyScore', parseFloat(e.target.value))} 
+                                                            />
+                                                        </div>
+                                                        <div className="mt-1 pt-1 border-t border-gray-200 w-full text-center">
+                                                            <span className="text-[10px] font-black text-blue-600">均分: {sal.evaluationScore || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.performanceReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'performanceReward', e.target.value)} />{sal.performanceReward > 0 && <span className="text-[7px] md:text-[8px] text-blue-500 font-black">绩效奖</span>}</div></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right font-black text-bvb-black text-[11px] md:text-base tabular-nums leading-none">¥{sal.totalSalary.toLocaleString()}</td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-center">
                                                     <div className="flex justify-center gap-0.5 md:gap-1">

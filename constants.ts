@@ -110,10 +110,7 @@ export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
         { threshold: 90, amount: 200 },
     ],
     quarterlyRenewalReward: { threshold: 80, amount: 100 },
-    monthlyPerformanceRewards: [
-        { minScore: 8, maxScore: 8.9, amount: 100 },
-        { minScore: 9, maxScore: 10, amount: 200 },
-    ],
+    evaluationAllocation: 1000, // 教练员综合评价绩效分配金额
 };
 
 export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [

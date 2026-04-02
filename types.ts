@@ -397,14 +397,17 @@ export interface SalarySettings {
     assistantCoachIncrementalPlayerFee: number; // 助教每超1人增加金额
     monthlyAttendanceRewards: { threshold: number; amount: number }[]; // 参训率改为月度
     quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，amount 为达标后每人奖励金额
-    monthlyPerformanceRewards: { minScore: number; maxScore: number; amount: number }[]; // [{8, 8.9, 100}, {9, 10, 200}]
+    evaluationAllocation: number; // 教练员综合评价绩效分配金额
 }
 
 export interface MonthlyEvaluation {
     id: string;
     year: number;
     month: number;
-    score: number;
+    score: number; // 平均分
+    trainingScore?: number; // 专业训练程度
+    attentionScore?: number; // 球员关注程度
+    synergyScore?: number; // 团队协同与协作
     comment: string;
 }
 

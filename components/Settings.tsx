@@ -498,6 +498,19 @@ const Settings: React.FC<SettingsProps> = ({
                                         <span className="text-xs font-bold text-gray-400">元/人</span>
                                     </div>
                                 </div>
+                                <div className="pt-2 border-t border-gray-200">
+                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block italic">教练员综合评价绩效分配金额 (¥)</label>
+                                    <p className="text-[9px] text-blue-500 font-bold mb-2">注：月度综合评价均分 &gt; 8 分时，发放该全额绩效奖金。</p>
+                                    <div className="flex gap-2 items-center">
+                                        <input 
+                                            type="number" 
+                                            className="flex-1 p-2 border rounded font-black text-xs bg-white" 
+                                            value={localSalarySettings.evaluationAllocation || 0} 
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, evaluationAllocation: parseInt(e.target.value) || 0})} 
+                                        />
+                                        <span className="text-xs font-bold text-gray-400">元</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
