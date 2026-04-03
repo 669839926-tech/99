@@ -66,9 +66,11 @@ interface WeeklyPlanEditorProps {
     onClose: () => void;
     clipboard?: WeeklyPlan | null;
     onCopy?: (week: WeeklyPlan) => void;
+    trainingFoci?: string[];
+    focusSubjects?: Record<string, string[]>;
 }
 
-const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy }) => {
+const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy, trainingFoci = [], focusSubjects = {} }) => {
     const [localWeek, setLocalWeek] = useState<WeeklyPlan>({ ...week });
 
     const handlePaste = () => {
@@ -131,11 +133,51 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
-                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.trainingTheme} onChange={e => setLocalWeek({...localWeek, trainingTheme: e.target.value})} placeholder="如：运控球" />
+                        <select 
+                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
+                            value={trainingFoci.includes(localWeek.trainingTheme) ? localWeek.trainingTheme : (localWeek.trainingTheme ? 'custom' : '')}
+                            onChange={e => {
+                                if (e.target.value === 'custom') {
+                                    setLocalWeek({...localWeek, trainingTheme: ''});
+                                } else {
+                                    setLocalWeek({...localWeek, trainingTheme: e.target.value, trainingContent: ''});
+                                }
+                            }}
+                        >
+                            <option value="">请选择训练重点</option>
+                            {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
+                            <option value="custom">自定义...</option>
+                        </select>
+                        {(!trainingFoci.includes(localWeek.trainingTheme) && localWeek.trainingTheme !== '') || (localWeek.trainingTheme === '' && !trainingFoci.length) ? (
+                             <input className="w-full mt-2 p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.trainingTheme} onChange={e => setLocalWeek({...localWeek, trainingTheme: e.target.value})} placeholder="输入自定义训练主题" />
+                        ) : null}
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练内容</label>
-                        <textarea rows={2} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingContent} onChange={e => setLocalWeek({...localWeek, trainingContent: e.target.value})} placeholder="核心训练细节..." />
+                        {localWeek.trainingTheme && focusSubjects[localWeek.trainingTheme]?.length > 0 ? (
+                            <>
+                                <select 
+                                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
+                                    value={focusSubjects[localWeek.trainingTheme].includes(localWeek.trainingContent) ? localWeek.trainingContent : (localWeek.trainingContent ? 'custom' : '')}
+                                    onChange={e => {
+                                        if (e.target.value === 'custom') {
+                                            setLocalWeek({...localWeek, trainingContent: ''});
+                                        } else {
+                                            setLocalWeek({...localWeek, trainingContent: e.target.value});
+                                        }
+                                    }}
+                                >
+                                    <option value="">请选择训练内容</option>
+                                    {focusSubjects[localWeek.trainingTheme].map(s => <option key={s} value={s}>{s}</option>)}
+                                    <option value="custom">自定义...</option>
+                                </select>
+                                {(!focusSubjects[localWeek.trainingTheme].includes(localWeek.trainingContent) && localWeek.trainingContent !== '') ? (
+                                    <textarea rows={2} className="w-full mt-2 p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingContent} onChange={e => setLocalWeek({...localWeek, trainingContent: e.target.value})} placeholder="输入自定义训练内容" />
+                                ) : null}
+                            </>
+                        ) : (
+                            <textarea rows={2} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingContent} onChange={e => setLocalWeek({...localWeek, trainingContent: e.target.value})} placeholder="核心训练细节..." />
+                        )}
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">情景对抗内容</label>
@@ -1355,6 +1397,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         onClose={() => setActiveWeekPlan(null)} 
                         clipboard={periodizationClipboard}
                         onCopy={handleCopyWeek}
+                        trainingFoci={trainingFoci}
+                        focusSubjects={focusSubjects}
                     />
                 )}
             </div>
