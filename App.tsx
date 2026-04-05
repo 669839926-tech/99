@@ -40,6 +40,7 @@ function App() {
   const [periodizationPlans, setPeriodizationPlans] = useState<PeriodizationPlan[]>([]);
   const [accountingRecords, setAccountingRecords] = useState<AccountingRecord[]>([]);
   const [tactics, setTactics] = useState<Tactic[]>([]);
+  const [matchPlans, setMatchPlans] = useState<MatchPlan[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -124,6 +125,7 @@ function App() {
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
             if (cloudData.tactics) setTactics(cloudData.tactics);
+            if (cloudData.matchPlans) setMatchPlans(cloudData.matchPlans);
             setCloudError(null);
         }
     } catch (err: any) {
@@ -166,7 +168,8 @@ function App() {
                 salarySettings,
                 periodizationPlans,
                 accountingRecords,
-                tactics
+                tactics,
+                matchPlans
             });
             setCloudError(null);
         } catch (e: any) {
@@ -178,7 +181,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, matchPlans, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -311,7 +314,20 @@ function App() {
       case 'training':
         return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
       case 'matches':
-        return <MatchPlanner matches={matches} players={derivedPlayers} teams={teams} currentUser={currentUser} onAddMatch={handleAddMatch} onDeleteMatch={handleDeleteMatch} onUpdateMatch={handleUpdateMatch} appLogo={appLogo} />;
+        return <MatchPlanner 
+          matches={matches} 
+          players={derivedPlayers} 
+          teams={teams} 
+          currentUser={currentUser} 
+          onAddMatch={handleAddMatch} 
+          onDeleteMatch={handleDeleteMatch} 
+          onUpdateMatch={handleUpdateMatch} 
+          appLogo={appLogo}
+          matchPlans={matchPlans}
+          onAddMatchPlan={(plan) => setMatchPlans(prev => [...prev, plan])}
+          onUpdateMatchPlan={(plan) => setMatchPlans(prev => prev.map(p => p.id === plan.id ? plan : p))}
+          onDeleteMatchPlan={(id) => setMatchPlans(prev => prev.filter(p => p.id !== id))}
+        />;
       case 'tactics':
         return <TacticsModule players={derivedPlayers} teams={teams} tactics={tactics} onUpdateTactics={setTactics} />;
       case 'settings':

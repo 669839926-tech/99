@@ -221,6 +221,25 @@ export interface FormationTemplate {
     positions: { label: string; x: number; y: number }[];
 }
 
+export interface MatchPlanRequirement {
+    id: string;
+    text: string;
+    completed: boolean;
+}
+
+export interface MatchPlan {
+    id: string;
+    teamId: string;
+    seasonName: string;
+    location: string;
+    date: string;
+    playerIds: string[];
+    teamRequirements: MatchPlanRequirement[];
+    playerRequirements: Record<string, MatchPlanRequirement[]>; // playerId -> requirements
+    status: 'Draft' | 'Active' | 'Completed';
+    createdAt: string;
+}
+
 export interface MatchDetails {
     weather: string;
     pitch: string;

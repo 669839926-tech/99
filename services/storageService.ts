@@ -18,6 +18,7 @@ export interface AppData {
     periodizationPlans?: any[];
     accountingRecords?: any[];
     tactics?: any[];
+    matchPlans?: any[];
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

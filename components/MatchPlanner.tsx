@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails } from '../types';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, MatchPlan, MatchPlanRequirement } from '../types';
 // Comment: Added 'Info' to the lucide-react imports
 import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -14,12 +14,30 @@ interface MatchPlannerProps {
   onAddMatch: (match: Match) => void;
   onDeleteMatch: (id: string) => void;
   onUpdateMatch: (match: Match) => void;
+  matchPlans: MatchPlan[];
+  onAddMatchPlan: (plan: MatchPlan) => void;
+  onUpdateMatchPlan: (plan: MatchPlan) => void;
+  onDeleteMatchPlan: (id: string) => void;
   appLogo?: string;
 }
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
+type ViewMode = 'matches' | 'plans';
 
-const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, currentUser, onAddMatch, onDeleteMatch, onUpdateMatch }) => {
+const MatchPlanner: React.FC<MatchPlannerProps> = ({ 
+  matches, 
+  players, 
+  teams, 
+  currentUser, 
+  onAddMatch, 
+  onDeleteMatch, 
+  onUpdateMatch,
+  matchPlans,
+  onAddMatchPlan,
+  onUpdateMatchPlan,
+  onDeleteMatchPlan
+}) => {
+  const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
   const [strategy, setStrategy] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -27,7 +45,9 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
   
   const [filterTeamId, setFilterTeamId] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAddPlanModal, setShowAddPlanModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
+  const [editingPlan, setEditingPlan] = useState<MatchPlan | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
 
   const isDirector = currentUser?.role === 'director';
@@ -224,7 +244,20 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
             <h2 className="text-2xl md:text-3xl font-black text-bvb-black uppercase tracking-tighter">比赛日中心</h2>
-            <p className="text-gray-500 font-bold uppercase text-[9px] md:text-[10px] tracking-widest">Match Schedule & Performance Analytics</p>
+            <div className="flex gap-4 mt-2">
+                <button 
+                    onClick={() => setViewMode('matches')}
+                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 ${viewMode === 'matches' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400'}`}
+                >
+                    比赛日程
+                </button>
+                <button 
+                    onClick={() => setViewMode('plans')}
+                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 ${viewMode === 'plans' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400'}`}
+                >
+                    比赛计划
+                </button>
+            </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
             <div className="relative group flex-1 md:flex-none">
@@ -234,83 +267,159 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
                     {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
             </div>
-            <button onClick={() => setShowAddModal(true)} className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"><Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建</button>
+            <button 
+                onClick={() => viewMode === 'matches' ? setShowAddModal(true) : setShowAddPlanModal(true)} 
+                className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"
+            >
+                <Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建
+            </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in slide-in-from-top-4 duration-300">
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-green-500 flex flex-col justify-between">
-              <div className="flex justify-between items-start">
-                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">本季胜场</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.wins}</h3></div>
-                  <div className="p-1.5 md:p-2 bg-green-50 rounded-lg text-green-600 shadow-inner"><TrendingUp className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-              <div className="mt-2 md:mt-3 flex items-center gap-1.5 md:gap-2">
-                  <div className="flex-1 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${seasonStats.winRate}%` }}></div></div>
-                  <span className="text-[8px] md:text-[10px] font-black text-green-600 tabular-nums">{seasonStats.winRate}%</span>
-              </div>
-          </div>
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col justify-between">
-               <div className="flex justify-between items-start">
-                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">战平局数</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.draws}</h3></div>
-                  <div className="p-1.5 md:p-2 bg-gray-100 rounded-lg text-gray-600 shadow-inner"><Activity className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">总: {seasonStats.total} 场</p>
-          </div>
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
-               <div className="flex justify-between items-start">
-                  <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">失利记录</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.losses}</h3></div>
-                  <div className="p-1.5 md:p-2 bg-red-50 rounded-lg text-red-600 shadow-inner"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /></div>
-              </div>
-              <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">需总结</p>
-          </div>
-          <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-bvb-yellow flex flex-col justify-between">
-               <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                      <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">队内射手王</p>
-                      <h3 className="text-sm md:text-lg font-black text-gray-800 truncate">{seasonStats.topScorer?.name || '-'}</h3>
-                      <p className="text-[8px] md:text-[10px] text-bvb-yellow font-black bg-black inline-block px-1.5 md:px-2 py-0.5 rounded mt-1.5 md:mt-2 uppercase italic tracking-tighter">{seasonStats.topScorer?.goals || 0} G</p>
+      {viewMode === 'matches' ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 animate-in slide-in-from-top-4 duration-300">
+              <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-green-500 flex flex-col justify-between">
+                  <div className="flex justify-between items-start">
+                      <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">本季胜场</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.wins}</h3></div>
+                      <div className="p-1.5 md:p-2 bg-green-50 rounded-lg text-green-600 shadow-inner"><TrendingUp className="w-4 h-4 md:w-5 md:h-5" /></div>
                   </div>
-                  <div className="p-1.5 md:p-2 bg-yellow-50 rounded-lg text-yellow-600 shadow-inner"><Trophy className="w-4 h-4 md:w-5 md:h-5" /></div>
+                  <div className="mt-2 md:mt-3 flex items-center gap-1.5 md:gap-2">
+                      <div className="flex-1 h-1 md:h-1.5 bg-gray-100 rounded-full overflow-hidden"><div className="h-full bg-green-500" style={{ width: `${seasonStats.winRate}%` }}></div></div>
+                      <span className="text-[8px] md:text-[10px] font-black text-green-600 tabular-nums">{seasonStats.winRate}%</span>
+                  </div>
+              </div>
+              <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-gray-400 flex flex-col justify-between">
+                   <div className="flex justify-between items-start">
+                      <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">战平局数</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.draws}</h3></div>
+                      <div className="p-1.5 md:p-2 bg-gray-100 rounded-lg text-gray-600 shadow-inner"><Activity className="w-4 h-4 md:w-5 md:h-5" /></div>
+                  </div>
+                  <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">总: {seasonStats.total} 场</p>
+              </div>
+              <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
+                   <div className="flex justify-between items-start">
+                      <div><p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">失利记录</p><h3 className="text-xl md:text-3xl font-black text-gray-800 tabular-nums leading-none">{seasonStats.losses}</h3></div>
+                      <div className="p-1.5 md:p-2 bg-red-50 rounded-lg text-red-600 shadow-inner"><AlertCircle className="w-4 h-4 md:w-5 md:h-5" /></div>
+                  </div>
+                  <p className="mt-2 md:mt-4 text-[8px] md:text-[10px] font-black text-gray-400 uppercase">需总结</p>
+              </div>
+              <div className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border-l-4 border-bvb-yellow flex flex-col justify-between">
+                   <div className="flex justify-between items-start">
+                      <div className="flex-1 min-w-0">
+                          <p className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">队内射手王</p>
+                          <h3 className="text-sm md:text-lg font-black text-gray-800 truncate">{seasonStats.topScorer?.name || '-'}</h3>
+                          <p className="text-[8px] md:text-[10px] text-bvb-yellow font-black bg-black inline-block px-1.5 md:px-2 py-0.5 rounded mt-1.5 md:mt-2 uppercase italic tracking-tighter">{seasonStats.topScorer?.goals || 0} G</p>
+                      </div>
+                      <div className="p-1.5 md:p-2 bg-yellow-50 rounded-lg text-yellow-600 shadow-inner"><Trophy className="w-4 h-4 md:w-5 md:h-5" /></div>
+                  </div>
               </div>
           </div>
-      </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 md:gap-8">
-          <div className="animate-in slide-in-from-left-4 duration-500">
-              <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-bvb-black uppercase tracking-tighter italic">
-                  <Shield className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> Upcoming / 即将进行
-              </h3>
-              <div className="space-y-3 md:space-y-4">
-                  {upcomingMatches.length > 0 ? upcomingMatches.map(m => (
-                    <MatchCard 
-                        key={m.id} 
-                        match={m} 
-                        teams={teams}
-                        onDeleteMatch={onDeleteMatch}
-                        startEditing={startEditing}
-                        handleGenerateStrategy={handleGenerateStrategy}
-                    />
-                  )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
+          <div className="grid lg:grid-cols-2 gap-6 md:gap-8">
+              <div className="animate-in slide-in-from-left-4 duration-500">
+                  <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-bvb-black uppercase tracking-tighter italic">
+                      <Shield className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-bvb-yellow" /> Upcoming / 即将进行
+                  </h3>
+                  <div className="space-y-3 md:space-y-4">
+                      {upcomingMatches.length > 0 ? upcomingMatches.map(m => (
+                        <MatchCard 
+                            key={m.id} 
+                            match={m} 
+                            teams={teams}
+                            onDeleteMatch={onDeleteMatch}
+                            startEditing={startEditing}
+                            handleGenerateStrategy={handleGenerateStrategy}
+                        />
+                      )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
+                  </div>
+              </div>
+              <div className="animate-in slide-in-from-right-4 duration-500">
+                  <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-gray-400 uppercase tracking-tighter italic">
+                      <Trophy className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" /> History / 近期赛果
+                  </h3>
+                  <div className="space-y-3 md:space-y-4 opacity-90">
+                      {pastMatches.length > 0 ? pastMatches.map(m => (
+                        <MatchCard 
+                            key={m.id} 
+                            match={m} 
+                            teams={teams}
+                            onDeleteMatch={onDeleteMatch}
+                            startEditing={startEditing}
+                            handleGenerateStrategy={handleGenerateStrategy}
+                        />
+                      )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
+                  </div>
               </div>
           </div>
-          <div className="animate-in slide-in-from-right-4 duration-500">
-              <h3 className="font-black text-lg md:text-xl mb-4 md:mb-6 flex items-center text-gray-400 uppercase tracking-tighter italic">
-                  <Trophy className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3" /> History / 近期赛果
-              </h3>
-              <div className="space-y-3 md:space-y-4 opacity-90">
-                  {pastMatches.length > 0 ? pastMatches.map(m => (
-                    <MatchCard 
-                        key={m.id} 
-                        match={m} 
-                        teams={teams}
-                        onDeleteMatch={onDeleteMatch}
-                        startEditing={startEditing}
-                        handleGenerateStrategy={handleGenerateStrategy}
-                    />
-                  )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
-              </div>
-          </div>
-      </div>
+        </>
+      ) : (
+        <div className="animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {matchPlans.filter(p => filterTeamId === 'all' || p.teamId === filterTeamId).map(plan => (
+                    <div key={plan.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-all group relative">
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => setEditingPlan(plan)} className="p-1.5 bg-gray-100 text-gray-400 hover:text-bvb-black rounded-lg"><Edit2 className="w-4 h-4" /></button>
+                            <button onClick={() => onDeleteMatchPlan(plan.id)} className="p-1.5 bg-gray-100 text-gray-400 hover:text-red-500 rounded-lg"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="px-2 py-0.5 bg-bvb-yellow text-bvb-black text-[10px] font-black rounded uppercase italic tracking-tighter">{plan.seasonName}</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{plan.date}</span>
+                        </div>
+                        <h4 className="text-lg font-black text-gray-800 mb-1">{teams.find(t => t.id === plan.teamId)?.name} 外出比赛计划</h4>
+                        <div className="flex items-center text-xs text-gray-500 mb-4 font-bold">
+                            <MapPin className="w-3 h-3 mr-1 text-gray-400" /> {plan.location}
+                        </div>
+                        
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-gray-400 border-b pb-1">
+                                <span>任务达成情况</span>
+                                <span className="text-bvb-black">
+                                    {(() => {
+                                        const teamDone = plan.teamRequirements.filter(r => r.completed).length;
+                                        const teamTotal = plan.teamRequirements.length;
+                                        let playerDone = 0;
+                                        let playerTotal = 0;
+                                        Object.values(plan.playerRequirements).forEach(reqs => {
+                                            playerDone += reqs.filter(r => r.completed).length;
+                                            playerTotal += reqs.length;
+                                        });
+                                        const total = teamTotal + playerTotal;
+                                        const done = teamDone + playerDone;
+                                        return total > 0 ? `${Math.round((done / total) * 100)}%` : '0%';
+                                    })()}
+                                </span>
+                            </div>
+                            <div className="flex -space-x-2 overflow-hidden">
+                                {plan.playerIds.slice(0, 5).map(pid => {
+                                    const p = players.find(player => player.id === pid);
+                                    return <img key={pid} src={p?.image} className="inline-block h-6 w-6 rounded-full ring-2 ring-white object-cover" />;
+                                })}
+                                {plan.playerIds.length > 5 && (
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-[8px] font-black text-gray-400 ring-2 ring-white">
+                                        +{plan.playerIds.length - 5}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        
+                        <button 
+                            onClick={() => setEditingPlan(plan)}
+                            className="w-full mt-5 py-2.5 bg-gray-50 text-gray-600 text-xs font-black rounded-xl hover:bg-bvb-yellow hover:text-bvb-black transition-all flex items-center justify-center gap-2"
+                        >
+                            <ClipboardList className="w-4 h-4" /> 查看详情与跟踪
+                        </button>
+                    </div>
+                ))}
+                {matchPlans.filter(p => filterTeamId === 'all' || p.teamId === filterTeamId).length === 0 && (
+                    <div className="col-span-full py-20 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl">
+                        <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                        <p className="text-gray-400 font-black uppercase italic tracking-widest text-sm">暂无比赛计划</p>
+                        <button onClick={() => setShowAddPlanModal(true)} className="mt-4 text-xs font-black text-bvb-yellow bg-bvb-black px-6 py-2.5 rounded-xl shadow-lg hover:scale-105 transition-all uppercase tracking-widest">立即创建</button>
+                    </div>
+                )}
+            </div>
+        </div>
+      )}
 
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
@@ -591,8 +700,250 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({ matches, players, teams, cu
               </div>
           </div>
       )}
+
+      {(showAddPlanModal || editingPlan) && (
+          <MatchPlanModal 
+            plan={editingPlan} 
+            teams={availableTeams} 
+            players={players} 
+            onClose={() => { setShowAddPlanModal(false); setEditingPlan(null); }} 
+            onSave={(plan) => {
+                if (editingPlan) {
+                    onUpdateMatchPlan(plan);
+                } else {
+                    onAddMatchPlan(plan);
+                }
+                setShowAddPlanModal(false);
+                setEditingPlan(null);
+            }}
+          />
+      )}
     </div>
   );
+};
+
+interface MatchPlanModalProps {
+    plan: MatchPlan | null;
+    teams: Team[];
+    players: Player[];
+    onClose: () => void;
+    onSave: (plan: MatchPlan) => void;
+}
+
+const MatchPlanModal: React.FC<MatchPlanModalProps> = ({ plan, teams, players, onClose, onSave }) => {
+    const [formData, setFormData] = useState<Partial<MatchPlan>>(plan || {
+        teamId: teams[0]?.id || '',
+        seasonName: '',
+        location: '',
+        date: new Date().toISOString().split('T')[0],
+        playerIds: [],
+        teamRequirements: [],
+        playerRequirements: {},
+        status: 'Draft',
+        createdAt: new Date().toISOString()
+    });
+
+    const [activeTab, setActiveTab] = useState<'info' | 'tracking'>('info');
+
+    const teamPlayers = useMemo(() => players.filter(p => p.teamId === formData.teamId), [players, formData.teamId]);
+
+    const handleSave = useCallback(() => {
+        if (formData.teamId && formData.seasonName && formData.location && formData.date) {
+            onSave({
+                ...formData,
+                id: formData.id || Math.random().toString(36).slice(2, 11),
+                teamId: formData.teamId!,
+                seasonName: formData.seasonName!,
+                location: formData.location!,
+                date: formData.date!,
+                playerIds: formData.playerIds || [],
+                teamRequirements: formData.teamRequirements || [],
+                playerRequirements: formData.playerRequirements || {},
+                status: formData.status || 'Draft',
+                createdAt: formData.createdAt || new Date().toISOString()
+            } as MatchPlan);
+        }
+    }, [formData, onSave]);
+
+    const addTeamRequirement = useCallback(() => {
+        const text = prompt('输入团队技战术要求:');
+        if (text) {
+            const newReq: MatchPlanRequirement = { id: Math.random().toString(36).slice(2, 11), text, completed: false };
+            setFormData(prev => ({ ...prev, teamRequirements: [...(prev.teamRequirements || []), newReq] }));
+        }
+    }, []);
+
+    const addPlayerRequirement = useCallback((playerId: string) => {
+        const text = prompt('输入球员个人技战术要求:');
+        if (text) {
+            const newReq: MatchPlanRequirement = { id: Math.random().toString(36).slice(2, 11), text, completed: false };
+            setFormData(prev => {
+                const current = prev.playerRequirements || {};
+                const playerReqs = current[playerId] || [];
+                return { ...prev, playerRequirements: { ...current, [playerId]: [...playerReqs, newReq] } };
+            });
+        }
+    }, []);
+
+    const toggleRequirement = useCallback((type: 'team' | 'player', reqId: string, playerId?: string) => {
+        setFormData(prev => {
+            if (type === 'team') {
+                return {
+                    ...prev,
+                    teamRequirements: prev.teamRequirements?.map(r => r.id === reqId ? { ...r, completed: !r.completed } : r)
+                };
+            } else if (playerId) {
+                const current = prev.playerRequirements || {};
+                const playerReqs = current[playerId] || [];
+                return {
+                    ...prev,
+                    playerRequirements: {
+                        ...current,
+                        [playerId]: playerReqs.map(r => r.id === reqId ? { ...r, completed: !r.completed } : r)
+                    }
+                };
+            }
+            return prev;
+        });
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white w-full h-full md:h-[90vh] md:max-w-5xl md:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-bvb-black p-4 md:p-6 flex justify-between items-center text-white shrink-0">
+                    <h3 className="font-black text-lg md:text-xl flex items-center uppercase italic tracking-tighter">
+                        <ClipboardList className="w-5 h-5 md:w-6 md:h-6 mr-2 text-bvb-yellow" /> 
+                        {plan ? '管理比赛计划' : '新建比赛计划'}
+                    </h3>
+                    <button onClick={onClose} className="p-1 hover:bg-gray-800 rounded-lg transition-colors"><X className="w-6 h-6" /></button>
+                </div>
+
+                <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto no-scrollbar shrink-0">
+                    <button onClick={() => setActiveTab('info')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest flex items-center transition-all border-b-2 ${activeTab === 'info' ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-400'}`}><Info className="w-4 h-4 mr-2" /> 基本信息</button>
+                    <button onClick={() => setActiveTab('tracking')} className={`px-6 py-4 text-xs font-black uppercase tracking-widest flex items-center transition-all border-b-2 ${activeTab === 'tracking' ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-400'}`}><Activity className="w-4 h-4 mr-2" /> 任务跟踪与评估</button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar pb-24 md:pb-8">
+                    {activeTab === 'info' ? (
+                        <div className="grid md:grid-cols-2 gap-8 animate-in fade-in duration-300">
+                            <div className="space-y-6">
+                                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b pb-2">计划详情</h4>
+                                <div className="space-y-4">
+                                    <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5">所属梯队</label>
+                                        <select className="w-full p-3 border rounded-2xl font-bold bg-white text-sm" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+                                    </div>
+                                    <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5">赛季名称</label><input className="w-full p-3 border rounded-2xl font-bold text-sm" placeholder="如: 2024春季联赛" value={formData.seasonName} onChange={e => setFormData({...formData, seasonName: e.target.value})} /></div>
+                                    <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5">比赛地点</label><input className="w-full p-3 border rounded-2xl font-bold text-sm" placeholder="输入详细地点..." value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} /></div>
+                                    <div><label className="block text-[10px] font-black text-gray-400 uppercase mb-1.5">计划日期</label><input type="date" className="w-full p-3 border rounded-2xl font-bold text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /></div>
+                                </div>
+                            </div>
+                            <div className="space-y-6">
+                                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b pb-2">参赛球员名单 ({formData.playerIds?.length || 0})</h4>
+                                <div className="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {teamPlayers.map(p => {
+                                        const isSelected = formData.playerIds?.includes(p.id);
+                                        return (
+                                            <button key={p.id} onClick={() => {
+                                                const current = formData.playerIds || [];
+                                                const next = isSelected ? current.filter(id => id !== p.id) : [...current, p.id];
+                                                setFormData({...formData, playerIds: next});
+                                            }} className={`p-2.5 rounded-xl border-2 flex items-center gap-2 transition-all ${isSelected ? 'bg-bvb-black text-bvb-yellow border-bvb-black' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-200'}`}>
+                                                <img src={p.image} className="w-6 h-6 rounded-full object-cover" /><span className="text-xs font-bold truncate">{p.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid md:grid-cols-3 gap-8 animate-in fade-in duration-300">
+                            <div className="md:col-span-1 space-y-6">
+                                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b pb-2">团队要求</h4>
+                                <div className="space-y-2">
+                                    {formData.teamRequirements?.map(req => (
+                                        <div key={req.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                                            <button onClick={() => toggleRequirement('team', req.id)} className={`p-1 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}><CheckCircle className="w-4 h-4" /></button>
+                                            <span className={`text-xs font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
+                                            <button onClick={() => setFormData(prev => ({ ...prev, teamRequirements: prev.teamRequirements?.filter(r => r.id !== req.id) }))} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                        </div>
+                                    ))}
+                                    <button onClick={addTeamRequirement} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-all flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest"><Plus className="w-4 h-4" /> 添加团队要求</button>
+                                </div>
+                            </div>
+                            <div className="md:col-span-2 space-y-6">
+                                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b pb-2">球员个人要求跟踪</h4>
+                                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {formData.playerIds?.map(pid => {
+                                        const p = players.find(player => player.id === pid);
+                                        const playerReqs = formData.playerRequirements?.[pid] || [];
+                                        return (
+                                            <div key={pid} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <img src={p?.image} className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                        <div>
+                                                            <h5 className="font-black text-gray-800 text-sm">{p?.name}</h5>
+                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                                                任务进度: {playerReqs.length > 0 ? `${Math.round((playerReqs.filter(r => r.completed).length / playerReqs.length) * 100)}%` : '0%'}
+                                                                <span className="ml-2 text-bvb-yellow">({playerReqs.filter(r => r.completed).length}/{playerReqs.length})</span>
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => addPlayerRequirement(pid)} 
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-bvb-black text-white text-[10px] font-black rounded-lg uppercase tracking-widest hover:bg-gray-800 transition-all"
+                                                    >
+                                                        <Plus className="w-3 h-3 text-bvb-yellow" /> 新增任务
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    {playerReqs.map(req => (
+                                                        <div key={req.id} className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-gray-100 group shadow-sm">
+                                                            <button onClick={() => toggleRequirement('player', req.id, pid)} className={`p-0.5 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}><CheckCircle className="w-3.5 h-3.5" /></button>
+                                                            <span className={`text-[11px] font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
+                                                            <button onClick={() => setFormData(prev => {
+                                                                const current = prev.playerRequirements || {};
+                                                                const reqs = current[pid] || [];
+                                                                return { ...prev, playerRequirements: { ...current, [pid]: reqs.filter(r => r.id !== req.id) } };
+                                                            })} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                                        </div>
+                                                    ))}
+                                                    {playerReqs.length === 0 && (
+                                                        <p className="text-center text-[10px] text-gray-300 italic py-2">暂无个人任务要求</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {(!formData.playerIds || formData.playerIds.length === 0) && (
+                                        <div className="py-20 text-center bg-gray-50 border-2 border-dashed border-gray-100 rounded-2xl">
+                                            <UserMinus className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+                                            <p className="text-gray-400 text-xs font-black uppercase tracking-widest italic">请先在“基本信息”中选择参赛球员</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="bg-gray-50 p-4 md:p-6 border-t flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">状态:</span>
+                        <select className="bg-white border rounded-lg px-3 py-1.5 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-bvb-yellow" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
+                            <option value="Draft">草稿</option>
+                            <option value="Active">执行中</option>
+                            <option value="Completed">已归档</option>
+                        </select>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={onClose} className="px-6 py-3 text-gray-500 font-black text-xs uppercase tracking-widest hover:text-gray-800">取消</button>
+                        <button onClick={handleSave} className="px-10 py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs tracking-widest flex items-center gap-2"><Save className="w-4 h-4 text-bvb-yellow" /> 保存计划</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export default MatchPlanner;
