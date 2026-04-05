@@ -443,7 +443,29 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
 
                         <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                            <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 mb-6 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> 公共绩效奖励阈值设置</h4>
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="font-black text-xs uppercase tracking-widest text-gray-400 flex items-center"><CheckSquare className="w-4 h-4 mr-2" /> 公共绩效奖励阈值设置</h4>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 rounded border-gray-300 text-bvb-yellow focus:ring-bvb-yellow"
+                                            checked={localSalarySettings.enableCoachPerformanceReward}
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, enableCoachPerformanceReward: e.target.checked})}
+                                        />
+                                        <span className="text-[10px] font-black text-gray-600 uppercase">主教练开启</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            className="w-4 h-4 rounded border-gray-300 text-bvb-yellow focus:ring-bvb-yellow"
+                                            checked={localSalarySettings.enableAssistantPerformanceReward}
+                                            onChange={e => setLocalSalarySettings({...localSalarySettings, enableAssistantPerformanceReward: e.target.checked})}
+                                        />
+                                        <span className="text-[10px] font-black text-gray-600 uppercase">助教开启</span>
+                                    </label>
+                                </div>
+                            </div>
                             <div className="space-y-4">
                                 <div>
                                     <div className="flex justify-between items-center mb-2">

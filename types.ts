@@ -398,6 +398,8 @@ export interface SalarySettings {
     monthlyAttendanceRewards: { threshold: number; amount: number }[]; // 参训率改为月度
     quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，amount 为达标后每人奖励金额
     evaluationAllocation: number; // 教练员综合评价绩效分配金额
+    enableCoachPerformanceReward: boolean; // 是否向主教练开启公共绩效
+    enableAssistantPerformanceReward: boolean; // 是否向助教开启公共绩效
 }
 
 export interface MonthlyEvaluation {

@@ -213,6 +213,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
             const coachTeams = coach.teamIds || [];
             const isAssistant = coach.role === 'assistant_coach';
+            const isPerformanceEnabled = isAssistant ? salarySettings.enableAssistantPerformanceReward : salarySettings.enableCoachPerformanceReward;
             
             let calcSessionFees = 0;
             let calcAttendanceReward = 0;
@@ -260,8 +261,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         .sort((a,b) => b.threshold - a.threshold)
                         .find(r => monthlyAttendanceRate >= r.threshold);
                     
-                    attendanceReward = rewardConfig?.amount || 0;
-                    attendanceFormula = `${totalPresent}实到 / ${totalPossible}应到 = ${monthlyAttendanceRate.toFixed(1)}% (阈值≥${rewardConfig?.threshold || '-'}% 奖¥${attendanceReward})`;
+                    attendanceReward = isPerformanceEnabled ? (rewardConfig?.amount || 0) : 0;
+                    attendanceFormula = isPerformanceEnabled 
+                        ? `${totalPresent}实到 / ${totalPossible}应到 = ${monthlyAttendanceRate.toFixed(1)}% (阈值≥${rewardConfig?.threshold || '-'}% 奖¥${attendanceReward})`
+                        : "公共绩效未开启";
                 }
 
                 let renewalReward = 0;
@@ -288,8 +291,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
                     const dueForRenewalCount = renewedCount + expiredCount;
                     renewalRate = dueForRenewalCount > 0 ? (renewedCount / dueForRenewalCount) * 100 : (teamSize > 0 ? 100 : 0);
-                    renewalReward = renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0;
-                    renewalFormula = `${renewedCount}实续 / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`;
+                    renewalReward = isPerformanceEnabled ? (renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0) : 0;
+                    renewalFormula = isPerformanceEnabled 
+                        ? `${renewedCount}实续 / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`
+                        : "公共绩效未开启";
                 }
 
                 return { 
@@ -316,12 +321,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
             
             // 修改：评分 > 8 分获得配置的评价绩效金额，取消原有的分段奖励
-            const evaluationSalary = (evaluation && !isNaN(evaluation.score) && evaluation.score > 8) ? salarySettings.evaluationAllocation : 0;
+            const evaluationSalary = (isPerformanceEnabled && evaluation && !isNaN(evaluation.score) && evaluation.score > 8) ? salarySettings.evaluationAllocation : 0;
             const calcPerformanceReward = evaluationSalary;
             
-            const performanceFormula = (evaluation && !isNaN(evaluation.score))
-                ? `评分 ${evaluation.score} (评价绩效¥${evaluationSalary})` 
-                : "未评分";
+            const performanceFormula = !isPerformanceEnabled 
+                ? "公共绩效未开启"
+                : (evaluation && !isNaN(evaluation.score))
+                    ? `评分 ${evaluation.score} (评价绩效¥${evaluationSalary})` 
+                    : "未评分";
 
             const currentEdit = editPayroll[coach.id] || {};
             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : (isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary));

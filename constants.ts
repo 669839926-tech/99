@@ -111,6 +111,8 @@ export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
     ],
     quarterlyRenewalReward: { threshold: 80, amount: 100 },
     evaluationAllocation: 1000, // 教练员综合评价绩效分配金额
+    enableCoachPerformanceReward: true,
+    enableAssistantPerformanceReward: true,
 };
 
 export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [
