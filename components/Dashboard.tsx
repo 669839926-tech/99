@@ -69,6 +69,20 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Credit Alert Filter
   const [creditAlertTeamId, setCreditAlertTeamId] = useState<string>('all');
   
+  // Recharge Analysis State
+  const [rechargeRange, setRechargeRange] = useState<TimeRange>('month');
+  const [rechargeYear, setRechargeYear] = useState<number>(new Date().getFullYear());
+  const [selectedRechargeMonth, setSelectedRechargeMonth] = useState<number>(new Date().getMonth());
+  const [selectedRechargeQuarter, setSelectedRechargeQuarter] = useState<number>(Math.floor(new Date().getMonth() / 3));
+  const [customRechargeStartDate, setCustomRechargeStartDate] = useState<string>(() => {
+      const d = new Date();
+      d.setDate(1); 
+      return d.toISOString().split('T')[0];
+  });
+  const [customRechargeEndDate, setCustomRechargeEndDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [rechargeTeamId, setRechargeTeamId] = useState<string>('all');
+  const [rechargePlayerId, setRechargePlayerId] = useState<string>('all');
+
   // Permission check
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -136,11 +150,35 @@ const Dashboard: React.FC<DashboardProps> = ({
     return { start, end };
   }, [attendanceRange, attendanceYear, selectedMonth, selectedQuarter, customStartDate, customEndDate]);
 
+  // Recharge Date Range calculation
+  const rechargeDateRange = useMemo(() => {
+    let start = new Date(rechargeYear, 0, 1);
+    let end = new Date(rechargeYear, 11, 31, 23, 59, 59);
+
+    if (rechargeRange === 'month') {
+        start = new Date(rechargeYear, selectedRechargeMonth, 1);
+        end = new Date(rechargeYear, selectedRechargeMonth + 1, 0, 23, 59, 59);
+    } else if (rechargeRange === 'quarter') {
+        start = new Date(rechargeYear, selectedRechargeQuarter * 3, 1);
+        end = new Date(rechargeYear, (selectedRechargeQuarter * 3) + 3, 0, 23, 59, 59);
+    } else if (rechargeRange === 'custom') {
+        start = parseLocalDate(customRechargeStartDate);
+        end = parseLocalDate(customRechargeEndDate);
+        end.setHours(23, 59, 59, 999);
+    }
+
+    return { start, end };
+  }, [rechargeRange, rechargeYear, selectedRechargeMonth, selectedRechargeQuarter, customRechargeStartDate, customRechargeEndDate]);
+
   // Reset selections when filter changes
   useEffect(() => {
       setAttendancePlayerId('all');
       setSelectedSessionId(null);
   }, [attendanceTeamId, attendanceRange, selectedMonth, selectedQuarter, attendanceYear]);
+
+  useEffect(() => {
+      setRechargePlayerId('all');
+  }, [rechargeTeamId, rechargeRange, selectedRechargeMonth, selectedRechargeQuarter, rechargeYear]);
 
   // Quick Action: Jump to individual report from credit alert
   const handleLowCreditPlayerClick = (player: Player) => {
@@ -410,6 +448,59 @@ const Dashboard: React.FC<DashboardProps> = ({
           } 
       };
   }, [attendancePlayerId, displayTrainings, displayPlayers, dateRange, teams]);
+
+  const rechargeAnalysis = useMemo(() => {
+      const start = rechargeDateRange.start;
+      const end = rechargeDateRange.end;
+
+      const allRecharges: { playerId: string, playerName: string, teamName: string, date: string, amount: number, credits: number }[] = [];
+      
+      displayPlayers.forEach(player => {
+          if (rechargePlayerId !== 'all' && player.id !== rechargePlayerId) return;
+          if (rechargeTeamId !== 'all' && player.teamId !== rechargeTeamId) return;
+
+          const team = teams.find(t => t.id === player.teamId);
+          const teamName = team?.name || '未知梯队';
+
+          player.rechargeHistory?.forEach(record => {
+              const d = parseLocalDate(record.date);
+              if (d >= start && d <= end) {
+                  allRecharges.push({
+                      playerId: player.id,
+                      playerName: player.name,
+                      teamName,
+                      date: record.date,
+                      amount: record.amount,
+                      credits: record.quotaAdded
+                  });
+              }
+          });
+      });
+
+      // Sort by date descending
+      allRecharges.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Aggregate by player for counts
+      const playerAggregates: Record<string, { count: number, totalAmount: number, totalCredits: number, lastDate: string }> = {};
+      allRecharges.forEach(r => {
+          if (!playerAggregates[r.playerId]) {
+              playerAggregates[r.playerId] = { count: 0, totalAmount: 0, totalCredits: 0, lastDate: r.date };
+          }
+          playerAggregates[r.playerId].count += 1;
+          playerAggregates[r.playerId].totalAmount += r.amount;
+          playerAggregates[r.playerId].totalCredits += r.credits;
+          if (new Date(r.date) > new Date(playerAggregates[r.playerId].lastDate)) {
+              playerAggregates[r.playerId].lastDate = r.date;
+          }
+      });
+
+      return {
+          list: allRecharges,
+          aggregates: playerAggregates,
+          totalRechargeCount: allRecharges.length,
+          totalRechargeCredits: allRecharges.reduce((sum, r) => sum + r.credits, 0)
+      };
+  }, [displayPlayers, rechargeDateRange, rechargeTeamId, rechargePlayerId, teams]);
 
   const handleExportPDF = async () => {
     setIsExporting(true);
@@ -1205,6 +1296,144 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             )}
         </div>
+
+        {/* Recharge Analysis Section */}
+        {isDirector && (
+            <div id="recharge-analysis-section" className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6 flex flex-col mt-6">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4 border-b border-gray-100 pb-4">
+                    <div>
+                        <h3 className="text-base md:text-xl font-black text-gray-800 flex items-center italic uppercase tracking-tighter"><Wallet className="w-5 h-5 md:w-6 md:h-6 mr-1.5 md:mr-2 text-green-500" /> 续费充值深度分析</h3>
+                        <p className="text-[9px] md:text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Recharge Analytics & Insights</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center justify-end w-full lg:w-auto">
+                        <div className="flex bg-gray-100 p-1 rounded-xl shadow-inner shrink-0 overflow-x-auto no-scrollbar">
+                            <div className="flex items-center gap-1 px-1.5 border-r border-gray-200">
+                                <Calendar className="w-3 h-3 text-gray-400" />
+                                <select 
+                                    value={rechargeYear} 
+                                    onChange={(e) => setRechargeYear(parseInt(e.target.value))}
+                                    className="bg-transparent text-[10px] md:text-xs font-black text-gray-600 outline-none focus:ring-0 cursor-pointer"
+                                >
+                                    {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年</option>)}
+                                </select>
+                            </div>
+                            {['month', 'quarter', 'year', 'custom'].map(r => (
+                                <button 
+                                    key={r} 
+                                    onClick={() => setRechargeRange(r as any)} 
+                                    className={`px-2 md:px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all whitespace-nowrap ${rechargeRange === r ? 'bg-white shadow text-bvb-black' : 'text-gray-500'}`}
+                                >
+                                    {r === 'month' ? '按月' : r === 'quarter' ? '季度' : r === 'year' ? '年度' : '自选'}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 items-center bg-gray-50 p-1.5 rounded-xl border border-gray-100">
+                            {rechargeRange === 'month' && (
+                                <select 
+                                    value={selectedRechargeMonth} 
+                                    onChange={e => setSelectedRechargeMonth(parseInt(e.target.value))}
+                                    className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black"
+                                >
+                                    {Array.from({length: 12}, (_, i) => <option key={i} value={i}>{i+1}月</option>)}
+                                </select>
+                            )}
+                            {rechargeRange === 'quarter' && (
+                                <select 
+                                    value={selectedRechargeQuarter} 
+                                    onChange={e => setSelectedRechargeQuarter(parseInt(e.target.value))}
+                                    className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black"
+                                >
+                                    <option value={0}>第一季度 (Q1)</option>
+                                    <option value={1}>第二季度 (Q2)</option>
+                                    <option value={2}>第三季度 (Q3)</option>
+                                    <option value={3}>第四季度 (Q4)</option>
+                                </select>
+                            )}
+                            {rechargeRange === 'custom' && (
+                                <div className="flex items-center gap-1">
+                                    <input 
+                                        type="date" 
+                                        className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black" 
+                                        value={customRechargeStartDate} 
+                                        onChange={e => setCustomRechargeStartDate(e.target.value)} 
+                                    />
+                                    <span className="text-gray-400">至</span>
+                                    <input 
+                                        type="date" 
+                                        className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black" 
+                                        value={customRechargeEndDate} 
+                                        onChange={e => setCustomRechargeEndDate(e.target.value)} 
+                                    />
+                                </div>
+                            )}
+                            
+                            <div className="h-4 w-px bg-gray-200 mx-1"></div>
+
+                            <select value={rechargeTeamId} onChange={e => setRechargeTeamId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black">
+                                <option value="all">所有梯队</option>
+                                {displayTeams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                            </select>
+                            
+                            <select value={rechargePlayerId} onChange={e => setRechargePlayerId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black max-w-[120px]">
+                                <option value="all">全体球员</option>
+                                {displayPlayers.filter(p => rechargeTeamId === 'all' || p.teamId === rechargeTeamId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Recharge Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                    <div className="bg-green-50/50 border border-green-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                        <CheckCircle className="w-5 h-5 text-green-600 mb-2" />
+                        <span className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1">累计充值次数</span>
+                        <span className="text-2xl font-black text-green-800 tabular-nums">{rechargeAnalysis.totalRechargeCount} 次</span>
+                    </div>
+                    <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                        <Sparkles className="w-5 h-5 text-blue-600 mb-2" />
+                        <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest mb-1">累计充值课时</span>
+                        <span className="text-2xl font-black text-blue-800 tabular-nums">{rechargeAnalysis.totalRechargeCredits} 节</span>
+                    </div>
+                </div>
+
+                {/* Recharge List Table */}
+                <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 font-black text-gray-500 text-[9px] md:text-xs uppercase tracking-widest border-b">
+                            <tr>
+                                <th className="px-3 py-3 md:px-4">球员姓名</th>
+                                <th className="px-3 py-3 md:px-4">所属梯队</th>
+                                <th className="px-3 py-3 md:px-4">充值日期</th>
+                                <th className="px-3 py-3 md:px-4 text-right">充值课时</th>
+                                <th className="px-3 py-3 md:px-4 text-center">累计次数</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {rechargeAnalysis.list.length > 0 ? rechargeAnalysis.list.map((r, idx) => (
+                                <tr key={`${r.playerId}-${r.date}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-3 py-3 md:px-4 font-black text-gray-700 text-[11px] md:text-sm">{r.playerName}</td>
+                                    <td className="px-3 py-3 md:px-4 text-[10px] text-gray-500">{r.teamName}</td>
+                                    <td className="px-3 py-3 md:px-4 font-mono text-[9px] md:text-xs text-gray-400 whitespace-nowrap">{r.date}</td>
+                                    <td className="px-3 py-3 md:px-4 text-right font-black text-blue-600 text-[11px] md:text-sm">{r.credits} 节</td>
+                                    <td className="px-3 py-3 md:px-4 text-center">
+                                        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-[10px] font-black">
+                                            第 {rechargeAnalysis.aggregates[r.playerId]?.count || 1} 次
+                                        </span>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan={5} className="px-3 py-10 text-center text-gray-300 italic text-xs uppercase tracking-widest font-black">
+                                        暂无充值记录
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        )}
       </div>
 
       {/* Birthday Card Customizer Modal - Optimized Size and Focus */}
