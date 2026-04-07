@@ -467,7 +467,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const start = rechargeDateRange.start;
       const end = rechargeDateRange.end;
 
-      const allRecharges: { playerId: string, playerName: string, teamName: string, date: string, amount: number, credits: number }[] = [];
+      const allRecharges: { playerId: string, playerName: string, teamName: string, date: string, amount: number, credits: number, leaveQuota: number }[] = [];
       
       displayPlayers.forEach(player => {
           if (rechargePlayerId !== 'all' && player.id !== rechargePlayerId) return;
@@ -485,7 +485,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       teamName,
                       date: record.date,
                       amount: record.amount,
-                      credits: record.quotaAdded
+                      credits: record.amount,
+                      leaveQuota: record.quotaAdded
                   });
               }
           });
