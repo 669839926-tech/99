@@ -281,7 +281,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     const filteredSessions = (displayTrainings || []).filter(s => {
         const d = parseLocalDate(s.date);
         const matchDate = d >= start && d <= end;
-        const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId;
+        const hasRecord = attendancePlayerId !== 'all' && s.attendance?.some(r => r.playerId === attendancePlayerId);
+        const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId || hasRecord;
         return matchDate && matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
@@ -348,7 +349,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     let aggAbsent = 0;
 
     const exportList = teamPlayers.map(p => {
-         const pSessions = filteredSessions.filter(t => t.teamId === p.teamId);
+         // 包含该球员有出勤记录的所有场次，或者属于他当前梯队的场次
+         const pSessions = (displayTrainings || []).filter(s => {
+             const d = parseLocalDate(s.date);
+             const matchDate = d >= start && d <= end;
+             if (!matchDate) return false;
+             
+             const hasRecord = s.attendance?.some(r => r.playerId === p.id);
+             const isCurrentTeam = s.teamId === p.teamId;
+             
+             return isCurrentTeam || hasRecord;
+         });
+         
          const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
          const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
          const pInjury = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Injury')).length;
@@ -369,7 +381,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     }).sort((a,b) => b.rate - a.rate);
 
     const exportSessions = filteredSessions.map(s => {
-         const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId);
+         const recordedPlayerIds = s.attendance?.map(r => r.playerId) || [];
+         const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId || recordedPlayerIds.includes(p.id));
          const total = sTeamPlayers.length;
          const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
          const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
@@ -424,7 +437,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       const end = dateRange.end;
       const sessionRecords = displayTrainings.filter(s => {
           const d = parseLocalDate(s.date);
-          return d >= start && d <= end && s.teamId === player.teamId;
+          const hasRecord = s.attendance?.some(r => r.playerId === player.id);
+          return d >= start && d <= end && (s.teamId === player.teamId || hasRecord);
       }).map(s => {
           const record = s.attendance?.find(r => r.playerId === player.id);
           const teamName = teams.find(t => t.id === s.teamId)?.name || '';
