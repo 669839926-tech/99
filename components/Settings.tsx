@@ -469,7 +469,27 @@ const Settings: React.FC<SettingsProps> = ({
                             <div className="space-y-4">
                                 <div>
                                     <div className="flex justify-between items-center mb-2">
-                                        <label className="text-[10px] font-bold text-gray-400 uppercase block">月度参训率奖励 (≥ X% 奖 Y元)</label>
+                                        <div className="flex items-center gap-3">
+                                            <label className="text-[10px] font-bold text-gray-400 uppercase block">月度参训率奖励 (≥ X% 奖 Y元)</label>
+                                            <div className="flex gap-2 bg-white px-2 py-0.5 rounded border border-gray-200">
+                                                <label className="flex items-center gap-1 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" className="w-3 h-3 rounded border-gray-300 text-bvb-yellow" 
+                                                        checked={localSalarySettings.performanceBonusConfig?.attendance?.coach ?? true} 
+                                                        onChange={e => setLocalSalarySettings({...localSalarySettings, performanceBonusConfig: {...(localSalarySettings.performanceBonusConfig || { attendance: {coach:true, assistant:true}, renewal: {coach:true, assistant:true}, evaluation: {coach:true, assistant:true} }), attendance: {...(localSalarySettings.performanceBonusConfig?.attendance || {coach:true, assistant:true}), coach: e.target.checked}}})} 
+                                                    />
+                                                    <span className="text-[8px] font-black text-gray-500">主教</span>
+                                                </label>
+                                                <label className="flex items-center gap-1 cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" className="w-3 h-3 rounded border-gray-300 text-bvb-yellow" 
+                                                        checked={localSalarySettings.performanceBonusConfig?.attendance?.assistant ?? true} 
+                                                        onChange={e => setLocalSalarySettings({...localSalarySettings, performanceBonusConfig: {...(localSalarySettings.performanceBonusConfig || { attendance: {coach:true, assistant:true}, renewal: {coach:true, assistant:true}, evaluation: {coach:true, assistant:true} }), attendance: {...(localSalarySettings.performanceBonusConfig?.attendance || {coach:true, assistant:true}), assistant: e.target.checked}}})} 
+                                                    />
+                                                    <span className="text-[8px] font-black text-gray-500">助教</span>
+                                                </label>
+                                            </div>
+                                        </div>
                                         <button 
                                             onClick={() => {
                                                 const next = { ...localSalarySettings };
@@ -511,7 +531,27 @@ const Settings: React.FC<SettingsProps> = ({
                                     </div>
                                 </div>
                                 <div className="pt-2 border-t border-gray-200">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block">季度续费率奖励 (≥ X% 奖 Y元/人)</label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block">季度续费率奖励 (≥ X% 奖 Y元/人)</label>
+                                        <div className="flex gap-2 bg-white px-2 py-0.5 rounded border border-gray-200">
+                                            <label className="flex items-center gap-1 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" className="w-3 h-3 rounded border-gray-300 text-bvb-yellow" 
+                                                    checked={localSalarySettings.performanceBonusConfig?.renewal?.coach ?? true} 
+                                                    onChange={e => setLocalSalarySettings({...localSalarySettings, performanceBonusConfig: {...(localSalarySettings.performanceBonusConfig || { attendance: {coach:true, assistant:true}, renewal: {coach:true, assistant:true}, evaluation: {coach:true, assistant:true} }), renewal: {...(localSalarySettings.performanceBonusConfig?.renewal || {coach:true, assistant:true}), coach: e.target.checked}}})} 
+                                                />
+                                                <span className="text-[8px] font-black text-gray-500">主教</span>
+                                            </label>
+                                            <label className="flex items-center gap-1 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" className="w-3 h-3 rounded border-gray-300 text-bvb-yellow" 
+                                                    checked={localSalarySettings.performanceBonusConfig?.renewal?.assistant ?? true} 
+                                                    onChange={e => setLocalSalarySettings({...localSalarySettings, performanceBonusConfig: {...(localSalarySettings.performanceBonusConfig || { attendance: {coach:true, assistant:true}, renewal: {coach:true, assistant:true}, evaluation: {coach:true, assistant:true} }), renewal: {...(localSalarySettings.performanceBonusConfig?.renewal || {coach:true, assistant:true}), assistant: e.target.checked}}})} 
+                                                />
+                                                <span className="text-[8px] font-black text-gray-500">助教</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <p className="text-[9px] text-blue-500 font-bold mb-2">注：达到阈值后，按实际续费人数发放奖励（每人 Y 元）。</p>
                                     <div className="flex gap-2 items-center">
                                         <input type="number" className="w-20 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.threshold} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, threshold: parseInt(e.target.value) || 0}})} />
@@ -521,7 +561,27 @@ const Settings: React.FC<SettingsProps> = ({
                                     </div>
                                 </div>
                                 <div className="pt-2 border-t border-gray-200">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase mb-2 block italic">教练员综合评价绩效分配金额 (¥)</label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-[10px] font-bold text-gray-400 uppercase block italic">教练员综合评价绩效分配金额 (¥)</label>
+                                        <div className="flex gap-2 bg-white px-2 py-0.5 rounded border border-gray-200">
+                                            <label className="flex items-center gap-1 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" className="w-3 h-3 rounded border-gray-300 text-bvb-yellow" 
+                                                    checked={localSalarySettings.performanceBonusConfig?.evaluation?.coach ?? true} 
+                                                    onChange={e => setLocalSalarySettings({...localSalarySettings, performanceBonusConfig: {...(localSalarySettings.performanceBonusConfig || { attendance: {coach:true, assistant:true}, renewal: {coach:true, assistant:true}, evaluation: {coach:true, assistant:true} }), evaluation: {...(localSalarySettings.performanceBonusConfig?.evaluation || {coach:true, assistant:true}), coach: e.target.checked}}})} 
+                                                />
+                                                <span className="text-[8px] font-black text-gray-500">主教</span>
+                                            </label>
+                                            <label className="flex items-center gap-1 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" className="w-3 h-3 rounded border-gray-300 text-bvb-yellow" 
+                                                    checked={localSalarySettings.performanceBonusConfig?.evaluation?.assistant ?? true} 
+                                                    onChange={e => setLocalSalarySettings({...localSalarySettings, performanceBonusConfig: {...(localSalarySettings.performanceBonusConfig || { attendance: {coach:true, assistant:true}, renewal: {coach:true, assistant:true}, evaluation: {coach:true, assistant:true} }), evaluation: {...(localSalarySettings.performanceBonusConfig?.evaluation || {coach:true, assistant:true}), assistant: e.target.checked}}})} 
+                                                />
+                                                <span className="text-[8px] font-black text-gray-500">助教</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <p className="text-[9px] text-blue-500 font-bold mb-2">注：月度综合评价均分 &gt; 8 分时，发放该全额绩效奖金。</p>
                                     <div className="flex gap-2 items-center">
                                         <input 

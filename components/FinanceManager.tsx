@@ -215,6 +215,18 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const isAssistant = coach.role === 'assistant_coach';
             const isPerformanceEnabled = isAssistant ? salarySettings.enableAssistantPerformanceReward : salarySettings.enableCoachPerformanceReward;
             
+            const isAttendanceEnabled = isPerformanceEnabled && (isAssistant 
+                ? (salarySettings.performanceBonusConfig?.attendance?.assistant ?? true)
+                : (salarySettings.performanceBonusConfig?.attendance?.coach ?? true));
+            
+            const isRenewalEnabled = isPerformanceEnabled && (isAssistant 
+                ? (salarySettings.performanceBonusConfig?.renewal?.assistant ?? true)
+                : (salarySettings.performanceBonusConfig?.renewal?.coach ?? true));
+            
+            const isEvaluationEnabled = isPerformanceEnabled && (isAssistant 
+                ? (salarySettings.performanceBonusConfig?.evaluation?.assistant ?? true)
+                : (salarySettings.performanceBonusConfig?.evaluation?.coach ?? true));
+            
             let calcSessionFees = 0;
             let calcAttendanceReward = 0;
             let calcRenewalReward = 0;
@@ -261,10 +273,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         .sort((a,b) => b.threshold - a.threshold)
                         .find(r => monthlyAttendanceRate >= r.threshold);
                     
-                    attendanceReward = isPerformanceEnabled ? (rewardConfig?.amount || 0) : 0;
-                    attendanceFormula = isPerformanceEnabled 
+                    attendanceReward = isAttendanceEnabled ? (rewardConfig?.amount || 0) : 0;
+                    attendanceFormula = isAttendanceEnabled 
                         ? `${totalPresent}实到 / ${totalPossible}应到 = ${monthlyAttendanceRate.toFixed(1)}% (阈值≥${rewardConfig?.threshold || '-'}% 奖¥${attendanceReward})`
-                        : "公共绩效未开启";
+                        : "该项绩效未开启";
                 }
 
                 let renewalReward = 0;
@@ -291,10 +303,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
                     const dueForRenewalCount = renewedCount + expiredCount;
                     renewalRate = dueForRenewalCount > 0 ? (renewedCount / dueForRenewalCount) * 100 : (teamSize > 0 ? 100 : 0);
-                    renewalReward = isPerformanceEnabled ? (renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0) : 0;
-                    renewalFormula = isPerformanceEnabled 
+                    renewalReward = isRenewalEnabled ? (renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0) : 0;
+                    renewalFormula = isRenewalEnabled 
                         ? `${renewedCount}实续 / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`
-                        : "公共绩效未开启";
+                        : "该项绩效未开启";
                 }
 
                 return { 
@@ -321,11 +333,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
             
             // 修改：评分 > 8 分获得配置的评价绩效金额，取消原有的分段奖励
-            const evaluationSalary = (isPerformanceEnabled && evaluation && !isNaN(evaluation.score) && evaluation.score > 8) ? salarySettings.evaluationAllocation : 0;
+            const evaluationSalary = (isEvaluationEnabled && evaluation && !isNaN(evaluation.score) && evaluation.score > 8) ? salarySettings.evaluationAllocation : 0;
             const calcPerformanceReward = evaluationSalary;
             
-            const performanceFormula = !isPerformanceEnabled 
-                ? "公共绩效未开启"
+            const performanceFormula = !isEvaluationEnabled 
+                ? "该项绩效未开启"
                 : (evaluation && !isNaN(evaluation.score))
                     ? `评分 ${evaluation.score} (评价绩效¥${evaluationSalary})` 
                     : "未评分";
