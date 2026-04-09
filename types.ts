@@ -415,7 +415,7 @@ export interface SalarySettings {
     assistantCoachMinPlayersForCalculation: number; // 助教起算基准人数
     assistantCoachIncrementalPlayerFee: number; // 助教每超1人增加金额
     monthlyAttendanceRewards: { threshold: number; amount: number }[]; // 参训率改为月度
-    quarterlyRenewalReward: { threshold: number; amount: number }; // 续费保持季度，amount 为达标后每人奖励金额
+    quarterlyRenewalReward: { threshold: number; amount: number; minRechargeAmount: number }; // 续费保持季度，amount 为达标后每人奖励金额
     evaluationAllocation: number; // 教练员综合评价绩效分配金额
     performanceBonusConfig: {
         attendance: { coach: boolean; assistant: boolean };

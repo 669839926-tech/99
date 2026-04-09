@@ -559,6 +559,11 @@ const Settings: React.FC<SettingsProps> = ({
                                         <input type="number" className="flex-1 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.amount} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, amount: parseInt(e.target.value) || 0}})} />
                                         <span className="text-xs font-bold text-gray-400">元/人</span>
                                     </div>
+                                    <div className="flex gap-2 items-center mt-2">
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase">单次充值 ≥</span>
+                                        <input type="number" className="w-16 p-2 border rounded font-black text-xs" value={localSalarySettings.quarterlyRenewalReward.minRechargeAmount} onChange={e => setLocalSalarySettings({...localSalarySettings, quarterlyRenewalReward: {...localSalarySettings.quarterlyRenewalReward, minRechargeAmount: parseInt(e.target.value) || 0}})} />
+                                        <span className="text-xs font-bold text-gray-400 uppercase">节课才计入续费统计</span>
+                                    </div>
                                 </div>
                                 <div className="pt-2 border-t border-gray-200">
                                     <div className="flex justify-between items-center mb-2">

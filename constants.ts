@@ -109,7 +109,7 @@ export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
         { threshold: 85, amount: 150 },
         { threshold: 90, amount: 200 },
     ],
-    quarterlyRenewalReward: { threshold: 80, amount: 100 },
+    quarterlyRenewalReward: { threshold: 80, amount: 100, minRechargeAmount: 9 },
     evaluationAllocation: 1000, // 教练员综合评价绩效分配金额
     performanceBonusConfig: {
         attendance: { coach: true, assistant: true },

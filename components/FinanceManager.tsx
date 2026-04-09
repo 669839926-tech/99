@@ -287,7 +287,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     const renewedCount = teamPlayers.filter(p => 
                         p.rechargeHistory?.some(r => {
                             const { year, month } = parseDateInfo(r.date);
-                            return year === effectiveYear && quarterMonths.includes(month);
+                            return year === effectiveYear && quarterMonths.includes(month) && r.amount >= (salarySettings.quarterlyRenewalReward.minRechargeAmount || 0);
                         })
                     ).length;
                     
@@ -296,7 +296,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         const { year, month } = parseDateInfo(p.validUntil);
                         const hasRenewed = p.rechargeHistory?.some(r => {
                             const { year: rYear, month: rMonth } = parseDateInfo(r.date);
-                            return rYear === effectiveYear && quarterMonths.includes(rMonth);
+                            return rYear === effectiveYear && quarterMonths.includes(rMonth) && r.amount >= (salarySettings.quarterlyRenewalReward.minRechargeAmount || 0);
                         });
                         return !hasRenewed && year === effectiveYear && quarterMonths.includes(month);
                     }).length;
@@ -305,7 +305,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     renewalRate = dueForRenewalCount > 0 ? (renewedCount / dueForRenewalCount) * 100 : (teamSize > 0 ? 100 : 0);
                     renewalReward = isRenewalEnabled ? (renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0) : 0;
                     renewalFormula = isRenewalEnabled 
-                        ? `${renewedCount}实续 / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`
+                        ? `${renewedCount}实续(单次≥${salarySettings.quarterlyRenewalReward.minRechargeAmount}节) / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`
                         : "该项绩效未开启";
                 }
 
