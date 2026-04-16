@@ -258,11 +258,11 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
         return record ? record.status : 'Absent';
     };
 
-    const setPlayerStatus = (playerId: string, status: AttendanceStatus) => {
+    const setPlayerStatus = (playerId: string, status: AttendanceStatus, creditCost?: number) => {
         setLocalSession(prev => {
             const currentAttendance = prev.attendance || [];
             const others = currentAttendance.filter(r => r.playerId !== playerId);
-            const nextAttendance = status === 'Absent' ? others : [...others, { playerId, status }];
+            const nextAttendance = status === 'Absent' ? others : [...others, { playerId, status, creditCost }];
             return { ...prev, attendance: nextAttendance };
         });
     };
@@ -509,6 +509,8 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                               <div className="space-y-3">
                                   {teamPlayers.map(player => {
                                       const status = getStatus(player.id);
+                                      const record = localSession.attendance?.find(r => r.playerId === player.id);
+                                      const currentCost = record?.creditCost || 1;
                                       const isFocused = localSession.focusedPlayerIds?.includes(player.id);
                                       return (
                                           <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-sm transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-white border-gray-100'}`}>
@@ -528,10 +530,24 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                                                           <div className="text-[10px] text-gray-400 font-mono">#{player.number} • {player.position}</div>
                                                       </div>
                                                   </div>
-                                                  <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
+                                                  <div className="flex flex-col items-end gap-1">
+                                                      <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
+                                                      {status === 'Present' && (
+                                                          <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                              <span className="text-[9px] font-black text-gray-500 uppercase">扣课时:</span>
+                                                              <select 
+                                                                  className="bg-transparent text-[10px] font-black text-bvb-black outline-none cursor-pointer"
+                                                                  value={currentCost}
+                                                                  onChange={(e) => setPlayerStatus(player.id, 'Present', parseInt(e.target.value))}
+                                                              >
+                                                                  {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
+                                                              </select>
+                                                          </div>
+                                                      )}
+                                                  </div>
                                               </div>
                                               <div className="flex bg-gray-50/50 p-1 rounded-lg gap-1">
-                                                  <button onClick={() => setPlayerStatus(player.id, 'Present')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}><CheckCircle className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Present', currentCost)} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}><CheckCircle className="w-5 h-5" /></button>
                                                   <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}><Clock className="w-5 h-5" /></button>
                                                   <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-sm text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}><AlertCircle className="w-5 h-5" /></button>
                                                   <button onClick={() => setPlayerStatus(player.id, 'Absent')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-sm text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-200'}`}><Ban className="w-5 h-5" /></button>

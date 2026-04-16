@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
-import { Users as UsersIcon, Trophy, Calendar, Cake, Activity, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, ClipboardCheck, Edit2, ArrowRight, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, Sparkles, Camera, FileDown, FileSpreadsheet, Quote, ShieldCheck, PartyPopper, Star, Triangle, Pencil } from 'lucide-react';
+import { Users as UsersIcon, Trophy, Calendar, Cake, Activity, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, ClipboardCheck, Edit2, ArrowRight, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, Sparkles, Camera, FileDown, FileSpreadsheet, Quote, ShieldCheck, PartyPopper, Star, Triangle, Pencil, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
@@ -20,6 +20,7 @@ interface DashboardProps {
   onDeleteAnnouncement?: (id: string) => void;
   appLogo?: string;
   tactics?: Tactic[];
+  salarySettings?: SalarySettings;
 }
 
 type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
@@ -35,7 +36,7 @@ const parseLocalDate = (dateStr: string) => {
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
     announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, appLogo,
-    tactics = []
+    tactics = [], salarySettings
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
@@ -509,13 +510,18 @@ const Dashboard: React.FC<DashboardProps> = ({
           }
       });
 
+      const minAmount = salarySettings?.quarterlyRenewalReward?.minRechargeAmount || 0;
+      const qualifiedRecharges = allRecharges.filter(r => r.amount >= minAmount);
+
       return {
           list: allRecharges,
           aggregates: playerAggregates,
           totalRechargeCount: allRecharges.length,
-          totalRechargeCredits: allRecharges.reduce((sum, r) => sum + r.credits, 0)
+          qualifiedRechargeCount: qualifiedRecharges.length,
+          totalRechargeCredits: allRecharges.reduce((sum, r) => sum + r.credits, 0),
+          minAmount
       };
-  }, [displayPlayers, rechargeDateRange, rechargeTeamId, rechargePlayerId, teams]);
+  }, [displayPlayers, rechargeDateRange, rechargeTeamId, rechargePlayerId, teams, salarySettings]);
 
   const handleExportPDF = async () => {
     setIsExporting(true);
@@ -1399,11 +1405,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
 
                 {/* Recharge Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                     <div className="bg-green-50/50 border border-green-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                         <CheckCircle className="w-5 h-5 text-green-600 mb-2" />
-                        <span className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1">累计充值次数</span>
+                        <span className="text-[10px] font-black text-green-700 uppercase tracking-widest mb-1">累计充值总人次</span>
                         <span className="text-2xl font-black text-green-800 tabular-nums">{rechargeAnalysis.totalRechargeCount} 次</span>
+                    </div>
+                    <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
+                        <UserCheck className="w-5 h-5 text-amber-600 mb-2" />
+                        <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest mb-1">达标充值人次 (≥{rechargeAnalysis.minAmount}节)</span>
+                        <span className="text-2xl font-black text-amber-800 tabular-nums">{rechargeAnalysis.qualifiedRechargeCount} 次</span>
                     </div>
                     <div className="bg-blue-50/50 border border-blue-100 p-4 rounded-2xl flex flex-col items-center text-center shadow-sm">
                         <Sparkles className="w-5 h-5 text-blue-600 mb-2" />

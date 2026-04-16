@@ -22,6 +22,7 @@ export type AttendanceStatus = 'Present' | 'Leave' | 'Injury' | 'Absent';
 export interface AttendanceRecord {
   playerId: string;
   status: AttendanceStatus;
+  creditCost?: number; // 扣除课时数，默认为1
 }
 
 export interface RechargeRecord {

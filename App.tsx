@@ -52,7 +52,7 @@ function App() {
   const derivedPlayers = useMemo(() => {
       return players.map(p => {
           // 构建该球员的所有财务/考勤事件流
-          const events: { type: 'recharge' | 'training', date: string, amount?: number, quota?: number, status?: string }[] = [];
+          const events: { type: 'recharge' | 'training', date: string, amount?: number, quota?: number, status?: string, creditCost?: number }[] = [];
           
           (p.rechargeHistory || []).forEach(r => {
               events.push({ type: 'recharge', date: r.date, amount: r.amount, quota: r.quotaAdded });
@@ -61,7 +61,12 @@ function App() {
           trainings.forEach(t => {
               const record = t.attendance?.find(att => att.playerId === p.id);
               if (record && record.status !== 'Absent') {
-                  events.push({ type: 'training', date: t.date, status: record.status });
+                  events.push({ 
+                      type: 'training', 
+                      date: t.date, 
+                      status: record.status,
+                      creditCost: record.creditCost 
+                  });
               }
           });
 
@@ -78,14 +83,17 @@ function App() {
                   // 核心更新：请假次数不累计，而是更新为最新一次充值的额度
                   runningLeaveQuota = e.quota || 0;
               } else if (e.type === 'training') {
+                  const cost = e.creditCost ?? 1;
                   if (e.status === 'Present') {
-                      runningCredits -= 1;
+                      runningCredits -= cost;
                   } else if (e.status === 'Leave') {
                       if (runningLeaveQuota > 0) {
                           runningLeaveQuota -= 1;
                           usedLeaveQuota += 1;
+                          // 如果请假且有多扣课时需求，目前逻辑是扣除1次请假额度，不额外扣课时
+                          // 但如果用户想在请假时也扣多倍，可以根据需求调整
                       } else {
-                          runningCredits -= 1;
+                          runningCredits -= cost;
                       }
                   }
                   // Injury 状态通常不计费也不扣除额度
@@ -302,7 +310,7 @@ function App() {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} tactics={tactics} />;
+        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} tactics={tactics} salarySettings={salarySettings} />;
       case 'players':
         return <PlayerManager teams={teams} players={derivedPlayers} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} />;
       case 'growth':
