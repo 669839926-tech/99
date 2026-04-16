@@ -9,9 +9,10 @@ interface ParentPortalProps {
     onLogout: () => void;
     appLogo?: string;
     onUpdatePlayer: (player: Player) => void;
+    trainings: TrainingSession[];
 }
 
-const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, onLogout, appLogo, onUpdatePlayer }) => {
+const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, onLogout, appLogo, onUpdatePlayer, trainings }) => {
     
     const [activeTab, setActiveTab] = useState<'overview' | 'growth' | 'history'>('overview');
     
@@ -139,18 +140,63 @@ const ParentPortal: React.FC<ParentPortalProps> = ({ player, team, onLogout, app
 
                     {activeTab === 'history' && (
                          <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 animate-in slide-in-from-right-4">
-                            <h3 className="font-bold text-gray-800 mb-4 flex items-center uppercase tracking-widest text-xs"><Activity className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练计次详情</h3>
-                            <div className="space-y-2">
-                                {(player.homeTrainingLogs || []).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(log => (
-                                    <div key={log.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                                        <div>
-                                            <p className="font-black text-gray-800 text-sm">{log.title}</p>
-                                            <p className="text-[10px] text-gray-400 font-mono">{log.date}</p>
-                                        </div>
-                                        <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">计次 +1</div>
+                            <h3 className="font-bold text-gray-800 mb-6 flex items-center uppercase tracking-widest text-xs"><Activity className="w-5 h-5 mr-2 text-bvb-yellow" /> 变动记录</h3>
+                            
+                            <div className="space-y-6">
+                                <div>
+                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 border-b pb-1">训练与课时记录</h4>
+                                    <div className="space-y-2">
+                                        {(() => {
+                                            const events: any[] = [];
+                                            (player.rechargeHistory || []).forEach(r => events.push({ type: 'recharge', date: r.date, amount: r.amount, title: '账户充值', note: `赠予请假 ${r.quotaAdded}次` }));
+                                            trainings.forEach(t => {
+                                                const record = t.attendance?.find(att => att.playerId === player.id);
+                                                if (record && record.status !== 'Absent') {
+                                                    const cost = record.creditCost || 1;
+                                                    events.push({ 
+                                                        type: 'training', 
+                                                        date: t.date, 
+                                                        title: t.title, 
+                                                        status: record.status,
+                                                        amount: record.status === 'Present' ? -cost : (record.status === 'Leave' ? 0 : 0),
+                                                        note: record.status === 'Present' ? `扣除 ${cost} 课时` : (record.status === 'Leave' ? '请假 (消耗额度)' : '伤停')
+                                                    });
+                                                }
+                                            });
+                                            
+                                            return events.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((e, idx) => (
+                                                <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                                                    <div>
+                                                        <p className="font-black text-gray-800 text-sm">{e.title}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-[10px] text-gray-400 font-mono">{e.date}</p>
+                                                            <span className="text-[9px] font-bold text-gray-400 bg-gray-200 px-1.5 rounded-sm">{e.note}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${e.amount > 0 ? 'bg-blue-100 text-blue-700' : e.amount < 0 ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-500'}`}>
+                                                        {e.amount > 0 ? `+${e.amount}` : e.amount === 0 ? '0' : e.amount}
+                                                    </div>
+                                                </div>
+                                            ));
+                                        })()}
                                     </div>
-                                ))}
-                                {(player.homeTrainingLogs || []).length === 0 && <p className="text-center py-10 text-gray-400 italic text-sm">暂无打卡记录，开启第一步吧！</p>}
+                                </div>
+
+                                <div>
+                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 border-b pb-1">居家训练打卡</h4>
+                                    <div className="space-y-2">
+                                        {(player.homeTrainingLogs || []).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(log => (
+                                            <div key={log.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                                                <div>
+                                                    <p className="font-black text-gray-800 text-sm">{log.title}</p>
+                                                    <p className="text-[10px] text-gray-400 font-mono">{log.date}</p>
+                                                </div>
+                                                <div className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">计次 +1</div>
+                                            </div>
+                                        ))}
+                                        {(player.homeTrainingLogs || []).length === 0 && <p className="text-center py-4 text-gray-400 italic text-[10px]">暂无打卡记录</p>}
+                                    </div>
+                                </div>
                             </div>
                          </div>
                     )}

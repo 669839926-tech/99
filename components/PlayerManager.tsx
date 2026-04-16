@@ -733,6 +733,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             balanceAfter?: number; 
             quotaAfter?: number;
             note?: string; 
+            creditCost?: number;
         };
         
         const events: Event[] = []; 
@@ -755,7 +756,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     type: 'training', 
                     status: record.status, 
                     amount: 0,
-                    desc: `参加训练: ${t.title}` 
+                    desc: `参加训练: ${t.title}`,
+                    creditCost: record.creditCost
                 }); 
             } 
         });
@@ -776,19 +778,20 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     currentQuota = recharge.quotaAdded;
                 }
             } else if (e.type === 'training') { 
+                const cost = e.creditCost ?? 1;
                 if (e.status === 'Present') { 
-                    currentBalance -= 1; 
-                    e.amount = -1; 
-                    e.note = '扣除 1 课时';
+                    currentBalance -= cost; 
+                    e.amount = -cost; 
+                    e.note = `扣除 ${cost} 课时`;
                 } else if (e.status === 'Leave') { 
                     if (currentQuota > 0) {
                         currentQuota -= 1;
                         e.amount = 0;
                         e.note = '消耗赠予额度 (不计费)';
                     } else {
-                        currentBalance -= 1;
-                        e.amount = -1;
-                        e.note = '额度已用尽，扣除 1 课时';
+                        currentBalance -= cost;
+                        e.amount = -cost;
+                        e.note = cost > 1 ? `额度已用尽，扣除 ${cost} 课时` : '额度已用尽，扣除 1 课时';
                     }
                 } else {
                     e.amount = 0;
