@@ -41,6 +41,9 @@ function App() {
   const [accountingRecords, setAccountingRecords] = useState<AccountingRecord[]>([]);
   const [tactics, setTactics] = useState<Tactic[]>([]);
   const [matchPlans, setMatchPlans] = useState<MatchPlan[]>([]);
+  const [pointItemDefinitions, setPointItemDefinitions] = useState<PointItemDefinition[]>([]);
+  const [playerPointRecords, setPlayerPointRecords] = useState<PlayerPointRecord[]>([]);
+  const [travelingPlayerIds, setTravelingPlayerIds] = useState<string[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -134,6 +137,9 @@ function App() {
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
             if (cloudData.tactics) setTactics(cloudData.tactics);
             if (cloudData.matchPlans) setMatchPlans(cloudData.matchPlans);
+            if (cloudData.pointItemDefinitions) setPointItemDefinitions(cloudData.pointItemDefinitions);
+            if (cloudData.playerPointRecords) setPlayerPointRecords(cloudData.playerPointRecords);
+            if (cloudData.travelingPlayerIds) setTravelingPlayerIds(cloudData.travelingPlayerIds);
             setCloudError(null);
         }
     } catch (err: any) {
@@ -177,7 +183,10 @@ function App() {
                 periodizationPlans,
                 accountingRecords,
                 tactics,
-                matchPlans
+                matchPlans,
+                pointItemDefinitions,
+                playerPointRecords,
+                travelingPlayerIds
             });
             setCloudError(null);
         } catch (e: any) {
@@ -189,7 +198,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, matchPlans, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, matchPlans, pointItemDefinitions, playerPointRecords, travelingPlayerIds, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -240,6 +249,15 @@ function App() {
   const handleAddAnnouncement = (announcement: Announcement) => setAnnouncements(prev => [announcement, ...prev]);
   const handleDeleteAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
   const handleUpdateAnnouncement = (updatedAnnouncement: Announcement) => setAnnouncements(prev => prev.map(a => a.id === updatedAnnouncement.id ? updatedAnnouncement : a));
+  
+  // Point Handlers
+  const handleAddPointItem = (item: PointItemDefinition) => setPointItemDefinitions(prev => [...prev, item]);
+  const handleDeletePointItem = (id: string) => setPointItemDefinitions(prev => prev.filter(i => i.id !== id));
+  const handleAddPointRecord = (record: PlayerPointRecord) => setPlayerPointRecords(prev => [...prev, record]);
+  const handleBulkAddPointRecords = (records: PlayerPointRecord[]) => setPlayerPointRecords(prev => [...prev, ...records]);
+  const handleDeletePointRecord = (id: string) => setPlayerPointRecords(prev => prev.filter(r => r.id !== id));
+  const handleUpdateTravelingPlayers = (ids: string[]) => setTravelingPlayerIds(ids);
+
   const handleRechargePlayer = (playerId: string, amount: number, leaveQuota: number) => {
       const today = new Date();
       today.setFullYear(today.getFullYear() + 1);
@@ -335,6 +353,15 @@ function App() {
           onAddMatchPlan={(plan) => setMatchPlans(prev => [...prev, plan])}
           onUpdateMatchPlan={(plan) => setMatchPlans(prev => prev.map(p => p.id === plan.id ? plan : p))}
           onDeleteMatchPlan={(id) => setMatchPlans(prev => prev.filter(p => p.id !== id))}
+          pointItemDefinitions={pointItemDefinitions}
+          onAddPointItem={handleAddPointItem}
+          onDeletePointItem={handleDeletePointItem}
+          playerPointRecords={playerPointRecords}
+          onAddPointRecord={handleAddPointRecord}
+          onBulkAddPointRecords={handleBulkAddPointRecords}
+          onDeletePointRecord={handleDeletePointRecord}
+          travelingPlayerIds={travelingPlayerIds}
+          onUpdateTravelingPlayers={handleUpdateTravelingPlayers}
         />;
       case 'tactics':
         return <TacticsModule players={derivedPlayers} teams={teams} tactics={tactics} onUpdateTactics={setTactics} />;

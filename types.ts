@@ -117,6 +117,26 @@ export interface TechTestResult {
     coachId?: string;
 }
 
+// --- Match Point Management Types ---
+export type PointChangeType = 'gain' | 'loss' | 'consumption';
+
+export interface PointItemDefinition {
+    id: string;
+    title: string;
+    points: number;
+    type: PointChangeType;
+    isVariable?: boolean;
+}
+
+export interface PlayerPointRecord {
+    id: string;
+    playerId: string;
+    itemId: string; // Reference to PointItemDefinition
+    date: string;
+    points: number;
+    note?: string;
+}
+
 export interface Player {
   id: string;
   teamId: string;

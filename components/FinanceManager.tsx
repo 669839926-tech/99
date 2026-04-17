@@ -196,12 +196,21 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 else expenseMap[cat.label] = (expenseMap[cat.label] || 0) + (Number(t.expense) || 0);
             }
         });
+        const rechargeCategory = financeCategories.find(c => c.label.includes('续费') || c.label.includes('充值') || c.label.includes('学费'));
+        const rechargeTransactions = monthTransactions.filter(t => t.category === rechargeCategory?.id);
+        const threshold = salarySettings.quarterlyRenewalReward.minRechargeAmount || 0;
+        const validRechargeCount = rechargeTransactions.filter(t => {
+            return (Number(t.income) || 0) >= threshold; 
+        }).length;
+
         return {
             income, expense, profit: income - expense,
+            rechargeCount: validRechargeCount,
+            totalRecharges: rechargeTransactions.length,
             incomeData: Object.keys(incomeMap).map(label => ({ name: label, value: incomeMap[label], percent: income > 0 ? (incomeMap[label] / income * 100).toFixed(1) : '0' })).sort((a,b) => b.value - a.value),
             expenseData: Object.keys(expenseMap).map(label => ({ name: label, value: expenseMap[label], percent: expense > 0 ? (expenseMap[label] / expense * 100).toFixed(1) : '0' })).sort((a,b) => b.value - a.value)
         };
-    }, [transactions, selectedYear, selectedMonth, financeCategories]);
+    }, [transactions, selectedYear, selectedMonth, financeCategories, salarySettings.quarterlyRenewalReward.minRechargeAmount]);
 
     const coachSalaries = useMemo(() => {
         const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
@@ -1092,6 +1101,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                 <div className="text-right border-l pl-4 md:pl-8 border-gray-100">
                                     <p className="text-[10px] font-black text-gray-400 uppercase">月利润</p>
                                     <p className={`text-lg md:text-2xl font-black ${monthlyAnalysis.profit >= 0 ? 'text-bvb-black' : 'text-red-600'}`}>¥{monthlyAnalysis.profit.toLocaleString()}</p>
+                                </div>
+                                <div className="text-right border-l pl-4 md:pl-8 border-gray-100">
+                                    <p className="text-[10px] font-black text-gray-400 uppercase">符合奖励充值人次</p>
+                                    <div className="flex items-baseline justify-end gap-1">
+                                        <p className="text-lg md:text-2xl font-black text-blue-600">{monthlyAnalysis.rechargeCount}</p>
+                                        <p className="text-[10px] font-bold text-gray-400">/ {monthlyAnalysis.totalRecharges} 总人次</p>
+                                    </div>
+                                    <p className="text-[8px] text-gray-400 font-bold uppercase tracking-tighter">阈值 ≥{salarySettings.quarterlyRenewalReward.minRechargeAmount || 0} 节/次</p>
                                 </div>
                             </div>
                         </div>

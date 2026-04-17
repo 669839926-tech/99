@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, MatchPlan, MatchPlanRequirement } from '../types';
-// Comment: Added 'Info' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info } from 'lucide-react';
+import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, MatchPlan, MatchPlanRequirement, PointItemDefinition, PlayerPointRecord, PointChangeType } from '../types';
+// Comment: Added 'Coins', 'TrendingDown', 'ListPlus' to the lucide-react imports
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 
@@ -18,11 +18,20 @@ interface MatchPlannerProps {
   onAddMatchPlan: (plan: MatchPlan) => void;
   onUpdateMatchPlan: (plan: MatchPlan) => void;
   onDeleteMatchPlan: (id: string) => void;
+  pointItemDefinitions: PointItemDefinition[];
+  onAddPointItem: (item: PointItemDefinition) => void;
+  onDeletePointItem: (id: string) => void;
+  playerPointRecords: PlayerPointRecord[];
+  onAddPointRecord: (record: PlayerPointRecord) => void;
+  onBulkAddPointRecords: (records: PlayerPointRecord[]) => void;
+  onDeletePointRecord: (id: string) => void;
+  travelingPlayerIds: string[];
+  onUpdateTravelingPlayers: (ids: string[]) => void;
   appLogo?: string;
 }
 
 type TabType = 'info' | 'lineup' | 'events' | 'report';
-type ViewMode = 'matches' | 'plans';
+type ViewMode = 'matches' | 'plans' | 'points';
 
 const MatchPlanner: React.FC<MatchPlannerProps> = ({ 
   matches, 
@@ -35,7 +44,16 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   matchPlans,
   onAddMatchPlan,
   onUpdateMatchPlan,
-  onDeleteMatchPlan
+  onDeleteMatchPlan,
+  pointItemDefinitions,
+  onAddPointItem,
+  onDeletePointItem,
+  playerPointRecords,
+  onAddPointRecord,
+  onBulkAddPointRecords,
+  onDeletePointRecord,
+  travelingPlayerIds,
+  onUpdateTravelingPlayers
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
@@ -49,6 +67,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
   const [editingPlan, setEditingPlan] = useState<MatchPlan | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('info');
+  const [showAddPointItemModal, setShowAddPointItemModal] = useState(false);
 
   const isDirector = currentUser?.role === 'director';
 
@@ -257,6 +276,12 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                 >
                     比赛计划
                 </button>
+                <button 
+                    onClick={() => setViewMode('points')}
+                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 ${viewMode === 'points' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400'}`}
+                >
+                    积分管理
+                </button>
             </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
@@ -268,7 +293,11 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                 </select>
             </div>
             <button 
-                onClick={() => viewMode === 'matches' ? setShowAddModal(true) : setShowAddPlanModal(true)} 
+                onClick={() => {
+                    if (viewMode === 'matches') setShowAddModal(true);
+                    else if (viewMode === 'plans') setShowAddPlanModal(true);
+                    else setShowAddPointItemModal(true);
+                }} 
                 className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"
             >
                 <Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建
@@ -352,7 +381,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
               </div>
           </div>
         </>
-      ) : (
+      ) : viewMode === 'plans' ? (
         <div className="animate-in fade-in duration-500">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {matchPlans.filter(p => filterTeamId === 'all' || p.teamId === filterTeamId).map(plan => (
@@ -419,6 +448,22 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                 )}
             </div>
         </div>
+      ) : (
+        <MatchPointManager 
+            players={players} 
+            teams={teams}
+            currentUser={currentUser}
+            filterTeamId={filterTeamId}
+            pointItemDefinitions={pointItemDefinitions}
+            onAddPointItem={onAddPointItem}
+            onDeletePointItem={onDeletePointItem}
+            playerPointRecords={playerPointRecords}
+            onAddPointRecord={onAddPointRecord}
+            onBulkAddPointRecords={onBulkAddPointRecords}
+            onDeletePointRecord={onDeletePointRecord}
+            travelingPlayerIds={travelingPlayerIds}
+            onUpdateTravelingPlayers={onUpdateTravelingPlayers}
+        />
       )}
 
       {showAddModal && (
@@ -718,6 +763,16 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
             }}
           />
       )}
+
+      {showAddPointItemModal && (
+          <AddPointItemModal 
+              onClose={() => setShowAddPointItemModal(false)}
+              onAdd={(item) => {
+                  onAddPointItem(item);
+                  setShowAddPointItemModal(false);
+              }}
+          />
+      )}
     </div>
   );
 };
@@ -1000,6 +1055,670 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, star
                          <button onClick={() => handleGenerateStrategy(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-black text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-gray-800 transition-all"><Bot className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> 助手</button>
                     </div>
                 )}
+            </div>
+        </div>
+    );
+};
+
+// --- Match Point Management Components ---
+
+interface MatchPointManagerProps {
+  players: Player[];
+  teams: Team[];
+  currentUser: User | null;
+  filterTeamId: string;
+  pointItemDefinitions: PointItemDefinition[];
+  onAddPointItem: (item: PointItemDefinition) => void;
+  onDeletePointItem: (id: string) => void;
+  playerPointRecords: PlayerPointRecord[];
+  onAddPointRecord: (record: PlayerPointRecord) => void;
+  onBulkAddPointRecords: (records: PlayerPointRecord[]) => void;
+  onDeletePointRecord: (id: string) => void;
+  travelingPlayerIds: string[];
+  onUpdateTravelingPlayers: (ids: string[]) => void;
+}
+
+const MatchPointManager: React.FC<MatchPointManagerProps> = ({
+    players,
+    teams,
+    currentUser,
+    filterTeamId,
+    pointItemDefinitions,
+    onDeletePointItem,
+    playerPointRecords,
+    onBulkAddPointRecords,
+    onDeletePointRecord,
+    travelingPlayerIds,
+    onUpdateTravelingPlayers
+}) => {
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [activeTab, setActiveTab] = useState<'squad' | 'record' | 'summary' | 'history' | 'items'>('squad');
+    const [tempSquadIds, setTempSquadIds] = useState<string[]>(travelingPlayerIds || []);
+    const [isAddingItem, setIsAddingItem] = useState(false);
+
+    const isDirector = currentUser?.role === 'director';
+    const availableTeams = useMemo(() => {
+        if (isDirector) return teams;
+        return teams.filter(t => currentUser?.teamIds?.includes(t.id));
+    }, [currentUser, teams, isDirector]);
+
+    const displayTeams = useMemo(() => {
+        return filterTeamId === 'all' ? availableTeams : availableTeams.filter(t => t.id === filterTeamId);
+    }, [availableTeams, filterTeamId]);
+
+    const playersByTeam = useMemo(() => {
+        const result: Record<string, Player[]> = {};
+        displayTeams.forEach(team => {
+            result[team.id] = players.filter(p => p.teamId === team.id);
+        });
+        return result;
+    }, [displayTeams, players]);
+
+    // Only show traveling players in management tabs
+    const travelingPlayers = useMemo(() => {
+        return players.filter(p => travelingPlayerIds.includes(p.id));
+    }, [players, travelingPlayerIds]);
+
+    const playerPointsMap = useMemo(() => {
+        const map: Record<string, number> = {};
+        playerPointRecords.forEach(r => {
+            const item = pointItemDefinitions.find(i => i.id === r.itemId);
+            if (!item) return;
+            const pointsValue = (item.type === 'loss' || item.type === 'consumption') ? -r.points : r.points;
+            map[r.playerId] = (map[r.playerId] || 0) + pointsValue;
+        });
+        return map;
+    }, [playerPointRecords, pointItemDefinitions]);
+
+    const dailyRecords = useMemo(() => {
+        return playerPointRecords.filter(r => r.date === selectedDate);
+    }, [playerPointRecords, selectedDate]);
+
+    // Aggregated stats for summary table
+    const summaryData = useMemo(() => {
+        const data: Record<string, Record<PointChangeType, number>> = {};
+        travelingPlayerIds.forEach(pid => {
+            data[pid] = { gain: 0, loss: 0, consumption: 0 };
+        });
+
+        playerPointRecords.forEach(r => {
+            if (travelingPlayerIds.includes(r.playerId) && data[r.playerId]) {
+                const item = pointItemDefinitions.find(i => i.id === r.itemId);
+                if (item) {
+                   data[r.playerId][item.type] += r.points;
+                }
+            }
+        });
+        return data;
+    }, [playerPointRecords, pointItemDefinitions, travelingPlayerIds]);
+
+    const handleRecordPoints = (itemId: string) => {
+        if (selectedPlayerIds.length === 0) return;
+        const item = pointItemDefinitions.find(i => i.id === itemId);
+        if (!item) return;
+
+        let finalPoints = item.points;
+        if (item.isVariable) {
+            const input = prompt(`请输入 "${item.title}" 的积分数额:`, item.points.toString());
+            if (input === null) return; // Cancelled
+            const parsed = parseInt(input);
+            if (isNaN(parsed) || parsed < 0) {
+                alert('请输入有效的正整数');
+                return;
+            }
+            finalPoints = parsed;
+        }
+
+        const newRecords: PlayerPointRecord[] = selectedPlayerIds.map(pid => ({
+            id: Math.random().toString(36).slice(2, 11),
+            playerId: pid,
+            itemId: item.id,
+            date: selectedDate,
+            points: finalPoints
+        }));
+
+        onBulkAddPointRecords(newRecords);
+        setSelectedPlayerIds([]);
+        alert('记录成功');
+    };
+
+    const toggleSquadSelection = (playerId: string) => {
+        setTempSquadIds(prev => 
+            prev.includes(playerId) ? prev.filter(id => id !== playerId) : [...prev, playerId]
+        );
+    };
+
+    const toggleTeamSquadSelection = (teamId: string) => {
+        const teamPlayerIds = playersByTeam[teamId]?.map(p => p.id) || [];
+        const allSelected = teamPlayerIds.every(id => tempSquadIds.includes(id));
+        
+        if (allSelected) {
+            setTempSquadIds(prev => prev.filter(id => !teamPlayerIds.includes(id)));
+        } else {
+            setTempSquadIds(prev => Array.from(new Set([...prev, ...teamPlayerIds])));
+        }
+    };
+
+    const confirmSquad = () => {
+        onUpdateTravelingPlayers(tempSquadIds);
+        alert(`已确认 ${tempSquadIds.length} 名出行球员`);
+        setActiveTab('record');
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500 pb-24">
+            {/* Tabs */}
+            <div className="bg-white p-1 rounded-xl shadow-sm border border-gray-100 flex gap-1 overflow-x-auto">
+                {[
+                    { id: 'squad', label: '人员名单', icon: UsersIcon },
+                    { id: 'record', label: '积分录入', icon: PenTool },
+                    { id: 'summary', label: '积分概览', icon: Trophy },
+                    { id: 'history', label: '录入流水', icon: ClipboardList },
+                    { id: 'items', label: '项目管理', icon: ListPlus }
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`flex-1 min-w-[100px] py-3 text-[10px] md:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex flex-col items-center gap-1 ${activeTab === tab.id ? 'bg-bvb-black text-bvb-yellow shadow-lg' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                    >
+                        <tab.icon className="w-4 h-4" />
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+
+            {activeTab === 'squad' && (
+                <div className="space-y-4">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
+                            <h4 className="font-black text-gray-800 text-sm flex items-center gap-2 uppercase italic tracking-tighter">
+                                <UsersIcon className="w-4 h-4 text-bvb-yellow" /> 选择外派比赛名单
+                            </h4>
+                            <div className="bg-bvb-yellow/10 px-3 py-1 rounded-full">
+                                <span className="text-[10px] font-black text-bvb-black uppercase">当前选定: {tempSquadIds.length} 人</span>
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
+                            {displayTeams.map(team => (
+                                <div key={team.id} className="space-y-3">
+                                    <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                                        <h5 className="text-xs font-black text-bvb-black uppercase flex items-center gap-2">
+                                            <Shield className="w-3.5 h-3.5 text-bvb-yellow" /> {team.name}
+                                        </h5>
+                                        <button 
+                                            onClick={() => toggleTeamSquadSelection(team.id)}
+                                            className="text-[10px] font-black uppercase text-gray-400 hover:text-bvb-black"
+                                        >
+                                            全选/取消
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                                        {playersByTeam[team.id]?.map(player => (
+                                            <button
+                                                key={player.id}
+                                                onClick={() => toggleSquadSelection(player.id)}
+                                                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${tempSquadIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md scale-[1.02]' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                            >
+                                                <div className="relative">
+                                                    <img src={player.image} className="w-10 h-10 rounded-full object-cover" />
+                                                    {tempSquadIds.includes(player.id) && (
+                                                        <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
+                                                            <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <p className={`text-[10px] font-black truncate w-full px-1 text-center ${tempSquadIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                            <button 
+                                onClick={confirmSquad}
+                                className="px-8 py-3 bg-bvb-black text-bvb-yellow font-black rounded-xl shadow-lg hover:scale-105 transition-all uppercase italic text-sm tracking-widest flex items-center gap-2"
+                            >
+                                <CheckCircle className="w-4 h-4" /> 确认名单并开始管理
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'record' && (
+                travelingPlayerIds.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-20 flex flex-col items-center justify-center border border-dashed border-gray-200 text-gray-400 gap-4">
+                        <UsersIcon className="w-12 h-12 opacity-20" />
+                        <p className="font-black uppercase tracking-widest text-sm">请先在"人员名单"标签中选择外派球员</p>
+                        <button onClick={() => setActiveTab('squad')} className="px-6 py-2 bg-bvb-black text-bvb-yellow rounded-lg font-black text-xs uppercase italic">前往选择</button>
+                    </div>
+                ) : (
+                    <div className="grid lg:grid-cols-3 gap-6">
+                        {/* Player Selection from Traveling Squad */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
+                                    <h4 className="font-black text-gray-800 text-sm flex items-center gap-2 uppercase italic tracking-tighter">
+                                        <PenTool className="w-4 h-4 text-bvb-yellow" /> 积分录入 - 选中外派球员
+                                    </h4>
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="date" 
+                                            value={selectedDate} 
+                                            onChange={e => setSelectedDate(e.target.value)}
+                                            className="text-xs font-bold p-1.5 border rounded-lg bg-white"
+                                        />
+                                        <span className="text-[10px] font-black text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+                                            已选: {selectedPlayerIds.length}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="p-4 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
+                                    {displayTeams.map(team => {
+                                        const teamTravelingPlayers = playersByTeam[team.id]?.filter(p => travelingPlayerIds.includes(p.id)) || [];
+                                        if (teamTravelingPlayers.length === 0) return null;
+                                        
+                                        return (
+                                            <div key={team.id} className="space-y-3">
+                                                <div className="flex items-center justify-between border-b border-gray-100 pb-1">
+                                                    <h5 className="text-[10px] font-black text-gray-400 uppercase flex items-center gap-1.5">
+                                                        <Shield className="w-3 h-3" /> {team.name}
+                                                    </h5>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const ids = teamTravelingPlayers.map(p => p.id);
+                                                            const allSelected = ids.every(id => selectedPlayerIds.includes(id));
+                                                            if (allSelected) {
+                                                                setSelectedPlayerIds(prev => prev.filter(id => !ids.includes(id)));
+                                                            } else {
+                                                                setSelectedPlayerIds(prev => Array.from(new Set([...prev, ...ids])));
+                                                            }
+                                                        }}
+                                                        className="text-[9px] font-bold text-blue-500 hover:text-blue-700"
+                                                    >
+                                                        全选
+                                                    </button>
+                                                </div>
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                                                    {teamTravelingPlayers.map(player => (
+                                                        <button
+                                                            key={player.id}
+                                                            onClick={() => setSelectedPlayerIds(prev => prev.includes(player.id) ? prev.filter(id => id !== player.id) : [...prev, player.id])}
+                                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedPlayerIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md scale-105 ring-2 ring-bvb-yellow' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                                        >
+                                                            <div className="relative">
+                                                                <img src={player.image} className="w-10 h-10 rounded-full object-cover" />
+                                                                {selectedPlayerIds.includes(player.id) && (
+                                                                    <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
+                                                                        <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-center overflow-hidden w-full">
+                                                                <p className={`text-[10px] font-black truncate w-full px-1 ${selectedPlayerIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
+                                                                <p className={`text-[8px] font-bold ${selectedPlayerIds.includes(player.id) ? 'text-bvb-yellow' : 'text-gray-400'}`}>{playerPointsMap[player.id] || 0} PTS</p>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="p-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+                                    <button 
+                                        onClick={() => setSelectedPlayerIds(travelingPlayerIds)}
+                                        className="text-[10px] font-black text-gray-500 uppercase hover:text-bvb-black"
+                                    >
+                                        全选名单球员
+                                    </button>
+                                    <button 
+                                        onClick={() => setSelectedPlayerIds([])}
+                                        className="text-[10px] font-black text-gray-500 uppercase hover:text-red-500"
+                                    >
+                                        清空选择
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Point Actions */}
+                        <div className="space-y-6">
+                            {[
+                                { type: 'gain', title: '加分项目', icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-50', border: 'border-green-100', btnBg: 'bg-green-600' },
+                                { type: 'loss', title: '减分项目', icon: TrendingDown, color: 'text-red-500', bg: 'bg-red-50', border: 'border-red-100', btnBg: 'bg-red-600' },
+                                { type: 'consumption', title: '积分消耗', icon: Coins, color: 'text-bvb-yellow', bg: 'bg-yellow-50', border: 'border-yellow-100', btnBg: 'bg-bvb-black' }
+                            ].map(group => (
+                                <div key={group.type} className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-5`}>
+                                    <h4 className="font-black text-gray-800 text-sm mb-4 flex items-center gap-2 uppercase tracking-tighter">
+                                        <group.icon className={`w-4 h-4 ${group.color}`} /> {group.title}
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {pointItemDefinitions.filter(i => i.type === group.type).map(item => (
+                                            <button
+                                                key={item.id}
+                                                onClick={() => handleRecordPoints(item.id)}
+                                                disabled={selectedPlayerIds.length === 0}
+                                                className={`w-full flex items-center justify-between p-3 rounded-xl ${group.bg} border ${group.border} ${group.color} hover:shadow-md transition-all font-black text-xs disabled:opacity-50`}
+                                            >
+                                                <span>{item.title}</span>
+                                                <span className={`${group.btnBg} text-white px-2 py-0.5 rounded-full text-[10px]`}>
+                                                    {item.isVariable ? '?' : (group.type === 'gain' ? '+' : '-') + item.points}
+                                                </span>
+                                            </button>
+                                        ))}
+                                        {pointItemDefinitions.filter(i => i.type === group.type).length === 0 && (
+                                            <p className="text-[10px] text-gray-400 italic text-center py-4 bg-gray-50 rounded-xl border border-dashed">暂无该类项目</p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )
+            )}
+
+            {activeTab === 'summary' && (
+                travelingPlayerIds.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-20 flex flex-col items-center justify-center border border-dashed border-gray-200 text-gray-400 gap-4">
+                        <Trophy className="w-12 h-12 opacity-20" />
+                        <p className="font-black uppercase tracking-widest text-sm">暂无数据，请先确定外派球员名单</p>
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <div className="bg-gray-50 p-4 border-b border-gray-100">
+                            <h4 className="font-black text-gray-800 text-sm flex items-center gap-2 uppercase italic tracking-tighter">
+                                <Trophy className="w-4 h-4 text-bvb-yellow" /> 积分统计概览 (按出行球员)
+                            </h4>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-xs">
+                                <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                    <tr>
+                                        <th className="px-6 py-4 sticky left-0 bg-gray-50 z-10 w-40">球员姓名</th>
+                                        <th className="px-6 py-4 text-center">累计加分 (+)</th>
+                                        <th className="px-6 py-4 text-center">累计减分 (-)</th>
+                                        <th className="px-6 py-4 text-center">累计消耗 (▼)</th>
+                                        <th className="px-6 py-4 text-right font-black text-bvb-black bg-yellow-50 w-24">当前总积分</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {travelingPlayers.map(player => (
+                                        <tr key={player.id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4 sticky left-0 bg-white z-10">
+                                                <div className="flex items-center gap-2">
+                                                    <img src={player.image} className="w-6 h-6 rounded-full object-cover" />
+                                                    <span className="font-black text-gray-800">{player.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold text-green-600">
+                                                {summaryData[player.id]?.gain || 0}
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold text-red-600">
+                                                {summaryData[player.id]?.loss || 0}
+                                            </td>
+                                            <td className="px-6 py-4 text-center font-bold text-amber-600">
+                                                {summaryData[player.id]?.consumption || 0}
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-black text-bvb-black bg-yellow-50/30">
+                                                <span className={`${(playerPointsMap[player.id] || 0) >= 0 ? 'text-bvb-black' : 'text-red-500'}`}>
+                                                    {playerPointsMap[player.id] || 0}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {/* Total row per item type */}
+                                    <tr className="bg-gray-50/50 font-black">
+                                        <td className="px-6 py-4 sticky left-0 bg-gray-50/50 z-10">全员合计</td>
+                                        <td className="px-6 py-4 text-center text-green-700">
+                                            {travelingPlayerIds.reduce((sum, pid) => sum + (summaryData[pid]?.gain || 0), 0)}
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-red-700">
+                                            {travelingPlayerIds.reduce((sum, pid) => sum + (summaryData[pid]?.loss || 0), 0)}
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-amber-700">
+                                            {travelingPlayerIds.reduce((sum, pid) => sum + (summaryData[pid]?.consumption || 0), 0)}
+                                        </td>
+                                        <td className="px-6 py-4 text-right bg-bvb-yellow/10">
+                                            {travelingPlayerIds.reduce((sum, pid) => sum + (playerPointsMap[pid] || 0), 0)}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )
+            )}
+
+            {activeTab === 'history' && (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="bg-gray-50 p-4 border-b border-gray-100 flex justify-between items-center">
+                        <h4 className="font-black text-gray-800 text-sm flex items-center gap-2 uppercase italic tracking-tighter">
+                            <ClipboardList className="w-4 h-4 text-bvb-yellow" /> 积分录入明细流水
+                        </h4>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black text-gray-400 uppercase">日期筛选:</span>
+                            <input 
+                                type="date" 
+                                value={selectedDate} 
+                                onChange={e => setSelectedDate(e.target.value)}
+                                className="text-xs font-bold p-1 border rounded-lg bg-white"
+                            />
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                <tr>
+                                    <th className="px-6 py-4">球员</th>
+                                    <th className="px-6 py-4">变动项目</th>
+                                    <th className="px-6 py-4 text-center">分值</th>
+                                    <th className="px-6 py-4 text-right">日期</th>
+                                    <th className="px-6 py-4 text-right w-16">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {dailyRecords.map(record => {
+                                    const player = players.find(p => p.id === record.playerId);
+                                    const item = pointItemDefinitions.find(i => i.id === record.itemId);
+                                    if (!player || !item) return null;
+                                    return (
+                                        <tr key={record.id} className="text-xs hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <img src={player.image} className="w-6 h-6 rounded-full object-cover" />
+                                                    <span className="font-black text-gray-800">{player.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${item.type === 'gain' ? 'bg-green-500' : item.type === 'loss' ? 'bg-red-500' : 'bg-bvb-yellow'}`} />
+                                                    <span className="font-bold text-gray-600">{item.title}</span>
+                                                    <span className="text-[10px] text-gray-400 italic">({item.type === 'gain' ? '加分' : item.type === 'loss' ? '减分' : '消耗'})</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`font-black px-2 py-0.5 rounded-full text-[10px] ${item.type === 'gain' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                                    {item.type === 'gain' ? '+' : '-'}{record.points}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right font-mono text-gray-500">{record.date}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button onClick={() => onDeletePointRecord(record.id)} className="p-1.5 hover:bg-red-50 text-gray-300 hover:text-red-500 rounded-lg">
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {dailyRecords.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="text-center py-24">
+                                            <div className="flex flex-col items-center gap-2 text-gray-300">
+                                                <RefreshCw className="w-8 h-8 opacity-20 animate-spin-slow" />
+                                                <p className="text-[10px] font-black uppercase tracking-widest italic">该日无流水记录</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'items' && (
+                <div className="space-y-6">
+                    <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-bvb-yellow w-1 h-8 rounded-full"></div>
+                            <h3 className="font-black text-gray-800 uppercase italic tracking-tighter">分值项目配置管理</h3>
+                        </div>
+                        <button 
+                            onClick={() => setIsAddingItem(true)}
+                            className="bg-bvb-black text-bvb-yellow px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg hover:scale-105 transition-all flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> 新增项目
+                        </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-3 gap-6">
+                        {[
+                            { type: 'gain', title: '加分项配置', icon: TrendingUp, color: 'text-green-500' },
+                            { type: 'loss', title: '减分项配置', icon: TrendingDown, color: 'text-red-500' },
+                            { type: 'consumption', title: '消耗项配置', icon: Coins, color: 'text-bvb-yellow' }
+                        ].map(section => (
+                            <div key={section.type} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col min-h-[300px]">
+                                <h4 className="font-black text-gray-800 text-sm mb-4 uppercase tracking-tighter flex justify-between items-center border-b border-gray-50 pb-2">
+                                    <span>{section.title}</span>
+                                    <section.icon className={`w-4 h-4 ${section.color}`} />
+                                </h4>
+                                <div className="space-y-2 flex-1 scrollbar-hide">
+                                    {pointItemDefinitions.filter(i => i.type === section.type).map(item => (
+                                        <div key={item.id} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 group hover:bg-gray-100 transition-all border border-transparent hover:border-gray-200">
+                                            <div>
+                                                <p className="text-xs font-black text-gray-800 uppercase tracking-tight italic">{item.title}</p>
+                                                <p className="text-[10px] text-gray-400 font-black uppercase italic tracking-tighter">
+                                                    {item.isVariable ? '不定值 (录入时输入)' : `${item.points} PTS`}
+                                                </p>
+                                            </div>
+                                            <button onClick={() => onDeletePointItem(item.id)} className="p-1.5 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {pointItemDefinitions.filter(i => i.type === section.type).length === 0 && (
+                                        <div className="flex-1 flex flex-col items-center justify-center text-gray-200 py-10">
+                                            <Plus className="w-8 h-8 opacity-10" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest opacity-20 italic">暂无项</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {isAddingItem && (
+                <AddPointItemModal 
+                    onClose={() => setIsAddingItem(false)} 
+                    onAdd={(item) => {
+                        onAddPointItem(item);
+                        setIsAddingItem(false);
+                    }} 
+                />
+            )}
+        </div>
+    );
+};
+
+const AddPointItemModal: React.FC<{ onClose: () => void, onAdd: (item: PointItemDefinition) => void }> = ({ onClose, onAdd }) => {
+    const [title, setTitle] = useState('');
+    const [points, setPoints] = useState(1);
+    const [type, setType] = useState<PointChangeType>('gain');
+    const [isVariable, setIsVariable] = useState(false);
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (title.trim()) {
+            onAdd({
+                id: Math.random().toString(36).slice(2, 11),
+                title,
+                points: isVariable ? 0 : points,
+                type,
+                isVariable
+            });
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="bg-bvb-black p-4 flex justify-between items-center text-white">
+                    <h3 className="font-black text-sm uppercase italic flex items-center gap-2">
+                        <Plus className="w-4 h-4 text-bvb-yellow" /> 新增积分管理项
+                    </h3>
+                    <button onClick={onClose}><X className="w-5 h-5" /></button>
+                </div>
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目名称</label>
+                        <input 
+                            required 
+                            className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-sm focus:bg-white transition-all" 
+                            placeholder="如: 进球奖励, 迟到惩罚..." 
+                            value={title} 
+                            onChange={e => setTitle(e.target.value)} 
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目数值类型</label>
+                            <div className="flex items-center gap-4 mt-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" checked={!isVariable} onChange={() => setIsVariable(false)} className="accent-bvb-yellow" />
+                                    <span className="text-xs font-bold text-gray-600">固定分值</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" checked={isVariable} onChange={() => setIsVariable(true)} className="accent-bvb-yellow" />
+                                    <span className="text-xs font-bold text-gray-600">不定值</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">分值 (固定时有效)</label>
+                            <input 
+                                type="number" 
+                                min="1"
+                                disabled={isVariable}
+                                required={!isVariable}
+                                className={`w-full p-3.5 border rounded-xl font-bold outline-none text-sm transition-all ${isVariable ? 'bg-gray-100 text-gray-400 border-gray-100 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:ring-2 focus:ring-bvb-yellow focus:bg-white'}`} 
+                                value={points} 
+                                onChange={e => setPoints(parseInt(e.target.value) || 0)} 
+                            />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">项目分类</label>
+                        <select 
+                            className="w-full p-3.5 bg-gray-50 border border-gray-200 rounded-xl font-bold bg-white text-sm outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
+                            value={type} 
+                            onChange={e => setType(e.target.value as PointChangeType)}
+                        >
+                            <option value="gain">加分项目 (Gain)</option>
+                            <option value="loss">减分项目 (Loss)</option>
+                            <option value="consumption">积分消耗 (Expense)</option>
+                        </select>
+                    </div>
+                    <div className="pt-4">
+                        <button type="submit" className="w-full py-4 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase italic text-sm tracking-widest">
+                            <Save className="w-4 h-4 text-bvb-yellow" /> 保存项目配置
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     );
