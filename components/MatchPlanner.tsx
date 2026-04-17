@@ -1253,24 +1253,39 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                             全选/取消
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                                        {playersByTeam[team.id]?.map(player => (
-                                            <button
-                                                key={player.id}
-                                                onClick={() => toggleSquadSelection(player.id)}
-                                                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${tempSquadIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md scale-[1.02]' : 'bg-white border-gray-100 hover:border-gray-200'}`}
-                                            >
-                                                <div className="relative">
-                                                    <img src={player.image} className="w-10 h-10 rounded-full object-cover" />
-                                                    {tempSquadIds.includes(player.id) && (
-                                                        <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
-                                                            <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                    <div className="flex flex-col gap-2">
+                                        {playersByTeam[team.id]?.map(player => {
+                                            const isSelected = tempSquadIds.includes(player.id);
+                                            return (
+                                                <button
+                                                    key={player.id}
+                                                    onClick={() => toggleSquadSelection(player.id)}
+                                                    className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${isSelected ? 'bg-bvb-black border-bvb-black shadow-md' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="relative shrink-0">
+                                                            <img src={player.image} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                                            {isSelected && (
+                                                                <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
+                                                                    <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <p className={`text-[10px] font-black truncate w-full px-1 text-center ${tempSquadIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
-                                            </button>
-                                        ))}
+                                                        <div className="text-left">
+                                                            <p className={`text-sm font-black ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+                                                                <span className="text-bvb-yellow mr-1">#{player.number}</span> {player.name}
+                                                            </p>
+                                                            <p className={`text-[10px] font-bold ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>
+                                                                {player.position}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center">
+                                                        {isSelected && <CheckCircle className="w-5 h-5 text-bvb-yellow" />}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             ))}
@@ -1341,27 +1356,41 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                                         全选
                                                     </button>
                                                 </div>
-                                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                                                    {teamTravelingPlayers.map(player => (
-                                                        <button
-                                                            key={player.id}
-                                                            onClick={() => setSelectedPlayerIds(prev => prev.includes(player.id) ? prev.filter(id => id !== player.id) : [...prev, player.id])}
-                                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedPlayerIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md scale-105 ring-2 ring-bvb-yellow' : 'bg-white border-gray-100 hover:border-gray-200'}`}
-                                                        >
-                                                            <div className="relative">
-                                                                <img src={player.image} className="w-10 h-10 rounded-full object-cover" />
-                                                                {selectedPlayerIds.includes(player.id) && (
-                                                                    <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
-                                                                        <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                <div className="flex flex-col gap-2">
+                                                    {teamTravelingPlayers.map(player => {
+                                                        const isSelected = selectedPlayerIds.includes(player.id);
+                                                        return (
+                                                            <button
+                                                                key={player.id}
+                                                                onClick={() => setSelectedPlayerIds(prev => isSelected ? prev.filter(id => id !== player.id) : [...prev, player.id])}
+                                                                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${isSelected ? 'bg-bvb-black border-bvb-black shadow-md ring-2 ring-bvb-yellow' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="relative shrink-0">
+                                                                        <img src={player.image} className="w-10 h-10 rounded-full object-cover border border-gray-100" />
+                                                                        {isSelected && (
+                                                                            <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
+                                                                                <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                                            </div>
+                                                                        )}
                                                                     </div>
-                                                                )}
-                                                            </div>
-                                                            <div className="text-center overflow-hidden w-full">
-                                                                <p className={`text-[10px] font-black truncate w-full px-1 ${selectedPlayerIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
-                                                                <p className={`text-[8px] font-bold ${selectedPlayerIds.includes(player.id) ? 'text-bvb-yellow' : 'text-gray-400'}`}>{playerPointsMap[player.id] || 0} PTS</p>
-                                                            </div>
-                                                        </button>
-                                                    ))}
+                                                                    <div className="text-left">
+                                                                        <p className={`text-sm font-black ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+                                                                            <span className="text-bvb-yellow mr-1">#{player.number}</span> {player.name}
+                                                                        </p>
+                                                                        <p className={`text-[10px] font-bold ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>
+                                                                            {player.position}
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className={`text-xs font-black ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>
+                                                                        {playerPointsMap[player.id] || 0} <span className="text-[10px] font-bold">积分</span>
+                                                                    </p>
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         );
