@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, MatchPlan, MatchPlanRequirement, PointItemDefinition, PlayerPointRecord, PointChangeType } from '../types';
 // Comment: Added 'Coins', 'TrendingDown', 'ListPlus' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Send } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 
@@ -799,6 +799,8 @@ const MatchPlanModal: React.FC<MatchPlanModalProps> = ({ plan, teams, players, o
     });
 
     const [activeTab, setActiveTab] = useState<'info' | 'tracking'>('info');
+    const [newTeamReq, setNewTeamReq] = useState('');
+    const [newPlayerReqs, setNewPlayerReqs] = useState<Record<string, string>>({});
 
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === formData.teamId), [players, formData.teamId]);
 
@@ -820,25 +822,26 @@ const MatchPlanModal: React.FC<MatchPlanModalProps> = ({ plan, teams, players, o
         }
     }, [formData, onSave]);
 
-    const addTeamRequirement = useCallback(() => {
-        const text = prompt('输入团队技战术要求:');
-        if (text) {
-            const newReq: MatchPlanRequirement = { id: Math.random().toString(36).slice(2, 11), text, completed: false };
+    const handleAddTeamReq = useCallback(() => {
+        if (newTeamReq.trim()) {
+            const newReq: MatchPlanRequirement = { id: Math.random().toString(36).slice(2, 11), text: newTeamReq.trim(), completed: false };
             setFormData(prev => ({ ...prev, teamRequirements: [...(prev.teamRequirements || []), newReq] }));
+            setNewTeamReq('');
         }
-    }, []);
+    }, [newTeamReq]);
 
-    const addPlayerRequirement = useCallback((playerId: string) => {
-        const text = prompt('输入球员个人技战术要求:');
-        if (text) {
-            const newReq: MatchPlanRequirement = { id: Math.random().toString(36).slice(2, 11), text, completed: false };
+    const handleAddPlayerReq = useCallback((playerId: string) => {
+        const text = newPlayerReqs[playerId];
+        if (text && text.trim()) {
+            const newReq: MatchPlanRequirement = { id: Math.random().toString(36).slice(2, 11), text: text.trim(), completed: false };
             setFormData(prev => {
                 const current = prev.playerRequirements || {};
                 const playerReqs = current[playerId] || [];
                 return { ...prev, playerRequirements: { ...current, [playerId]: [...playerReqs, newReq] } };
             });
+            setNewPlayerReqs(prev => ({ ...prev, [playerId]: '' }));
         }
-    }, []);
+    }, [newPlayerReqs]);
 
     const toggleRequirement = useCallback((type: 'team' | 'player', reqId: string, playerId?: string) => {
         setFormData(prev => {
@@ -914,15 +917,38 @@ const MatchPlanModal: React.FC<MatchPlanModalProps> = ({ plan, teams, players, o
                         <div className="grid md:grid-cols-3 gap-8 animate-in fade-in duration-300">
                             <div className="md:col-span-1 space-y-6">
                                 <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b pb-2">团队要求</h4>
-                                <div className="space-y-2">
-                                    {formData.teamRequirements?.map(req => (
-                                        <div key={req.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group">
-                                            <button onClick={() => toggleRequirement('team', req.id)} className={`p-1 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}><CheckCircle className="w-4 h-4" /></button>
-                                            <span className={`text-xs font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
-                                            <button onClick={() => setFormData(prev => ({ ...prev, teamRequirements: prev.teamRequirements?.filter(r => r.id !== req.id) }))} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
-                                        </div>
-                                    ))}
-                                    <button onClick={addTeamRequirement} className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 hover:text-bvb-black hover:border-bvb-yellow transition-all flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest"><Plus className="w-4 h-4" /> 添加团队要求</button>
+                                <div className="space-y-4">
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={newTeamReq} 
+                                            onChange={e => setNewTeamReq(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && handleAddTeamReq()}
+                                            placeholder="输入新的团队战术要求..."
+                                            className="flex-1 p-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-bvb-yellow shadow-sm transition-all"
+                                        />
+                                        <button 
+                                            onClick={handleAddTeamReq}
+                                            disabled={!newTeamReq.trim()}
+                                            className="p-2.5 bg-bvb-black text-bvb-yellow rounded-xl hover:bg-gray-800 disabled:opacity-50 transition-all shadow-md"
+                                        >
+                                            <Send className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {formData.teamRequirements?.map(req => (
+                                            <div key={req.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                                                <button onClick={() => toggleRequirement('team', req.id)} className={`p-1 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}><CheckCircle className="w-4 h-4" /></button>
+                                                <span className={`text-xs font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
+                                                <button onClick={() => setFormData(prev => ({ ...prev, teamRequirements: prev.teamRequirements?.filter(r => r.id !== req.id) }))} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
+                                            </div>
+                                        ))}
+                                        {formData.teamRequirements?.length === 0 && (
+                                            <div className="text-center py-6 bg-gray-50 rounded-xl border-2 border-dashed border-gray-100">
+                                                <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest italic font-black">暂无团队要求</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div className="md:col-span-2 space-y-6">
@@ -944,28 +970,48 @@ const MatchPlanModal: React.FC<MatchPlanModalProps> = ({ plan, teams, players, o
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <button 
-                                                        onClick={() => addPlayerRequirement(pid)} 
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-bvb-black text-white text-[10px] font-black rounded-lg uppercase tracking-widest hover:bg-gray-800 transition-all"
-                                                    >
-                                                        <Plus className="w-3 h-3 text-bvb-yellow" /> 新增任务
-                                                    </button>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    {playerReqs.map(req => (
-                                                        <div key={req.id} className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-gray-100 group shadow-sm">
-                                                            <button onClick={() => toggleRequirement('player', req.id, pid)} className={`p-0.5 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}><CheckCircle className="w-3.5 h-3.5" /></button>
-                                                            <span className={`text-[11px] font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
-                                                            <button onClick={() => setFormData(prev => {
-                                                                const current = prev.playerRequirements || {};
-                                                                const reqs = current[pid] || [];
-                                                                return { ...prev, playerRequirements: { ...current, [pid]: reqs.filter(r => r.id !== req.id) } };
-                                                            })} className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500"><Trash2 className="w-3 h-3" /></button>
-                                                        </div>
-                                                    ))}
-                                                    {playerReqs.length === 0 && (
-                                                        <p className="text-center text-[10px] text-gray-300 italic py-2">暂无个人任务要求</p>
-                                                    )}
+                                                <div className="space-y-2 mt-4">
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            type="text" 
+                                                            value={newPlayerReqs[pid] || ''} 
+                                                            onChange={e => setNewPlayerReqs(prev => ({...prev, [pid]: e.target.value}))}
+                                                            onKeyDown={e => e.key === 'Enter' && handleAddPlayerReq(pid)}
+                                                            placeholder="输入个人任务..."
+                                                            className="flex-1 p-2 bg-white border border-gray-200 rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-bvb-yellow"
+                                                        />
+                                                        <button 
+                                                            onClick={() => handleAddPlayerReq(pid)}
+                                                            disabled={!(newPlayerReqs[pid] || '').trim()}
+                                                            className="p-2 bg-bvb-black text-bvb-yellow rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-all font-black"
+                                                        >
+                                                            <Plus className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="space-y-1.5 flex flex-col gap-1.5 mt-2">
+                                                        {playerReqs.map(req => (
+                                                            <div key={req.id} className="flex items-center gap-2.5 p-2 bg-white rounded-lg border border-gray-100 group shadow-sm transition-all hover:border-gray-200">
+                                                                <button onClick={() => toggleRequirement('player', req.id, pid)} className={`p-0.5 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}>
+                                                                    <CheckCircle className="w-3.5 h-3.5" />
+                                                                </button>
+                                                                <span className={`text-[11px] font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
+                                                                <button 
+                                                                    onClick={() => setFormData(prev => {
+                                                                        const current = prev.playerRequirements || {};
+                                                                        const reqs = current[pid] || [];
+                                                                        return { ...prev, playerRequirements: { ...current, [pid]: reqs.filter(r => r.id !== req.id) } };
+                                                                    })} 
+                                                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-all"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                        {playerReqs.length === 0 && (
+                                                            <p className="text-center text-[10px] text-gray-300 italic py-2 bg-white/50 rounded-lg border border-dashed border-gray-100">暂无个人任务要求</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -1084,6 +1130,7 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
     currentUser,
     filterTeamId,
     pointItemDefinitions,
+    onAddPointItem,
     onDeletePointItem,
     playerPointRecords,
     onBulkAddPointRecords,
@@ -1125,7 +1172,7 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
         playerPointRecords.forEach(r => {
             const item = pointItemDefinitions.find(i => i.id === r.itemId);
             if (!item) return;
-            const pointsValue = (item.type === 'loss' || item.type === 'consumption') ? -r.points : r.points;
+            const pointsValue = (item.type === 'loss' || item.type === 'consumption') ? -Number(r.points) : Number(r.points);
             map[r.playerId] = (map[r.playerId] || 0) + pointsValue;
         });
         return map;
@@ -1146,7 +1193,7 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
             if (travelingPlayerIds.includes(r.playerId) && data[r.playerId]) {
                 const item = pointItemDefinitions.find(i => i.id === r.itemId);
                 if (item) {
-                   data[r.playerId][item.type] += r.points;
+                   data[r.playerId][item.type] += Number(r.points);
                 }
             }
         });
@@ -1248,27 +1295,42 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                         </h5>
                                         <button 
                                             onClick={() => toggleTeamSquadSelection(team.id)}
-                                            className="text-[10px] font-black uppercase text-gray-400 hover:text-bvb-black"
+                                            className="text-[10px] font-black uppercase text-gray-400 hover:text-bvb-black px-2 py-1 bg-gray-100 rounded-lg"
                                         >
-                                            全选/取消
+                                            全选 / 取消
                                         </button>
                                     </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                                         {playersByTeam[team.id]?.map(player => (
                                             <button
                                                 key={player.id}
                                                 onClick={() => toggleSquadSelection(player.id)}
-                                                className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${tempSquadIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md scale-[1.02]' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                                className={`p-2.5 rounded-xl border flex items-center justify-between transition-all group ${tempSquadIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md' : 'bg-white border-gray-100 hover:border-gray-200'}`}
                                             >
-                                                <div className="relative">
-                                                    <img src={player.image} className="w-10 h-10 rounded-full object-cover" />
-                                                    {tempSquadIds.includes(player.id) && (
-                                                        <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
-                                                            <CheckCircle className="w-3 h-3 text-bvb-black" />
-                                                        </div>
-                                                    )}
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative">
+                                                        <img src={player.image} className="w-9 h-9 rounded-full object-cover border-2 border-transparent group-hover:border-bvb-yellow transition-all" />
+                                                        {tempSquadIds.includes(player.id) && (
+                                                            <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5 shadow-sm">
+                                                                <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className={`text-[11px] font-black leading-tight ${tempSquadIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
+                                                        <p className={`text-[9px] font-bold opacity-60 flex items-center gap-1 ${tempSquadIds.includes(player.id) ? 'text-bvb-yellow' : 'text-gray-500'}`}>
+                                                            <span className="font-black italic">#{player.number}</span>
+                                                            <span className="uppercase tracking-tighter">{player.position}</span>
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className={`text-[10px] font-black truncate w-full px-1 text-center ${tempSquadIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
+                                                {tempSquadIds.includes(player.id) ? (
+                                                    <div className="w-6 h-6 rounded-full bg-bvb-yellow/20 flex items-center justify-center">
+                                                        <Shield className="w-3.5 h-3.5 text-bvb-yellow" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-6 h-6 rounded-full border border-gray-100" />
+                                                )}
                                             </button>
                                         ))}
                                     </div>
@@ -1341,24 +1403,34 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                                         全选
                                                     </button>
                                                 </div>
-                                                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                                     {teamTravelingPlayers.map(player => (
                                                         <button
                                                             key={player.id}
                                                             onClick={() => setSelectedPlayerIds(prev => prev.includes(player.id) ? prev.filter(id => id !== player.id) : [...prev, player.id])}
-                                                            className={`p-3 rounded-xl border flex flex-col items-center gap-2 transition-all ${selectedPlayerIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md scale-105 ring-2 ring-bvb-yellow' : 'bg-white border-gray-100 hover:border-gray-200'}`}
+                                                            className={`p-2.5 rounded-xl border flex items-center justify-between transition-all group ${selectedPlayerIds.includes(player.id) ? 'bg-bvb-black border-bvb-black shadow-md ring-1 ring-bvb-yellow' : 'bg-white border-gray-100 hover:border-gray-200'}`}
                                                         >
-                                                            <div className="relative">
-                                                                <img src={player.image} className="w-10 h-10 rounded-full object-cover" />
-                                                                {selectedPlayerIds.includes(player.id) && (
-                                                                    <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5">
-                                                                        <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="relative">
+                                                                    <img src={player.image} className="w-9 h-9 rounded-full object-cover border-2 border-transparent group-hover:border-bvb-yellow transition-all" />
+                                                                    {selectedPlayerIds.includes(player.id) && (
+                                                                        <div className="absolute -top-1 -right-1 bg-bvb-yellow rounded-full p-0.5 shadow-sm">
+                                                                            <CheckCircle className="w-3 h-3 text-bvb-black" />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="text-left">
+                                                                    <p className={`text-[11px] font-black leading-tight ${selectedPlayerIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
+                                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                                         <p className={`text-[9px] font-bold opacity-60 ${selectedPlayerIds.includes(player.id) ? 'text-bvb-yellow' : 'text-gray-500'}`}>#{player.number} {player.position}</p>
+                                                                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${selectedPlayerIds.includes(player.id) ? 'bg-white/10 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                                                            {playerPointsMap[player.id] || 0} pts
+                                                                         </span>
                                                                     </div>
-                                                                )}
+                                                                </div>
                                                             </div>
-                                                            <div className="text-center overflow-hidden w-full">
-                                                                <p className={`text-[10px] font-black truncate w-full px-1 ${selectedPlayerIds.includes(player.id) ? 'text-white' : 'text-gray-800'}`}>{player.name}</p>
-                                                                <p className={`text-[8px] font-bold ${selectedPlayerIds.includes(player.id) ? 'text-bvb-yellow' : 'text-gray-400'}`}>{playerPointsMap[player.id] || 0} PTS</p>
+                                                            <div className={`w-5 h-5 rounded-full border-2 transition-all flex items-center justify-center ${selectedPlayerIds.includes(player.id) ? 'border-bvb-yellow bg-bvb-yellow' : 'border-gray-100'}`}>
+                                                                {selectedPlayerIds.includes(player.id) && <CheckCircle className="w-3 h-3 text-bvb-black" />}
                                                             </div>
                                                         </button>
                                                     ))}
@@ -1433,7 +1505,42 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                 <Trophy className="w-4 h-4 text-bvb-yellow" /> 积分统计概览 (按出行球员)
                             </h4>
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="md:hidden divide-y divide-gray-50">
+                            {travelingPlayers.map(player => (
+                                <div key={player.id} className="p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <img src={player.image} className="w-8 h-8 rounded-full object-cover border border-gray-100" />
+                                            <div>
+                                                <p className="font-black text-gray-800 text-xs">{player.name}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">#{player.number} {player.position}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">当前总分</p>
+                                            <p className={`text-lg font-black leading-none ${(playerPointsMap[player.id] || 0) >= 0 ? 'text-bvb-black' : 'text-red-500'}`}>
+                                                {playerPointsMap[player.id] || 0}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 py-2 border-t border-gray-50">
+                                        <div className="text-center p-2 bg-green-50 rounded-lg">
+                                            <p className="text-[8px] font-black text-green-700 uppercase mb-1">加分 (+)</p>
+                                            <p className="text-xs font-black text-green-600">{summaryData[player.id]?.gain || 0}</p>
+                                        </div>
+                                        <div className="text-center p-2 bg-red-50 rounded-lg">
+                                            <p className="text-[8px] font-black text-red-700 uppercase mb-1">减分 (-)</p>
+                                            <p className="text-xs font-black text-red-600">{summaryData[player.id]?.loss || 0}</p>
+                                        </div>
+                                        <div className="text-center p-2 bg-amber-50 rounded-lg">
+                                            <p className="text-[8px] font-black text-amber-700 uppercase mb-1">消耗 (▼)</p>
+                                            <p className="text-xs font-black text-amber-600">{summaryData[player.id]?.consumption || 0}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="hidden md:block overflow-x-auto">
                             <table className="w-full text-left text-xs">
                                 <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                     <tr>
@@ -1469,7 +1576,6 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                             </td>
                                         </tr>
                                     ))}
-                                    {/* Total row per item type */}
                                     <tr className="bg-gray-50/50 font-black">
                                         <td className="px-6 py-4 sticky left-0 bg-gray-50/50 z-10">全员合计</td>
                                         <td className="px-6 py-4 text-center text-green-700">
@@ -1508,7 +1614,45 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                             />
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="md:hidden divide-y divide-gray-50">
+                        {dailyRecords.map(record => {
+                            const player = players.find(p => p.id === record.playerId);
+                            const item = pointItemDefinitions.find(i => i.id === record.itemId);
+                            if (!player || !item) return null;
+                            return (
+                                <div key={record.id} className="p-4 space-y-2">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-2">
+                                            <img src={player.image} className="w-8 h-8 rounded-full object-cover" />
+                                            <div>
+                                                <p className="font-black text-gray-800 text-xs">{player.name}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase">#{player.number}</p>
+                                            </div>
+                                        </div>
+                                        <span className={`font-black px-2.5 py-1 rounded-lg text-xs ${item.type === 'gain' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                            {item.type === 'gain' ? '+' : '-'}{record.points}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                        <div className="flex items-center gap-2">
+                                             <span className={`w-2 h-2 rounded-full ${item.type === 'gain' ? 'bg-green-500' : item.type === 'loss' ? 'bg-red-500' : 'bg-bvb-yellow'}`} />
+                                             <span className="text-[11px] font-bold text-gray-700">{item.title}</span>
+                                        </div>
+                                        <button onClick={() => onDeletePointRecord(record.id)} className="p-1 px-2 bg-red-50 text-red-500 rounded text-[10px] font-black flex items-center gap-1">
+                                            <Trash2 className="w-3 h-3" /> 删除
+                                        </button>
+                                    </div>
+                                    <p className="text-[9px] text-gray-400 font-mono text-right">{record.date}</p>
+                                </div>
+                            );
+                        })}
+                        {dailyRecords.length === 0 && (
+                            <div className="py-20 text-center">
+                                <p className="text-[10px] font-black text-gray-300 uppercase italic tracking-widest italic font-black">该日无流水记录</p>
+                            </div>
+                        )}
+                    </div>
+                    <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                                 <tr>
