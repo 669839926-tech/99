@@ -341,7 +341,7 @@ interface RechargeModalProps {
     onSubmit: (amount: number, quota: number) => void;
 }
 const RechargeModal: React.FC<RechargeModalProps> = ({ player, onClose, onSubmit }) => {
-    const [amount, setAmount] = useState<string>('10'); const [quota, setQuota] = useState<string>('0');
+    const [amount, setAmount] = useState<string>('8'); const [quota, setQuota] = useState<string>('0');
     if (!player) return null;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -368,7 +368,7 @@ interface BulkRechargeModalProps {
     onSubmit: (amount: number, quota: number) => void;
 }
 const BulkRechargeModal: React.FC<BulkRechargeModalProps> = ({ count, onClose, onSubmit }) => {
-    const [amount, setAmount] = useState<string>('10'); const [quota, setQuota] = useState<string>('0');
+    const [amount, setAmount] = useState<string>('8'); const [quota, setQuota] = useState<string>('0');
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in duration-200">
