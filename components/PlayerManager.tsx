@@ -1228,7 +1228,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     if (!p || !p.name) return false;
     const shouldIgnoreTeamFilter = showDraftsOnly && isDirector; 
     const matchesTeam = selectedTeamId === 'all' 
-      ? (isDirector ? true : availableTeams.some(t => t.id === p.teamId))
+      ? (isDirector ? (p.teamId !== 'unassigned') : availableTeams.some(t => t.id === p.teamId))
       : (shouldIgnoreTeamFilter || p.teamId === selectedTeamId);
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
     const posVal = (p.position || '').toString(); 
@@ -1536,7 +1536,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       <div className="w-full md:w-64 flex-shrink-0 flex flex-col space-y-4">
         <div className="flex justify-between items-center md:block"><h2 className="text-3xl font-black text-bvb-black uppercase hidden md:block mb-4">球队管理</h2>{isDirector && <button onClick={() => setShowAddTeamModal(true)} className="text-xs flex items-center text-gray-500 hover:text-bvb-black font-bold border border-gray-300 rounded-full px-3 py-1 md:w-full md:justify-center md:py-2 md:border-2 md:border-dashed md:hover:border-bvb-yellow md:hover:bg-yellow-50"><Plus className="w-3 h-3 mr-1" /> 新建梯队</button>}</div>
         <div className="md:hidden overflow-x-auto pb-2 flex space-x-2 no-scrollbar">
-          <button onClick={() => setSelectedTeamId('all')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'all' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>全部球员 ({isDirector ? players.length : players.filter(p => availableTeams.some(t => t.id === p.teamId)).length})</button>
+          <button onClick={() => setSelectedTeamId('all')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'all' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>全部球员 ({isDirector ? players.filter(p => p.teamId !== 'unassigned').length : players.filter(p => availableTeams.some(t => t.id === p.teamId)).length})</button>
           {availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === team.id ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{team.name} ({players.filter(p => p.teamId === team.id).length})</button>)}
           <button onClick={() => setSelectedTeamId('unassigned')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'unassigned' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>待分配 ({players.filter(p => p.teamId === 'unassigned').length})</button>
         </div>
@@ -1545,7 +1545,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             <div className="flex justify-between items-center">
               <h3 className={`font-bold ${selectedTeamId === 'all' ? 'text-bvb-black' : ''}`}>全部球员</h3>
               <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
-                {isDirector ? players.length : players.filter(p => availableTeams.some(t => t.id === p.teamId)).length}
+                {isDirector ? players.filter(p => p.teamId !== 'unassigned').length : players.filter(p => availableTeams.some(t => t.id === p.teamId)).length}
               </span>
             </div>
             <p className="text-xs text-gray-400 mt-1">{isDirector ? '俱乐部所有在册球员' : '您负责的所有梯队球员'}</p>

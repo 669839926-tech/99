@@ -67,7 +67,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
 
     const displayPlayers = useMemo(() => {
         const basePlayers = isDirector 
-            ? players 
+            ? players.filter(p => p.teamId !== 'unassigned')
             : players.filter(p => currentUser?.teamIds?.includes(p.teamId));
         return basePlayers.filter(p => selectedTeamId === 'all' || p.teamId === selectedTeamId);
     }, [players, selectedTeamId, currentUser, isDirector]);

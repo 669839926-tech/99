@@ -100,7 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [teams, isDirector, managedTeamIds]);
 
   const displayPlayers = useMemo(() => {
-      if (isDirector) return players;
+      if (isDirector) return players.filter(p => p.teamId !== 'unassigned');
       return players.filter(p => managedTeamIds.includes(p.teamId));
   }, [players, isDirector, managedTeamIds]);
 
