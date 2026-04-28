@@ -36,7 +36,7 @@ export interface Team {
   id: string;
   name: string;
   level: string;
-  attribute?: '兴趣' | '竞技';
+  attribute?: string; // e.g. '启蒙' | '成长' | '挑战' | '兴趣' | '竞技'
   description?: string;
 }
 
