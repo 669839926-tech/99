@@ -1081,7 +1081,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, star
             <div className="flex justify-between items-center mb-1.5 md:mb-2">
                 <span className="text-[9px] md:text-[10px] font-black uppercase text-gray-400 flex items-center tracking-widest"><Calendar className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> {match.date} • {match.time}</span>
                 <div className="flex items-center gap-1.5 md:gap-2 pr-10 md:pr-0">
-                    <span className="text-[8px] md:text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 rounded border border-gray-200">{team?.level}</span>
+                    <span className="text-[8px] md:text-[10px] bg-gray-100 text-gray-500 font-bold px-1.5 rounded border border-gray-200">{team?.name}</span>
                     <span className={`px-1.5 py-0.5 text-[8px] md:text-[10px] font-black rounded uppercase tracking-tighter ${match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-gray-200 text-gray-600'}`}>{getLocationLabel(match.location)}</span>
                 </div>
             </div>

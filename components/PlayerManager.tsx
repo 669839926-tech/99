@@ -1198,7 +1198,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
   }, [selectedTeamId]);
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
   const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
-  const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: 'U17', attribute: '兴趣', description: '' });
+  const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: '', attribute: '兴趣', description: '' });
   
   const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const id = e.target.value; const updates: Partial<Player> = { idCard: id };
@@ -1400,10 +1400,25 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }
   };
 
-  const handleAddTeamSubmit = (e: React.FormEvent) => { e.preventDefault(); if (newTeam.name && newTeam.level) { const t: Team = { id: `t-${Date.now()}`, name: newTeam.name!, level: newTeam.level!, attribute: newTeam.attribute as any, description: newTeam.description || '新组建的梯队' }; onAddTeam(t); setSelectedTeamId(t.id); setShowAddTeamModal(false); setNewTeam({ name: '', level: 'U17', attribute: '兴趣', description: '' }); } };
+  const handleAddTeamSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newTeam.name) {
+      const t: Team = {
+        id: `t-${Date.now()}`,
+        name: newTeam.name!,
+        level: '',
+        attribute: newTeam.attribute as any,
+        description: newTeam.description || '新组建的梯队'
+      };
+      onAddTeam(t);
+      setSelectedTeamId(t.id);
+      setShowAddTeamModal(false);
+      setNewTeam({ name: '', level: '', attribute: '兴趣', description: '' });
+    }
+  };
   const handleUpdateTeamSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (teamToEdit && teamToEdit.name && teamToEdit.level) {
+      if (teamToEdit && teamToEdit.name) {
           onUpdateTeam(teamToEdit);
           setShowEditTeamModal(false);
           setTeamToEdit(null);
@@ -1521,9 +1536,9 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       <div className="w-full md:w-64 flex-shrink-0 flex flex-col space-y-4">
         <div className="flex justify-between items-center md:block"><h2 className="text-3xl font-black text-bvb-black uppercase hidden md:block mb-4">球队管理</h2>{isDirector && <button onClick={() => setShowAddTeamModal(true)} className="text-xs flex items-center text-gray-500 hover:text-bvb-black font-bold border border-gray-300 rounded-full px-3 py-1 md:w-full md:justify-center md:py-2 md:border-2 md:border-dashed md:hover:border-bvb-yellow md:hover:bg-yellow-50"><Plus className="w-3 h-3 mr-1" /> 新建梯队</button>}</div>
         <div className="md:hidden overflow-x-auto pb-2 flex space-x-2 no-scrollbar">
-          <button onClick={() => setSelectedTeamId('all')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'all' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>全部球员</button>
-          {availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === team.id ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{team.name}</button>)}
-          <button onClick={() => setSelectedTeamId('unassigned')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'unassigned' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>待分配</button>
+          <button onClick={() => setSelectedTeamId('all')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'all' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>全部球员 ({isDirector ? players.length : players.filter(p => availableTeams.some(t => t.id === p.teamId)).length})</button>
+          {availableTeams.map(team => <button key={team.id} onClick={() => setSelectedTeamId(team.id)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === team.id ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{team.name} ({players.filter(p => p.teamId === team.id).length})</button>)}
+          <button onClick={() => setSelectedTeamId('unassigned')} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all ${selectedTeamId === 'unassigned' ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>待分配 ({players.filter(p => p.teamId === 'unassigned').length})</button>
         </div>
         <div className="hidden md:flex flex-col space-y-2">
           <button onClick={() => setSelectedTeamId('all')} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 mb-2 ${selectedTeamId === 'all' ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}>
@@ -1535,14 +1550,40 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </div>
             <p className="text-xs text-gray-400 mt-1">{isDirector ? '俱乐部所有在册球员' : '您负责的所有梯队球员'}</p>
           </button>
-          {availableTeams.map(team => (<div key={team.id} className="relative group"><button onClick={() => setSelectedTeamId(team.id)} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 ${selectedTeamId === team.id ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}><div className="flex items-center gap-2">
-            <h3 className={`font-bold ${selectedTeamId === team.id ? 'text-bvb-black' : ''}`}>{team.name}</h3>
-            {team.attribute && (
-                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded leading-none ${team.attribute === '竞技' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
-                    {team.attribute}
-                </span>
-            )}
-        </div><p className="text-xs text-gray-400 mt-1">{team.description}</p></button>{isDirector && (<div className="absolute top-4 right-2 flex items-center opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white/80 rounded-lg p-1 shadow-sm"><button onClick={(e) => { e.stopPropagation(); setTeamToEdit(team); setShowEditTeamModal(true); }} className="p-1.5 text-gray-400 hover:text-bvb-black transition-colors" title="修改梯队分组"><Edit2 className="w-4 h-4" /></button><button onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这支球队吗？删除后该队球员将自动转入“待分配”列表，不会被删除。')) { onDeleteTeam(team.id); } }} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="删除球队"><Trash2 className="w-4 h-4" /></button></div>)}</div>))}<button onClick={() => setSelectedTeamId('unassigned')} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 mt-2 ${selectedTeamId === 'unassigned' ? 'bg-white border-gray-400 shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}><div className="flex justify-between items-center"><h3 className={`font-bold ${selectedTeamId === 'unassigned' ? 'text-gray-800' : ''}`}>待分配球员</h3><span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{players.filter(p => p.teamId === 'unassigned').length}</span></div><p className="text-xs text-gray-400 mt-1">暂无归属梯队的球员</p></button></div>
+          {availableTeams.map(team => {
+            const teamPlayerCount = players.filter(p => p.teamId === team.id).length;
+            return (
+              <div key={team.id} className="relative group">
+                <button onClick={() => setSelectedTeamId(team.id)} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 ${selectedTeamId === team.id ? 'bg-white border-bvb-yellow shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <h3 className={`font-bold ${selectedTeamId === team.id ? 'text-bvb-black' : ''}`}>{team.name}</h3>
+                      {team.attribute && (
+                        <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded leading-none ${
+                          team.attribute === '竞技' ? 'bg-red-500 text-white' : 
+                          team.attribute === '精英' ? 'bg-yellow-500 text-black' : 
+                          team.attribute === '基础' ? 'bg-green-500 text-white' : 
+                          'bg-blue-500 text-white'
+                        }`}>
+                          {team.attribute}
+                        </span>
+                      )}
+                    </div>
+                    <span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                      {teamPlayerCount}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">{team.description}</p>
+                </button>
+                {isDirector && (
+                  <div className="absolute top-4 right-10 flex items-center opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white/80 rounded-lg p-1 shadow-sm">
+                    <button onClick={(e) => { e.stopPropagation(); setTeamToEdit(team); setShowEditTeamModal(true); }} className="p-1.5 text-gray-400 hover:text-bvb-black transition-colors" title="修改梯队分组"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); if (confirm('确定要删除这支球队吗？删除后该队球员将自动转入“待分配”列表，不会被删除。')) { onDeleteTeam(team.id); } }} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="删除球队"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                )}
+              </div>
+            );
+          })}<button onClick={() => setSelectedTeamId('unassigned')} className={`w-full text-left p-4 rounded-xl transition-all border-l-4 mt-2 ${selectedTeamId === 'unassigned' ? 'bg-white border-gray-400 shadow-md transform translate-x-2' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-white hover:shadow-sm'}`}><div className="flex justify-between items-center"><h3 className={`font-bold ${selectedTeamId === 'unassigned' ? 'text-gray-800' : ''}`}>待分配球员</h3><span className="bg-gray-200 text-gray-600 text-xs font-bold px-2 py-0.5 rounded-full">{players.filter(p => p.teamId === 'unassigned').length}</span></div><p className="text-xs text-gray-400 mt-1">暂无归属梯队的球员</p></button></div>
       </div>
       <div className="flex-1 flex flex-col min-h-0">
         <div className="bg-white p-4 rounded-xl shadow-sm mb-4 flex flex-col sm:flex-row justify-between items-center gap-4"><div className="flex w-full sm:w-auto items-center gap-3"><div className="flex items-center bg-gray-100 px-3 py-2 rounded-lg flex-1 sm:w-64"><Search className="w-5 h-5 text-gray-400 mr-2" /><input placeholder="搜索球员..." className="bg-transparent border-none focus:outline-none text-sm w-full bg-white px-2 rounded" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}/></div><div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg shrink-0"><div className="relative"><select className="appearance-none bg-transparent pl-3 pr-8 py-1.5 rounded-md text-xs font-bold text-gray-600 focus:outline-none cursor-pointer hover:text-bvb-black" value={sortField} onChange={(e) => setSortField(e.target.value as any)}><option value="default">默认 (按入队时间)</option><option value="position">主位置</option><option value="age">出生年月</option><option value="rating">综合评分</option><option value="attendance">出勤率</option><option value="credits">课时余额</option></select><ArrowUpDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" /></div>{sortField !== 'default' && (<button onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')} className="p-1.5 bg-white shadow-sm rounded-md text-gray-600 hover:text-bvb-black transition-colors">{sortDirection === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}</button>)}</div><div className="flex bg-gray-100 p-1 rounded-lg shrink-0"><button onClick={() => setViewMode('list')} className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`} title="列表视图"><LayoutList className="w-4 h-4" /></button><button onClick={() => setViewMode('grid')} className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`} title="网格视图"><LayoutGrid className="w-4 h-4" /></button></div></div><div className="flex w-full sm:w-auto items-center gap-2 overflow-x-auto no-scrollbar"><div className="flex gap-1 p-1 bg-gray-100 rounded-lg shrink-0">{['全部', '前锋', '中场', '后卫', '门将'].map(pos => <button key={pos} onClick={() => setFilterPos(pos)} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-colors ${filterPos === pos ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-500'}`}>{pos}</button>)}</div><button onClick={() => setShowDraftsOnly(!showDraftsOnly)} className={`px-3 py-1 rounded text-xs font-bold whitespace-nowrap transition-colors border flex items-center gap-1 shrink-0 ${showDraftsOnly ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}><ClipboardCheck className="w-3 h-3" /> 草稿箱</button></div><div className="flex gap-2 w-full sm:w-auto justify-end">
@@ -1596,7 +1637,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
                         {filteredPlayers.map((p, i) => (
                             <tr key={p.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
                                 <td className="p-2 border border-gray-100"><div className="font-black text-xs">{p.name}</div><div className="text-[8px] text-gray-400 font-mono">#{p.number}</div></td>
-                                <td className="p-2 border border-gray-100"><div className="text-[9px] font-bold">{teams.find(t => t.id === p.teamId)?.level || '待分配'}</div><div className="text-[8px] text-gray-400 truncate">{p.position}</div></td>
+                                <td className="p-2 border border-gray-100"><div className="text-[9px] font-bold">{teams.find(t => t.id === p.teamId)?.name || '待分配'}</div><div className="text-[8px] text-gray-400 truncate">{p.position}</div></td>
                                 <td className="p-2 border border-gray-100 font-mono text-[9px] font-black tracking-tighter">{p.idCard || '-'}</td>
                                 <td className="p-2 border border-gray-100 text-[9px] font-mono">{p.birthDate || '-'}</td>
                                 <td className="p-2 border border-gray-100"><div className="text-[9px] font-bold">{p.parentPhone || '-'}</div><div className="text-[7px] text-gray-400 uppercase">Parent: {p.parentName || '-'}</div></td>
@@ -1610,7 +1651,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             </div>
         </div>
         </div>)}
-        {viewMode === 'grid' && (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-10 custom-scrollbar pr-2 flex-1">{filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const ratingVal = parseFloat(getOverallRating(player)); const birthday = getBirthdayStatus(player.birthDate); return (<div key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`bg-white rounded-2xl p-4 shadow-sm border-2 transition-all relative group cursor-pointer hover:shadow-md ${isSelected ? 'border-bvb-yellow ring-2 ring-bvb-yellow/20 translate-y-[-4px]' : 'border-transparent hover:border-gray-200'}`}>{isSelectionMode && (<div className="absolute top-3 left-3 z-10"><input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded text-bvb-black" /></div>)}<div className="absolute top-4 right-4 flex flex-col items-end gap-1.5"><div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${ratingVal >= 8 ? 'bg-green-100 text-green-700' : ratingVal >= 6 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>OVR: {getOverallRating(player)}</div>{player.isCaptain && <Crown className="w-4 h-4 text-bvb-yellow fill-current" />}</div><div className="flex flex-col items-center mt-2 mb-4"><div className="relative"><img src={player.image} alt={player.name} className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg bg-gray-50" />{birthday && <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border-2 border-white shadow-md ${birthday.color}`}><Cake className="w-3 h-3 text-white" /></div>}</div><h3 className="mt-3 font-black text-gray-800 text-lg flex items-center gap-1.5">{player.name}</h3><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">#{player.number} • {teams.find(t => t.id === player.teamId)?.level || '待分配'}</p>{player.birthDate && <p className="text-[9px] text-gray-400 font-mono mt-1">{player.birthDate}</p>}</div><div className="grid grid-cols-2 gap-2"><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">主位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded text-white ${getPosColor(player.position)}`}>{player.position}</span></div><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">第二位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded border ${getPosColorLight(player.secondaryPosition || Position.TBD)}`}>{player.secondaryPosition || Position.TBD}</span></div></div><div className="mt-4 flex justify-between items-center"><div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase">剩余课时</span><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500' : 'text-gray-800'}`}>{player.credits} 节</span></div><button onClick={(e) => openRechargeModal(e, player.id)} className="p-2 bg-gray-50 rounded-xl hover:bg-yellow-50 text-gray-400 hover:text-bvb-black transition-colors"><Plus className="w-4 h-4" /></button></div></div>); })}</div>)}
+        {viewMode === 'grid' && (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-10 custom-scrollbar pr-2 flex-1">{filteredPlayers.map((player) => { const isSelected = selectedIds.has(player.id); const ratingVal = parseFloat(getOverallRating(player)); const birthday = getBirthdayStatus(player.birthDate); return (<div key={player.id} onClick={() => { if (isSelectionMode) toggleSelection(player.id); else setSelectedPlayer(player); }} className={`bg-white rounded-2xl p-4 shadow-sm border-2 transition-all relative group cursor-pointer hover:shadow-md ${isSelected ? 'border-bvb-yellow ring-2 ring-bvb-yellow/20 translate-y-[-4px]' : 'border-transparent hover:border-gray-200'}`}>{isSelectionMode && (<div className="absolute top-3 left-3 z-10"><input type="checkbox" checked={isSelected} onChange={() => toggleSelection(player.id)} onClick={(e) => e.stopPropagation()} className="w-4 h-4 rounded text-bvb-black" /></div>)}<div className="absolute top-4 right-4 flex flex-col items-end gap-1.5"><div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${ratingVal >= 8 ? 'bg-green-100 text-green-700' : ratingVal >= 6 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>OVR: {getOverallRating(player)}</div>{player.isCaptain && <Crown className="w-4 h-4 text-bvb-yellow fill-current" />}</div><div className="flex flex-col items-center mt-2 mb-4"><div className="relative"><img src={player.image} alt={player.name} className="w-20 h-20 rounded-full object-cover border-4 border-white shadow-lg bg-gray-50" />{birthday && <div className={`absolute -bottom-1 -right-1 p-1.5 rounded-full border-2 border-white shadow-md ${birthday.color}`}><Cake className="w-3 h-3 text-white" /></div>}</div><h3 className="mt-3 font-black text-gray-800 text-lg flex items-center gap-1.5">{player.name}</h3><p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">#{player.number} • {teams.find(t => t.id === player.teamId)?.name || '待分配'}</p>{player.birthDate && <p className="text-[9px] text-gray-400 font-mono mt-1">{player.birthDate}</p>}</div><div className="grid grid-cols-2 gap-2"><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">主位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded text-white ${getPosColor(player.position)}`}>{player.position}</span></div><div className="bg-gray-50 p-2 rounded-xl flex flex-col items-center"><span className="text-[9px] font-black text-gray-400 uppercase">第二位置</span><span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded border ${getPosColorLight(player.secondaryPosition || Position.TBD)}`}>{player.secondaryPosition || Position.TBD}</span></div></div><div className="mt-4 flex justify-between items-center"><div className="flex flex-col"><span className="text-[9px] font-black text-gray-400 uppercase">剩余课时</span><span className={`text-sm font-black ${player.credits <= 5 ? 'text-red-500' : 'text-gray-800'}`}>{player.credits} 节</span></div><button onClick={(e) => openRechargeModal(e, player.id)} className="p-2 bg-gray-50 rounded-xl hover:bg-yellow-50 text-gray-400 hover:text-bvb-black transition-colors"><Plus className="w-4 h-4" /></button></div></div>); })}</div>)}
       </div>
 
       {/* Modals */}
@@ -1645,30 +1686,64 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       {showImportModal && <ImportPlayersModal teams={teams} attributeConfig={attributeConfig} onImport={onBulkAddPlayers} onClose={() => setShowImportModal(false)} />}
       {showAddTeamModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200 flex flex-col">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200 flex flex-col relative">
+                  <button onClick={() => setShowAddTeamModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                      <X className="w-5 h-5" />
+                  </button>
                   <h3 className="font-bold text-lg mb-4 flex items-center"><Shield className="w-5 h-5 mr-2 text-bvb-yellow" /> 新建梯队分组</h3>
                   <form onSubmit={handleAddTeamSubmit} className="space-y-4">
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">梯队名称</label><input required className="w-full p-2 border rounded font-bold" placeholder="例如: 2012 精英队" value={newTeam.name} onChange={e => setNewTeam({...newTeam, name: e.target.value})} /></div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">组别</label><input required className="w-full p-2 border rounded font-black" placeholder="例如: U11" value={newTeam.level} onChange={e => setNewTeam({...newTeam, level: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球队属性</label><select className="w-full p-2 border rounded font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow" value={newTeam.attribute} onChange={e => setNewTeam({...newTeam, attribute: e.target.value as any})}><option value="兴趣">兴趣</option><option value="竞技">竞技</option></select></div>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">球队属性</label>
+                          <input 
+                            list="team-attributes"
+                            className="w-full p-2 border rounded font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow" 
+                            value={newTeam.attribute} 
+                            onChange={e => setNewTeam({...newTeam, attribute: e.target.value})}
+                            placeholder="选择或输入属性"
+                          />
+                          <datalist id="team-attributes">
+                            <option value="兴趣" />
+                            <option value="竞技" />
+                            <option value="精英" />
+                            <option value="基础" />
+                          </datalist>
+                        </div>
                       </div>
-                      <button type="submit" className="w-full py-3 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-md">创建梯队</button>
+                      <div className="flex gap-3">
+                          <button type="button" onClick={() => setShowAddTeamModal(false)} className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-lg hover:bg-gray-200 transition-colors">取消</button>
+                          <button type="submit" className="flex-[2] py-3 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-md">创建梯队</button>
+                      </div>
                   </form>
               </div>
           </div>
       )}
       {showEditTeamModal && teamToEdit && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200 flex flex-col">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200 flex flex-col relative">
+                  <button onClick={() => setShowEditTeamModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+                      <X className="w-5 h-5" />
+                  </button>
                   <h3 className="font-bold text-lg mb-4 flex items-center"><Edit2 className="w-5 h-5 mr-2 text-bvb-yellow" /> 编辑梯队信息</h3>
                   <form onSubmit={handleUpdateTeamSubmit} className="space-y-4">
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">梯队名称</label><input required className="w-full p-2 border rounded font-bold" value={teamToEdit.name} onChange={e => setTeamToEdit({...teamToEdit, name: e.target.value})} /></div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">组别</label><input required className="w-full p-2 border rounded font-black" value={teamToEdit.level} onChange={e => setTeamToEdit({...teamToEdit, level: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">球队属性</label><select className="w-full p-2 border rounded font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow" value={teamToEdit.attribute || '兴趣'} onChange={e => setTeamToEdit({...teamToEdit, attribute: e.target.value as any})}><option value="兴趣">兴趣</option><option value="竞技">竞技</option></select></div>
+                      <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">球队属性</label>
+                          <input 
+                            list="team-attributes"
+                            className="w-full p-2 border rounded font-bold bg-white outline-none focus:ring-2 focus:ring-bvb-yellow" 
+                            value={teamToEdit.attribute || ''} 
+                            onChange={e => setTeamToEdit({...teamToEdit, attribute: e.target.value})}
+                            placeholder="选择或输入属性"
+                          />
+                        </div>
                       </div>
-                      <button type="submit" className="w-full py-3 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-md">保存修改</button>
+                      <div className="flex gap-3">
+                          <button type="button" onClick={() => setShowEditTeamModal(false)} className="flex-1 py-3 bg-gray-100 text-gray-600 font-bold rounded-lg hover:bg-gray-200 transition-colors">取消</button>
+                          <button type="submit" className="flex-[2] py-3 bg-bvb-black text-white font-bold rounded-lg hover:bg-gray-800 transition-colors shadow-md">保存修改</button>
+                      </div>
                   </form>
               </div>
           </div>

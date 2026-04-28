@@ -889,7 +889,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     className="text-[10px] md:text-xs bg-gray-100 border-none rounded-lg px-2 py-1 font-black outline-none focus:ring-2 focus:ring-bvb-yellow"
                                 >
                                     <option value="all">全部梯队</option>
-                                    {teams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
                                 <button 
                                     onClick={handleExportCreditsPDF} 
@@ -1065,7 +1065,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                         <select value={attendanceTeamId} onChange={e => setAttendanceTeamId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black">
                             <option value="all">所有梯队</option>
-                            {displayTeams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                            {displayTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                         
                         <select value={attendancePlayerId} onChange={e => setAttendancePlayerId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black max-w-[120px]">
@@ -1393,7 +1393,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                             <select value={rechargeTeamId} onChange={e => setRechargeTeamId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black">
                                 <option value="all">所有梯队</option>
-                                {displayTeams.map(t => <option key={t.id} value={t.id}>{t.level}</option>)}
+                                {displayTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                             </select>
                             
                             <select value={rechargePlayerId} onChange={e => setRechargePlayerId(e.target.value)} className="text-[10px] md:text-xs p-1.5 bg-white border border-gray-200 rounded-lg font-black max-w-[120px]">

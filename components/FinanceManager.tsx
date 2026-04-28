@@ -320,7 +320,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
                 return { 
                     teamId, 
-                    teamName: teams.find(t => t.id === teamId)?.level || '未知',
+                    teamName: teams.find(t => t.id === teamId)?.name || '未知',
                     teamSize, 
                     sessionCount: monthlySessions.length, 
                     singleSessionFee,

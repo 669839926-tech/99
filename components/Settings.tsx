@@ -756,7 +756,7 @@ const Settings: React.FC<SettingsProps> = ({
                                             <span className="flex items-center gap-1 font-mono">ID: {u.username}</span>
                                             {(u.teamIds && u.teamIds.length > 0) && (
                                                 <span className="flex items-center gap-1 text-blue-500">
-                                                    <Shirt className="w-3 h-3" /> 负责: {u.teamIds.map(tid => teams.find(t => t.id === tid)?.level || tid).join(', ')}
+                                                    <Shirt className="w-3 h-3" /> 负责: {u.teamIds.map(tid => teams.find(t => t.id === tid)?.name || tid).join(', ')}
                                                 </span>
                                             )}
                                         </div>
