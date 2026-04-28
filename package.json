@@ -28,6 +28,9 @@
     "use-image": "^1.1.4",
     "xlsx": "^0.18.5"
   },
+  "overrides": {
+    "node-domexception": "file:./patches/node-domexception"
+  },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@typescript-eslint/eslint-plugin": "^8.56.1",

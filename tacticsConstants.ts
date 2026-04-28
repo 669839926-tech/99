@@ -1,5 +1,5 @@
 
-import { GameFormat, FormationTemplate } from './types';
+import { FormationTemplate } from './types';
 
 export const FORMATIONS: FormationTemplate[] = [
     // 11v11
