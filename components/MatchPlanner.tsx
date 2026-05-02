@@ -1143,6 +1143,7 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
     const [activeTab, setActiveTab] = useState<'squad' | 'record' | 'summary' | 'history' | 'items'>('squad');
     const [tempSquadIds, setTempSquadIds] = useState<string[]>(travelingPlayerIds || []);
     const [isAddingItem, setIsAddingItem] = useState(false);
+    const [summaryViewMode, setSummaryViewMode] = useState<'all' | 'daily'>('all');
 
     const isDirector = currentUser?.role === 'director';
     const availableTeams = useMemo(() => {
@@ -1190,6 +1191,7 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
         });
 
         playerPointRecords.forEach(r => {
+            if (summaryViewMode === 'daily' && r.date !== selectedDate) return;
             if (travelingPlayerIds.includes(r.playerId) && data[r.playerId]) {
                 const item = pointItemDefinitions.find(i => i.id === r.itemId);
                 if (item) {
@@ -1198,7 +1200,7 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
             }
         });
         return data;
-    }, [playerPointRecords, pointItemDefinitions, travelingPlayerIds]);
+    }, [playerPointRecords, pointItemDefinitions, travelingPlayerIds, summaryViewMode, selectedDate]);
 
     const handleRecordPoints = (itemId: string) => {
         if (selectedPlayerIds.length === 0) return;
@@ -1500,10 +1502,34 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                     </div>
                 ) : (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="bg-gray-50 p-4 border-b border-gray-100">
+                        <div className="bg-gray-50 p-4 border-b border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
                             <h4 className="font-black text-gray-800 text-sm flex items-center gap-2 uppercase italic tracking-tighter">
-                                <Trophy className="w-4 h-4 text-bvb-yellow" /> 积分统计概览 (按出行球员)
+                                <Trophy className="w-4 h-4 text-bvb-yellow" /> 积分统计概览 {summaryViewMode === 'daily' ? `(${selectedDate})` : '(所有时期)'}
                             </h4>
+                            <div className="flex items-center gap-2">
+                                <div className="flex bg-gray-200 p-0.5 rounded-lg border border-gray-200">
+                                    <button 
+                                        onClick={() => setSummaryViewMode('all')}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-black transition-all ${summaryViewMode === 'all' ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        累计统计
+                                    </button>
+                                    <button 
+                                        onClick={() => setSummaryViewMode('daily')}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-black transition-all ${summaryViewMode === 'daily' ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-500'}`}
+                                    >
+                                        按日统计
+                                    </button>
+                                </div>
+                                {summaryViewMode === 'daily' && (
+                                    <input 
+                                        type="date" 
+                                        value={selectedDate} 
+                                        onChange={e => setSelectedDate(e.target.value)}
+                                        className="text-xs font-bold p-1 border rounded-lg bg-white"
+                                    />
+                                )}
+                            </div>
                         </div>
                         <div className="md:hidden divide-y divide-gray-50">
                             {travelingPlayers.map(player => (
@@ -1517,10 +1543,18 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">当前总分</p>
-                                            <p className={`text-lg font-black leading-none ${(playerPointsMap[player.id] || 0) >= 0 ? 'text-bvb-black' : 'text-red-500'}`}>
-                                                {playerPointsMap[player.id] || 0}
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
+                                                {summaryViewMode === 'daily' ? '当日变动' : '当前总积分'}
                                             </p>
+                                            {(() => {
+                                                const playerDayNet = (summaryData[player.id]?.gain || 0) - (summaryData[player.id]?.loss || 0) - (summaryData[player.id]?.consumption || 0);
+                                                const displayValue = summaryViewMode === 'daily' ? playerDayNet : (playerPointsMap[player.id] || 0);
+                                                return (
+                                                    <p className={`text-lg font-black leading-none ${displayValue >= 0 ? 'text-bvb-black' : 'text-red-500'}`}>
+                                                        {displayValue > 0 && summaryViewMode === 'daily' ? '+' : ''}{displayValue}
+                                                    </p>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-3 gap-2 py-2 border-t border-gray-50">
@@ -1548,34 +1582,41 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                         <th className="px-6 py-4 text-center">累计加分 (+)</th>
                                         <th className="px-6 py-4 text-center">累计减分 (-)</th>
                                         <th className="px-6 py-4 text-center">累计消耗 (▼)</th>
-                                        <th className="px-6 py-4 text-right font-black text-bvb-black bg-yellow-50 w-24">当前总积分</th>
+                                        <th className="px-6 py-4 text-center font-black text-bvb-black bg-yellow-50 w-24">
+                                            {summaryViewMode === 'daily' ? '当日变动' : '当前总积分'}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {travelingPlayers.map(player => (
-                                        <tr key={player.id} className="hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-6 py-4 sticky left-0 bg-white z-10">
-                                                <div className="flex items-center gap-2">
-                                                    <img src={player.image} className="w-6 h-6 rounded-full object-cover" />
-                                                    <span className="font-black text-gray-800">{player.name}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-bold text-green-600">
-                                                {summaryData[player.id]?.gain || 0}
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-bold text-red-600">
-                                                {summaryData[player.id]?.loss || 0}
-                                            </td>
-                                            <td className="px-6 py-4 text-center font-bold text-amber-600">
-                                                {summaryData[player.id]?.consumption || 0}
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-black text-bvb-black bg-yellow-50/30">
-                                                <span className={`${(playerPointsMap[player.id] || 0) >= 0 ? 'text-bvb-black' : 'text-red-500'}`}>
-                                                    {playerPointsMap[player.id] || 0}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                    {travelingPlayers.map(player => {
+                                        const playerDayNet = (summaryData[player.id]?.gain || 0) - (summaryData[player.id]?.loss || 0) - (summaryData[player.id]?.consumption || 0);
+                                        const displayValue = summaryViewMode === 'daily' ? playerDayNet : (playerPointsMap[player.id] || 0);
+                                        
+                                        return (
+                                            <tr key={player.id} className="hover:bg-gray-50/50 transition-colors">
+                                                <td className="px-6 py-4 sticky left-0 bg-white z-10">
+                                                    <div className="flex items-center gap-2">
+                                                        <img src={player.image} className="w-6 h-6 rounded-full object-cover" />
+                                                        <span className="font-black text-gray-800">{player.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-center font-bold text-green-600">
+                                                    {summaryData[player.id]?.gain || 0}
+                                                </td>
+                                                <td className="px-6 py-4 text-center font-bold text-red-600">
+                                                    {summaryData[player.id]?.loss || 0}
+                                                </td>
+                                                <td className="px-6 py-4 text-center font-bold text-amber-600">
+                                                    {summaryData[player.id]?.consumption || 0}
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-black text-bvb-black bg-yellow-50/30">
+                                                    <span className={`${displayValue >= 0 ? 'text-bvb-black' : 'text-red-500'}`}>
+                                                        {displayValue > 0 && summaryViewMode === 'daily' ? '+' : ''}{displayValue}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                     <tr className="bg-gray-50/50 font-black">
                                         <td className="px-6 py-4 sticky left-0 bg-gray-50/50 z-10">全员合计</td>
                                         <td className="px-6 py-4 text-center text-green-700">
@@ -1588,7 +1629,15 @@ const MatchPointManager: React.FC<MatchPointManagerProps> = ({
                                             {travelingPlayerIds.reduce((sum, pid) => sum + (summaryData[pid]?.consumption || 0), 0)}
                                         </td>
                                         <td className="px-6 py-4 text-right bg-bvb-yellow/10">
-                                            {travelingPlayerIds.reduce((sum, pid) => sum + (playerPointsMap[pid] || 0), 0)}
+                                            {(() => {
+                                                const totalNet = travelingPlayerIds.reduce((sum, pid) => {
+                                                    const val = summaryViewMode === 'daily' 
+                                                        ? ((summaryData[pid]?.gain || 0) - (summaryData[pid]?.loss || 0) - (summaryData[pid]?.consumption || 0))
+                                                        : (playerPointsMap[pid] || 0);
+                                                    return sum + val;
+                                                }, 0);
+                                                return (totalNet > 0 && summaryViewMode === 'daily' ? '+' : '') + totalNet;
+                                            })()}
                                         </td>
                                     </tr>
                                 </tbody>
