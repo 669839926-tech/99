@@ -55,6 +55,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [journalSortOrder, setJournalSortOrder] = useState<'asc' | 'desc'>('desc');
     const [filterCoachId, setFilterCoachId] = useState<string>('all');
     const [editPayroll, setEditPayroll] = useState<Record<string, Partial<MonthlySalaryRecord>>>({});
+    const [overriddenTeamSizes, setOverriddenTeamSizes] = useState<Record<string, number>>({});
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
     const [activeType, setActiveType] = useState<'income' | 'expense'>('income');
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], details: '', category: '', amount: '', account: '黔农云', attachment: '' as string });
@@ -242,7 +243,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             
             const teamBreakdown = coachTeams.map(teamId => {
                 const teamPlayers = players.filter(p => p.teamId === teamId);
-                const teamSize = teamPlayers.length;
+                const overrideKey = `${selectedYear}-${selectedMonth}-${coach.id}-${teamId}`;
+                const teamSize = overriddenTeamSizes[overrideKey] !== undefined 
+                    ? overriddenTeamSizes[overrideKey] 
+                    : (savedRecord?.overriddenTeamSizes?.[teamId] !== undefined ? savedRecord.overriddenTeamSizes[teamId] : teamPlayers.length);
                 
                 let singleSessionFee = 0;
                 let sessionFeeFormula = "";
@@ -376,11 +380,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 evaluationDetails: evaluation,
                 isSaved: !!savedRecord,
                 isDisbursed: savedRecord?.isDisbursed || false,
-                isModified: Object.keys(currentEdit).length > 0,
+                isModified: Object.keys(currentEdit).length > 0 || Object.keys(overriddenTeamSizes).some(k => k.startsWith(`${selectedYear}-${selectedMonth}-${coach.id}-`)),
                 teamBreakdown
             };
         });
-    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams]);
+    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams, overriddenTeamSizes]);
 
     const handleUpdatePayrollField = (coachId: string, field: keyof MonthlySalaryRecord, value: string) => {
         const numVal = parseFloat(value) || 0;
@@ -395,10 +399,42 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         if (!coach || !row) return;
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: row.isDisbursed };
+        
+        // Extract overrides for this coach and month
+        const teamOverrides: Record<string, number> = {};
+        Object.entries(overriddenTeamSizes).forEach(([key, val]) => {
+            if (key.startsWith(`${yearNum}-${selectedMonth}-${coachId}-`)) {
+                const teamId = key.split('-').slice(3).join('-');
+                teamOverrides[teamId] = val;
+            }
+        });
+
+        const newRecord: MonthlySalaryRecord = { 
+            id: `sal-${yearNum}-${selectedMonth}-${coachId}`, 
+            year: yearNum, 
+            month: selectedMonth, 
+            baseSalary: row.baseSalary, 
+            sessionFees: row.sessionFees, 
+            attendanceReward: row.attendanceReward, 
+            renewalReward: row.renewalReward, 
+            performanceReward: row.performanceReward, 
+            totalSalary: row.totalSalary, 
+            isDisbursed: row.isDisbursed,
+            overriddenTeamSizes: teamOverrides
+        };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
+        
+        // Clear local overrides that were just saved
+        const nextOverrides = { ...overriddenTeamSizes };
+        Object.keys(nextOverrides).forEach(key => {
+            if (key.startsWith(`${yearNum}-${selectedMonth}-${coachId}-`)) {
+                delete nextOverrides[key];
+            }
+        });
+        setOverriddenTeamSizes(nextOverrides);
+        
         const nextEdit = { ...editPayroll }; delete nextEdit[coachId]; setEditPayroll(nextEdit);
         alert(`已保存 ${coach.name} 的薪酬快照。`);
     };
@@ -649,8 +685,24 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                                             {sal.teamBreakdown.map(teamInfo => (
                                                                 <div key={teamInfo.teamId} className="bg-white/50 border border-gray-100 p-2.5 rounded-xl space-y-1.5 shadow-sm">
-                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
-                                                                        <span>{teamInfo.teamName} 梯队 ({teamInfo.teamSize}人)</span>
+                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between items-center">
+                                                                        <span className="flex items-center gap-1">
+                                                                            {teamInfo.teamName} (
+                                                                            <input 
+                                                                                type="number"
+                                                                                className="w-8 bg-gray-100 hover:bg-white border border-transparent hover:border-gray-300 rounded text-center focus:ring-1 focus:ring-bvb-yellow outline-none font-black text-[10px] p-0"
+                                                                                value={teamInfo.teamSize}
+                                                                                onChange={(e) => {
+                                                                                    const val = parseInt(e.target.value) || 0;
+                                                                                    setOverriddenTeamSizes(prev => ({
+                                                                                        ...prev,
+                                                                                        [`${selectedYear}-${selectedMonth}-${sal.coachId}-${teamInfo.teamId}`]: val
+                                                                                    }));
+                                                                                }}
+                                                                                title="点击修改计算人数"
+                                                                            />
+                                                                            人)
+                                                                        </span>
                                                                         <span className="text-bvb-yellow bg-black px-1 rounded-sm">¥{teamInfo.monthlySessionFee}</span>
                                                                     </p>
                                                                     <div className="space-y-1">

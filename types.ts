@@ -470,6 +470,7 @@ export interface MonthlySalaryRecord {
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;
+    overriddenTeamSizes?: Record<string, number>;
 }
 
 // --- Accounting Types ---
