@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, FileText, Loader2, Sparkles, Download, Clock, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag } from 'lucide-react';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, Clock, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Tag, Maximize2, Minimize2 } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -424,10 +424,12 @@ interface PlayerDetailModalProps {
     initialFilter?: string;
     appLogo?: string;
     onDeleteRecharge: (playerId: string, rechargeId: string) => void;
+    allPlayers: Player[];
+    onSwitchPlayer: (player: Player) => void;
 }
 
 const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
-    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge
+    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge, allPlayers, onSwitchPlayer
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
@@ -440,8 +442,20 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [exportYear, setExportYear] = useState<number>(new Date().getFullYear());
     const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
     const [tempPhotoCaption, setTempPhotoCaption] = useState('');
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [playerSearchTerm, setPlayerSearchTerm] = useState('');
+    const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
 
     const [selectedStatsYear, setSelectedStatsYear] = useState<number>(new Date().getFullYear());
+
+    const [trackingYear, setTrackingYear] = useState(new Date().getFullYear());
+    const [trackingQuarter, setTrackingQuarter] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4'>(() => {
+        const month = new Date().getMonth();
+        if (month < 3) return 'Q1';
+        if (month < 6) return 'Q2';
+        if (month < 9) return 'Q3';
+        return 'Q4';
+    });
 
     const isCoach = currentUser?.role === 'coach';
     const isDirector = currentUser?.role === 'director';
@@ -744,57 +758,144 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         const sortedReviews = [...(editedPlayer.reviews || [])].sort((a,b) => b.year - a.year || b.quarter.localeCompare(a.quarter));
         const groupedReviews = sortedReviews.reduce((acc, review) => { (acc[review.year] = acc[review.year] || []).push(review); return acc; }, {} as Record<number, PlayerReview[]>);
         const years = Object.keys(groupedReviews).map(Number).sort((a,b) => b - a);
+
+        // Tracking Data Calculation
+        const { start, end } = (() => {
+            let startMonth, endMonth;
+            switch (trackingQuarter) {
+                case 'Q1': startMonth = 0; endMonth = 2; break;
+                case 'Q2': startMonth = 3; endMonth = 5; break;
+                case 'Q3': startMonth = 6; endMonth = 8; break;
+                case 'Q4': startMonth = 9; endMonth = 11; break;
+                default: startMonth = 0; endMonth = 11;
+            }
+            const startDate = new Date(trackingYear, startMonth, 1);
+            const endDate = new Date(trackingYear, endMonth + 1, 0);
+            return { 
+                start: startDate.toISOString().split('T')[0], 
+                end: endDate.toISOString().split('T')[0] 
+            };
+        })();
+
+        const quarterTrainings = trainings.filter(t => t.date >= start && t.date <= end && t.teamId === editedPlayer.teamId);
+        const attendedSessions = quarterTrainings.filter(t => t.attendance.some(a => a.playerId === editedPlayer.id && a.status === 'Present'));
+        const attendanceRate = quarterTrainings.length > 0 ? (attendedSessions.length / quarterTrainings.length * 100).toFixed(1) : '0';
+
+        const focusEvents = quarterTrainings
+            .filter(t => t.focusedPlayerIds?.includes(editedPlayer.id))
+            .map(t => ({
+                date: t.date,
+                title: t.title,
+                notes: t.focusedPlayerNotes?.[editedPlayer.id]
+            }))
+            .filter(e => e.notes);
+
+        const homeLogs = (editedPlayer.homeTrainingLogs || []).filter(l => l.date >= start && l.date <= end);
+        const totalHomeDuration = homeLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
+
         return (
-            <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col md:flex-row gap-6 pb-24 md:pb-10">
-                <div className="w-full md:w-1/2 space-y-6 md:overflow-y-auto md:max-h-[600px] pr-2 custom-scrollbar border-b md:border-b-0 pb-6 md:pb-0 border-gray-100 shrink-0">
-                    <h3 className="font-bold text-gray-800 flex items-center sticky top-0 bg-white z-10 py-2"><FileText className="w-5 h-5 mr-2 text-bvb-yellow" /> 历史点评归档</h3>
-                    {years.length === 0 && <p className="text-gray-400 text-sm">暂无点评记录。</p>}
-                    {years.map(year => (
-                        <div key={year} className="relative border-l-2 border-gray-200 pl-6 ml-2 space-y-6">
-                            <span className="absolute -left-[21px] top-0 bg-gray-100 text-gray-500 text-xs font-bold px-1.5 py-0.5 rounded border border-gray-300">{year}</span>
-                            {groupedReviews[year].map(review => (
-                                <div key={review.id} className={`relative group ${review.status === 'Draft' ? 'opacity-80' : ''}`}>
-                                    <div className="absolute -left-[31px] top-1 w-3 h-3 bg-bvb-yellow rounded-full border-2 border-white shadow-sm group-hover:scale-125 transition-transform"></div>
-                                    <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div className="flex items-center gap-2"><span className="text-sm font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getStatusColor(review.status)}`}>{getStatusLabel(review.status)}</span></div>
-                                            <div className="flex items-center gap-2"><span className="text-xs text-gray-400">{review.date}</span><button onClick={() => handleDeleteReview(review.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button></div>
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">技战术能力改善</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.technicalTacticalImprovement || '（未填写）'}</p></div>
-                                            <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">心理建设</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.mentalDevelopment || '（未填写）'}</p></div>
-                                            <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">季度总结</h4><p className="text-sm text-gray-700导致-relaxed bg-gray-50 p-2 rounded italic border-l-2 border-bvb-yellow">{review.summary || '（未填写）'}</p></div>
-                                            <div className="flex justify-end pt-2 gap-2 border-t border-gray-100">
-                                                {(review.status === 'Draft' || review.status === 'Submitted' || review.status === 'Published') && (<button onClick={() => handleEditReview(review)} className="text-xs bg-bvb-yellow text-bvb-black px-3 py-1.5 rounded font-bold hover:brightness-105 flex items-center shadow-sm"><Edit2 className="w-3 h-3 mr-1" /> 编辑</button>)}
-                                                {review.status !== 'Published' && (<button onClick={() => updateReviewStatus(review.id, 'Published')} className="text-xs bg-green-50 text-green-600 px-2 py-1.5 rounded font-bold hover:bg-green-100 flex items-center"><CheckCircle className="w-3 h-3 mr-1" /> 发布</button>)}
+            <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-6 pb-24 md:pb-10">
+                {/* Tracking Dashboard Section */}
+                <div className="bg-gradient-to-br from-gray-900 to-bvb-black text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row gap-6 items-center">
+                    <div className="flex-1 w-full space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-bvb-yellow/20 rounded-lg"><Activity className="w-5 h-5 text-bvb-yellow" /></div>
+                                <div><h3 className="font-black text-lg uppercase tracking-wider">季度追踪总结</h3><p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{trackingYear} {trackingQuarter} ASSESSMENT DASHBOARD</p></div>
+                            </div>
+                            <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-lg border border-white/5 shadow-inner">
+                                <select value={trackingYear} onChange={e => setTrackingYear(parseInt(e.target.value))} className="bg-transparent text-xs font-bold px-2 outline-none cursor-pointer"><option value={2026} className="text-black">2026</option><option value={2025} className="text-black">2025</option><option value={2024} className="text-black">2024</option></select>
+                                <div className="w-px h-3 bg-white/20"></div>
+                                <select value={trackingQuarter} onChange={e => setTrackingQuarter(e.target.value as any)} className="bg-transparent text-xs font-bold px-2 outline-none cursor-pointer"><option value="Q1" className="text-black">Q1 (第一季度)</option><option value="Q2" className="text-black">Q2 (第二季度)</option><option value="Q3" className="text-black">Q3 (第三季度)</option><option value="Q4" className="text-black">Q4 (第四季度)</option></select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center">
+                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">参训率</p>
+                                <div className="text-3xl font-black text-white mb-0.5">{attendanceRate}<span className="text-xs font-bold ml-0.5">%</span></div>
+                                <p className="text-[10px] text-gray-500 font-bold">{attendedSessions.length} / {quarterTrainings.length} 总课次</p>
+                            </div>
+                            <div className="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center">
+                                <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">重点关注</p>
+                                <div className="text-3xl font-black text-white mb-0.5">{focusEvents.length}<span className="text-xs font-bold ml-1">次</span></div>
+                                <p className="text-[10px] text-gray-500 font-bold truncate w-full px-2">由教练员特别标记</p>
+                            </div>
+                            <div className="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center text-center">
+                                <p className="text-[10px] font-black text-green-400 uppercase tracking-widest mb-1">居家打卡</p>
+                                <div className="text-3xl font-black text-white mb-0.5">{homeLogs.length}<span className="text-xs font-bold ml-1">次</span></div>
+                                <p className="text-[10px] text-gray-500 font-bold">{Math.round(totalHomeDuration / 60)} 小时总时长</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="w-full md:w-1/3 bg-white/5 rounded-xl border border-white/10 p-4 overflow-y-auto max-h-[160px] custom-scrollbar">
+                        <h4 className="text-[10px] font-black text-bvb-yellow uppercase tracking-widest mb-2 flex items-center"><Search className="w-3 h-3 mr-1" /> 重点关注详情</h4>
+                        {focusEvents.length === 0 ? (
+                            <p className="text-gray-500 text-[10px] italic">本季度暂未被标记为重点关注球员</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {focusEvents.map((event, idx) => (
+                                    <div key={idx} className="border-l-2 border-bvb-yellow pl-2">
+                                        <p className="text-[9px] text-gray-400 font-bold tracking-tighter uppercase">{event.date} • {event.title}</p>
+                                        <p className="text-[11px] text-white/90 leading-relaxed mt-0.5">{event.notes?.technical || event.notes?.mental}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-6">
+                    <div className="w-full md:w-1/2 space-y-6 md:overflow-y-auto md:max-h-[600px] pr-2 custom-scrollbar border-b md:border-b-0 pb-6 md:pb-0 border-gray-100 shrink-0">
+                        <h3 className="font-bold text-gray-800 flex items-center sticky top-0 bg-white z-10 py-2"><History className="w-5 h-5 mr-2 text-bvb-yellow" /> 历史点评归档</h3>
+                        {years.length === 0 && <p className="text-gray-400 text-sm">暂无点评记录。</p>}
+                        {years.map(year => (
+                            <div key={year} className="relative border-l-2 border-gray-200 pl-6 ml-2 space-y-6">
+                                <span className="absolute -left-[21px] top-0 bg-gray-100 text-gray-500 text-xs font-bold px-1.5 py-0.5 rounded border border-gray-300">{year}</span>
+                                {groupedReviews[year].map(review => (
+                                    <div key={review.id} className={`relative group ${review.status === 'Draft' ? 'opacity-80' : ''}`}>
+                                        <div className="absolute -left-[31px] top-1 w-3 h-3 bg-bvb-yellow rounded-full border-2 border-white shadow-sm group-hover:scale-125 transition-transform"></div>
+                                        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+                                            <div className="flex justify-between items-center mb-3">
+                                                <div className="flex items-center gap-2"><span className="text-sm font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getStatusColor(review.status)}`}>{getStatusLabel(review.status)}</span></div>
+                                                <div className="flex items-center gap-2"><span className="text-xs text-gray-400">{review.date}</span><button onClick={() => handleDeleteReview(review.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button></div>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">技战术能力改善</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.technicalTacticalImprovement || '（未填写）'}</p></div>
+                                                <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">心理建设</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.mentalDevelopment || '（未填写）'}</p></div>
+                                                <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">季度总结</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded italic border-l-2 border-bvb-yellow">{review.summary || '（未填写）'}</p></div>
+                                                <div className="flex justify-end pt-2 gap-2 border-t border-gray-100">
+                                                    {(review.status === 'Draft' || review.status === 'Submitted' || review.status === 'Published') && (<button onClick={() => handleEditReview(review)} className="text-xs bg-bvb-yellow text-bvb-black px-3 py-1.5 rounded font-bold hover:brightness-105 flex items-center shadow-sm"><Edit2 className="w-3 h-3 mr-1" /> 编辑</button>)}
+                                                    {review.status !== 'Published' && (<button onClick={() => updateReviewStatus(review.id, 'Published')} className="text-xs bg-green-50 text-green-600 px-2 py-1.5 rounded font-bold hover:bg-green-100 flex items-center"><CheckCircle className="w-3 h-3 mr-1" /> 发布</button>)}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-                <div className="w-full md:w-1/2 bg-gray-50 p-6 rounded-xl border border-gray-200 flex flex-col shrink-0">
-                    <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-800">{editingReviewId ? '编辑季度点评' : '新增季度点评'}</h3><button type="button" onClick={handleGenerateAiReview} disabled={isGeneratingReview} className="text-xs flex items-center bg-white border border-gray-300 hover:border-bvb-yellow px-3 py-1.5 rounded-full font-bold transition-all">{isGeneratingReview ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1 text-bvb-yellow" />} AI 辅助生成</button></div>
-                    <form className="space-y-4 flex-1 flex flex-col" onSubmit={(e) => { e.preventDefault(); handleSaveReview('Published'); }}>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">年份</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" value={newReview.year} onChange={e => setNewReview({...newReview, year: parseInt(e.target.value)})}>{[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">季度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" value={newReview.quarter} onChange={e => setNewReview({...newReview, quarter: e.target.value as any})}><option value="Q1">Q1 (第一季度)</option><option value="Q2">Q2 (第二季度)</option><option value="Q3">Q3 (第三季度)</option><option value="Q4">Q4 (第四季度)</option></select></div>
-                        </div>
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">技战术能力改善</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="描述球员本季度的技术和战术进步..." value={newReview.technicalTacticalImprovement} onChange={e => setNewReview({...newReview, technicalTacticalImprovement: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">心理建设</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="评价球员的心理状态、抗压能力和团队融入..." value={newReview.mentalDevelopment} onChange={e => setNewReview({...newReview, mentalDevelopment: e.target.value})} /></div>
-                        <div><label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} /></div>
-                        <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
-                            <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">预览/保存草稿</button>
-                            <button type="button" onClick={() => handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
-                        </div>
-                    </form>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="w-full md:w-1/2 bg-gray-50 p-6 rounded-xl border border-gray-200 flex flex-col shrink-0">
+                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-800">{editingReviewId ? '编辑季度点评' : '新增季度点评'}</h3><button type="button" onClick={handleGenerateAiReview} disabled={isGeneratingReview} className="text-xs flex items-center bg-white border border-gray-300 hover:border-bvb-yellow px-3 py-1.5 rounded-full font-bold transition-all">{isGeneratingReview ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1 text-bvb-yellow" />} AI 辅助生成</button></div>
+                        <form className="space-y-4 flex-1 flex flex-col" onSubmit={(e) => { e.preventDefault(); handleSaveReview('Published'); }}>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">年份</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" value={newReview.year} onChange={e => setNewReview({...newReview, year: parseInt(e.target.value)})}>{[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
+                                <div><label className="block text-xs font-bold text-gray-500 mb-1">季度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" value={newReview.quarter} onChange={e => setNewReview({...newReview, quarter: e.target.value as any})}><option value="Q1">Q1 (第一季度)</option><option value="Q2">Q2 (第二季度)</option><option value="Q3">Q3 (第三季度)</option><option value="Q4">Q4 (第四季度)</option></select></div>
+                            </div>
+                            <div><label className="block text-xs font-bold text-gray-500 mb-1">技战术能力改善</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="描述球员本季度的技术和战术进步..." value={newReview.technicalTacticalImprovement} onChange={e => setNewReview({...newReview, technicalTacticalImprovement: e.target.value})} /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 mb-1">心理建设</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="评价球员的心理状态、抗压能力和团队融入..." value={newReview.mentalDevelopment} onChange={e => setNewReview({...newReview, mentalDevelopment: e.target.value})} /></div>
+                            <div><label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} /></div>
+                            <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
+                                <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">预览/保存草稿</button>
+                                <button type="button" onClick={() => handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         );
     };
-
     const renderRecords = () => {
         type Event = { 
             id: string; 
@@ -993,14 +1094,117 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         );
     };
 
+    const searchablePlayers = allPlayers.filter(p => 
+        p.name.toLowerCase().includes(playerSearchTerm.toLowerCase()) || 
+        p.number.toString().includes(playerSearchTerm)
+    ).slice(0, 10);
+
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
-        <div className="bg-white w-full h-full md:h-[90vh] md:max-w-5xl rounded-none md:rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col">
+      <div className={`fixed inset-0 z-50 flex items-center justify-center p-0 ${isFullscreen ? '' : 'md:p-4'} bg-black/60 backdrop-blur-sm transition-all duration-300`}>
+        <div className={`bg-white w-full h-full flex flex-col transition-all duration-300 overflow-hidden ${isFullscreen ? 'rounded-none' : 'md:h-[90vh] md:max-w-6xl md:rounded-2xl shadow-2xl animate-in fade-in zoom-in'}`}>
           <div className="bg-bvb-black text-white p-4 flex justify-between items-center shrink-0">
-             <div className="flex items-center space-x-3"><button onClick={onClose} className="md:hidden mr-2 p-1"><ChevronLeft className="w-6 h-6" /></button><h2 className="text-xl font-bold uppercase tracking-wider flex items-center"><UserIcon className="w-5 h-5 mr-2 text-bvb-yellow" /> 球员档案</h2>{isEditing && (<div className="ml-4 flex items-center gap-2">{saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}{saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}</div>)}</div>
-             <div className="flex items-center space-x-3"><div className="hidden md:flex items-center gap-2 bg-gray-800 rounded px-2"><span className="text-xs text-gray-400 font-bold">导出年份:</span><select value={exportYear} onChange={(e) => setExportYear(parseInt(e.target.value))} className="bg-transparent text-white text-xs font-bold py-1 focus:outline-none">{[2023, 2024, 2025, 2026].map(y => <option key={y} value={y} className="text-black">{y}</option>)}</select></div><button onClick={handleExportPDF} disabled={isExporting} className="hidden md:flex p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow items-center" title="导出PDF档案">{isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}</button>{isEditing ? (<><button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">退出</button><button onClick={handleSave} className={`px-3 py-1 font-bold rounded hover:brightness-110 text-sm flex items-center ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-yellow text-bvb-black'}`}>{saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-2" />} {saveStatus === 'saved' ? '已保存' : '保存'}</button></>) : (<><button onClick={() => setIsEditing(true)} className="p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow" title="编辑"><Edit2 className="w-4 h-4" /></button>{isDirector && <button onClick={handleDelete} className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-900 hover:text-red-300" title="删除"><Trash2 className="w-4 h-4" /></button>}</>)}<button onClick={onClose} className="hidden md:block hover:bg-gray-800 p-1 rounded"><X className="w-6 h-6" /></button></div>
+             <div className="flex items-center space-x-3">
+                <button onClick={onClose} className="md:hidden mr-2 p-1"><ChevronLeft className="w-6 h-6" /></button>
+                
+                <div className="relative group/switcher">
+                    <button 
+                        onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                    >
+                        <UserIcon className="w-4 h-4 text-bvb-yellow" />
+                        <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
+                        <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+                    
+                    {showPlayerDropdown && (
+                        <div className="absolute top-full left-0 mt-2 w-64 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="relative mb-2">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                                <input 
+                                    autoFocus
+                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors"
+                                    placeholder="搜索球员姓名/号码..."
+                                    value={playerSearchTerm}
+                                    onChange={e => setPlayerSearchTerm(e.target.value)}
+                                />
+                                {playerSearchTerm && (
+                                    <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3 h-3" /></button>
+                                )}
+                            </div>
+                            <div className="max-h-80 overflow-y-auto custom-scrollbar space-y-1">
+                                {searchablePlayers.map(p => (
+                                    <button 
+                                        key={p.id}
+                                        onClick={() => {
+                                            onSwitchPlayer(p);
+                                            setShowPlayerDropdown(false);
+                                            setPlayerSearchTerm('');
+                                        }}
+                                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                    >
+                                        <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold truncate">{p.name}</p>
+                                            <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
+                                        </div>
+                                    </button>
+                                ))}
+                                {searchablePlayers.length === 0 && (
+                                    <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {isEditing && (
+                    <div className="ml-4 flex items-center gap-2">
+                        {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
+                        {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
+                    </div>
+                )}
+             </div>
+             
+             <div className="flex items-center space-x-3">
+                <div className="hidden md:flex items-center gap-2 bg-gray-800 rounded px-2">
+                    <span className="text-xs text-gray-400 font-bold">导出年份:</span>
+                    <select value={exportYear} onChange={(e) => setExportYear(parseInt(e.target.value))} className="bg-transparent text-white text-xs font-bold py-1 focus:outline-none">
+                        {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y} className="text-black">{y}</option>)}
+                    </select>
+                </div>
+                
+                <button 
+                    onClick={() => setIsFullscreen(!isFullscreen)} 
+                    className="hidden md:flex p-2 bg-gray-800 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+
+                <button onClick={handleExportPDF} disabled={isExporting} className="hidden md:flex p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow items-center" title="导出PDF档案">
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                </button>
+                
+                {isEditing ? (
+                    <>
+                        <button onClick={() => setIsEditing(false)} className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 text-sm">退出</button>
+                        <button onClick={handleSave} className={`px-3 py-1 font-bold rounded hover:brightness-110 text-sm flex items-center ${saveStatus === 'saved' ? 'bg-green-600 text-white' : 'bg-bvb-yellow text-bvb-black'}`}>
+                            {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-1" /> : <Save className="w-4 h-4 mr-2" />} 
+                            {saveStatus === 'saved' ? '已保存' : '保存'}
+                        </button>
+                    </>
+                ) : (
+                    <>
+                        <button onClick={() => setIsEditing(true)} className="p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow" title="编辑"><Edit2 className="w-4 h-4" /></button>
+                        {isDirector && <button onClick={handleDelete} className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-900 hover:text-red-300" title="删除"><Trash2 className="w-4 h-4" /></button>}
+                    </>
+                )}
+                
+                <button onClick={onClose} className="hidden md:block hover:bg-gray-800 p-1 rounded">
+                    <X className="w-6 h-6" />
+                </button>
+             </div>
           </div>
-          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'overview', label: '概览', icon: Activity }, { id: 'technical', label: '技术', icon: Target }, { id: 'tactical', label: '战术', icon: Brain }, { id: 'physical', label: '身体', icon: Dumbbell }, { id: 'mental', label: '心理', icon: CheckSquare }, { id: 'reviews', label: '点评', icon: FileText }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
+          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'overview', label: '概览', icon: Activity }, { id: 'technical', label: '技术', icon: Target }, { id: 'tactical', label: '战术', icon: Brain }, { id: 'physical', label: '身体', icon: Dumbbell }, { id: 'mental', label: '心理', icon: CheckSquare }, { id: 'reviews', label: '球员跟踪', icon: Search }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
              {activeTab === 'overview' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.gender} onChange={e => setEditedPlayer({...editedPlayer, gender: e.target.value})}><option value="男">男</option><option value="女">女</option></select> : <span className="font-bold">{editedPlayer.gender}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{editedPlayer.age} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => setEditedPlayer({...editedPlayer, birthDate: e.target.value})} /> : <span className="font-bold font-mono">{editedPlayer.birthDate || '未录入'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">惯用脚</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.preferredFoot} onChange={e => setEditedPlayer({...editedPlayer, preferredFoot: e.target.value as any})}><option value="右">右脚</option><option value="左">左脚</option></select> : <span className="font-bold">{editedPlayer.preferredFoot}脚</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">昵称</span>{isEditing ? <input className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.nickname || ''} onChange={e => setEditedPlayer({...editedPlayer, nickname: e.target.value})} placeholder="选填" /> : <span className="font-bold">{editedPlayer.nickname || '-'}</span>}</div></div><div className="bg-gray-50 rounded-xl p-4 space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">体格信息</h4><div className="grid grid-cols-2 gap-4"><div className="flex items-center gap-3"><div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Ruler className="w-4 h-4" /></div><div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold">身高 (cm)</span>{isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.height || ''} onChange={e => setEditedPlayer({...editedPlayer, height: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.height || '-'}</span>}</div></div><div className="flex items-center gap-3"><div className="p-2 bg-white rounded-lg border border-gray-100 text-gray-400"><Weight className="w-4 h-4" /></div><div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold">体重 (kg)</span>{isEditing ? <input type="number" className="p-1 border rounded text-xs bg-white w-20" value={editedPlayer.weight || ''} onChange={e => setEditedPlayer({...editedPlayer, weight: parseInt(e.target.value)})} /> : <span className="font-bold">{editedPlayer.weight || '-'}</span>}</div></div></div></div><div className="bg-gray-50 rounded-xl p-4 space-y-3"><h4 className="text-xs font-bold text-gray-400 uppercase border-b border-gray-200 pb-2 mb-2">详细资料</h4><div className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm"><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><CalendarDays className="w-3 h-3 mr-1"/> 入队时间</span>{isEditing ? <input type="date" className="p-1 border rounded text-xs bg-white" value={editedPlayer.joinDate || ''} onChange={e => setEditedPlayer({...editedPlayer, joinDate: e.target.value})} /> : (<div><span className="font-bold">{editedPlayer.joinDate || '-'}</span>{editedPlayer.joinDate && (<div className="text-[10px] text-bvb-black bg-bvb-yellow px-1.5 py-0.5 rounded w-max mt-1 font-bold">球龄: {calculateTenure(editedPlayer.joinDate)}</div>)}</div>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><School className="w-3 h-3 mr-1"/> 就读学校</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="学校名称" value={editedPlayer.school || ''} onChange={e => setEditedPlayer({...editedPlayer, school: e.target.value})} /> : <span className="font-bold truncate">{editedPlayer.school || '-'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><UserIcon className="w-3 h-3 mr-1"/> 家长姓名</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="姓名" value={editedPlayer.parentName || ''} onChange={e => setEditedPlayer({...editedPlayer, parentName: e.target.value})} /> : <span className="font-bold">{editedPlayer.parentName || '-'}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs flex items-center"><Phone className="w-3 h-3 mr-1"/> 联系方式</span>{isEditing ? <input className="p-1 border rounded text-xs bg-white" placeholder="电话号码" value={editedPlayer.parentPhone || ''} onChange={e => setEditedPlayer({...editedPlayer, parentPhone: e.target.value})} /> : <span className="font-bold font-mono">{editedPlayer.parentPhone || '-'}</span>}</div></div></div></div><div className="w-full md:w-2/3 flex flex-col space-y-4">
                <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between gap-6 relative overflow-hidden">
@@ -1724,7 +1928,24 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
       </div>
 
       {/* Modals */}
-      {selectedPlayer && (<PlayerDetailModal player={selectedPlayer} teams={teams} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onUpdatePlayer={onUpdatePlayer} onDeletePlayer={onDeletePlayer} onDeleteRecharge={onDeleteRecharge} initialFilter={initialFilter} appLogo={appLogo} onClose={() => setSelectedPlayer(null)}/>)}
+      {selectedPlayer && (
+        <PlayerDetailModal 
+            key={selectedPlayer.id}
+            player={selectedPlayer} 
+            allPlayers={players}
+            onSwitchPlayer={setSelectedPlayer}
+            teams={teams} 
+            trainings={trainings} 
+            attributeConfig={attributeConfig} 
+            currentUser={currentUser} 
+            onUpdatePlayer={onUpdatePlayer} 
+            onDeletePlayer={onDeletePlayer} 
+            onDeleteRecharge={onDeleteRecharge} 
+            initialFilter={initialFilter} 
+            appLogo={appLogo} 
+            onClose={() => setSelectedPlayer(null)}
+        />
+      )}
       {showAddPlayerModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white w-full h-full md:h-auto md:max-w-2xl rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col md:max-h-[90vh]">
