@@ -55,6 +55,12 @@ export interface AttributeConfig {
     drillLibrary: string[];
     trainingFoci: string[];
     focusSubjects?: Record<string, string[]>;
+    // Player Profile Tag Config
+    playerTypes?: string[];
+    technicalStrengths?: string[];
+    personalityTraits?: string[];
+    behavioralTraits?: string[];
+    coachingReminders?: string[];
 }
 
 export interface PlayerStats {
@@ -177,6 +183,12 @@ export interface Player {
   homeTrainingLogs?: HomeTrainingLog[];
   jugglingHistory?: JugglingRecord[];
   testResults?: TechTestResult[];
+  // Player Profile Tags
+  playerType?: string[];
+  technicalStrengths?: string[];
+  personalityTraits?: string[];
+  behavioralTraits?: string[];
+  coachingReminders?: string[];
 }
 
 export type MatchEventType = 'Goal' | 'Assist' | 'YellowCard' | 'RedCard' | 'Sub' | 'OwnGoal';
