@@ -82,7 +82,8 @@ const calculateTenure = (dateStr?: string) => {
 
 const getOverallRating = (player: Player): string => {
   if (!player) return '0.0';
-  const sourceStats = player.lastPublishedStats || player.stats;
+  const currentYear = new Date().getFullYear();
+  const sourceStats = (player.yearlyStats && player.yearlyStats[currentYear]) || player.lastPublishedStats || player.stats;
   if (!sourceStats) return '0.0';
   
   let total = 0;
@@ -101,12 +102,13 @@ const getOverallRating = (player: Player): string => {
   return count === 0 ? '0.0' : (total / count).toFixed(1);
 };
 
-const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig) return 0;
+const getCategoryAvg = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig, overrideStats?: PlayerStats) => {
+  const stats = overrideStats || player.stats;
+  if (!player || !stats || !attributeConfig) return 0;
   const configItems = attributeConfig[category];
   if (!configItems || configItems.length === 0) return 0;
   
-  const catStats = player.stats[category];
+  const catStats = stats[category];
   if (!catStats) return 0;
 
   let sum = 0;
@@ -119,10 +121,11 @@ const getCategoryAvg = (player: Player, category: AttributeCategory, attributeCo
   return count === 0 ? 0 : parseFloat((sum / count).toFixed(1));
 };
 
-const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig) => {
-  if (!player || !player.stats || !attributeConfig || !attributeConfig[category]) return [];
+const getCategoryRadarData = (player: Player, category: AttributeCategory, attributeConfig: AttributeConfig, overrideStats?: PlayerStats) => {
+  const stats = overrideStats || player.stats;
+  if (!player || !stats || !attributeConfig || !attributeConfig[category]) return [];
   
-  const catStats = player.stats[category];
+  const catStats = stats[category];
   return attributeConfig[category].map(attr => ({
     subject: attr.label,
     value: (catStats && catStats[attr.key]) || 0,
@@ -438,6 +441,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
     const [tempPhotoCaption, setTempPhotoCaption] = useState('');
 
+    const [selectedStatsYear, setSelectedStatsYear] = useState<number>(new Date().getFullYear());
+
     const isCoach = currentUser?.role === 'coach';
     const isDirector = currentUser?.role === 'director';
 
@@ -491,11 +496,22 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const categoryLabels: Record<AttributeCategory, string> = { technical: '技术能力', tactical: '战术意识', physical: '身体素质', mental: '心理素质' };
     
+    const currentYear = new Date().getFullYear();
+    const currentYearStats = editedPlayer?.yearlyStats?.[currentYear] || editedPlayer?.stats;
+    
     const overviewRadarData = [
-      { subject: '技术', A: getCategoryAvg(editedPlayer, 'technical', attributeConfig), fullMark: 10 },
-      { subject: '战术', A: getCategoryAvg(editedPlayer, 'tactical', attributeConfig), fullMark: 10 },
-      { subject: '身体', A: getCategoryAvg(editedPlayer, 'physical', attributeConfig), fullMark: 10 },
-      { subject: '心理', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig), fullMark: 10 },
+      { subject: '技术', A: getCategoryAvg(editedPlayer, 'technical', attributeConfig, currentYearStats), fullMark: 10 },
+      { subject: '战术', A: getCategoryAvg(editedPlayer, 'tactical', attributeConfig, currentYearStats), fullMark: 10 },
+      { subject: '身体', A: getCategoryAvg(editedPlayer, 'physical', attributeConfig, currentYearStats), fullMark: 10 },
+      { subject: '心理', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig, currentYearStats), fullMark: 10 },
+    ];
+
+    const exportYearStats = editedPlayer?.yearlyStats?.[exportYear] || editedPlayer?.stats;
+    const exportRadarData = [
+      { subject: '技术', A: getCategoryAvg(editedPlayer, 'technical', attributeConfig, exportYearStats), fullMark: 10 },
+      { subject: '战术', A: getCategoryAvg(editedPlayer, 'tactical', attributeConfig, exportYearStats), fullMark: 10 },
+      { subject: '身体', A: getCategoryAvg(editedPlayer, 'physical', attributeConfig, exportYearStats), fullMark: 10 },
+      { subject: '心理', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig, exportYearStats), fullMark: 10 },
     ];
 
     const handleSave = () => {
@@ -514,8 +530,22 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
          setEditedPlayer(prev => ({ ...prev, rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || [] }));
     };
     const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
+    const changeStatsYear = (year: number) => {
+      setSelectedStatsYear(year);
+      const statsForYear = editedPlayer.yearlyStats?.[year] || generateDefaultStats(attributeConfig);
+      setEditedPlayer(prev => ({ ...prev, stats: statsForYear }));
+    };
+
     const handleStatChange = (category: keyof PlayerStats, key: string, value: number) => {
-      setEditedPlayer(prev => ({ ...prev, stats: { ...prev.stats, [category]: { ...prev.stats[category], [key]: value } }, }));
+      setEditedPlayer(prev => {
+        const newStats = { ...prev.stats, [category]: { ...prev.stats[category], [key]: value } };
+        const newYearlyStats = { ...(prev.yearlyStats || {}), [selectedStatsYear]: newStats };
+        return {
+          ...prev,
+          stats: newStats,
+          yearlyStats: newYearlyStats
+        };
+      });
     };
     const handleIdCardChangeLocal = (e: React.ChangeEvent<HTMLInputElement>) => {
       const id = e.target.value; const updates: any = { idCard: id };
@@ -637,10 +667,14 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const renderStatSliders = (category: AttributeCategory) => {
         const attributes = attributeConfig[category];
         if (attributes.length === 0) return <div className="p-8 text-center text-gray-400">该维度暂无评估项目</div>;
+        
+        // Use stats for the selected year
+        const baseStats = editedPlayer.yearlyStats?.[selectedStatsYear] || editedPlayer.stats;
+        
         return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-1 content-start">
             {attributes.map(attr => {
-              const value = editedPlayer.stats[category][attr.key] ?? 5;
+              const value = baseStats[category][attr.key] ?? 5;
               const getMeta = (v: number) => {
                   if (v >= 9) return { color: 'text-green-600', hex: '#16a34a' };
                   if (v >= 7) return { color: 'text-blue-600', hex: '#2563eb' };
@@ -665,11 +699,43 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     };
 
     const renderCategoryContent = (category: AttributeCategory) => {
-      const radarData = getCategoryRadarData(editedPlayer, category, attributeConfig);
+      const statsForYear = editedPlayer.yearlyStats?.[selectedStatsYear] || editedPlayer.stats;
+      const radarData = getCategoryRadarData(editedPlayer, category, attributeConfig, statsForYear);
       return (
          <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col md:flex-row h-full gap-4 md:gap-6 overflow-hidden">
-            <div className="w-full md:w-5/12 h-64 md:h-auto relative bg-gray-50/50 rounded-xl p-2 shrink-0 border border-gray-100 flex flex-col justify-center"><div className="absolute top-2 left-3 z-10"><span className="text-xs font-black text-gray-400 uppercase tracking-wider">{categoryLabels[category]}分析</span></div><div className="h-64 md:h-full w-full"><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="55%" outerRadius="70%" data={radarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name={categoryLabels[category]} dataKey="value" stroke="#000" strokeWidth={2} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div><div className="absolute bottom-2 right-2 bg-white px-2 py-1 rounded shadow-sm border border-gray-100 text-center"><div className="text-[10px] text-gray-400 font-bold uppercase">平均分</div><div className="text-lg font-black text-bvb-black">{getCategoryAvg(editedPlayer, category, attributeConfig)}</div></div></div>
-            <div className="w-full md:w-7/12 overflow-y-auto custom-scrollbar pb-20 md:pb-0 pr-1"><div className="mb-3 px-1 flex justify-between items-center sticky top-0 bg-white z-10 py-2 border-b border-gray-50"><span className="text-xs text-gray-400 font-bold flex items-center"><Edit2 className="w-3 h-3 mr-1" />{isEditing ? '拖动滑块调整数值' : '点击右上角“编辑”进行修改'}</span></div>{renderStatSliders(category)}</div>
+            <div className="w-full md:w-5/12 h-64 md:h-auto relative bg-gray-50/50 rounded-xl p-2 shrink-0 border border-gray-100 flex flex-col justify-center">
+                <div className="absolute top-2 right-3 z-10 flex items-center gap-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-lg border border-gray-100 shadow-sm">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">评估年份</span>
+                    <select 
+                        value={selectedStatsYear} 
+                        onChange={(e) => changeStatsYear(parseInt(e.target.value))}
+                        className="bg-transparent text-[11px] font-black text-gray-800 outline-none cursor-pointer"
+                    >
+                        {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年度</option>)}
+                    </select>
+                </div>
+                <div className="absolute top-2 left-3 z-10"><span className="text-xs font-black text-gray-400 uppercase tracking-wider">{categoryLabels[category]}分析</span></div>
+                <div className="h-64 md:h-full w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="55%" outerRadius="70%" data={radarData}>
+                            <PolarGrid stroke="#e5e7eb" />
+                            <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
+                            <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
+                            <Radar name={categoryLabels[category]} dataKey="value" stroke="#000" strokeWidth={2} fill="#FDE100" fillOpacity={0.6} />
+                        </RadarChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="absolute bottom-2 right-2 bg-white px-2 py-1 rounded shadow-sm border border-gray-100 text-center">
+                    <div className="text-[10px] text-gray-400 font-bold uppercase">平均分</div>
+                    <div className="text-lg font-black text-bvb-black">{getCategoryAvg(editedPlayer, category, attributeConfig, statsForYear)}</div>
+                </div>
+            </div>
+            <div className="w-full md:w-7/12 overflow-y-auto custom-scrollbar pb-20 md:pb-0 pr-1">
+                <div className="mb-3 px-1 flex justify-between items-center sticky top-0 bg-white z-10 py-2 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-bold flex items-center"><Edit2 className="w-3 h-3 mr-1" />{isEditing ? '拖动滑块调整数值' : '点击右上角“编辑”进行修改'}</span>
+                </div>
+                {renderStatSliders(category)}
+            </div>
          </div>
       );
     };
@@ -1043,7 +1109,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       <table className="w-full text-xs">
                         <tbody>
                           {attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
-                            const val = editedPlayer.stats[section.category as AttributeCategory][attr.key] || 5;
+                            const val = exportYearStats[section.category as AttributeCategory][attr.key] || 5;
                             const scaledVal = Math.min(4, Math.max(1, Math.ceil(val / 2.5)));
                             return (
                               <tr key={aIdx} className="border-b border-gray-300 last:border-b-0">
@@ -1080,7 +1146,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                   <div className="w-72 h-full p-4 flex flex-col items-center justify-center bg-gray-50">
                     <div className="w-full h-full">
                       <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={overviewRadarData}>
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={exportRadarData}>
                           <PolarGrid stroke="#e5e7eb" />
                           <PolarAngleAxis dataKey="subject" tick={{ fill: '#6b7280', fontSize: 10, fontWeight: 'bold' }} />
                           <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
@@ -1205,7 +1271,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
     }, 0);
   }, [selectedTeamId]);
   const selectedTeam = teams.find(t => t.id === selectedTeamId);
-  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '男', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
+  const [newPlayer, setNewPlayer] = useState<Partial<Player>>({ name: '', gender: '女', idCard: '', birthDate: '', position: Position.ST, secondaryPosition: Position.TBD, number: 0, age: 0, image: '', teamId: '', isCaptain: false, joinDate: '', school: '', parentName: '', parentPhone: '', preferredFoot: '右', nickname: '', height: undefined, weight: undefined });
   const [newTeam, setNewTeam] = useState<Partial<Team>>({ name: '', level: '', attribute: '启蒙', description: '' });
   
   const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {

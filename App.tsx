@@ -20,6 +20,7 @@ import { Loader2 } from 'lucide-react';
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [openedTabs, setOpenedTabs] = useState<string[]>(['dashboard']);
   const [navigationParams, setNavigationParams] = useState<{ filter?: string }>({});
   
   // App State
@@ -204,17 +205,35 @@ function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setActiveTab('dashboard');
+    setOpenedTabs(['dashboard']);
     setNavigationParams({});
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setOpenedTabs(['dashboard']);
     setNavigationParams({});
   };
 
   const handleNavigate = (tab: string, filter?: string) => {
-      setActiveTab(tab);
+      handleOpenTab(tab);
       if (filter) setNavigationParams({ filter });
+  };
+
+  const handleOpenTab = (tabId: string) => {
+    setActiveTab(tabId);
+    if (!openedTabs.includes(tabId)) {
+      setOpenedTabs(prev => [...prev, tabId]);
+    }
+  };
+
+  const handleCloseTab = (tabId: string) => {
+    if (openedTabs.length <= 1) return;
+    const newTabs = openedTabs.filter(id => id !== tabId);
+    setOpenedTabs(newTabs);
+    if (activeTab === tabId) {
+      setActiveTab(newTabs[newTabs.length - 1]);
+    }
   };
 
   // Finance Handlers
@@ -325,8 +344,8 @@ function App() {
     return <ParentPortal player={childPlayer} team={childTeam} attributeConfig={attributeConfig} trainings={trainings} onLogout={handleLogout} appLogo={appLogo} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} />;
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
+  const renderTabContent = (tabId: string) => {
+    switch (tabId) {
       case 'dashboard':
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} tactics={tactics} salarySettings={salarySettings} />;
       case 'players':
@@ -368,12 +387,23 @@ function App() {
       case 'settings':
         return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} />;
       default:
-        return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} appLogo={appLogo} />;
+        return null;
     }
   };
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} currentUser={currentUser} onLogout={handleLogout} isSyncing={isSyncing} hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} appLogo={appLogo} permissions={permissions}>
+    <Layout 
+      activeTab={activeTab} 
+      setActiveTab={handleOpenTab} 
+      openedTabs={openedTabs}
+      onCloseTab={handleCloseTab}
+      currentUser={currentUser} 
+      onLogout={handleLogout} 
+      isSyncing={isSyncing} 
+      hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} 
+      appLogo={appLogo} 
+      permissions={permissions}
+    >
       {cloudError && (
         <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg flex justify-between items-center shadow-sm animate-in fade-in slide-in-from-top-2">
           <div className="flex items-center">
@@ -393,7 +423,17 @@ function App() {
           </button>
         </div>
       )}
-      {renderContent()}
+      
+      <div className="relative h-full">
+        {openedTabs.map(tabId => (
+          <div 
+            key={tabId} 
+            className={`h-full ${activeTab === tabId ? 'block' : 'hidden'}`}
+          >
+            {renderTabContent(tabId)}
+          </div>
+        ))}
+      </div>
     </Layout>
   );
 }

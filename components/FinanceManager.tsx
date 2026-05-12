@@ -701,6 +701,21 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                                 }}
                                                                                 title="点击修改计算人数"
                                                                             />
+                                                                            {(overriddenTeamSizes[`${selectedYear}-${selectedMonth}-${sal.coachId}-${teamInfo.teamId}`] !== undefined || (savedRecord?.overriddenTeamSizes?.[teamInfo.teamId] !== undefined)) && (
+                                                                                <button 
+                                                                                    onClick={() => {
+                                                                                        setOverriddenTeamSizes(prev => {
+                                                                                            const next = { ...prev };
+                                                                                            delete next[`${selectedYear}-${selectedMonth}-${sal.coachId}-${teamInfo.teamId}`];
+                                                                                            return next;
+                                                                                        });
+                                                                                    }}
+                                                                                    className="p-0.5 text-gray-300 hover:text-bvb-yellow transition-colors"
+                                                                                    title="同步至当前实际人数"
+                                                                                >
+                                                                                    <RefreshCw className="w-2.5 h-2.5" />
+                                                                                </button>
+                                                                            )}
                                                                             人)
                                                                         </span>
                                                                         <span className="text-bvb-yellow bg-black px-1 rounded-sm">¥{teamInfo.monthlySessionFee}</span>

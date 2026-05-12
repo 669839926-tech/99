@@ -164,6 +164,7 @@ export interface Player {
   stats: PlayerStats;
   statsStatus?: ApprovalStatus;
   lastPublishedStats?: PlayerStats;
+  yearlyStats?: Record<number, PlayerStats>;
   reviews: PlayerReview[];
   credits: number;
   validUntil: string;
@@ -261,6 +262,26 @@ export interface MatchPlan {
     createdAt: string;
 }
 
+export interface MatchSummaryBreakdown {
+    overall: string;
+    technicalTactical: string;
+    individual: string;
+    gapAnalysis: string;
+    trainingPriorities: string;
+    management: string;
+}
+
+export interface SeriesFixture {
+    id: string;
+    opponent: string;
+    result: string;
+    location: 'Home' | 'Away';
+    date: string;
+    weather?: string;
+    pitch?: string;
+    events: MatchEvent[];
+}
+
 export interface MatchDetails {
     weather: string;
     pitch: string;
@@ -268,6 +289,7 @@ export interface MatchDetails {
     substitutes: string[];
     events: MatchEvent[];
     summary: string;
+    summaryBreakdown?: MatchSummaryBreakdown;
 }
 
 export interface Match {
@@ -276,16 +298,21 @@ export interface Match {
   title?: string;
   opponent: string;
   date: string;
+  endDate?: string;
   time: string;
   location: 'Home' | 'Away';
   province?: string;
   city?: string;
   district?: string;
   result?: string;
+  seriesResult?: string;
+  seriesRanking?: string;
   status: 'Upcoming' | 'Completed' | 'Cancelled';
   competition: string;
   matchLog?: string;
   details?: MatchDetails;
+  isSeries?: boolean;
+  fixtures?: SeriesFixture[];
 }
 
 export interface TrainingSession {

@@ -1,12 +1,14 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, Layout as LayoutIcon } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, Layout as LayoutIcon, X } from 'lucide-react';
 import { User as UserType, RolePermissions, ModuleId } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  openedTabs: string[];
+  onCloseTab: (tab: string) => void;
   currentUser: UserType | null;
   onLogout: () => void;
   isSyncing?: boolean;
@@ -15,7 +17,7 @@ interface LayoutProps {
   permissions: RolePermissions;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, isSyncing = false, hasNewAnnouncements = false, appLogo, permissions }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, openedTabs, onCloseTab, currentUser, onLogout, isSyncing = false, hasNewAnnouncements = false, appLogo, permissions }) => {
   
   const hasViewPermission = (moduleId: ModuleId) => {
       if (!currentUser) return false;
@@ -33,6 +35,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
     { id: 'training', label: '训练计划', icon: Calendar },
     { id: 'matches', label: '比赛日程', icon: Trophy },
   ].filter(item => hasViewPermission(item.id as ModuleId));
+
+  const allModulesMap = [
+    ...navItems,
+    { id: 'settings', label: '系统设置', icon: Settings }
+  ].reduce((acc, item) => ({ ...acc, [item.id]: item }), {} as Record<string, any>);
 
   const getMobileLabel = (label: string) => {
     if (label === '俱乐部概览') return '概览';
@@ -145,6 +152,36 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
                  <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
              </div>
         </header>
+
+        {/* Tab Bar - Desktop */}
+        <div className="hidden md:flex bg-white border-b border-gray-200 shrink-0 overflow-x-auto no-scrollbar items-end h-12 px-4 gap-1">
+          {openedTabs.map(tabId => {
+            const module = allModulesMap[tabId];
+            if (!module) return null;
+            const IsActive = activeTab === tabId;
+            return (
+              <div 
+                key={tabId}
+                onClick={() => setActiveTab(tabId)}
+                className={`group relative flex items-center h-10 min-w-[120px] max-w-[200px] px-4 rounded-t-xl cursor-pointer transition-all border-t border-x ${
+                  IsActive 
+                  ? 'bg-gray-50 border-gray-200 text-bvb-black font-bold' 
+                  : 'bg-gray-100/50 border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                }`}
+              >
+                <module.icon className={`w-3.5 h-3.5 mr-2 ${IsActive ? 'text-bvb-yellow' : 'text-gray-400'}`} />
+                <span className="text-xs truncate">{module.label}</span>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onCloseTab(tabId); }}
+                  className={`ml-2 p-0.5 rounded-full hover:bg-gray-200 transition-colors ${IsActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                {IsActive && <div className="absolute top-0 left-0 right-0 h-0.5 bg-bvb-yellow rounded-full"></div>}
+              </div>
+            );
+          })}
+        </div>
 
         <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-8 pb-32 md:pb-8 scroll-smooth">
           <div className="max-w-7xl mx-auto h-full">
