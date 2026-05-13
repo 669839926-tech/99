@@ -41,7 +41,6 @@ function App() {
   const [periodizationPlans, setPeriodizationPlans] = useState<PeriodizationPlan[]>([]);
   const [accountingRecords, setAccountingRecords] = useState<AccountingRecord[]>([]);
   const [tactics, setTactics] = useState<Tactic[]>([]);
-  const [matchPlans, setMatchPlans] = useState<MatchPlan[]>([]);
   const [pointItemDefinitions, setPointItemDefinitions] = useState<PointItemDefinition[]>([]);
   const [playerPointRecords, setPlayerPointRecords] = useState<PlayerPointRecord[]>([]);
   const [travelingPlayerIds, setTravelingPlayerIds] = useState<string[]>([]);
@@ -137,7 +136,6 @@ function App() {
             if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
             if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
             if (cloudData.tactics) setTactics(cloudData.tactics);
-            if (cloudData.matchPlans) setMatchPlans(cloudData.matchPlans);
             if (cloudData.pointItemDefinitions) setPointItemDefinitions(cloudData.pointItemDefinitions);
             if (cloudData.playerPointRecords) setPlayerPointRecords(cloudData.playerPointRecords);
             if (cloudData.travelingPlayerIds) setTravelingPlayerIds(cloudData.travelingPlayerIds);
@@ -184,7 +182,6 @@ function App() {
                 periodizationPlans,
                 accountingRecords,
                 tactics,
-                matchPlans,
                 pointItemDefinitions,
                 playerPointRecords,
                 travelingPlayerIds
@@ -199,7 +196,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, matchPlans, pointItemDefinitions, playerPointRecords, travelingPlayerIds, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -368,10 +365,6 @@ function App() {
           onDeleteMatch={handleDeleteMatch} 
           onUpdateMatch={handleUpdateMatch} 
           appLogo={appLogo}
-          matchPlans={matchPlans}
-          onAddMatchPlan={(plan) => setMatchPlans(prev => [...prev, plan])}
-          onUpdateMatchPlan={(plan) => setMatchPlans(prev => prev.map(p => p.id === plan.id ? plan : p))}
-          onDeleteMatchPlan={(id) => setMatchPlans(prev => prev.filter(p => p.id !== id))}
           pointItemDefinitions={pointItemDefinitions}
           onAddPointItem={handleAddPointItem}
           onDeletePointItem={handleDeletePointItem}

@@ -506,7 +506,7 @@ const TacticsBoard: React.FC<TacticsBoardProps> = ({ players, teams, initialData
             </div>
             
             <div className="p-3 bg-gray-50 border-t border-b flex justify-between items-center">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">首发阵容 ({assignedPlayerIds.length})</span>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">参赛阵容 ({assignedPlayerIds.length})</span>
             </div>
             <div className="flex-[2] p-3 space-y-1.5 overflow-y-auto custom-scrollbar bg-gray-50/50">
                 {tacticsPlayers.length === 0 ? (

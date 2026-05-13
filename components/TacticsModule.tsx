@@ -231,7 +231,7 @@ const TacticsModule: React.FC<TacticsModuleProps> = ({ players, teams, tactics, 
                       {[
                           { title: '全赛制支持', desc: '支持5人、8人、11人制足球赛，内置所有主流阵型模板。' },
                           { title: '可视化演示', desc: '通过传球、跑动、射门等多种标注工具，清晰传达战术意图。' },
-                          { title: '球员库集成', desc: '直接从球队名单中拖拽球员，实时管理首发与替补阵容。' }
+                          { title: '球员库集成', desc: '直接从球队名单中拖拽球员，实时管理参赛人员阵容。' }
                       ].map((item, i) => (
                           <div key={i} className="flex gap-4">
                               <div className="bg-bvb-yellow/20 w-10 h-10 rounded-xl flex items-center justify-center shrink-0">

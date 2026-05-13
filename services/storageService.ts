@@ -18,7 +18,6 @@ export interface AppData {
     periodizationPlans?: any[];
     accountingRecords?: any[];
     tactics?: any[];
-    matchPlans?: any[];
     pointItemDefinitions?: any[];
     playerPointRecords?: any[];
     travelingPlayerIds?: string[];

@@ -259,6 +259,8 @@ export interface MatchPlanRequirement {
     id: string;
     text: string;
     completed: boolean;
+    score?: number; // 1-10 points
+    rating?: 'Excellent' | 'Good' | 'Normal';
 }
 
 export interface MatchPlan {
@@ -302,6 +304,8 @@ export interface MatchDetails {
     events: MatchEvent[];
     summary: string;
     summaryBreakdown?: MatchSummaryBreakdown;
+    teamRequirements?: MatchPlanRequirement[];
+    playerRequirements?: Record<string, MatchPlanRequirement[]>;
 }
 
 export interface Match {
