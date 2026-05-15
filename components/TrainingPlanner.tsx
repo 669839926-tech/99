@@ -60,6 +60,19 @@ const calculateFocusStats = (playerId: string, allSessions: TrainingSession[]) =
     return stats;
 };
 
+// 辅助函数：获取某月有多少个星期日
+const getSundaysInMonth = (year: number, month: number) => {
+    let sundays = 0;
+    const date = new Date(year, month - 1, 1);
+    while (date.getMonth() === month - 1) {
+        if (date.getDay() === 0) { // 0 is Sunday
+            sundays++;
+        }
+        date.setDate(date.getDate() + 1);
+    }
+    return sundays;
+};
+
 interface WeeklyPlanEditorProps {
     week: WeeklyPlan;
     onSave: (week: WeeklyPlan) => void;
@@ -1347,7 +1360,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {months.map(month => {
-                                const monthWeeks = Array.from({length: 4}, (_, i) => i + 1);
+                                const monthWeeksCount = getSundaysInMonth(year, month);
+                                const monthWeeks = Array.from({length: monthWeeksCount}, (_, i) => i + 1);
                                 return monthWeeks.map((weekNum, idx) => {
                                     const weekPlan = currentPeriodization.weeks.find(w => w.month === month && w.weekInMonth === weekNum) || {
                                         id: `w-${month}-${weekNum}`,
@@ -1359,7 +1373,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                     return (
                                         <tr key={`${month}-${weekNum}`} className={`hover:bg-yellow-50/30 transition-colors group cursor-pointer ${isClipboardSource ? 'bg-yellow-50' : ''}`} onClick={() => setActiveWeekPlan(weekPlan)}>
                                             {idx === 0 && (
-                                                <td rowSpan={4} className="border-r font-black text-sm md:text-lg bg-gray-50/80 backdrop-blur-sm sticky left-0 z-20">
+                                                <td rowSpan={monthWeeksCount} className="border-r font-black text-sm md:text-lg bg-gray-50/80 backdrop-blur-sm sticky left-0 z-20">
                                                     {month}月
                                                 </td>
                                             )}
@@ -1393,7 +1407,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             </td>
                                             <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-black text-blue-600">{weekPlan.oppositionContent || '-'}</td>
                                             {idx === 0 && (
-                                                <td rowSpan={4} className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-red-600 font-bold text-left align-top leading-snug md:leading-relaxed whitespace-pre-wrap">
+                                                <td rowSpan={monthWeeksCount} className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-red-600 font-bold text-left align-top leading-snug md:leading-relaxed whitespace-pre-wrap">
                                                     {weekPlan.trainingGoals || '-'}
                                                 </td>
                                             )}
