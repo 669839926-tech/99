@@ -73,6 +73,33 @@ const getSundaysInMonth = (year: number, month: number) => {
     return sundays;
 };
 
+// 辅助函数：计算特定日期在其月份的第几个周（按星期日分割周次，与周期表一致）
+const getWeekInMonthOfDate = (dateStr: string) => {
+    if (!dateStr) return null;
+    const parts = dateStr.split('-').map(Number);
+    if (parts.length !== 3 || parts.some(isNaN)) return null;
+    const [year, month, day] = parts;
+    
+    let sundaysBefore = 0;
+    const tempDate = new Date(year, month - 1, 1);
+    while (tempDate.getDate() < day && tempDate.getMonth() === month - 1) {
+        if (tempDate.getDay() === 0) { // Sunday
+            sundaysBefore++;
+        }
+        tempDate.setDate(tempDate.getDate() + 1);
+    }
+    
+    let weekInMonth = sundaysBefore + 1;
+    const totalSundays = getSundaysInMonth(year, month);
+    if (weekInMonth > totalSundays) {
+        weekInMonth = totalSundays;
+    }
+    if (weekInMonth < 1) {
+        weekInMonth = 1;
+    }
+    return { year, month, weekInMonth };
+};
+
 interface WeeklyPlanEditorProps {
     week: WeeklyPlan;
     onSave: (week: WeeklyPlan) => void;
@@ -888,6 +915,24 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const year = currentDate.getFullYear();
       return periodizationPlans.find(p => p.teamId === teamId && p.year === year) || { id: `p-${teamId}-${year}`, teamId, year, weeks: [] };
   }, [periodizationPlans, statsTeamFilter, availableTeams, currentDate]);
+
+  const matchedWeekPlanForForm = useMemo(() => {
+      if (!formData.teamId || !formData.date || !periodizationPlans) return null;
+      const weekInfo = getWeekInMonthOfDate(formData.date);
+      if (!weekInfo) return null;
+      const plan = periodizationPlans.find(p => p.teamId === formData.teamId && p.year === weekInfo.year);
+      if (!plan) return null;
+      const weekPlan = plan.weeks.find(w => w.month === weekInfo.month && w.weekInMonth === weekInfo.weekInMonth);
+      if (weekPlan && (weekPlan.trainingTheme || weekPlan.trainingContent)) {
+          return {
+              ...weekPlan,
+              year: weekInfo.year,
+              month: weekInfo.month,
+              weekInMonth: weekInfo.weekInMonth
+          };
+      }
+      return null;
+  }, [formData.teamId, formData.date, periodizationPlans]);
 
   // 球员关注追踪视图逻辑
   const focusedPlayersSummary = useMemo(() => {
@@ -1770,6 +1815,90 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   </div>
                   {!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}
                   
+                  {matchedWeekPlanForForm && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3 shadow-xs animate-in slide-in-from-top-2 duration-200">
+                      <div className="flex items-center gap-2 text-amber-900 font-black text-xs uppercase tracking-wider">
+                        <TableProperties className="w-4 h-4 text-amber-600" />
+                        <span>📅 已匹配此团队的周期训练计划 (第 {matchedWeekPlanForForm.month}月 第{matchedWeekPlanForForm.weekInMonth}周)</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        {matchedWeekPlanForForm.trainingTheme && (
+                          <div className="bg-white p-2.5 rounded-lg border border-amber-100 flex flex-col justify-between">
+                            <div>
+                              <span className="text-gray-400 block text-[10px] font-bold">拟定重点：</span>
+                              <span className="font-extrabold text-gray-800 text-xs md:text-sm">{matchedWeekPlanForForm.trainingTheme}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const isStandard = trainingFoci.includes(matchedWeekPlanForForm.trainingTheme);
+                                setFormData(p => ({
+                                  ...p,
+                                  focus: isStandard ? matchedWeekPlanForForm.trainingTheme : 'Custom',
+                                  focusCustom: isStandard ? '' : matchedWeekPlanForForm.trainingTheme,
+                                  title: ''
+                                }));
+                              }}
+                              className="mt-2 text-center text-[10px] font-black bg-amber-100 hover:bg-amber-200 text-amber-800 py-1.5 px-2 rounded-md transition-colors"
+                            >
+                              优先采用此重点
+                            </button>
+                          </div>
+                        )}
+                        
+                        {matchedWeekPlanForForm.trainingContent && (
+                          <div className="bg-white p-2.5 rounded-lg border border-amber-100 flex flex-col justify-between">
+                            <div>
+                              <span className="text-gray-400 block text-[10px] font-bold">拟定主题：</span>
+                              <span className="font-extrabold text-gray-800 text-xs md:text-sm line-clamp-2" title={matchedWeekPlanForForm.trainingContent}>
+                                {matchedWeekPlanForForm.trainingContent}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(p => ({
+                                  ...p,
+                                  title: matchedWeekPlanForForm.trainingContent
+                                }));
+                              }}
+                              className="mt-2 text-center text-[10px] font-black bg-amber-100 hover:bg-amber-200 text-amber-800 py-1.5 px-2 rounded-md transition-colors"
+                            >
+                              优先采用此主题
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {matchedWeekPlanForForm.trainingTheme && matchedWeekPlanForForm.trainingContent && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const isStandard = trainingFoci.includes(matchedWeekPlanForForm.trainingTheme);
+                            setFormData(p => ({
+                              ...p,
+                              focus: isStandard ? matchedWeekPlanForForm.trainingTheme : 'Custom',
+                              focusCustom: isStandard ? '' : matchedWeekPlanForForm.trainingTheme,
+                              title: matchedWeekPlanForForm.trainingContent
+                            }));
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-bvb-black hover:bg-black text-bvb-yellow hover:text-white text-xs font-black rounded-lg shadow-sm transition-all text-center border border-transparent hover:border-yellow-400"
+                        >
+                          一键同步拟定主题和重点
+                        </button>
+                      )}
+                      
+                      {(matchedWeekPlanForForm.physicalTheme || matchedWeekPlanForForm.oppositionContent || matchedWeekPlanForForm.trainingGoals) && (
+                        <div className="text-[10px] text-amber-850 font-bold space-y-1 border-t border-amber-200/60 pt-2">
+                          {matchedWeekPlanForForm.physicalTheme && <div>💪 体能拟定: {matchedWeekPlanForForm.physicalTheme}</div>}
+                          {matchedWeekPlanForForm.oppositionContent && <div>⚔️ 情景对抗: {matchedWeekPlanForForm.oppositionContent}</div>}
+                          {matchedWeekPlanForForm.trainingGoals && <div className="line-clamp-2" title={matchedWeekPlanForForm.trainingGoals}>🎯 训练目标: {matchedWeekPlanForForm.trainingGoals}</div>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
