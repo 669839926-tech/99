@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, MatchPlan, MatchPlanRequirement, PointItemDefinition, PlayerPointRecord, PointChangeType } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType } from '../types';
 // Comment: Added 'Coins', 'TrendingDown', 'ListPlus' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, Clock, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Send, Cloud, Maximize2, Minimize2 } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Cloud, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 

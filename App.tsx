@@ -103,11 +103,30 @@ function App() {
               }
           });
 
+          // Calculate dynamic age from birthDate
+          let dynamicAge = p.age || 0;
+          if (p.birthDate) {
+              const today = new Date();
+              const parts = p.birthDate.split('-').map(Number);
+              if (parts.length === 3) {
+                  const [bYear, bMonth, bDay] = parts;
+                  if (!isNaN(bYear) && !isNaN(bMonth) && !isNaN(bDay)) {
+                      let computedAge = today.getFullYear() - bYear;
+                      const monthDiff = today.getMonth() + 1 - bMonth;
+                      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bDay)) {
+                          computedAge--;
+                      }
+                      dynamicAge = computedAge >= 0 ? computedAge : 0;
+                  }
+              }
+          }
+
           return { 
               ...p, 
               credits: runningCredits, 
               remainingLeaveQuota: runningLeaveQuota,
-              leavesUsed: usedLeaveQuota
+              leavesUsed: usedLeaveQuota,
+              age: dynamicAge
           };
       });
   }, [players, trainings]);
