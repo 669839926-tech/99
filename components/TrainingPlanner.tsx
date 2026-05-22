@@ -1899,6 +1899,37 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     </div>
                   )}
 
+                  {!matchedWeekPlanForForm && formData.teamId && formData.date && formData.teamId !== 'unassigned' && (() => {
+                      const weekInfo = getWeekInMonthOfDate(formData.date);
+                      const teamName = teams.find(t => t.id === formData.teamId)?.name || '该球队';
+                      return (
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-2 space-y-2 shadow-xs animate-in slide-in-from-top-2 duration-200">
+                          <div className="flex items-start gap-2.5">
+                            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                            <div className="flex-1">
+                              <h4 className="font-extrabold text-red-800 text-xs uppercase tracking-wider">⚠️ 请先建立周期训练计划</h4>
+                              <p className="text-[10px] text-red-600 font-medium mt-1">
+                                {teamName} 在 <strong>{weekInfo ? `${weekInfo.year}年${weekInfo.month}月 第${weekInfo.weekInMonth}周` : ''}</strong> 尚未制定任何周期性训练主题或重点。
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStatsTeamFilter(formData.teamId);
+                                setViewType('periodization');
+                                setShowAddModal(false);
+                              }}
+                              className="text-[10px] font-black bg-red-100 hover:bg-red-200 text-red-850 py-1.5 px-3 rounded-md transition-colors border border-red-200"
+                            >
+                              立即前往制定周期计划
+                            </button>
+                          </div>
+                        </div>
+                      );
+                  })()}
+
                   <div className="space-y-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
