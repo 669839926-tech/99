@@ -616,27 +616,83 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                                         { key: 'discipline', label: '4. 球队纪律性' },
                                     ].map(metric => {
                                         const value = localSession.performanceRatings?.[metric.key as keyof typeof localSession.performanceRatings] ?? 5;
-                                        const getMeta = (v: number) => {
-                                            if (v >= 8) return { color: 'text-green-600', hex: '#16a34a' };
-                                            if (v >= 6) return { color: 'text-blue-600', hex: '#2563eb' };
-                                            if (v >= 4) return { color: 'text-yellow-600', hex: '#EAB308' };
-                                            return { color: 'text-red-500', hex: '#ef4444' };
+                                        
+                                        const getRatingLevel = (v: number) => {
+                                            if (v <= 3) return 1;
+                                            if (v <= 5) return 2;
+                                            if (v <= 8) return 3;
+                                            return 4;
                                         };
-                                        const meta = getMeta(value);
+
+                                        const currentLevel = getRatingLevel(value);
+
+                                        const levels = [
+                                            { 
+                                                level: 1, 
+                                                label: '较差', 
+                                                colorClass: 'border-red-100 text-red-600 hover:bg-red-50/50 hover:text-red-700 bg-red-50/10 font-bold', 
+                                                activeClass: 'bg-red-500 border-red-500 text-white shadow-sm font-black', 
+                                                value: 2 
+                                            },
+                                            { 
+                                                level: 2, 
+                                                label: '一般', 
+                                                colorClass: 'border-yellow-100 text-yellow-700 hover:bg-yellow-50/50 hover:text-yellow-800 bg-yellow-50/10 font-bold', 
+                                                activeClass: 'bg-yellow-500 border-yellow-500 text-white shadow-sm font-black', 
+                                                value: 5 
+                                            },
+                                            { 
+                                                level: 3, 
+                                                label: '良好', 
+                                                colorClass: 'border-blue-100 text-blue-600 hover:bg-blue-50/50 hover:text-blue-700 bg-blue-50/10 font-bold', 
+                                                activeClass: 'bg-blue-600 border-blue-600 text-white shadow-sm font-black', 
+                                                value: 8 
+                                            },
+                                            { 
+                                                level: 4, 
+                                                label: '优秀', 
+                                                colorClass: 'border-green-100 text-green-600 hover:bg-green-50/50 hover:text-green-700 bg-green-50/10 font-bold', 
+                                                activeClass: 'bg-green-600 border-green-600 text-white shadow-sm font-black', 
+                                                value: 10 
+                                            },
+                                        ];
+
+                                        const activeLvl = levels.find(l => l.level === currentLevel) || levels[1];
+
                                         return (
                                             <div key={metric.key} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
                                                 <div className="flex justify-between items-center">
                                                     <label className="text-xs font-black text-gray-500 uppercase tracking-widest">{metric.label}</label>
-                                                    <span className={`text-sm font-black font-mono px-2 py-0.5 rounded bg-gray-50 ${meta.color}`}>{value}</span>
+                                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                                        currentLevel === 1 ? 'bg-red-50 text-red-600' :
+                                                        currentLevel === 2 ? 'bg-yellow-50 text-yellow-600' :
+                                                        currentLevel === 3 ? 'bg-blue-50 text-blue-600' :
+                                                        'bg-green-50 text-green-600'
+                                                    }`}>
+                                                        {activeLvl.label}
+                                                    </span>
                                                 </div>
-                                                <input 
-                                                    type="range" min="1" max="10" step="1"
-                                                    disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
-                                                    value={value}
-                                                    onChange={e => handleRatingChange(metric.key, parseInt(e.target.value))}
-                                                    className="w-full h-1.5 rounded-full appearance-none cursor-pointer bg-gray-100 outline-none"
-                                                    style={{ background: `linear-gradient(to right, ${meta.hex} ${(value-1)/9*100}%, #f3f4f6 ${(value-1)/9*100}%)` }}
-                                                />
+                                                <div className="grid grid-cols-4 gap-1.5 pt-1">
+                                                    {levels.map(lvl => {
+                                                        const isSelected = currentLevel === lvl.level;
+                                                        const isDisabled = !canEdit || localSession.submissionStatus === 'Reviewed';
+                                                        return (
+                                                            <button
+                                                                key={lvl.level}
+                                                                type="button"
+                                                                disabled={isDisabled}
+                                                                onClick={() => handleRatingChange(metric.key, lvl.value)}
+                                                                className={`py-2 text-[11px] rounded-xl border text-center transition-all duration-200 ${
+                                                                    isSelected 
+                                                                        ? lvl.activeClass 
+                                                                        : lvl.colorClass
+                                                                } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-[1.02] active:scale-95'}`}
+                                                            >
+                                                                {lvl.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         );
                                     })}
