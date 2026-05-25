@@ -378,6 +378,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 performanceFormula,
                 evaluationScore: evaluation?.score || 0,
                 evaluationDetails: evaluation,
+                savedRecord,
                 isSaved: !!savedRecord,
                 isDisbursed: savedRecord?.isDisbursed || false,
                 isModified: Object.keys(currentEdit).length > 0 || Object.keys(overriddenTeamSizes).some(k => k.startsWith(`${selectedYear}-${selectedMonth}-${coach.id}-`)),
@@ -701,7 +702,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                                 }}
                                                                                 title="点击修改计算人数"
                                                                             />
-                                                                            {(overriddenTeamSizes[`${selectedYear}-${selectedMonth}-${sal.coachId}-${teamInfo.teamId}`] !== undefined || (savedRecord?.overriddenTeamSizes?.[teamInfo.teamId] !== undefined)) && (
+                                                                            {(overriddenTeamSizes[`${selectedYear}-${selectedMonth}-${sal.coachId}-${teamInfo.teamId}`] !== undefined || (sal.savedRecord?.overriddenTeamSizes?.[teamInfo.teamId] !== undefined)) && (
                                                                                 <button 
                                                                                     onClick={() => {
                                                                                         setOverriddenTeamSizes(prev => {
