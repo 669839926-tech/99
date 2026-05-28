@@ -5,6 +5,7 @@ import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, Chevr
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
+import { BasicTechItem, ScenarioTheme, BASIC_TECH_THEMES, SCENARIO_THEMES } from '../src/philosophyData';
 
 interface TrainingPlannerProps {
   trainings: TrainingSession[];
@@ -22,7 +23,198 @@ interface TrainingPlannerProps {
   appLogo?: string;
   periodizationPlans?: PeriodizationPlan[];
   onUpdatePeriodization?: (plan: PeriodizationPlan) => void;
+  basicTechThemes?: BasicTechItem[];
+  scenarioThemes?: ScenarioTheme[];
 }
+
+interface ThemeSelectorModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (focus: string, content: string) => void;
+  basicTechThemes?: BasicTechItem[];
+  scenarioThemes?: ScenarioTheme[];
+}
+
+const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
+  isOpen,
+  onClose,
+  onSelect,
+  basicTechThemes = BASIC_TECH_THEMES,
+  scenarioThemes = SCENARIO_THEMES
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'tech' | 'scenario'>('all');
+  
+  if (!isOpen) return null;
+
+  const techItems = (basicTechThemes || BASIC_TECH_THEMES).map(t => ({
+    type: 'tech' as const,
+    key: `tech-${t.code}`,
+    code: t.code,
+    category: t.focus,
+    theme: t.theme,
+    focusLabel: `[基础技术] ${t.focus}`,
+    displayTag: '基础技术',
+    description: t.objective || '',
+    teachingPoints: t.teachingPoints || '',
+  }));
+
+  const scenarioItems = (scenarioThemes || SCENARIO_THEMES).map(s => ({
+    type: 'scenario' as const,
+    key: `scenario-${s.code}`,
+    code: s.code,
+    category: `${s.stage} · ${s.moment}`,
+    theme: s.theme,
+    focusLabel: `[比赛场景] ${s.stage} · ${s.moment}`,
+    displayTag: '比赛场景',
+    description: s.objective || '',
+    teachingPoints: s.cue || '',
+  }));
+
+  const allItems = [...techItems, ...scenarioItems];
+
+  const filteredItems = allItems.filter(item => {
+    const matchesSearch = 
+      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.theme.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (activeTab === 'tech') return item.type === 'tech';
+    if (activeTab === 'scenario') return item.type === 'scenario';
+    return true;
+  });
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+          <div>
+            <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
+              <span className="text-bvb-yellow">★</span>
+              选择俱乐部体系库核心主题
+            </h3>
+            <p className="text-gray-400 text-xs mt-0.5">从俱乐部标准技术库与比赛场景库中统一检索与选择核心训练主题</p>
+          </div>
+          <button onClick={onClose} className="p-1 px-2 hover:bg-gray-800 rounded text-gray-400 hover:text-white transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between shrink-0">
+          <div className="flex gap-1.5 p-1 bg-gray-200/60 rounded-xl w-full sm:w-auto">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'all'
+                  ? 'bg-white shadow-sm text-bvb-black'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              全部体系 ({allItems.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('tech')}
+              className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'tech'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-blue-600'
+              }`}
+            >
+              基础技术 ({techItems.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('scenario')}
+              className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
+                activeTab === 'scenario'
+                  ? 'bg-green-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-green-600'
+              }`}
+            >
+              比赛场景 ({scenarioItems.length})
+            </button>
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="搜索编码、主题、大类..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 bg-white rounded-xl text-xs font-bold outline-none ring-bvb-yellow focus:ring-1 focus:border-bvb-yellow"
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-gray-50/50">
+          {filteredItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+              <Search className="w-10 h-10 mb-2 stroke-1" />
+              <p className="text-xs font-bold font-mono">没有找到匹配的核心训练主题</p>
+            </div>
+          ) : (
+            filteredItems.map(item => (
+              <div
+                key={item.key}
+                onClick={() => {
+                  onSelect(item.focusLabel, `${item.theme} (${item.code})`);
+                  onClose();
+                }}
+                className="group cursor-pointer hover:scale-[1.005] transition-all duration-150 relative bg-white border border-gray-200 hover:border-bvb-yellow rounded-xl p-3 shadow-sm hover:shadow-md flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between"
+              >
+                <div
+                  className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl ${
+                    item.type === 'tech' ? 'bg-blue-500' : 'bg-green-500'
+                  }`}
+                />
+                
+                <div className="pl-2 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono px-1.5 py-0.5 rounded text-[10px] font-black tracking-wider uppercase text-white bg-bvb-black">
+                      {item.code}
+                    </span>
+                    <span className="text-xs font-black text-gray-800">{item.theme}</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                        item.type === 'tech'
+                          ? 'bg-blue-50 text-blue-600'
+                          : 'bg-green-50 text-green-600'
+                      }`}
+                    >
+                      {item.category}
+                    </span>
+                  </div>
+                  {item.description && (
+                    <p className="text-[11px] text-gray-500 font-medium line-clamp-2">
+                      <span className="font-extrabold text-gray-600">目标: </span>
+                      {item.description}
+                    </p>
+                  )}
+                  {item.teachingPoints && (
+                    <p className="text-[10px] text-gray-400 line-clamp-1">
+                      <span className="font-extrabold text-gray-500">提示: </span>
+                      {item.teachingPoints}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  className="shrink-0 self-end sm:self-center px-4 py-1.5 bg-gray-50 hover:bg-bvb-yellow hover:text-bvb-black text-gray-700 rounded-lg text-xs font-black transition-colors border border-gray-100 group-hover:bg-bvb-yellow group-hover:text-bvb-black"
+                >
+                  选择
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 type TimeScope = 'month' | 'quarter' | 'year';
 type ViewType = 'calendar' | 'list' | 'periodization' | 'focus';
@@ -108,10 +300,13 @@ interface WeeklyPlanEditorProps {
     onCopy?: (week: WeeklyPlan) => void;
     trainingFoci?: string[];
     focusSubjects?: Record<string, string[]>;
+    basicTechThemes?: BasicTechItem[];
+    scenarioThemes?: ScenarioTheme[];
 }
 
-const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy, trainingFoci = [], focusSubjects = {} }) => {
+const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES }) => {
     const [localWeek, setLocalWeek] = useState<WeeklyPlan>({ ...week });
+    const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
 
     const handlePaste = () => {
         if (clipboard) {
@@ -167,58 +362,134 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
                             </button>
                         )}
                     </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">体能主题</label>
-                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.physicalTheme} onChange={e => setLocalWeek({...localWeek, physicalTheme: e.target.value})} placeholder="如：速度、敏捷" />
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
-                        <select 
-                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
-                            value={trainingFoci.includes(localWeek.trainingTheme) ? localWeek.trainingTheme : (localWeek.trainingTheme ? 'custom' : '')}
-                            onChange={e => {
-                                if (e.target.value === 'custom') {
-                                    setLocalWeek({...localWeek, trainingTheme: ''});
-                                } else {
-                                    setLocalWeek({...localWeek, trainingTheme: e.target.value, trainingContent: ''});
-                                }
-                            }}
-                        >
-                            <option value="">请选择训练重点</option>
-                            {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
-                            <option value="custom">自定义...</option>
-                        </select>
-                        {(!trainingFoci.includes(localWeek.trainingTheme) && localWeek.trainingTheme !== '') || (localWeek.trainingTheme === '' && !trainingFoci.length) ? (
-                             <input className="w-full mt-2 p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.trainingTheme} onChange={e => setLocalWeek({...localWeek, trainingTheme: e.target.value})} placeholder="输入自定义训练主题" />
-                        ) : null}
-                    </div>
-                    <div>
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练内容</label>
-                        {localWeek.trainingTheme && focusSubjects[localWeek.trainingTheme]?.length > 0 ? (
-                            <>
-                                <select 
-                                    className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
-                                    value={focusSubjects[localWeek.trainingTheme].includes(localWeek.trainingContent) ? localWeek.trainingContent : (localWeek.trainingContent ? 'custom' : '')}
-                                    onChange={e => {
-                                        if (e.target.value === 'custom') {
-                                            setLocalWeek({...localWeek, trainingContent: ''});
-                                        } else {
-                                            setLocalWeek({...localWeek, trainingContent: e.target.value});
-                                        }
-                                    }}
+                    
+                    <label className="block text-[10px] font-black text-gray-400 mb-1">训练重点 / 核心主题内容</label>
+                    <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl flex flex-col gap-3">
+                            <div className="flex justify-between items-center gap-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black text-gray-400 uppercase">当前重点分类:</span>
+                                        {localWeek.trainingTheme ? (
+                                            <span className="px-2 py-0.5 rounded text-[10px] font-black bg-bvb-black text-white shrink-0">
+                                                {localWeek.trainingTheme}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-gray-400 font-bold">未指定分类</span>
+                                        )}
+                                    </div>
+                                    <div className="text-xs font-black text-gray-800">
+                                        {localWeek.trainingContent || '未选择主题内容'}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsThemeSelectorOpen(true)}
+                                    className="px-3 py-1.5 bg-bvb-yellow hover:brightness-105 text-bvb-black text-xs font-black rounded-lg shadow-sm transition-all shrink-0 flex items-center gap-1.5"
                                 >
-                                    <option value="">请选择训练内容</option>
-                                    {focusSubjects[localWeek.trainingTheme].map(s => <option key={s} value={s}>{s}</option>)}
-                                    <option value="custom">自定义...</option>
-                                </select>
-                                {(!focusSubjects[localWeek.trainingTheme].includes(localWeek.trainingContent) && localWeek.trainingContent !== '') ? (
-                                    <textarea rows={2} className="w-full mt-2 p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingContent} onChange={e => setLocalWeek({...localWeek, trainingContent: e.target.value})} placeholder="输入自定义训练内容" />
-                                ) : null}
-                            </>
-                        ) : (
-                            <textarea rows={2} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingContent} onChange={e => setLocalWeek({...localWeek, trainingContent: e.target.value})} placeholder="核心训练细节..." />
-                        )}
-                    </div>
+                                    <Edit2 className="w-3.5 h-3.5" /> 选择体系核心主题
+                                </button>
+                            </div>
+
+                            {/* Enable manual override */}
+                            <div className="pt-2 border-t border-gray-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订分类</label>
+                                    <input
+                                        type="text"
+                                        placeholder="分类, 例如 [基础技术] 运控球"
+                                        className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                        value={localWeek.trainingTheme || ''}
+                                        onChange={e => setLocalWeek({ ...localWeek, trainingTheme: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订中心训练内容</label>
+                                    <input
+                                        type="text"
+                                        placeholder="主题具体描述描述..."
+                                        className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                        value={localWeek.trainingContent || ''}
+                                        onChange={e => setLocalWeek({ ...localWeek, trainingContent: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Integrated pedagogical prompt card */}
+                        {(() => {
+                            const match = localWeek.trainingContent?.match(/\(([^)]+)\)/);
+                            const currentCode = match ? match[1] : '';
+                            const techItem = (basicTechThemes || BASIC_TECH_THEMES).find(t => t.code === currentCode);
+                            if (techItem) {
+                                return (
+                                    <div className="bg-yellow-50/50 border border-yellow-200/60 p-3 rounded-xl text-[11px] text-gray-600 space-y-1.5 mt-3 animate-in fade-in duration-150">
+                                        <div className="font-extrabold text-bvb-black flex items-center justify-between">
+                                            <span className="flex items-center gap-1"><Brain className="w-3.5 h-3.5 text-bvb-yellow" /> 技术要领:</span>
+                                            <span className="text-gray-400 font-mono text-[9px] bg-white border border-gray-100 px-1.5 py-0.5 rounded-full">{techItem.code}</span>
+                                        </div>
+                                        <p><strong className="text-gray-700">技术目标:</strong> {techItem.objective}</p>
+                                        <p><strong className="text-gray-700">教学步骤:</strong> {techItem.teachingPoints}</p>
+                                        <p><strong className="text-gray-700">典型错误:</strong> {techItem.problem}</p>
+                                        <p><strong className="text-gray-700">呐喊口令:</strong> <span className="bg-yellow-100 font-black px-1.5 py-0.5 rounded text-bvb-black">{techItem.coachCue}</span></p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLocalWeek(prev => ({
+                                                    ...prev,
+                                                    trainingGoals: `【基础技术核心目标】\n1. 动作要领：${techItem.objective}\n2. 教学要义：${techItem.teachingPoints}\n3. 易犯动作：${techItem.problem}`,
+                                                    remarks: `青训口令：${techItem.coachCue}`
+                                                }));
+                                            }}
+                                            className="mt-1 w-full bg-white border border-yellow-250 text-yellow-800 font-bold py-1 px-2 rounded hover:bg-yellow-101 active:scale-95 transition-all text-[10px]"
+                                        >
+                                            ✨ 自动关联：一键同步动作目标 & 青训呐喊暗语
+                                        </button>
+                                    </div>
+                                );
+                            }
+                            const scenarioItem = (scenarioThemes || SCENARIO_THEMES).find(s => s.code === currentCode);
+                            if (scenarioItem) {
+                                return (
+                                    <div className="bg-yellow-50/50 border border-yellow-200/60 p-3 rounded-xl text-[11px] text-gray-600 space-y-1.5 mt-3 animate-in fade-in duration-150">
+                                        <div className="font-extrabold text-bvb-black flex items-center justify-between">
+                                            <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-bvb-yellow" /> 战术目标:</span>
+                                            <span className="text-gray-400 font-mono text-[9px] bg-white border border-gray-100 px-1.5 py-0.5 rounded-full">{scenarioItem.code}</span>
+                                        </div>
+                                        <p><strong className="text-gray-700">战术重点:</strong> {scenarioItem.objective}</p>
+                                        <p><strong className="text-gray-700">战术原则:</strong> {scenarioItem.principle}</p>
+                                        <p><strong className="text-gray-700">纠错呐喊:</strong> <span className="bg-yellow-100 font-black px-1.5 py-0.5 rounded text-bvb-black">{scenarioItem.cue}</span></p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setLocalWeek(prev => ({
+                                                    ...prev,
+                                                    trainingGoals: `【战术情景目标】\n${scenarioItem.objective}\n【典型错误纠正】\n${scenarioItem.typicalError || scenarioItem.problem}`,
+                                                    oppositionContent: scenarioItem.trainingFormat || prev.oppositionContent,
+                                                    remarks: `呐喊指令：${scenarioItem.cue}`
+                                                }));
+                                            }}
+                                            className="mt-1 w-full bg-white border border-yellow-250 text-yellow-800 font-bold py-1 px-2 rounded hover:bg-yellow-101 active:scale-95 transition-all text-[10px]"
+                                        >
+                                            ✨ 自动条件对抗导入 (例如: 3v3 等) 并在日程中关联战术
+                                        </button>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+                    <ThemeSelectorModal
+                        isOpen={isThemeSelectorOpen}
+                        onClose={() => setIsThemeSelectorOpen(false)}
+                        onSelect={(focus, content) => {
+                            setLocalWeek(prev => ({
+                                ...prev,
+                                trainingTheme: focus,
+                                trainingContent: content
+                            }));
+                        }}
+                        basicTechThemes={basicTechThemes}
+                        scenarioThemes={scenarioThemes}
+                    />
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">情景对抗内容</label>
                         <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.oppositionContent} onChange={e => setLocalWeek({...localWeek, oppositionContent: e.target.value})} placeholder="如：1v1、2v2" />
@@ -245,7 +516,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFoci = [], currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -257,6 +528,8 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
         }
         return copy;
     });
+    const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
+
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [drillInput, setDrillInput] = useState('');
 
@@ -389,15 +662,123 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                     {activeTab === 'info' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题</label>
-                                    <input 
-                                        disabled={!canEdit}
-                                        className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                        value={localSession.title}
-                                        onChange={e => setLocalSession({...localSession, title: e.target.value})}
-                                    />
+                                <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl flex flex-col gap-3">
+                                    <div className="flex justify-between items-center gap-4 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                                        <div className="space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-black text-gray-400 uppercase">当前重点分类:</span>
+                                                {localSession.focus ? (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-black bg-bvb-black text-white shrink-0">
+                                                        {localSession.focus}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400 font-bold">未指定重点分类</span>
+                                                )}
+                                            </div>
+                                            <div className="text-xs font-black text-gray-800">
+                                                {localSession.title || '未选择主题内容'}
+                                            </div>
+                                        </div>
+                                        {canEdit && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsThemeSelectorOpen(true)}
+                                                className="px-3 py-1.5 bg-bvb-yellow hover:brightness-105 text-bvb-black text-xs font-black rounded-lg shadow-sm transition-all shrink-0 flex items-center gap-1.5"
+                                            >
+                                                <Edit2 className="w-3.5 h-3.5" /> 选择体系核心主题
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {/* Enable manual override */}
+                                    <div className="pt-2 border-t border-gray-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订分类</label>
+                                            <input
+                                                type="text"
+                                                disabled={!canEdit}
+                                                placeholder="分类, 例如 [基础技术] 运控球"
+                                                className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                                value={localSession.focus || ''}
+                                                onChange={e => setLocalSession({ ...localSession, focus: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订中心训练内容</label>
+                                            <input
+                                                type="text"
+                                                disabled={!canEdit}
+                                                placeholder="主题具体描述描述..."
+                                                className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                                value={localSession.title || ''}
+                                                onChange={e => setLocalSession({ ...localSession, title: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {/* Integrated pedagogical prompt card */}
+                                {(() => {
+                                    const match = localSession.title?.match(/\(([^)]+)\)/);
+                                    const currentCode = match ? match[1] : '';
+                                    const techItem = (basicTechThemes || BASIC_TECH_THEMES).find(t => t.code === currentCode);
+                                    if (techItem) {
+                                        return (
+                                            <div className="bg-yellow-50/50 border border-yellow-200/60 p-3 rounded-xl text-[11px] text-gray-600 space-y-1.5 animate-in fade-in duration-150">
+                                                <div className="font-extrabold text-bvb-black flex items-center justify-between">
+                                                    <span className="flex items-center gap-1"><Brain className="w-3.5 h-3.5 text-bvb-yellow" /> 技术要领:</span>
+                                                    <span className="text-gray-400 font-mono text-[9px] bg-white border border-gray-100 px-1.5 py-0.5 rounded-full">{techItem.code}</span>
+                                                </div>
+                                                <p><strong className="text-gray-700">技术目标:</strong> {techItem.objective}</p>
+                                                <p><strong className="text-gray-700">教学步骤:</strong> {techItem.teachingPoints}</p>
+                                                <p><strong className="text-gray-700">典型错误:</strong> {techItem.problem}</p>
+                                                <p><strong className="text-gray-700">呐喊口令:</strong> <span className="bg-yellow-101 font-black px-1.5 py-0.5 rounded text-bvb-black">{techItem.coachCue}</span></p>
+                                            </div>
+                                        );
+                                    }
+                                    const scenarioItem = (scenarioThemes || SCENARIO_THEMES).find(s => s.code === currentCode);
+                                    if (scenarioItem) {
+                                        return (
+                                            <div className="bg-yellow-50/50 border border-yellow-200/60 p-3 rounded-xl text-[11px] text-gray-600 space-y-1.5 animate-in fade-in duration-150">
+                                                <div className="font-extrabold text-bvb-black flex items-center justify-between">
+                                                    <span className="flex items-center gap-1"><Zap className="w-3.5 h-3.5 text-bvb-yellow" /> 战术目标:</span>
+                                                    <span className="text-gray-400 font-mono text-[9px] bg-white border border-gray-100 px-1.5 py-0.5 rounded-full">{scenarioItem.code}</span>
+                                                </div>
+                                                <p><strong className="text-gray-700">战术重点:</strong> {scenarioItem.objective}</p>
+                                                <p><strong className="text-gray-700">战术原则:</strong> {scenarioItem.principle}</p>
+                                                <p><strong className="text-gray-700">纠错呐喊:</strong> <span className="bg-yellow-101 font-black px-1.5 py-0.5 rounded text-bvb-black">{scenarioItem.cue}</span></p>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练主题描述 (精细内容或教案细项)</label>
+                                        <input 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all text-sm"
+                                            value={localSession.title}
+                                            onChange={e => setLocalSession({...localSession, title: e.target.value})}
+                                            placeholder="如：半场攻防演练 / 自定义主题"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
+                                        <select 
+                                            disabled={!canEdit}
+                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all text-sm"
+                                            value={localSession.intensity}
+                                            onChange={e => setLocalSession({...localSession, intensity: e.target.value as any})}
+                                        >
+                                            <option value="Low">低 (恢复性)</option>
+                                            <option value="Medium">中 (常规训练)</option>
+                                            <option value="High">高 (比赛高强)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练日期</label>
@@ -418,39 +799,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                                             value={localSession.duration}
                                             onChange={e => setLocalSession({...localSession, duration: parseInt(e.target.value) || 0})}
                                         />
-                                    </div>
-                                </div>
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练重点</label>
-                                        <select 
-                                            disabled={!canEdit}
-                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                            value={trainingFoci.includes(localSession.focus) ? localSession.focus : 'Custom'}
-                                            onChange={e => {
-                                                const val = e.target.value;
-                                                if (val !== 'Custom') {
-                                                    setLocalSession({...localSession, focus: val});
-                                                }
-                                            }}
-                                        >
-                                            {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
-                                            {!trainingFoci.includes(localSession.focus) && <option value="Custom">{localSession.focus}</option>}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练强度</label>
-                                        <select 
-                                            disabled={!canEdit}
-                                            className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 bg-gray-50 focus:bg-white transition-all"
-                                            value={localSession.intensity}
-                                            onChange={e => setLocalSession({...localSession, intensity: e.target.value as any})}
-                                        >
-                                            <option value="Low">低 (恢复性)</option>
-                                            <option value="Medium">中 (常规训练)</option>
-                                            <option value="High">高 (比赛高强)</option>
-                                        </select>
                                     </div>
                                 </div>
 
@@ -836,13 +1184,26 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, trainingFo
                         </button>
                     </div>
                 )}
+                <ThemeSelectorModal
+                    isOpen={isThemeSelectorOpen}
+                    onClose={() => setIsThemeSelectorOpen(false)}
+                    onSelect={(focus, title) => {
+                        setLocalSession(prev => ({
+                            ...prev,
+                            focus,
+                            title
+                        }));
+                    }}
+                    basicTechThemes={basicTechThemes}
+                    scenarioThemes={scenarioThemes}
+                />
             </div>
         </div>
     );
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization 
+    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -852,6 +1213,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [viewType, setViewType] = useState<ViewType>('calendar');
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isAddThemeSelectorOpen, setIsAddThemeSelectorOpen] = useState(false);
   const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
   const [isExporting, setIsExporting] = useState(false);
@@ -976,6 +1338,42 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       }
       return null;
   }, [formData.teamId, formData.date, periodizationPlans]);
+
+  // 自动化同步周期训练计划中的重点与主题内容，在未建立周期计划时清除，且取消自主选择
+  useEffect(() => {
+      if (showAddModal) {
+          if (matchedWeekPlanForForm) {
+              const theme = matchedWeekPlanForForm.trainingTheme || '';
+              const content = matchedWeekPlanForForm.trainingContent || '';
+              const isStandard = trainingFoci.includes(theme);
+              setFormData(prev => {
+                  if (prev.focus === (isStandard ? theme : 'Custom') &&
+                      prev.focusCustom === (isStandard ? '' : theme) &&
+                      prev.title === content) {
+                      return prev;
+                  }
+                  return {
+                      ...prev,
+                      focus: isStandard ? theme : 'Custom',
+                      focusCustom: isStandard ? '' : theme,
+                      title: content
+                  };
+              });
+          } else {
+              setFormData(prev => {
+                  if (prev.focus === '' && prev.focusCustom === '' && prev.title === '') {
+                      return prev;
+                  }
+                  return {
+                      ...prev,
+                      focus: '',
+                      focusCustom: '',
+                      title: ''
+                  };
+              });
+          }
+      }
+  }, [matchedWeekPlanForForm, showAddModal, trainingFoci]);
 
   // 球员关注追踪视图逻辑
   const focusedPlayersSummary = useMemo(() => {
@@ -1517,6 +1915,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         onCopy={handleCopyWeek}
                         trainingFoci={trainingFoci}
                         focusSubjects={focusSubjects}
+                        basicTechThemes={basicTechThemes}
+                        scenarioThemes={scenarioThemes}
                     />
                 )}
             </div>
@@ -1714,10 +2114,33 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const handleDuplicateConfirm = () => {
       if (!sessionToDuplicate) return;
-      const copy: TrainingSession = { ...sessionToDuplicate, id: Date.now().toString(), title: sessionToDuplicate.title, date: duplicateDate, submissionStatus: 'Planned', isReviewRead: true, coachId: currentUser?.id, attendance: [], coachFeedback: '', directorReview: '', focusedPlayerNotes: {} };
-      onAddTraining(copy);
-      setSessionToDuplicate(null);
-      alert('已成功复制训练计划到 ' + duplicateDate);
+      const weekInfo = getWeekInMonthOfDate(duplicateDate);
+      if (weekInfo) {
+          const plan = periodizationPlans.find(p => p.teamId === sessionToDuplicate.teamId && p.year === weekInfo.year);
+          const weekPlan = plan?.weeks.find(w => w.month === weekInfo.month && w.weekInMonth === weekInfo.weekInMonth);
+          if (!weekPlan || (!weekPlan.trainingTheme && !weekPlan.trainingContent)) {
+              alert(`目标日期 [第${weekInfo.month}月 第${weekInfo.weekInMonth}周] 尚未建立周期性训练计划，无法在该日期新建或复制训练计划。`);
+              return;
+          }
+          const theme = weekPlan.trainingTheme || '';
+          const copy: TrainingSession = { 
+              ...sessionToDuplicate, 
+              id: Date.now().toString(), 
+              title: weekPlan.trainingContent || sessionToDuplicate.title, 
+              focus: theme,
+              date: duplicateDate, 
+              submissionStatus: 'Planned', 
+              isReviewRead: true, 
+              coachId: currentUser?.id, 
+              attendance: [], 
+              coachFeedback: '', 
+              directorReview: '', 
+              focusedPlayerNotes: {} 
+          };
+          onAddTraining(copy);
+          setSessionToDuplicate(null);
+          alert('已成功复制训练计划到 ' + duplicateDate);
+      }
   };
 
   const addDrill = () => { if(drillInput.trim()) { setFormData(prev => ({ ...prev, drills: [...prev.drills, drillInput.trim()] })); setDrillInput(''); } };
@@ -1775,7 +2198,25 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出 (PDF)">
                         {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
                     </button>
-                    <button onClick={() => setShowAddModal(true)} className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all">
+                    <button 
+                        onClick={() => {
+                            const initialDate = selectedDate || new Date().toISOString().split('T')[0];
+                            const initialTeamId = statsTeamFilter === 'all' ? (formData.teamId || availableTeams[0]?.id || '') : statsTeamFilter;
+                            setFormData(prev => ({
+                                ...prev,
+                                date: initialDate,
+                                teamId: initialTeamId,
+                                title: '',
+                                focus: '',
+                                focusCustom: '',
+                                drills: [],
+                                linkedDesignId: undefined,
+                                focusedPlayerIds: []
+                            }));
+                            setShowAddModal(true);
+                        }} 
+                        className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all"
+                    >
                         <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建课次</span>
                     </button>
                 </div>
@@ -1849,110 +2290,83 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                   <button onClick={() => setShowAddModal(false)}><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleAddSubmit} className="p-6 space-y-4 flex-1 overflow-y-auto pb-24 md:pb-6">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center">
-                    <div className="flex items-center"><Zap className="w-4 h-4 text-bvb-black mr-2" /><span className="text-sm font-bold text-gray-800">启用 AI 辅助生成</span></div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => { setIsAiMode(e.target.checked); if(e.target.checked) setFormData(p => ({...p, linkedDesignId: undefined})) }}/>
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div>
-                    </label>
-                  </div>
-                  {!isAiMode && (<button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors"><PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}</button>)}
                   
-                  {matchedWeekPlanForForm && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-3 shadow-xs animate-in slide-in-from-top-2 duration-200">
-                      <div className="flex items-center gap-2 text-amber-900 font-black text-xs uppercase tracking-wider">
-                        <TableProperties className="w-4 h-4 text-amber-600" />
-                        <span>📅 已匹配此团队的周期训练计划 (第 {matchedWeekPlanForForm.month}月 第{matchedWeekPlanForForm.weekInMonth}周)</span>
+                  {/* 第一步：选择所属梯队与培训日期 */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-xs">
+                    <div>
+                      <label className="block text-xs font-black text-gray-500 uppercase mb-1">所属梯队</label>
+                      <select 
+                        className="w-full p-2.5 border border-gray-250 rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-black bg-white text-sm cursor-pointer" 
+                        value={formData.teamId} 
+                        onChange={e => setFormData({...formData, teamId: e.target.value})}
+                      >
+                        {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-black text-gray-500 uppercase mb-1 font-bold">培训日期</label>
+                      <input 
+                        type="date" 
+                        className="w-full p-2.5 border border-gray-250 rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-black bg-white text-sm text-gray-800" 
+                        value={formData.date} 
+                        onChange={e => setFormData({...formData, date: e.target.value})} 
+                        required 
+                      />
+                    </div>
+                  </div>
+
+                  {/* 周期计划匹配状态展示 */}
+                  {matchedWeekPlanForForm ? (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3 shadow-xs animate-in slide-in-from-top-2 duration-200 text-sm">
+                      <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs uppercase tracking-wider">
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
+                        <span>📅 周期训练计划已匹配并强制同步 (第 {matchedWeekPlanForForm.month}月 第{matchedWeekPlanForForm.weekInMonth}周)</span>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        {matchedWeekPlanForForm.trainingTheme && (
-                          <div className="bg-white p-2.5 rounded-lg border border-amber-100 flex flex-col justify-between">
-                            <div>
-                              <span className="text-gray-400 block text-[10px] font-bold">拟定重点：</span>
-                              <span className="font-extrabold text-gray-800 text-xs md:text-sm">{matchedWeekPlanForForm.trainingTheme}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const isStandard = trainingFoci.includes(matchedWeekPlanForForm.trainingTheme);
-                                setFormData(p => ({
-                                  ...p,
-                                  focus: isStandard ? matchedWeekPlanForForm.trainingTheme : 'Custom',
-                                  focusCustom: isStandard ? '' : matchedWeekPlanForForm.trainingTheme,
-                                  title: ''
-                                }));
-                              }}
-                              className="mt-2 text-center text-[10px] font-black bg-amber-100 hover:bg-amber-200 text-amber-800 py-1.5 px-2 rounded-md transition-colors"
-                            >
-                              优先采用此重点
-                            </button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-white p-3 rounded-lg border border-emerald-100 flex flex-col justify-between shadow-xs">
+                          <div>
+                            <span className="text-gray-400 block text-[10px] font-black uppercase tracking-wider mb-1">重点分类 (强制同步)</span>
+                            <span className="font-extrabold text-gray-800 text-xs md:text-sm bg-gray-100/50 px-2.5 py-1.5 rounded border border-gray-200 block truncate">
+                              {matchedWeekPlanForForm.trainingTheme || '无重点'}
+                            </span>
                           </div>
-                        )}
+                        </div>
                         
-                        {matchedWeekPlanForForm.trainingContent && (
-                          <div className="bg-white p-2.5 rounded-lg border border-amber-100 flex flex-col justify-between">
-                            <div>
-                              <span className="text-gray-400 block text-[10px] font-bold">拟定主题：</span>
-                              <span className="font-extrabold text-gray-800 text-xs md:text-sm line-clamp-2" title={matchedWeekPlanForForm.trainingContent}>
-                                {matchedWeekPlanForForm.trainingContent}
-                              </span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData(p => ({
-                                  ...p,
-                                  title: matchedWeekPlanForForm.trainingContent
-                                }));
-                              }}
-                              className="mt-2 text-center text-[10px] font-black bg-amber-100 hover:bg-amber-200 text-amber-800 py-1.5 px-2 rounded-md transition-colors"
-                            >
-                              优先采用此主题
-                            </button>
+                        <div className="bg-white p-3 rounded-lg border border-emerald-100 flex flex-col justify-between shadow-xs">
+                          <div>
+                            <span className="text-gray-400 block text-[10px] font-black uppercase tracking-wider mb-1">主要主题 (强制同步)</span>
+                            <span className="font-extrabold text-gray-805 text-xs md:text-sm line-clamp-2" title={matchedWeekPlanForForm.trainingContent}>
+                              {matchedWeekPlanForForm.trainingContent || '无特定主题'}
+                            </span>
                           </div>
-                        )}
+                        </div>
                       </div>
 
-                      {matchedWeekPlanForForm.trainingTheme && matchedWeekPlanForForm.trainingContent && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const isStandard = trainingFoci.includes(matchedWeekPlanForForm.trainingTheme);
-                            setFormData(p => ({
-                              ...p,
-                              focus: isStandard ? matchedWeekPlanForForm.trainingTheme : 'Custom',
-                              focusCustom: isStandard ? '' : matchedWeekPlanForForm.trainingTheme,
-                              title: matchedWeekPlanForForm.trainingContent
-                            }));
-                          }}
-                          className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-bvb-black hover:bg-black text-bvb-yellow hover:text-white text-xs font-black rounded-lg shadow-sm transition-all text-center border border-transparent hover:border-yellow-400"
-                        >
-                          一键同步拟定主题和重点
-                        </button>
-                      )}
-                      
                       {(matchedWeekPlanForForm.physicalTheme || matchedWeekPlanForForm.oppositionContent || matchedWeekPlanForForm.trainingGoals) && (
-                        <div className="text-[10px] text-amber-850 font-bold space-y-1 border-t border-amber-200/60 pt-2">
-                          {matchedWeekPlanForForm.physicalTheme && <div>💪 体能拟定: {matchedWeekPlanForForm.physicalTheme}</div>}
-                          {matchedWeekPlanForForm.oppositionContent && <div>⚔️ 情景对抗: {matchedWeekPlanForForm.oppositionContent}</div>}
-                          {matchedWeekPlanForForm.trainingGoals && <div className="line-clamp-2" title={matchedWeekPlanForForm.trainingGoals}>🎯 训练目标: {matchedWeekPlanForForm.trainingGoals}</div>}
+                        <div className="text-[10px] text-emerald-800 font-bold space-y-1 border-t border-emerald-200/50 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {matchedWeekPlanForForm.physicalTheme && <div className="truncate"><span className="text-gray-450 font-medium">💪 体能：</span>{matchedWeekPlanForForm.physicalTheme}</div>}
+                          {matchedWeekPlanForForm.oppositionContent && <div className="truncate"><span className="text-gray-450 font-medium">⚔️ 对抗：</span>{matchedWeekPlanForForm.oppositionContent}</div>}
+                          {matchedWeekPlanForForm.trainingGoals && <div className="line-clamp-1" title={matchedWeekPlanForForm.trainingGoals}><span className="text-gray-450 font-medium">🎯 目标：</span>{matchedWeekPlanForForm.trainingGoals}</div>}
                         </div>
                       )}
                     </div>
-                  )}
-
-                  {!matchedWeekPlanForForm && formData.teamId && formData.date && formData.teamId !== 'unassigned' && (() => {
+                  ) : (
+                    (() => {
                       const weekInfo = getWeekInMonthOfDate(formData.date);
                       const teamName = teams.find(t => t.id === formData.teamId)?.name || '该球队';
                       return (
-                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-2 space-y-2 shadow-xs animate-in slide-in-from-top-2 duration-200">
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3 shadow-xs animate-in slide-in-from-top-2 duration-200 text-sm">
                           <div className="flex items-start gap-2.5">
-                            <AlertCircle className="w-4 h-4 text-red-600 mt-0.5 shrink-0" />
+                            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                             <div className="flex-1">
-                              <h4 className="font-extrabold text-red-800 text-xs uppercase tracking-wider">⚠️ 请先建立周期训练计划</h4>
-                              <p className="text-[10px] text-red-600 font-medium mt-1">
-                                {teamName} 在 <strong>{weekInfo ? `${weekInfo.year}年${weekInfo.month}月 第${weekInfo.weekInMonth}周` : ''}</strong> 尚未制定任何周期性训练主题或重点。
+                              <h4 className="font-extrabold text-red-800 text-xs uppercase tracking-wider">⚠️ 周期计划未匹配，禁止新建</h4>
+                              <p className="text-[11px] text-red-655 font-bold mt-1.5 leading-relaxed">
+                                {teamName} 在 <strong>{weekInfo ? `${weekInfo.year}年${weekInfo.month}月 第${weekInfo.weekInMonth}周` : ''}</strong> 尚未建立任何周期性计划。
+                              </p>
+                              <p className="text-[10px] text-red-500 mt-1">
+                                根据俱乐部统筹规则，您必须先为该梯队在对应周期内通过其“周期训练计划”设置核心主题与重点，随后方可新建此日期课次。
                               </p>
                             </div>
                           </div>
@@ -1964,154 +2378,169 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                 setViewType('periodization');
                                 setShowAddModal(false);
                               }}
-                              className="text-[10px] font-black bg-red-100 hover:bg-red-200 text-red-850 py-1.5 px-3 rounded-md transition-colors border border-red-200"
+                              className="text-[10.5px] font-black bg-red-100 hover:bg-red-200 text-red-800 py-1.5 px-3 rounded-lg transition-colors border border-red-250 flex items-center gap-1 shadow-sm uppercase shrink-0"
                             >
-                              立即前往制定周期计划
+                              <TableProperties className="w-3.5 h-3.5" /> 立即前往配置周期计划
                             </button>
                           </div>
                         </div>
                       );
-                  })()}
+                    })()
+                  )}
 
-                  <div className="space-y-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">所属梯队</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.teamId} onChange={e => setFormData({...formData, teamId: e.target.value})}>{availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select></div>
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练主题</label>
-                        {formData.focus !== 'Custom' && focusSubjects?.[formData.focus] && focusSubjects[formData.focus].length > 0 ? (
-                          <select 
-                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white"
-                            value={formData.title}
-                            onChange={e => setFormData({...formData, title: e.target.value})}
-                            required={!isAiMode}
-                          >
-                            <option value="">请选择训练主题...</option>
-                            {focusSubjects[formData.focus].map(s => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input 
-                            className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" 
-                            placeholder="例如: 快速反击演练" 
-                            value={formData.title} 
-                            onChange={e => setFormData({...formData, title: e.target.value})} 
-                            required={!isAiMode} 
-                          />
-                        )}
+                  {/* 仅当已匹配周期计划时，允许填写其后的业务内容 */}
+                  {matchedWeekPlanForForm && (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                      
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex justify-between items-center">
+                        <div className="flex items-center"><Zap className="w-4 h-4 text-bvb-black mr-2" /><span className="text-sm font-bold text-gray-800">启用 AI 辅助生成</span></div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input type="checkbox" className="sr-only peer" checked={isAiMode} onChange={(e) => { setIsAiMode(e.target.checked); if(e.target.checked) setFormData(p => ({...p, linkedDesignId: undefined})) }}/>
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div>
+                        </label>
                       </div>
-
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">日期</label><input type="date" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} required /></div>
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label><input type="number" className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value)})} required /></div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">训练重点</label>
-                        <select 
-                          className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" 
-                          value={formData.focus} 
-                          onChange={e => {
-                            const newFocus = e.target.value;
-                            setFormData({
-                              ...formData, 
-                              focus: newFocus,
-                              title: '' // Reset title when focus changes to force selection from new list
-                            });
-                          }}
-                        >
-                          {trainingFoci.map(f => <option key={f} value={f}>{f}</option>)}
-                          <option value="Custom">自定义...</option>
-                        </select>
-                        {formData.focus === 'Custom' && (
-                          <input className="w-full p-2 border rounded mt-2 text-xs font-bold" placeholder="输入重点..." value={formData.focusCustom} onChange={e => setFormData({...formData, focusCustom: e.target.value})} />
-                        )}
-                      </div>
-
-                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}><option value="Low">低 (恢复)</option><option value="Medium">中 (常规)</option><option value="High">高 (比赛级)</option></select></div>
 
                       {!isAiMode && (
-                        <div className="md:col-span-2 pt-2 border-t border-gray-100">
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
-                            <LayoutList className="w-3 h-3 text-bvb-yellow" /> 训练项目
-                          </label>
-                          <div className="space-y-2 mb-2">
-                            {formData.drills.map((drill, idx) => (
-                              <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-sm shadow-sm">
-                                <span className="font-bold text-gray-700">{drill}</span>
-                                <button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500">
-                                  <X className="w-4 h-4"/>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex gap-2">
-                            <input 
-                              className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
-                              placeholder="添加项目..." 
-                              value={drillInput} 
-                              onChange={e => setDrillInput(e.target.value)} 
-                              onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} 
-                            />
-                            <button type="button" onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110 transition-all">
-                              <Plus className="w-4 h-4"/>
-                            </button>
-                          </div>
-                        </div>
+                        <button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors">
+                          <PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}
+                        </button>
                       )}
-                    </div>
-                  </div>
 
-                  {/* 重点关注球员选择器 (NEW) */}
-                  <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                      <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                          <Star className="w-3.5 h-3.5 text-bvb-yellow fill-current" /> 重点关注球员 (最多2名)
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                          {players.filter(p => p.teamId === formData.teamId).map(p => {
-                              const isSelected = formData.focusedPlayerIds.includes(p.id);
-                              const stats = calculateFocusStats(p.id, userManagedSessions);
-                              const isUnfocusedThisMonth = !focusedPlayerIdsThisMonth.has(p.id);
-                              return (
-                                  <button 
-                                      key={p.id}
-                                      type="button"
-                                      onClick={() => {
-                                          setFormData(prev => {
-                                              if (prev.focusedPlayerIds.includes(p.id)) return { ...prev, focusedPlayerIds: prev.focusedPlayerIds.filter(id => id !== p.id) };
-                                              if (prev.focusedPlayerIds.length >= 2) {
-                                                  alert('每课次最多选择2名重点关注球员');
-                                                  return prev;
-                                              }
-                                              return { ...prev, focusedPlayerIds: [...prev.focusedPlayerIds, p.id] };
-                                          });
-                                      }}
-                                      className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all text-left relative ${isSelected ? 'bg-white border-bvb-black shadow-md ring-2 ring-bvb-yellow/20' : 'bg-white border-transparent grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:border-gray-200'}`}
-                                  >
-                                      {isUnfocusedThisMonth && !isSelected && (
-                                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white shadow-sm z-10" title="本月尚未关注" />
-                                      )}
-                                      <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-gray-100" />
-                                      <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-1">
-                                              <div className="text-[11px] font-black text-gray-800 truncate">{p.name}</div>
-                                              {isUnfocusedThisMonth && <span className="text-[7px] font-black text-red-500 bg-red-50 px-1 rounded-sm shrink-0">待关注</span>}
-                                          </div>
-                                          <div className="flex gap-1 text-[8px] font-bold text-gray-400 mt-0.5">
-                                              <span title="本月被关注次数">M:{stats.month}</span>
-                                              <span title="本季被关注次数">Q:{stats.quarter}</span>
-                                              <span title="本年被关注次数">Y:{stats.year}</span>
-                                          </div>
-                                      </div>
-                                      {isSelected && <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">时长 (分钟)</label>
+                          <input type="number" className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white text-sm" value={formData.duration} onChange={e => setFormData({...formData, duration: parseInt(e.target.value) || 0})} required />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">强度</label>
+                          <select className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold bg-white text-sm" value={formData.intensity} onChange={e => setFormData({...formData, intensity: e.target.value})}>
+                            <option value="Low">低 (恢复)</option>
+                            <option value="Medium">中 (常规)</option>
+                            <option value="High">高 (比赛级)</option>
+                          </select>
+                        </div>
+
+                        {!isAiMode && (
+                          <div className="sm:col-span-2 pt-2 border-t border-gray-250/50">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-1">
+                              <LayoutList className="w-3 h-3 text-bvb-yellow" /> 训练项目 (Drills)
+                            </label>
+                            <div className="space-y-2 mb-2">
+                              {formData.drills.map((drill, idx) => (
+                                <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-gray-100 text-sm shadow-sm">
+                                  <span className="font-bold text-gray-700">{drill}</span>
+                                  <button type="button" onClick={() => removeDrill(idx)} className="text-gray-400 hover:text-red-500">
+                                    <X className="w-4 h-4"/>
                                   </button>
-                              );
-                          })}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <input 
+                                className="flex-1 p-2 border rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                                placeholder="添加项目..." 
+                                value={drillInput} 
+                                onChange={e => setDrillInput(e.target.value)} 
+                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addDrill())} 
+                              />
+                              <button type="button" onClick={addDrill} className="px-3 bg-bvb-black text-bvb-yellow rounded-lg hover:brightness-110 transition-all">
+                                <Plus className="w-4 h-4"/>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                  </div>
-                  <button type="submit" disabled={loading} className="w-full py-4 bg-bvb-black text-white font-bold rounded-xl hover:bg-gray-800 disabled:opacity-50 flex items-center justify-center shadow-lg transition-all">{loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</> : (isAiMode ? '生成并保存' : '创建计划')}</button>
+
+                      {/* 重点关注球员选择器 */}
+                      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <Star className="w-3.5 h-3.5 text-bvb-yellow fill-current" /> 重点关注球员 (最多2名)
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {players.filter(p => p.teamId === formData.teamId).map(p => {
+                            const isSelected = formData.focusedPlayerIds.includes(p.id);
+                            const stats = calculateFocusStats(p.id, userManagedSessions);
+                            const isUnfocusedThisMonth = !focusedPlayerIdsThisMonth.has(p.id);
+                            return (
+                              <button 
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => {
+                                    if (prev.focusedPlayerIds.includes(p.id)) return { ...prev, focusedPlayerIds: prev.focusedPlayerIds.filter(id => id !== p.id) };
+                                    if (prev.focusedPlayerIds.length >= 2) {
+                                      alert('每课次最多选择2名重点关注球员');
+                                      return prev;
+                                    }
+                                    return { ...prev, focusedPlayerIds: [...prev.focusedPlayerIds, p.id] };
+                                  });
+                                }}
+                                className={`flex items-center gap-2 p-2 rounded-xl border-2 transition-all text-left relative ${isSelected ? 'bg-white border-bvb-black shadow-md ring-2 ring-bvb-yellow/20' : 'bg-white border-transparent grayscale opacity-60 hover:grayscale-0 hover:opacity-100 hover:border-gray-200'}`}
+                              >
+                                {isUnfocusedThisMonth && !isSelected && (
+                                  <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white shadow-sm z-10" title="本月尚未关注" />
+                                )}
+                                <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-gray-100" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1">
+                                    <div className="text-[11px] font-black text-gray-805 truncate">{p.name}</div>
+                                    {isUnfocusedThisMonth && <span className="text-[7px] font-black text-red-500 bg-red-50 px-1 rounded-sm shrink-0">待关注</span>}
+                                  </div>
+                                  <div className="flex gap-1 text-[8px] font-bold text-gray-400 mt-0.5">
+                                    <span title="本月被关注次数">M:{stats.month}</span>
+                                    <span title="本季被关注次数">Q:{stats.quarter}</span>
+                                    <span title="本年被关注次数">Y:{stats.year}</span>
+                                  </div>
+                                </div>
+                                {isSelected && <CheckCircle className="w-3.5 h-3.5 text-green-500 shrink-0" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+
+                  {/* 提交按钮控制 */}
+                  <button 
+                    type="submit" 
+                    disabled={loading || !matchedWeekPlanForForm} 
+                    className={`w-full py-4 font-bold rounded-xl flex items-center justify-center shadow-lg transition-all text-sm ${
+                      matchedWeekPlanForForm 
+                        ? 'bg-bvb-black hover:bg-gray-800 text-white cursor-pointer active:scale-98' 
+                        : 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300'
+                    }`}
+                  >
+                    {loading ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isAiMode ? 'AI 正在生成教案...' : '保存中...'}</>
+                    ) : !matchedWeekPlanForForm ? (
+                      '❌ 无法新建 (请先创建相应周期计划)'
+                    ) : isAiMode ? (
+                      '智能生成并保存计划'
+                    ) : (
+                      '创建课次计划'
+                    )}
+                  </button>
+
                 </form>
               </div>
             </div>
         )}
+        <ThemeSelectorModal
+            isOpen={isAddThemeSelectorOpen}
+            onClose={() => setIsAddThemeSelectorOpen(false)}
+            onSelect={(focus, title) => {
+                setFormData(prev => ({
+                    ...prev,
+                    focus,
+                    title
+                }));
+            }}
+            basicTechThemes={basicTechThemes}
+            scenarioThemes={scenarioThemes}
+        />
         {sessionToDuplicate && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"><div className="bg-white rounded-xl shadow-2xl w-full max-sm overflow-hidden animate-in fade-in zoom-in duration-200"><div className="bg-bvb-black p-4 flex justify-between items-center text-white"><h3 className="font-bold flex items-center"><Copy className="w-4 h-4 mr-2 text-bvb-yellow" /> 复制训练计划</h3><button onClick={() => setSessionToDuplicate(null)}><X className="w-5 h-5" /></button></div><div className="p-6 space-y-4"><div className="bg-gray-50 p-3 rounded border border-gray-100"><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">正在复制</span><div className="font-bold text-gray-800">{sessionToDuplicate.title}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center"><CalendarDays className="w-3 h-3 mr-1 text-bvb-yellow" /> 选择新计划的日期</label><input type="date" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition-colors" value={duplicateDate} onChange={e => setDuplicateDate(e.target.value)}/></div><div className="pt-2 flex gap-3"><button onClick={() => setSessionToDuplicate(null)} className="flex-1 py-2 bg-gray-100 text-gray-600 font-bold rounded hover:bg-gray-200 transition-colors">取消</button><button onClick={handleDuplicateConfirm} className="flex-1 py-2 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 transition-colors shadow-sm">确认复制</button></div></div></div></div>
         )}
@@ -2119,7 +2548,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} focusSubjects={focusSubjects} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
         )}
     </div>
   );

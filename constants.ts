@@ -55,7 +55,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         matches: 'edit',
         growth: 'edit',
         settings: 'edit',
-        tactics: 'edit'
+        tactics: 'edit',
+        philosophy: 'edit'
     },
     coach: {
         dashboard: 'view',
@@ -66,7 +67,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         matches: 'view',
         growth: 'edit',
         settings: 'view',
-        tactics: 'edit'
+        tactics: 'edit',
+        philosophy: 'view'
     },
     assistant_coach: {
         dashboard: 'view',
@@ -77,7 +79,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         matches: 'view',
         growth: 'view',
         settings: 'view',
-        tactics: 'view'
+        tactics: 'view',
+        philosophy: 'view'
     },
     parent: {
         dashboard: 'view',
@@ -88,7 +91,8 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
         matches: 'view',
         growth: 'view',
         settings: 'view',
-        tactics: 'view'
+        tactics: 'view',
+        philosophy: 'view'
     }
 };
 

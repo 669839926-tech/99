@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, Layout as LayoutIcon, X } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, Layout as LayoutIcon, X, BookOpen } from 'lucide-react';
 import { User as UserType, RolePermissions, ModuleId } from '../types';
 
 interface LayoutProps {
@@ -27,6 +27,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, open
 
   const navItems = [
     { id: 'dashboard', label: '俱乐部概览', icon: LayoutDashboard },
+    { id: 'philosophy', label: '体系库', icon: BookOpen },
     { id: 'players', label: '球员管理', icon: Shirt },
     { id: 'growth', label: '球员成长', icon: TrendingUp },
     { id: 'tactics', label: '战术板', icon: LayoutIcon },
@@ -43,6 +44,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, open
 
   const getMobileLabel = (label: string) => {
     if (label === '俱乐部概览') return '概览';
+    if (label === '体系库') return '体系';
     if (label === '教案设计') return '教案';
     if (label === '账务管理') return '账务';
     if (label === '球员成长') return '成长';

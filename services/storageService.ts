@@ -21,6 +21,11 @@ export interface AppData {
     pointItemDefinitions?: any[];
     playerPointRecords?: any[];
     travelingPlayerIds?: string[];
+    philosophyDocs?: any[];
+    matchPrinciples?: any[];
+    basicTechThemes?: any[];
+    scenarioThemes?: any[];
+    philosophyOverview?: any;
 }
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {

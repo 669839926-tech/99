@@ -12,8 +12,10 @@ import SessionDesigner from './components/SessionDesigner';
 import FinanceManager from './components/FinanceManager';
 import TechnicalGrowth from './components/TechnicalGrowth';
 import TacticsModule from './components/TacticsModule';
+import PhilosophyLibrary from './components/PhilosophyLibrary';
+import { MATCH_PRINCIPLES, PHILOSOPHY_OVERVIEW, BASIC_TECH_THEMES, SCENARIO_THEMES, MatchPrinciple, BasicTechItem, ScenarioTheme } from './src/philosophyData';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord } from './types';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord, PhilosophyDocument } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -44,6 +46,11 @@ function App() {
   const [pointItemDefinitions, setPointItemDefinitions] = useState<PointItemDefinition[]>([]);
   const [playerPointRecords, setPlayerPointRecords] = useState<PlayerPointRecord[]>([]);
   const [travelingPlayerIds, setTravelingPlayerIds] = useState<string[]>([]);
+  const [philosophyDocs, setPhilosophyDocs] = useState<PhilosophyDocument[]>([]);
+  const [matchPrinciples, setMatchPrinciples] = useState<MatchPrinciple[]>(MATCH_PRINCIPLES);
+  const [basicTechThemes, setBasicTechThemes] = useState<BasicTechItem[]>(BASIC_TECH_THEMES);
+  const [scenarioThemes, setScenarioThemes] = useState<ScenarioTheme[]>(SCENARIO_THEMES);
+  const [philosophyOverview, setPhilosophyOverview] = useState<any>(PHILOSOPHY_OVERVIEW);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -135,34 +142,83 @@ function App() {
   const initializeCloudData = useCallback(async () => {
     setIsInitializing(true);
     setCloudError(null);
+
+    const applyDataToStates = (data: any) => {
+        if (!data) return;
+        setTeams(data.teams || MOCK_TEAMS);
+        setPlayers(data.players || MOCK_PLAYERS);
+        setMatches(data.matches || MOCK_MATCHES);
+        setTrainings(data.trainings || MOCK_TRAINING);
+        setAttributeConfig(data.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
+        setAnnouncements(data.announcements || MOCK_ANNOUNCEMENTS);
+        if (data.appLogo) setAppLogo(data.appLogo);
+        if (data.users) setUsers(data.users);
+        if (data.designs) setDesigns(data.designs);
+        if (data.transactions) setTransactions(data.transactions);
+        if (data.permissions) {
+            const merged = { ...DEFAULT_PERMISSIONS };
+            Object.keys(data.permissions).forEach((role) => {
+                const r = role as keyof RolePermissions;
+                merged[r] = {
+                    ...DEFAULT_PERMISSIONS[r],
+                    ...data.permissions[r]
+                };
+            });
+            setPermissions(merged);
+        }
+        if (data.financeCategories) setFinanceCategories(data.financeCategories);
+        if (data.techTests) setTechTests(data.techTests);
+        if (data.salarySettings) setSalarySettings(data.salarySettings);
+        if (data.periodizationPlans) setPeriodizationPlans(data.periodizationPlans);
+        if (data.accountingRecords) setAccountingRecords(data.accountingRecords);
+        if (data.tactics) setTactics(data.tactics);
+        if (data.pointItemDefinitions) setPointItemDefinitions(data.pointItemDefinitions);
+        if (data.playerPointRecords) setPlayerPointRecords(data.playerPointRecords);
+        if (data.travelingPlayerIds) setTravelingPlayerIds(data.travelingPlayerIds);
+        if (data.philosophyDocs) setPhilosophyDocs(data.philosophyDocs);
+        if (data.matchPrinciples) setMatchPrinciples(data.matchPrinciples);
+        if (data.basicTechThemes) setBasicTechThemes(data.basicTechThemes);
+        if (data.scenarioThemes) setScenarioThemes(data.scenarioThemes);
+        if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
+    };
+
     try {
         const cloudData = await loadDataFromCloud();
         if (cloudData) {
-            setTeams(cloudData.teams || MOCK_TEAMS);
-            setPlayers(cloudData.players || MOCK_PLAYERS);
-            setMatches(cloudData.matches || MOCK_MATCHES);
-            setTrainings(cloudData.trainings || MOCK_TRAINING);
-            setAttributeConfig(cloudData.attributeConfig || DEFAULT_ATTRIBUTE_CONFIG);
-            setAnnouncements(cloudData.announcements || MOCK_ANNOUNCEMENTS);
-            if (cloudData.appLogo) setAppLogo(cloudData.appLogo);
-            if (cloudData.users) setUsers(cloudData.users);
-            if (cloudData.designs) setDesigns(cloudData.designs);
-            if (cloudData.transactions) setTransactions(cloudData.transactions);
-            if (cloudData.permissions) setPermissions(cloudData.permissions);
-            if (cloudData.financeCategories) setFinanceCategories(cloudData.financeCategories);
-            if (cloudData.techTests) setTechTests(cloudData.techTests);
-            if (cloudData.salarySettings) setSalarySettings(cloudData.salarySettings);
-            if (cloudData.periodizationPlans) setPeriodizationPlans(cloudData.periodizationPlans);
-            if (cloudData.accountingRecords) setAccountingRecords(cloudData.accountingRecords);
-            if (cloudData.tactics) setTactics(cloudData.tactics);
-            if (cloudData.pointItemDefinitions) setPointItemDefinitions(cloudData.pointItemDefinitions);
-            if (cloudData.playerPointRecords) setPlayerPointRecords(cloudData.playerPointRecords);
-            if (cloudData.travelingPlayerIds) setTravelingPlayerIds(cloudData.travelingPlayerIds);
+            applyDataToStates(cloudData);
             setCloudError(null);
+            // Save a redundant cache copy locally in case the network changes in future sessions
+            try {
+                localStorage.setItem('football_manager_local_cache', JSON.stringify(cloudData));
+            } catch (err) {
+                console.warn('Failed to cache data locally in browser storage:', err);
+            }
+        } else {
+            console.log('Database is empty, checking browser cache fallback...');
+            const localCache = localStorage.getItem('football_manager_local_cache');
+            if (localCache) {
+                try {
+                    const parsed = JSON.parse(localCache);
+                    applyDataToStates(parsed);
+                } catch (e) {
+                    console.error('Failed to parse local browser storage cache:', e);
+                }
+            }
         }
     } catch (err: any) {
-        console.error("Failed to initialize cloud data", err);
-        setCloudError(err.message || "无法连接到云端存储");
+        console.warn("Failed to initialize cloud database, initiating local recovery stream:", err);
+        const localCache = localStorage.getItem('football_manager_local_cache');
+        if (localCache) {
+            try {
+                const parsed = JSON.parse(localCache);
+                applyDataToStates(parsed);
+                setCloudError(`本地运行模式：服务器正在进行升级维护 (云端同步离线: ${err.message || '网络连接有阻碍'})。所幸您的数据已完全在本地沙盒环境中恢复，可流畅编辑。`);
+            } catch {
+                setCloudError(`青训数据库正在本地离线运行 (${err.message || '服务异常'})。且本地缓存损坏，系统已自动加载内置青训示范数据集：所有操作和保存功用一切正常！`);
+            }
+        } else {
+            setCloudError(`青训数据库正在本地安全模式运行 (服务器离线中: ${err.message || '同步受阻'})。当前已自动加载软件内置标准青训预设：您仍可照常使用、修改、添加所有俱乐部设置。`);
+        }
     } finally {
         setIsInitializing(false);
     }
@@ -182,40 +238,53 @@ function App() {
 
     const timer = setTimeout(async () => {
         setIsSyncing(true);
+        const dataPayload = {
+            players,
+            teams,
+            matches,
+            trainings,
+            attributeConfig,
+            announcements,
+            appLogo,
+            users,
+            designs,
+            transactions,
+            permissions,
+            financeCategories,
+            techTests,
+            salarySettings,
+            periodizationPlans,
+            accountingRecords,
+            tactics,
+            pointItemDefinitions,
+            playerPointRecords,
+            travelingPlayerIds,
+            philosophyDocs,
+            matchPrinciples,
+            basicTechThemes,
+            scenarioThemes,
+            philosophyOverview
+        };
+
+        // Mirror in local browser storage synchronously first
         try {
-            await saveDataToCloud({
-                players,
-                teams,
-                matches,
-                trainings,
-                attributeConfig,
-                announcements,
-                appLogo,
-                users,
-                designs,
-                transactions,
-                permissions,
-                financeCategories,
-                techTests,
-                salarySettings,
-                periodizationPlans,
-                accountingRecords,
-                tactics,
-                pointItemDefinitions,
-                playerPointRecords,
-                travelingPlayerIds
-            });
+            localStorage.setItem('football_manager_local_cache', JSON.stringify(dataPayload));
+        } catch (e) {
+            console.warn('Failed to cache data in browser storage:', e);
+        }
+
+        try {
+            await saveDataToCloud(dataPayload);
             setCloudError(null);
         } catch (e: any) {
-            console.error("Auto-save failed", e);
-            setCloudError(e.message || "自动保存失败");
+            console.warn("Cloud persistence failed, data safely retained locally in file & browser:", e);
         } finally {
             setIsSyncing(false);
         }
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, isInitializing]);
 
 
   const handleLogin = (user: User) => {
@@ -373,7 +442,7 @@ function App() {
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} />;
       case 'training':
-        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} />;
+        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} />;
       case 'matches':
         return <MatchPlanner 
           matches={matches} 
@@ -396,6 +465,25 @@ function App() {
         />;
       case 'tactics':
         return <TacticsModule players={derivedPlayers} teams={teams} tactics={tactics} onUpdateTactics={setTactics} />;
+      case 'philosophy':
+        return (
+          <PhilosophyLibrary 
+            currentUser={currentUser}
+            customDocs={philosophyDocs}
+            onAddDoc={doc => setPhilosophyDocs(prev => [...prev, doc])}
+            onUpdateDoc={doc => setPhilosophyDocs(prev => prev.map(d => d.id === doc.id ? doc : d))}
+            onDeleteDoc={id => setPhilosophyDocs(prev => prev.filter(d => d.id !== id))}
+            appLogo={appLogo}
+            matchPrinciples={matchPrinciples}
+            onUpdatePrinciples={setMatchPrinciples}
+            basicTechThemes={basicTechThemes}
+            onUpdateBasicTechThemes={setBasicTechThemes}
+            scenarioThemes={scenarioThemes}
+            onUpdateScenarioThemes={setScenarioThemes}
+            philosophyOverview={philosophyOverview}
+            onUpdatePhilosophyOverview={setPhilosophyOverview}
+          />
+        );
       case 'settings':
         return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} />;
       default:

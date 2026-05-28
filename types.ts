@@ -530,8 +530,18 @@ export interface AccountingRecord {
 }
 
 // --- RBAC Types ---
-export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings' | 'tactics';
+export type ModuleId = 'dashboard' | 'players' | 'finance' | 'design' | 'training' | 'matches' | 'growth' | 'settings' | 'tactics' | 'philosophy';
 export type PermissionLevel = 'none' | 'view' | 'edit';
+
+export interface PhilosophyDocument {
+  id: string;
+  category: string;
+  title: string;
+  content: string; // 内容详细描述 (支持富文本/Markdown)
+  attachments?: { name: string; type: string; url: string }[]; // 上传的文件
+  updatedAt: string;
+  isBuiltIn?: boolean; // 标识是否为系统内置(即由上传PDF解析的基础内容)
+}
 
 export type RolePermissions = Record<UserRole, Record<ModuleId, PermissionLevel>>;
 

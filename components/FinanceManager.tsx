@@ -945,7 +945,60 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {journalWithBalance.map((t) => { const cat = financeCategories.find(c => c.id === t.category); const isSelected = selectedIds.has(t.id); return ( <tr key={t.id} className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`} onClick={() => toggleSelectId(t.id)}> <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}><input type="checkbox" className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow" checked={isSelected} onChange={() => toggleSelectId(t.id)} /></td> <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">{t.date}</td> <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap"><span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>{cat?.label || '未知'}</span></td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">{t.details}</td> <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-400 text-[10px] md:text-xs">{t.account}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">{t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">{t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">{t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}</td> <td className="px-3 py-3 md:px-6 md:py-4 text-center"><button onClick={(e) => { e.stopPropagation(); onDeleteTransaction(t.id); }} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button></td> </tr> ); })}
+                                {journalWithBalance.map((t) => {
+                                    const cat = financeCategories.find(c => c.id === t.category);
+                                    const isSelected = selectedIds.has(t.id);
+                                    return (
+                                        <tr
+                                            key={t.id}
+                                            className={`hover:bg-yellow-50/20 transition-colors cursor-pointer group animate-in fade-in duration-300 ${isSelected ? 'bg-yellow-50' : ''}`}
+                                            onClick={() => toggleSelectId(t.id)}
+                                        >
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    className="w-3.5 h-3.5 rounded text-bvb-black focus:ring-bvb-yellow"
+                                                    checked={isSelected}
+                                                    onChange={() => toggleSelectId(t.id)}
+                                                />
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 font-mono text-[9px] md:text-xs whitespace-nowrap text-gray-400">
+                                                {t.date}
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 whitespace-nowrap">
+                                                <span className={`text-[8px] md:text-[10px] px-1.5 md:px-2 py-0.5 rounded font-black border uppercase tracking-tighter ${cat?.type === 'income' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                                    {cat?.label || '未知'}
+                                                </span>
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-800 text-[10px] md:text-sm truncate max-w-[80px] md:max-w-none">
+                                                {t.details}
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 font-bold text-gray-400 text-[10px] md:text-xs">
+                                                {t.account}
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-green-600 tabular-nums text-[10px] md:text-sm">
+                                                {t.income > 0 ? Number(t.income).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-right font-black text-red-500 tabular-nums text-[10px] md:text-sm">
+                                                {t.expense > 0 ? Number(t.expense).toLocaleString(undefined, { minimumFractionDigits: 1 }) : '-'}
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-right font-mono font-black text-gray-600 bg-gray-50/30 tabular-nums text-[10px] md:text-sm leading-none">
+                                                {t.balance.toLocaleString(undefined, { minimumFractionDigits: 1 })}
+                                            </td>
+                                            <td className="px-3 py-3 md:px-6 md:py-4 text-center">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onDeleteTransaction(t.id);
+                                                    }}
+                                                    className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>

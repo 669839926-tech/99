@@ -26,8 +26,10 @@ interface SettingsProps {
 
 const MODULES: { id: ModuleId; label: string }[] = [
     { id: 'dashboard', label: '俱乐部概览' },
+    { id: 'philosophy', label: '体系库' },
     { id: 'players', label: '球队管理' },
     { id: 'growth', label: '球员成长' },
+    { id: 'tactics', label: '战术板' },
     { id: 'finance', label: '账务管理' },
     { id: 'design', label: '教案设计' },
     { id: 'training', label: '训练计划' },
@@ -62,11 +64,10 @@ const Settings: React.FC<SettingsProps> = ({
   const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
   const [localSalarySettings, setLocalSalarySettings] = useState<SalarySettings>(JSON.parse(JSON.stringify(salarySettings)));
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'profile_tags' | 'drills' | 'foci' | 'branding'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'profile_tags' | 'drills' | 'branding'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [activeTagGroup, setActiveTagGroup] = useState<'playerTypes' | 'technicalStrengths' | 'personalityTraits' | 'behavioralTraits' | 'coachingReminders'>('playerTypes');
   const [newItemName, setNewItemName] = useState('');
-  const [newSubjectName, setNewSubjectName] = useState<Record<string, string>>({});
 
   const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior' });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -112,12 +113,6 @@ const Settings: React.FC<SettingsProps> = ({
   const handleAddDrill = () => {
       if (!newItemName.trim()) return;
       setLocalConfig(prev => ({ ...prev, drillLibrary: [...(prev.drillLibrary || []), newItemName.trim()] }));
-      setNewItemName('');
-  };
-
-  const handleAddFocus = () => {
-      if (!newItemName.trim()) return;
-      setLocalConfig(prev => ({ ...prev, trainingFoci: [...(prev.trainingFoci || []), newItemName.trim()] }));
       setNewItemName('');
   };
 
@@ -206,50 +201,6 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
-  const handleDeleteFocus = (focus: string) => {
-    if(confirm('确定要删除此训练重点吗？删除后历史训练记录仍会保留该重点名称，但新建计划时不可选。')) {
-        setLocalConfig(prev => {
-            const next = { ...prev };
-            next.trainingFoci = (prev.trainingFoci || []).filter(f => f !== focus);
-            if (next.focusSubjects) {
-                const newSubjects = { ...next.focusSubjects };
-                delete newSubjects[focus];
-                next.focusSubjects = newSubjects;
-            }
-            return next;
-        });
-    }
-  };
-
-  const handleAddFocusSubject = (focus: string) => {
-    const subject = newSubjectName[focus]?.trim();
-    if (!subject) return;
-    
-    setLocalConfig(prev => {
-        const next = { ...prev };
-        const subjects = { ...(prev.focusSubjects || {}) };
-        subjects[focus] = [...(subjects[focus] || []), subject];
-        next.focusSubjects = subjects;
-        return next;
-    });
-    setNewSubjectName(prev => ({ ...prev, [focus]: '' }));
-  };
-
-  const handleDeleteFocusSubject = (focus: string, subjectToDelete: string) => {
-    if (confirm(`确定要删除主题 "${subjectToDelete}" 吗？`)) {
-        setLocalConfig(prev => {
-            const next = { ...prev };
-            if (next.focusSubjects && next.focusSubjects[focus]) {
-                next.focusSubjects = {
-                    ...next.focusSubjects,
-                    [focus]: next.focusSubjects[focus].filter(s => s !== subjectToDelete)
-                };
-            }
-            return next;
-        });
-    }
-  };
-
   const handleAddProfileTag = () => {
     if (!newItemName.trim()) return;
     setLocalConfig(prev => ({
@@ -303,7 +254,7 @@ const Settings: React.FC<SettingsProps> = ({
                {isDirector ? '自定义评价体系、角色权限及系统配置。' : '管理您的个人账户安全。'}
            </p>
         </div>
-        {isDirector && (activeTab === 'attributes' || activeTab === 'drills' || activeTab === 'foci') && (
+        {isDirector && (activeTab === 'attributes' || activeTab === 'drills') && (
             <button onClick={handleSaveConfig} className="flex items-center px-6 py-2 bg-bvb-yellow text-bvb-black font-bold rounded-lg shadow-md hover:brightness-105 transition-colors">
                 <Save className="w-5 h-5 mr-2" /> 保存配置更改
             </button>
@@ -329,7 +280,6 @@ const Settings: React.FC<SettingsProps> = ({
                 <button onClick={() => setActiveTab('users')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'users' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><UsersIcon className="w-4 h-4 mr-2" /> 用户账号管理</button>
                 <button onClick={() => setActiveTab('salary')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'salary' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Calculator className="w-4 h-4 mr-2" /> 薪酬规则配置</button>
                 <button onClick={() => setActiveTab('finance_cats')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'finance_cats' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Wallet className="w-4 h-4 mr-2" /> 财务科目管理</button>
-                <button onClick={() => setActiveTab('foci')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'foci' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Zap className="w-4 h-4 mr-2" /> 训练重点预设</button>
                 <button onClick={() => setActiveTab('attributes')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Target className="w-4 h-4 mr-2" /> 球员能力模型</button>
                 <button onClick={() => setActiveTab('profile_tags')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'profile_tags' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Zap className="w-4 h-4 mr-2" /> 球员画像标签</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
@@ -803,74 +753,7 @@ const Settings: React.FC<SettingsProps> = ({
              </div>
         )}
 
-        {activeTab === 'foci' && isDirector && (
-            <div className="flex-1 p-6 space-y-8">
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800 flex items-center"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 训练重点与主题预设</h3>
-                    <p className="text-sm text-gray-500 mt-1">配置训练计划中的“训练重点”及其对应的“训练主题”下拉选项。</p>
-                </div>
 
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <label className="block text-sm font-bold text-gray-600 mb-2">新增训练重点 (Focus)</label>
-                    <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            placeholder="例如：传接球、射门、体能..." 
-                            className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow font-bold" 
-                            value={newItemName} 
-                            onChange={(e) => setNewItemName(e.target.value)} 
-                        />
-                        <button onClick={handleAddFocus} className="px-6 py-2 bg-bvb-black text-white text-xs font-black rounded-lg flex items-center gap-2">
-                            <Plus className="w-4 h-4" /> 添加重点
-                        </button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {localConfig.trainingFoci.map(focus => (
-                        <div key={focus} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
-                            <div className="bg-gray-50 p-3 border-b border-gray-100 flex justify-between items-center">
-                                <span className="font-black text-sm text-bvb-black uppercase tracking-tight">{focus}</span>
-                                <button onClick={() => handleDeleteFocus(focus)} className="text-gray-300 hover:text-red-500 transition-colors">
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                            <div className="p-4 flex-1 space-y-3">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">对应主题 (Subjects)</label>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {(localConfig.focusSubjects?.[focus] || []).map(subject => (
-                                            <div key={subject} className="flex items-center gap-1 px-2 py-1 bg-yellow-50 text-bvb-black rounded text-[11px] font-bold border border-yellow-100 group">
-                                                {subject}
-                                                <button onClick={() => handleDeleteFocusSubject(focus, subject)} className="text-yellow-300 hover:text-red-500">
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                        {(localConfig.focusSubjects?.[focus] || []).length === 0 && (
-                                            <span className="text-[10px] text-gray-300 italic">暂无主题</span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="pt-3 border-t border-gray-50 flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        placeholder="新主题..." 
-                                        className="flex-1 p-1.5 border rounded text-xs outline-none focus:ring-1 focus:ring-bvb-yellow"
-                                        value={newSubjectName[focus] || ''}
-                                        onChange={e => setNewSubjectName(prev => ({ ...prev, [focus]: e.target.value }))}
-                                        onKeyDown={e => e.key === 'Enter' && handleAddFocusSubject(focus)}
-                                    />
-                                    <button onClick={() => handleAddFocusSubject(focus)} className="p-1.5 bg-gray-100 text-gray-500 rounded hover:bg-bvb-yellow hover:text-bvb-black transition-colors">
-                                        <Plus className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )}
 
         {activeTab === 'attributes' && isDirector && (
             <div className="flex-1 p-6 space-y-8">
