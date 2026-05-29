@@ -11,7 +11,6 @@ import ParentPortal from './components/ParentPortal';
 import SessionDesigner from './components/SessionDesigner';
 import FinanceManager from './components/FinanceManager';
 import TechnicalGrowth from './components/TechnicalGrowth';
-import TacticsModule from './components/TacticsModule';
 import PhilosophyLibrary from './components/PhilosophyLibrary';
 import { MATCH_PRINCIPLES, PHILOSOPHY_OVERVIEW, BASIC_TECH_THEMES, SCENARIO_THEMES, MatchPrinciple, BasicTechItem, ScenarioTheme } from './src/philosophyData';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
@@ -462,9 +461,9 @@ function App() {
           onDeletePointRecord={handleDeletePointRecord}
           travelingPlayerIds={travelingPlayerIds}
           onUpdateTravelingPlayers={handleUpdateTravelingPlayers}
+          tactics={tactics}
+          onUpdateTactics={setTactics}
         />;
-      case 'tactics':
-        return <TacticsModule players={derivedPlayers} teams={teams} tactics={tactics} onUpdateTactics={setTactics} />;
       case 'philosophy':
         return (
           <PhilosophyLibrary 
