@@ -70,11 +70,12 @@ export default async function handler(request: any, response: any) {
           new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
         );
 
-        const jsonUrl = sortedBlobs[0].url;
+        // Add a timestamp query parameter to bypass edge cache for static suffixed files
+        const jsonUrl = `${sortedBlobs[0].url}?t=${Date.now()}`;
         console.log('[Storage API] Loading data from vercel blob:', jsonUrl);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const timeoutId = setTimeout(() => controller.abort(), 6500);
 
         const res = await fetch(jsonUrl, { 
           cache: 'no-store',
@@ -110,27 +111,34 @@ export default async function handler(request: any, response: any) {
          return response.status(500).json({ error: 'Failed to write to local storage' });
       }
 
-      // Return status 200 immediately to client. This avoids client-side connection timeouts
-      response.status(200).json({ 
-        success: true, 
-        message: 'Saved to local storage. Syncing to cloud in background.',
-        url: 'local://' + DB_FILENAME 
-      });
+      let uploadUrl = 'local://' + DB_FILENAME;
 
       if (!isTokenMissing) {
-        console.log('[Storage API] Saving data to Vercel blob storage asynchronously in the background...');
-        put(DB_FILENAME, JSON.stringify(body), {
-          access: 'public',
-          addRandomSuffix: false, 
-          allowOverwrite: true,   
-          token,
-        }).then(({ url }) => {
-          console.log('[Storage API] Data saved successfully to Vercel Blob in background:', url);
-        }).catch(err => {
-          console.warn('[Storage API] Vercel Blob background put failed:', err.message);
-        });
+        console.log('[Storage API] Saving data to Vercel blob storage synchronously...');
+        try {
+          const blobRes = await withTimeout(put(DB_FILENAME, JSON.stringify(body), {
+            access: 'public',
+            addRandomSuffix: false, 
+            allowOverwrite: true,
+            token,
+          }), 15000); // Wait up to 15 seconds to finish the upload before returning 200
+          
+          uploadUrl = blobRes.url;
+          console.log('[Storage API] Data saved successfully to Vercel Blob:', uploadUrl);
+        } catch (err: any) {
+          console.error('[Storage API] Vercel Blob put failed:', err);
+          return response.status(500).json({ 
+            error: 'Failed to sync to cloud storage', 
+            message: err.message || 'The Vercel Blob system encountered an unexpected error.' 
+          });
+        }
       }
-      return;
+
+      return response.status(200).json({ 
+        success: true, 
+        message: 'Saved to local and cloud storage successfully.',
+        url: uploadUrl 
+      });
     }
 
     return response.status(405).send('Method not allowed');
