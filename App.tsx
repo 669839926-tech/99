@@ -288,6 +288,7 @@ function App() {
             setCloudError(null);
         } catch (e: any) {
             console.warn("Cloud persistence failed, data safely retained locally in file & browser:", e);
+            setCloudError(`数据云端保存失败：${e.message || '网络或同步接口连接受阻，建议检查并在 Vercel 配置中启用 Blob。所幸您的数据已完全安全缓存在浏览器本地中，可继续流畅操作！'}`);
         } finally {
             setIsSyncing(false);
         }

@@ -44,7 +44,7 @@ const getApiUrl = (relativePath: string): string => {
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
     try {
-        const apiUrl = getApiUrl('/api/storage');
+        const apiUrl = getApiUrl(`/api/storage?t=${Date.now()}`);
         console.log('Fetching data from cloud storage API...', apiUrl);
         const res = await fetch(apiUrl);
         if (!res.ok) {

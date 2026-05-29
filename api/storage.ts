@@ -43,6 +43,11 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
 export default async function handler(request: any, response: any) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
+  // Set strict, comprehensive cache-busting headers to prevent Vercel CDN or browser from caching
+  response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0, stale-while-revalidate=0');
+  response.setHeader('Pragma', 'no-cache');
+  response.setHeader('Expires', '0');
+
   console.log(`[Storage API] Method: ${request.method}, Token present: ${!!token}`);
 
   const isTokenMissing = !token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE';
@@ -51,6 +56,13 @@ export default async function handler(request: any, response: any) {
     // GET Request: Load data
     if (request.method === 'GET') {
       if (isTokenMissing) {
+        if (process.env.VERCEL === '1') {
+          console.warn('[Storage API] Vercel environment detected but Vercel Blob token is missing!');
+          return response.status(500).json({
+            error: 'Missing Vercel Blob Token',
+            message: '系统云端数据库未激活：当前部署处于 Vercel 环境，但未找到关联的 BLOB_READ_WRITE_TOKEN 环境变量。请登录 Vercel 控制台，进入该项目的 Settings -> Environment Variables 页签关联/开通 Vercel Blob 存储服务以开启云端持续同步功能！'
+          });
+        }
         console.log('[Storage API] Token missing. Loading from local file...');
         const localData = readLocalDB();
         return response.status(200).json(localData);
@@ -58,7 +70,8 @@ export default async function handler(request: any, response: any) {
 
       try {
         console.log('[Storage API] Listing blobs with prefix:', DB_PREFIX);
-        const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 4000);
+        // Increase list timeout to 12000ms to allow plenty of time for S3 retrieval under serverless platform cold starts
+        const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 12000);
         
         if (blobs.length === 0) {
           console.log('[Storage API] No blobs found. Loading from local file...');
@@ -75,7 +88,8 @@ export default async function handler(request: any, response: any) {
         console.log('[Storage API] Loading data from vercel blob:', jsonUrl);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6500);
+        // Increase fetch timeout to 10000ms
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const res = await fetch(jsonUrl, { 
           cache: 'no-store',
@@ -85,11 +99,10 @@ export default async function handler(request: any, response: any) {
         
         const data = await res.json();
         
-        response.setHeader('Cache-Control', 'no-store, max-age=0');
         // Cache to local file as warm backup
         writeLocalDB(data);
         return response.status(200).json(data);
-      } catch (blobError) {
+      } catch (blobError: any) {
         console.warn('[Storage API] Vercel Blob access failed. Falling back to local file:', blobError);
         const localData = readLocalDB();
         return response.status(200).json(localData);
@@ -102,6 +115,16 @@ export default async function handler(request: any, response: any) {
       
       if (!body || Object.keys(body).length === 0) {
         console.warn('[Storage API] Received empty body for POST request.');
+      }
+
+      if (isTokenMissing) {
+        if (process.env.VERCEL === '1') {
+          console.error('[Storage API] Fail to save: Vercel Blob token is missing!');
+          return response.status(500).json({
+            error: 'Missing Vercel Blob Token',
+            message: '云端同步保存失败：未检测到 BLOB_READ_WRITE_TOKEN。请前往 Vercel 控制台关联/添加 Vercel Blob，否则数据无法在 Vercel 中实现保存。'
+          });
+        }
       }
 
       // Always save to local file as primary or backup persistence
