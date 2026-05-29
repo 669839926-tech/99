@@ -181,17 +181,6 @@ function App() {
         if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
     };
 
-    const safeGetLocalStorage = (key: string): string | null => {
-        try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                return localStorage.getItem(key);
-            }
-        } catch (e) {
-            console.warn('Failed to access localStorage safely:', e);
-        }
-        return null;
-    };
-
     try {
         const cloudData = await loadDataFromCloud();
         if (cloudData) {
@@ -205,7 +194,7 @@ function App() {
             }
         } else {
             console.log('Database is empty, checking browser cache fallback...');
-            const localCache = safeGetLocalStorage('football_manager_local_cache');
+            const localCache = localStorage.getItem('football_manager_local_cache');
             if (localCache) {
                 try {
                     const parsed = JSON.parse(localCache);
@@ -217,14 +206,14 @@ function App() {
         }
     } catch (err: any) {
         console.warn("Failed to initialize cloud database, initiating local recovery stream:", err);
-        const localCache = safeGetLocalStorage('football_manager_local_cache');
+        const localCache = localStorage.getItem('football_manager_local_cache');
         if (localCache) {
             try {
                 const parsed = JSON.parse(localCache);
                 applyDataToStates(parsed);
                 setCloudError(`本地运行模式：服务器正在进行升级维护 (云端同步离线: ${err.message || '网络连接有阻碍'})。所幸您的数据已完全在本地沙盒环境中恢复，可流畅编辑。`);
             } catch {
-                setCloudError(`青训数据库正在本地离线运行 (${err.message || '服务异常'})。且本地缓存损坏，系统已自动加载内置青训示范数据集：所有操作 and 保存功用一切正常！`);
+                setCloudError(`青训数据库正在本地离线运行 (${err.message || '服务异常'})。且本地缓存损坏，系统已自动加载内置青训示范数据集：所有操作和保存功用一切正常！`);
             }
         } else {
             setCloudError(`青训数据库正在本地安全模式运行 (服务器离线中: ${err.message || '同步受阻'})。当前已自动加载软件内置标准青训预设：您仍可照常使用、修改、添加所有俱乐部设置。`);
@@ -288,7 +277,6 @@ function App() {
             setCloudError(null);
         } catch (e: any) {
             console.warn("Cloud persistence failed, data safely retained locally in file & browser:", e);
-            setCloudError(`数据云端保存失败：${e.message || '网络或同步接口连接受阻，建议检查并在 Vercel 配置中启用 Blob。所幸您的数据已完全安全缓存在浏览器本地中，可继续流畅操作！'}`);
         } finally {
             setIsSyncing(false);
         }

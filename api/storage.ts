@@ -6,9 +6,16 @@ import path from 'path';
 const DB_FILENAME = 'football_manager_db.json';
 const DB_PREFIX = 'football_manager_db'; 
 const LOCAL_DB_PATH = path.join(process.cwd(), 'football_manager_db.json');
+const TMP_DB_PATH = path.join('/tmp', 'football_manager_db.json');
 
 const readLocalDB = () => {
   try {
+    // 1. Try reading from /tmp first (the most recently written local backup)
+    if (fs.existsSync(TMP_DB_PATH)) {
+      const content = fs.readFileSync(TMP_DB_PATH, 'utf-8');
+      return JSON.parse(content);
+    }
+    // 2. Fallback to reading from the project root (the bundled asset)
     if (fs.existsSync(LOCAL_DB_PATH)) {
       const content = fs.readFileSync(LOCAL_DB_PATH, 'utf-8');
       return JSON.parse(content);
@@ -20,17 +27,33 @@ const readLocalDB = () => {
 };
 
 const writeLocalDB = (data: any) => {
+  let success = false;
+
+  // 1. Attempt to write to project root (works in dev or standard writeable containers)
   try {
     const dir = path.dirname(LOCAL_DB_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-    return true;
+    success = true;
   } catch (error) {
-    console.error('[Storage API] Failed to write to local file DB:', error);
-    return false;
+    console.warn('[Storage API] Write to project root failed (expected in read-only lambda/Vercel). Trying /tmp...', error);
   }
+
+  // 2. Always write to /tmp as a robust fallback/cache (writable in serverless, Cloud Run, Vercel)
+  try {
+    const tmpDir = path.dirname(TMP_DB_PATH);
+    if (!fs.existsSync(tmpDir)) {
+      fs.mkdirSync(tmpDir, { recursive: true });
+    }
+    fs.writeFileSync(TMP_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    success = true; // Mark as successful if we wrote to /tmp successfully
+  } catch (error) {
+    console.error('[Storage API] Failed to write DB to /tmp:', error);
+  }
+
+  return success;
 };
 
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
@@ -43,11 +66,6 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
 export default async function handler(request: any, response: any) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  // Set strict, comprehensive cache-busting headers to prevent Vercel CDN or browser from caching
-  response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0, stale-while-revalidate=0');
-  response.setHeader('Pragma', 'no-cache');
-  response.setHeader('Expires', '0');
-
   console.log(`[Storage API] Method: ${request.method}, Token present: ${!!token}`);
 
   const isTokenMissing = !token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE';
@@ -56,13 +74,6 @@ export default async function handler(request: any, response: any) {
     // GET Request: Load data
     if (request.method === 'GET') {
       if (isTokenMissing) {
-        if (process.env.VERCEL === '1') {
-          console.warn('[Storage API] Vercel environment detected but Vercel Blob token is missing!');
-          return response.status(500).json({
-            error: 'Missing Vercel Blob Token',
-            message: '系统云端数据库未激活：当前部署处于 Vercel 环境，但未找到关联的 BLOB_READ_WRITE_TOKEN 环境变量。请登录 Vercel 控制台，进入该项目的 Settings -> Environment Variables 页签关联/开通 Vercel Blob 存储服务以开启云端持续同步功能！'
-          });
-        }
         console.log('[Storage API] Token missing. Loading from local file...');
         const localData = readLocalDB();
         return response.status(200).json(localData);
@@ -70,8 +81,7 @@ export default async function handler(request: any, response: any) {
 
       try {
         console.log('[Storage API] Listing blobs with prefix:', DB_PREFIX);
-        // Increase list timeout to 12000ms to allow plenty of time for S3 retrieval under serverless platform cold starts
-        const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 12000);
+        const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 4000);
         
         if (blobs.length === 0) {
           console.log('[Storage API] No blobs found. Loading from local file...');
@@ -83,13 +93,11 @@ export default async function handler(request: any, response: any) {
           new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
         );
 
-        // Add a timestamp query parameter to bypass edge cache for static suffixed files
-        const jsonUrl = `${sortedBlobs[0].url}?t=${Date.now()}`;
+        const jsonUrl = sortedBlobs[0].url;
         console.log('[Storage API] Loading data from vercel blob:', jsonUrl);
 
         const controller = new AbortController();
-        // Increase fetch timeout to 10000ms
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         const res = await fetch(jsonUrl, { 
           cache: 'no-store',
@@ -99,10 +107,11 @@ export default async function handler(request: any, response: any) {
         
         const data = await res.json();
         
+        response.setHeader('Cache-Control', 'no-store, max-age=0');
         // Cache to local file as warm backup
         writeLocalDB(data);
         return response.status(200).json(data);
-      } catch (blobError: any) {
+      } catch (blobError) {
         console.warn('[Storage API] Vercel Blob access failed. Falling back to local file:', blobError);
         const localData = readLocalDB();
         return response.status(200).json(localData);
@@ -117,16 +126,6 @@ export default async function handler(request: any, response: any) {
         console.warn('[Storage API] Received empty body for POST request.');
       }
 
-      if (isTokenMissing) {
-        if (process.env.VERCEL === '1') {
-          console.error('[Storage API] Fail to save: Vercel Blob token is missing!');
-          return response.status(500).json({
-            error: 'Missing Vercel Blob Token',
-            message: '云端同步保存失败：未检测到 BLOB_READ_WRITE_TOKEN。请前往 Vercel 控制台关联/添加 Vercel Blob，否则数据无法在 Vercel 中实现保存。'
-          });
-        }
-      }
-
       // Always save to local file as primary or backup persistence
       const localWriteSuccess = writeLocalDB(body);
       if (!localWriteSuccess) {
@@ -134,34 +133,27 @@ export default async function handler(request: any, response: any) {
          return response.status(500).json({ error: 'Failed to write to local storage' });
       }
 
-      let uploadUrl = 'local://' + DB_FILENAME;
+      // Return status 200 immediately to client. This avoids client-side connection timeouts
+      response.status(200).json({ 
+        success: true, 
+        message: 'Saved to local storage. Syncing to cloud in background.',
+        url: 'local://' + DB_FILENAME 
+      });
 
       if (!isTokenMissing) {
-        console.log('[Storage API] Saving data to Vercel blob storage synchronously...');
-        try {
-          const blobRes = await withTimeout(put(DB_FILENAME, JSON.stringify(body), {
-            access: 'public',
-            addRandomSuffix: false, 
-            allowOverwrite: true,
-            token,
-          }), 15000); // Wait up to 15 seconds to finish the upload before returning 200
-          
-          uploadUrl = blobRes.url;
-          console.log('[Storage API] Data saved successfully to Vercel Blob:', uploadUrl);
-        } catch (err: any) {
-          console.error('[Storage API] Vercel Blob put failed:', err);
-          return response.status(500).json({ 
-            error: 'Failed to sync to cloud storage', 
-            message: err.message || 'The Vercel Blob system encountered an unexpected error.' 
-          });
-        }
+        console.log('[Storage API] Saving data to Vercel blob storage asynchronously in the background...');
+        put(DB_FILENAME, JSON.stringify(body), {
+          access: 'public',
+          addRandomSuffix: false, 
+          allowOverwrite: true,   
+          token,
+        }).then(({ url }) => {
+          console.log('[Storage API] Data saved successfully to Vercel Blob in background:', url);
+        }).catch(err => {
+          console.warn('[Storage API] Vercel Blob background put failed:', err.message);
+        });
       }
-
-      return response.status(200).json({ 
-        success: true, 
-        message: 'Saved to local and cloud storage successfully.',
-        url: uploadUrl 
-      });
+      return;
     }
 
     return response.status(405).send('Method not allowed');

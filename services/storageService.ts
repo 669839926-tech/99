@@ -29,22 +29,25 @@ export interface AppData {
 }
 
 const getApiUrl = (relativePath: string): string => {
-    try {
-        if (typeof window !== 'undefined' && window.location) {
-            const isHttp = /^https?:/i.test(window.location.protocol);
-            if (isHttp && window.location.host && window.location.host.trim() !== '') {
-                return `${window.location.protocol}//${window.location.host}${relativePath}`;
+    if (typeof window !== 'undefined' && window.location) {
+        const isHttp = /^https?:/i.test(window.location.protocol);
+        if (isHttp && window.location.host) {
+            return `${window.location.protocol}//${window.location.host}${relativePath}`;
+        }
+        if (window.location.href && /^https?:/i.test(window.location.href)) {
+            try {
+                return new URL(relativePath, window.location.href).href;
+            } catch (e) {
+                console.warn('[Storage Service] failed to parse absolute url:', e);
             }
         }
-    } catch (e) {
-        console.warn('[Storage Service] failed to build absolute url from window.location:', e);
     }
     return relativePath;
 };
 
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
     try {
-        const apiUrl = getApiUrl(`/api/storage?t=${Date.now()}`);
+        const apiUrl = getApiUrl('/api/storage');
         console.log('Fetching data from cloud storage API...', apiUrl);
         const res = await fetch(apiUrl);
         if (!res.ok) {
