@@ -28,59 +28,10 @@ export interface AppData {
     philosophyOverview?: any;
 }
 
-const getApiUrl = (relativePath: string): string => {
-    // 1. Try to get origin from import.meta.url (Vite module URL)
-    try {
-        if (typeof import.meta !== 'undefined' && import.meta.url) {
-            const urlObj = new URL(import.meta.url);
-            if (/^https?:/i.test(urlObj.protocol)) {
-                return `${urlObj.origin}${relativePath}`;
-            }
-        }
-    } catch {
-        // Fall through
-    }
-
-    // 2. Try window.location
-    try {
-        if (typeof window !== 'undefined' && window.location) {
-            const isHttp = /^https?:/i.test(window.location.protocol);
-            if (isHttp && window.location.host && window.location.host.trim() !== '') {
-                return `${window.location.protocol}//${window.location.host}${relativePath}`;
-            }
-        }
-    } catch {
-        // Fall through
-    }
-
-    // 3. Try document.referrer
-    try {
-        if (typeof document !== 'undefined' && document.referrer) {
-            const urlObj = new URL(document.referrer);
-            if (/^https?:/i.test(urlObj.protocol)) {
-                return `${urlObj.origin}${relativePath}`;
-            }
-        }
-    } catch {
-        // Fall through
-    }
-
-    // 4. Default to relative path
-    return relativePath;
-};
-
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
     try {
-        // Append cache-buster to prevent browser or intermediate reverse-proxy caching
-        const apiUrl = getApiUrl('/api/storage?t=' + Date.now());
-        console.log('Fetching data from cloud storage API...', apiUrl);
-        const res = await fetch(apiUrl, {
-            cache: 'no-store',
-            headers: {
-                'Pragma': 'no-cache',
-                'Cache-Control': 'no-cache'
-            }
-        });
+        console.log('Fetching data from cloud storage API...');
+        const res = await fetch('/api/storage');
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
             const errorMessage = errorData.details || errorData.message || `HTTP ${res.status}`;
@@ -102,9 +53,8 @@ export const loadDataFromCloud = async (): Promise<AppData | null> => {
 
 export const saveDataToCloud = async (data: AppData) => {
     try {
-        const apiUrl = getApiUrl('/api/storage');
-        console.log('Saving data to cloud storage API...', apiUrl);
-        const res = await fetch(apiUrl, {
+        console.log('Saving data to cloud storage API...');
+        const res = await fetch('/api/storage', {
             method: 'POST',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }

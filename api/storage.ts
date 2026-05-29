@@ -1,5 +1,5 @@
 
-import { put, list, del } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 import fs from 'fs';
 import path from 'path';
 
@@ -71,26 +71,20 @@ export default async function handler(request: any, response: any) {
         );
 
         const jsonUrl = sortedBlobs[0].url;
-        // Append unique timestamp to bypass aggressive edge caches/CDNs
-        const bypassCacheUrl = jsonUrl + (jsonUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
-        console.log('[Storage API] Loading data from vercel blob:', bypassCacheUrl);
+        console.log('[Storage API] Loading data from vercel blob:', jsonUrl);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const res = await fetch(bypassCacheUrl, { 
+        const res = await fetch(jsonUrl, { 
           cache: 'no-store',
-          headers: {
-            'Pragma': 'no-cache',
-            'Cache-Control': 'no-cache'
-          },
           signal: controller.signal 
         });
         clearTimeout(timeoutId);
         
         const data = await res.json();
         
-        response.setHeader('Cache-Control', 'no-store, max-age=0, must-revalidate');
+        response.setHeader('Cache-Control', 'no-store, max-age=0');
         // Cache to local file as warm backup
         writeLocalDB(data);
         return response.status(200).json(data);
@@ -116,55 +110,27 @@ export default async function handler(request: any, response: any) {
          return response.status(500).json({ error: 'Failed to write to local storage' });
       }
 
-      let cloudUrl = 'local://' + DB_FILENAME;
-      let cloudSaved = false;
+      // Return status 200 immediately to client. This avoids client-side connection timeouts
+      response.status(200).json({ 
+        success: true, 
+        message: 'Saved to local storage. Syncing to cloud in background.',
+        url: 'local://' + DB_FILENAME 
+      });
 
       if (!isTokenMissing) {
-        console.log('[Storage API] Saving data to Vercel blob storage with random suffix to bypass cache...');
-        try {
-          // Use addRandomSuffix: true to generate a unique CDN URL on every save!
-          const blobResult = await put(DB_FILENAME, JSON.stringify(body), {
-            access: 'public',
-            addRandomSuffix: true, 
-            token,
-          });
-          cloudUrl = blobResult.url;
-          cloudSaved = true;
-          console.log('[Storage API] Data saved successfully to Vercel Blob:', cloudUrl);
-
-          // Asynchronously clean up older backup files to keep storage clean (garbage collection)
-          try {
-            console.log('[Storage API] Starting garbage collection of older blobs...');
-            const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 4000);
-            if (blobs.length > 1) {
-              const sortedBlobs = blobs.sort((a, b) => 
-                new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-              );
-              // Keeps the most recent one (sortedBlobs[0] which is the one we just uploaded) and deletes the rest
-              const olderBlobs = sortedBlobs.slice(1);
-              console.log(`[Storage API] Deleting ${olderBlobs.length} older blobs...`);
-              for (const oldBlob of olderBlobs) {
-                try {
-                  await del(oldBlob.url, { token });
-                  console.log('[Storage API] Deleted older blob:', oldBlob.url);
-                } catch (delErr: any) {
-                  console.warn(`[Storage API] Failed to delete older blob ${oldBlob.url}:`, delErr.message);
-                }
-              }
-            }
-          } catch (gcError: any) {
-            console.warn('[Storage API] Garbage collection failed (non-critical):', gcError.message);
-          }
-        } catch (err: any) {
-          console.error('[Storage API] Vercel Blob put failed:', err);
-        }
+        console.log('[Storage API] Saving data to Vercel blob storage asynchronously in the background...');
+        put(DB_FILENAME, JSON.stringify(body), {
+          access: 'public',
+          addRandomSuffix: false, 
+          allowOverwrite: true,   
+          token,
+        }).then(({ url }) => {
+          console.log('[Storage API] Data saved successfully to Vercel Blob in background:', url);
+        }).catch(err => {
+          console.warn('[Storage API] Vercel Blob background put failed:', err.message);
+        });
       }
-
-      return response.status(200).json({ 
-        success: true, 
-        message: cloudSaved ? '数据已成功同步到云端。' : '数据已保存在本地，同步云端时遇到网络问题。',
-        url: cloudUrl 
-      });
+      return;
     }
 
     return response.status(405).send('Method not allowed');

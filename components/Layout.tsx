@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, X, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, Layout as LayoutIcon, X, BookOpen } from 'lucide-react';
 import { User as UserType, RolePermissions, ModuleId } from '../types';
 
 interface LayoutProps {
@@ -30,6 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, open
     { id: 'philosophy', label: '体系库', icon: BookOpen },
     { id: 'players', label: '球员管理', icon: Shirt },
     { id: 'growth', label: '球员成长', icon: TrendingUp },
+    { id: 'tactics', label: '战术板', icon: LayoutIcon },
     { id: 'finance', label: '账务管理', icon: Wallet },
     { id: 'design', label: '教案设计', icon: PenTool },
     { id: 'training', label: '训练计划', icon: Calendar },
@@ -47,6 +48,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, open
     if (label === '教案设计') return '教案';
     if (label === '账务管理') return '账务';
     if (label === '球员成长') return '成长';
+    if (label === '战术板') return '战术';
     return label.substring(0, 2);
   };
 

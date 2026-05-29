@@ -1,11 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic } from '../types';
+import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType } from '../types';
 // Comment: Added 'Coins', 'TrendingDown', 'ListPlus' to the lucide-react imports
 import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Cloud, Maximize2, Minimize2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
-import TacticsModule from './TacticsModule';
 
 interface MatchPlannerProps {
   matches: Match[];
@@ -25,12 +24,10 @@ interface MatchPlannerProps {
   travelingPlayerIds: string[];
   onUpdateTravelingPlayers: (ids: string[]) => void;
   appLogo?: string;
-  tactics: Tactic[];
-  onUpdateTactics: (tactics: Tactic[]) => void;
 }
 
 type TabType = 'info' | 'lineup' | 'objectives' | 'events' | 'report' | 'fixtures';
-type ViewMode = 'matches' | 'points' | 'tactics';
+type ViewMode = 'matches' | 'points';
 
 const MatchPlanner: React.FC<MatchPlannerProps> = ({ 
   matches, 
@@ -48,9 +45,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   onBulkAddPointRecords,
   onDeletePointRecord,
   travelingPlayerIds,
-  onUpdateTravelingPlayers,
-  tactics,
-  onUpdateTactics
+  onUpdateTravelingPlayers
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -323,34 +318,26 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                 >
                     积分管理
                 </button>
-                <button 
-                    onClick={() => setViewMode('tactics')}
-                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 ${viewMode === 'tactics' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400'}`}
-                >
-                    战术板
-                </button>
             </div>
         </div>
-        {viewMode !== 'tactics' && (
-          <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
-              <div className="relative group flex-1 md:flex-none">
-                  <div className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400"><Filter className="w-3.5 h-3.5 md:w-4 md:h-4" /></div>
-                  <select value={filterTeamId} onChange={e => setFilterTeamId(e.target.value)} className="w-full md:w-48 pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-white border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-bvb-yellow shadow-sm transition-all">
-                      {isDirector && <option value="all">所有梯队</option>}
-                      {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-              </div>
-              <button 
-                  onClick={() => {
-                      if (viewMode === 'matches') setShowAddModal(true);
-                      else setShowAddPointItemModal(true);
-                  }} 
-                  className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"
-              >
-                  <Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建
-              </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+            <div className="relative group flex-1 md:flex-none">
+                <div className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400"><Filter className="w-3.5 h-3.5 md:w-4 md:h-4" /></div>
+                <select value={filterTeamId} onChange={e => setFilterTeamId(e.target.value)} className="w-full md:w-48 pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-white border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-bvb-yellow shadow-sm transition-all">
+                    {isDirector && <option value="all">所有梯队</option>}
+                    {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+            </div>
+            <button 
+                onClick={() => {
+                    if (viewMode === 'matches') setShowAddModal(true);
+                    else setShowAddPointItemModal(true);
+                }} 
+                className="flex items-center px-4 md:px-6 py-2 md:py-2.5 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all shrink-0 text-xs md:text-sm"
+            >
+                <Plus className="w-4 h-4 md:w-5 md:h-5 mr-1 md:mr-2 text-bvb-yellow" /> 新建
+            </button>
+        </div>
       </div>
 
       {viewMode === 'matches' ? (
@@ -429,7 +416,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
               </div>
           </div>
         </>
-      ) : viewMode === 'points' ? (
+      ) : (
         <MatchPointManager 
             players={players} 
             teams={teams}
@@ -444,13 +431,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
             onDeletePointRecord={onDeletePointRecord}
             travelingPlayerIds={travelingPlayerIds}
             onUpdateTravelingPlayers={onUpdateTravelingPlayers}
-        />
-      ) : (
-        <TacticsModule 
-            players={players}
-            teams={teams}
-            tactics={tactics}
-            onUpdateTactics={onUpdateTactics}
         />
       )}
 
