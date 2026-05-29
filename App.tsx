@@ -11,7 +11,6 @@ import ParentPortal from './components/ParentPortal';
 import SessionDesigner from './components/SessionDesigner';
 import FinanceManager from './components/FinanceManager';
 import TechnicalGrowth from './components/TechnicalGrowth';
-import TacticsModule from './components/TacticsModule';
 import PhilosophyLibrary from './components/PhilosophyLibrary';
 import { MATCH_PRINCIPLES, PHILOSOPHY_OVERVIEW, BASIC_TECH_THEMES, SCENARIO_THEMES, MatchPrinciple, BasicTechItem, ScenarioTheme } from './src/philosophyData';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
@@ -182,6 +181,17 @@ function App() {
         if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
     };
 
+    const safeGetLocalStorage = (key: string): string | null => {
+        try {
+            if (typeof window !== 'undefined' && window.localStorage) {
+                return localStorage.getItem(key);
+            }
+        } catch (e) {
+            console.warn('Failed to access localStorage safely:', e);
+        }
+        return null;
+    };
+
     try {
         const cloudData = await loadDataFromCloud();
         if (cloudData) {
@@ -195,7 +205,7 @@ function App() {
             }
         } else {
             console.log('Database is empty, checking browser cache fallback...');
-            const localCache = localStorage.getItem('football_manager_local_cache');
+            const localCache = safeGetLocalStorage('football_manager_local_cache');
             if (localCache) {
                 try {
                     const parsed = JSON.parse(localCache);
@@ -207,14 +217,14 @@ function App() {
         }
     } catch (err: any) {
         console.warn("Failed to initialize cloud database, initiating local recovery stream:", err);
-        const localCache = localStorage.getItem('football_manager_local_cache');
+        const localCache = safeGetLocalStorage('football_manager_local_cache');
         if (localCache) {
             try {
                 const parsed = JSON.parse(localCache);
                 applyDataToStates(parsed);
                 setCloudError(`本地运行模式：服务器正在进行升级维护 (云端同步离线: ${err.message || '网络连接有阻碍'})。所幸您的数据已完全在本地沙盒环境中恢复，可流畅编辑。`);
             } catch {
-                setCloudError(`青训数据库正在本地离线运行 (${err.message || '服务异常'})。且本地缓存损坏，系统已自动加载内置青训示范数据集：所有操作和保存功用一切正常！`);
+                setCloudError(`青训数据库正在本地离线运行 (${err.message || '服务异常'})。且本地缓存损坏，系统已自动加载内置青训示范数据集：所有操作 and 保存功用一切正常！`);
             }
         } else {
             setCloudError(`青训数据库正在本地安全模式运行 (服务器离线中: ${err.message || '同步受阻'})。当前已自动加载软件内置标准青训预设：您仍可照常使用、修改、添加所有俱乐部设置。`);
@@ -462,9 +472,9 @@ function App() {
           onDeletePointRecord={handleDeletePointRecord}
           travelingPlayerIds={travelingPlayerIds}
           onUpdateTravelingPlayers={handleUpdateTravelingPlayers}
+          tactics={tactics}
+          onUpdateTactics={setTactics}
         />;
-      case 'tactics':
-        return <TacticsModule players={derivedPlayers} teams={teams} tactics={tactics} onUpdateTactics={setTactics} />;
       case 'philosophy':
         return (
           <PhilosophyLibrary 

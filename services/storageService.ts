@@ -28,10 +28,25 @@ export interface AppData {
     philosophyOverview?: any;
 }
 
+const getApiUrl = (relativePath: string): string => {
+    try {
+        if (typeof window !== 'undefined' && window.location) {
+            const isHttp = /^https?:/i.test(window.location.protocol);
+            if (isHttp && window.location.host && window.location.host.trim() !== '') {
+                return `${window.location.protocol}//${window.location.host}${relativePath}`;
+            }
+        }
+    } catch (e) {
+        console.warn('[Storage Service] failed to build absolute url from window.location:', e);
+    }
+    return relativePath;
+};
+
 export const loadDataFromCloud = async (): Promise<AppData | null> => {
     try {
-        console.log('Fetching data from cloud storage API...');
-        const res = await fetch('/api/storage');
+        const apiUrl = getApiUrl('/api/storage');
+        console.log('Fetching data from cloud storage API...', apiUrl);
+        const res = await fetch(apiUrl);
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({}));
             const errorMessage = errorData.details || errorData.message || `HTTP ${res.status}`;
@@ -53,8 +68,9 @@ export const loadDataFromCloud = async (): Promise<AppData | null> => {
 
 export const saveDataToCloud = async (data: AppData) => {
     try {
-        console.log('Saving data to cloud storage API...');
-        const res = await fetch('/api/storage', {
+        const apiUrl = getApiUrl('/api/storage');
+        console.log('Saving data to cloud storage API...', apiUrl);
+        const res = await fetch(apiUrl, {
             method: 'POST',
             body: JSON.stringify(data),
             headers: { 'Content-Type': 'application/json' }
