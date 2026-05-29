@@ -44,7 +44,25 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'tech' | 'scenario'>('all');
-  
+  const [selectedTechCategory, setSelectedTechCategory] = useState<string>('all');
+  const [selectedScenarioStage, setSelectedScenarioStage] = useState<string>('all');
+
+  const techCategories = useMemo(() => {
+    const list = (basicTechThemes || BASIC_TECH_THEMES).map(t => t.focus);
+    return Array.from(new Set(list)).filter(Boolean);
+  }, [basicTechThemes]);
+
+  const scenarioStages = useMemo(() => {
+    const list = (scenarioThemes || SCENARIO_THEMES).map(s => s.stage);
+    return Array.from(new Set(list)).filter(Boolean);
+  }, [scenarioThemes]);
+
+  const handleTabChange = (tab: 'all' | 'tech' | 'scenario') => {
+    setActiveTab(tab);
+    setSelectedTechCategory('all');
+    setSelectedScenarioStage('all');
+  };
+
   if (!isOpen) return null;
 
   const techItems = (basicTechThemes || BASIC_TECH_THEMES).map(t => ({
@@ -52,6 +70,7 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
     key: `tech-${t.code}`,
     code: t.code,
     category: t.focus,
+    subCategory: t.focus,
     theme: t.theme,
     focusLabel: `[基础技术] ${t.focus}`,
     displayTag: '基础技术',
@@ -64,6 +83,7 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
     key: `scenario-${s.code}`,
     code: s.code,
     category: `${s.stage} · ${s.moment}`,
+    subCategory: s.stage,
     theme: s.theme,
     focusLabel: `[比赛场景] ${s.stage} · ${s.moment}`,
     displayTag: '比赛场景',
@@ -82,8 +102,17 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
 
     if (!matchesSearch) return false;
 
-    if (activeTab === 'tech') return item.type === 'tech';
-    if (activeTab === 'scenario') return item.type === 'scenario';
+    if (activeTab === 'tech') {
+      if (item.type !== 'tech') return false;
+      if (selectedTechCategory !== 'all' && item.subCategory !== selectedTechCategory) return false;
+    } else if (activeTab === 'scenario') {
+      if (item.type !== 'scenario') return false;
+      if (selectedScenarioStage !== 'all' && item.subCategory !== selectedScenarioStage) return false;
+    } else {
+      // activeTab === 'all'
+      if (selectedTechCategory !== 'all' && item.type === 'tech' && item.subCategory !== selectedTechCategory) return false;
+      if (selectedScenarioStage !== 'all' && item.type === 'scenario' && item.subCategory !== selectedScenarioStage) return false;
+    }
     return true;
   });
 
@@ -106,7 +135,7 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
         <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between shrink-0">
           <div className="flex gap-1.5 p-1 bg-gray-200/60 rounded-xl w-full sm:w-auto">
             <button
-              onClick={() => setActiveTab('all')}
+              onClick={() => handleTabChange('all')}
               className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'all'
                   ? 'bg-white shadow-sm text-bvb-black'
@@ -116,7 +145,7 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
               全部体系 ({allItems.length})
             </button>
             <button
-              onClick={() => setActiveTab('tech')}
+              onClick={() => handleTabChange('tech')}
               className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'tech'
                   ? 'bg-blue-600 text-white shadow-sm'
@@ -126,7 +155,7 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
               基础技术 ({techItems.length})
             </button>
             <button
-              onClick={() => setActiveTab('scenario')}
+              onClick={() => handleTabChange('scenario')}
               className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
                 activeTab === 'scenario'
                   ? 'bg-green-600 text-white shadow-sm'
@@ -148,6 +177,69 @@ const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
             />
           </div>
         </div>
+
+        {/* 筛选过滤条: 技术分类 & 比赛阶段 */}
+        {((activeTab === 'tech' || activeTab === 'all') && techCategories.length > 0) && (
+          <div className="px-4 py-2 bg-slate-50 border-b border-gray-100 flex flex-wrap gap-1.5 items-center shrink-0">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider mr-1">技术分类:</span>
+            <button
+              type="button"
+              onClick={() => setSelectedTechCategory('all')}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                selectedTechCategory === 'all'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              全部技术
+            </button>
+            {techCategories.map(cat => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedTechCategory(cat)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  selectedTechCategory === cat
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {((activeTab === 'scenario' || activeTab === 'all') && scenarioStages.length > 0) && (
+          <div className="px-4 py-2 bg-slate-50 border-b border-gray-100 flex flex-wrap gap-1.5 items-center shrink-0">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider mr-1">比赛阶段:</span>
+            <button
+              type="button"
+              onClick={() => setSelectedScenarioStage('all')}
+              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                selectedScenarioStage === 'all'
+                  ? 'bg-green-600 text-white shadow-xs'
+                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              全部阶段
+            </button>
+            {scenarioStages.map(stage => (
+              <button
+                key={stage}
+                type="button"
+                onClick={() => setSelectedScenarioStage(stage)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                  selectedScenarioStage === stage
+                    ? 'bg-green-600 text-white shadow-xs'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                }`}
+              >
+                {stage}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-gray-50/50">
           {filteredItems.length === 0 ? (
