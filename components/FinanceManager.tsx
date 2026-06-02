@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, Gauge, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2 } from 'lucide-react';
+import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
@@ -233,10 +233,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 ? (salarySettings.performanceBonusConfig?.renewal?.assistant ?? true)
                 : (salarySettings.performanceBonusConfig?.renewal?.coach ?? true));
             
-            const isEvaluationEnabled = isPerformanceEnabled && (isAssistant 
-                ? (salarySettings.performanceBonusConfig?.evaluation?.assistant ?? true)
-                : (salarySettings.performanceBonusConfig?.evaluation?.coach ?? true));
-            
+
             let calcSessionFees = 0;
             let calcAttendanceReward = 0;
             let calcRenewalReward = 0;
@@ -345,15 +342,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
             
-            // 修改：评分 > 8 分获得配置的评价绩效金额，取消原有的分段奖励
-            const evaluationSalary = (isEvaluationEnabled && evaluation && !isNaN(evaluation.score) && evaluation.score > 8) ? salarySettings.evaluationAllocation : 0;
-            const calcPerformanceReward = evaluationSalary;
+            // 取消对训练、关注、协同的主观评价绩效奖励组块，置为0
+            const calcPerformanceReward = 0;
             
-            const performanceFormula = !isEvaluationEnabled 
-                ? "该项绩效未开启"
-                : (evaluation && !isNaN(evaluation.score))
-                    ? `评分 ${evaluation.score} (评价绩效¥${evaluationSalary})` 
-                    : "未评分";
+            const performanceFormula = "主观评价绩效奖励已取消";
 
             const currentEdit = editPayroll[coach.id] || {};
             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : (isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary));
@@ -361,8 +353,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const attendanceReward = currentEdit.attendanceReward !== undefined ? currentEdit.attendanceReward : (savedRecord ? savedRecord.attendanceReward : calcAttendanceReward);
             const renewalReward = currentEdit.renewalReward !== undefined ? currentEdit.renewalReward : (savedRecord ? savedRecord.renewalReward : calcRenewalReward);
             const performanceReward = currentEdit.performanceReward !== undefined ? currentEdit.performanceReward : (savedRecord ? savedRecord.performanceReward : calcPerformanceReward);
+            const matchSubsidy = currentEdit.matchSubsidy !== undefined ? currentEdit.matchSubsidy : (savedRecord ? (savedRecord.matchSubsidy || 0) : 0);
             
-            const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward;
+            const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward + matchSubsidy;
 
             return {
                 coachId: coach.id,
@@ -374,6 +367,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 attendanceReward,
                 renewalReward,
                 performanceReward,
+                matchSubsidy,
                 totalSalary,
                 performanceFormula,
                 evaluationScore: evaluation?.score || 0,
@@ -419,6 +413,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             attendanceReward: row.attendanceReward, 
             renewalReward: row.renewalReward, 
             performanceReward: row.performanceReward, 
+            matchSubsidy: row.matchSubsidy,
             totalSalary: row.totalSalary, 
             isDisbursed: row.isDisbursed,
             overriddenTeamSizes: teamOverrides
@@ -450,7 +445,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         if (row.isDisbursed && !confirm('该笔薪资已经发放过，确定要再次发放并记录支出吗？')) return;
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
+        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, matchSubsidy: row.matchSubsidy, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
@@ -468,42 +463,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const details = new Set(transactions.map(t => t.details).filter(Boolean));
         return Array.from(details).sort();
     }, [transactions]);
-
-    const handleUpdateEvaluation = (coachId: string, field: 'trainingScore' | 'attentionScore' | 'synergyScore', value: number) => {
-        if (selectedYear === 'all') { alert('请选择具体年份进行评价'); return; }
-        const yearNum = selectedYear as number;
-        const coach = users.find(u => u.id === coachId);
-        if (!coach) return;
-        const evaluations = coach.monthlyEvaluations || [];
-        const existingIdx = evaluations.findIndex(e => e.year === yearNum && e.month === selectedMonth);
-        const nextEvals = [...evaluations];
-        
-        let currentEval = existingIdx >= 0 ? { ...nextEvals[existingIdx] } : { 
-            id: `eval-${Date.now()}`, 
-            year: yearNum, 
-            month: selectedMonth, 
-            score: 0, 
-            trainingScore: 0, 
-            attentionScore: 0, 
-            synergyScore: 0, 
-            comment: '' 
-        };
-        
-        // Ensure values are between 0 and 10, handle NaN
-        const numValue = isNaN(value) ? 0 : value;
-        const safeValue = Math.max(0, Math.min(10, numValue));
-        currentEval = { ...currentEval, [field]: safeValue };
-        
-        // Calculate average
-        const scores = [currentEval.trainingScore || 0, currentEval.attentionScore || 0, currentEval.synergyScore || 0];
-        const avg = scores.reduce((a, b) => a + b, 0) / 3;
-        currentEval.score = parseFloat(avg.toFixed(1)) || 0;
-        
-        if (existingIdx >= 0) nextEvals[existingIdx] = currentEval;
-        else nextEvals.push(currentEval);
-        
-        onUpdateUser({ ...coach, monthlyEvaluations: nextEvals });
-    };
 
     const handleAccountingSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -614,7 +573,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">课时费</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">参训奖</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">续费奖</th>
-                                        <th className="px-2 py-3 md:px-4 md:py-4 text-center">分</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">比赛补贴</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">绩效</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right font-black text-bvb-black">应发总计</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-center">操作</th>
@@ -634,38 +593,15 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} />{sal.teamBreakdown.length > 0 && <span className="text-[7px] md:text-[8px] text-gray-400 italic">按课计费</span>}</div></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.attendanceReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} />{sal.attendanceReward > 0 && <span className="text-[7px] md:text-[8px] text-green-500 font-black uppercase">达标奖</span>}</div></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.renewalReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-center">
-                                                    <div className="flex flex-col gap-1 items-center min-w-[80px] md:min-w-[100px]">
-                                                        <div className="flex items-center gap-1 w-full justify-between">
-                                                            <span className="text-[8px] md:text-[9px] text-gray-400 font-bold">训练:</span>
-                                                            <input 
-                                                                type="number" min="0" max="10" step="1" 
-                                                                className="w-8 md:w-10 p-0.5 text-center border rounded font-black text-[10px] bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" 
-                                                                value={sal.evaluationDetails?.trainingScore || 0} 
-                                                                onChange={e => handleUpdateEvaluation(sal.coachId, 'trainingScore', parseFloat(e.target.value))} 
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-center gap-1 w-full justify-between">
-                                                            <span className="text-[8px] md:text-[9px] text-gray-400 font-bold">关注:</span>
-                                                            <input 
-                                                                type="number" min="0" max="10" step="1" 
-                                                                className="w-8 md:w-10 p-0.5 text-center border rounded font-black text-[10px] bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" 
-                                                                value={sal.evaluationDetails?.attentionScore || 0} 
-                                                                onChange={e => handleUpdateEvaluation(sal.coachId, 'attentionScore', parseFloat(e.target.value))} 
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-center gap-1 w-full justify-between">
-                                                            <span className="text-[8px] md:text-[9px] text-gray-400 font-bold">协同:</span>
-                                                            <input 
-                                                                type="number" min="0" max="10" step="1" 
-                                                                className="w-8 md:w-10 p-0.5 text-center border rounded font-black text-[10px] bg-gray-50 focus:ring-1 focus:ring-bvb-yellow outline-none" 
-                                                                value={sal.evaluationDetails?.synergyScore || 0} 
-                                                                onChange={e => handleUpdateEvaluation(sal.coachId, 'synergyScore', parseFloat(e.target.value))} 
-                                                            />
-                                                        </div>
-                                                        <div className="mt-1 pt-1 border-t border-gray-200 w-full text-center">
-                                                            <span className="text-[10px] font-black text-blue-600">均分: {sal.evaluationScore || 0}</span>
-                                                        </div>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right">
+                                                    <div className="flex flex-col items-end">
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" 
+                                                            value={sal.matchSubsidy || 0} 
+                                                            onChange={(e) => handleUpdatePayrollField(sal.coachId, 'matchSubsidy', e.target.value)} 
+                                                        />
+                                                        {sal.matchSubsidy > 0 && <span className="text-[7px] md:text-[8px] text-orange-600 font-black">赛事补贴</span>}
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.performanceReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'performanceReward', e.target.value)} />{sal.performanceReward > 0 && <span className="text-[7px] md:text-[8px] text-blue-500 font-black">绩效奖</span>}</div></td>
@@ -746,16 +682,16 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                     </div>
                                                                 </div>
                                                             ))}
-                                                            <div className="bg-yellow-50/30 border border-yellow-100/50 p-2.5 rounded-xl space-y-1.5 shadow-sm">
-                                                                <p className="text-[10px] font-black text-gray-800 border-b border-yellow-100 pb-1 flex justify-between">
-                                                                    <span>月度综合绩效</span>
-                                                                    <span className="text-blue-600 font-black">¥{sal.performanceReward}</span>
+                                                            <div className="bg-orange-50/30 border border-orange-100/50 p-2.5 rounded-xl space-y-1.5 shadow-sm">
+                                                                <p className="text-[10px] font-black text-gray-800 border-b border-orange-100 pb-1 flex justify-between">
+                                                                    <span>出差比赛补贴</span>
+                                                                    <span className="text-orange-600 font-black">¥{sal.matchSubsidy || 0}</span>
                                                                 </p>
                                                                 <div className="flex items-start gap-1.5">
-                                                                    <Gauge className="w-2.5 h-2.5 text-yellow-400 mt-0.5" />
+                                                                    <Banknote className="w-2.5 h-2.5 text-orange-400 mt-0.5" />
                                                                     <div>
-                                                                        <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">绩效核算规则:</p>
-                                                                        <p className="text-[9px] font-mono text-gray-600 font-bold">{sal.performanceFormula}</p>
+                                                                        <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">补贴说明:</p>
+                                                                        <p className="text-[9px] font-mono text-gray-600 font-bold">外出比赛差旅/出差补贴 (由管理员手动录入发放)</p>
                                                                     </div>
                                                                 </div>
                                                             </div>

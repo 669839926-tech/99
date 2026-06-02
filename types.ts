@@ -510,6 +510,7 @@ export interface MonthlySalaryRecord {
     attendanceReward: number;
     renewalReward: number;
     performanceReward: number;
+    matchSubsidy?: number;     // 比赛补贴 (可手动输入)
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;
