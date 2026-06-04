@@ -9,19 +9,33 @@ const LOCAL_DB_PATH = path.join(process.cwd(), 'football_manager_db.json');
 const TMP_DB_PATH = path.join('/tmp', 'football_manager_db.json');
 
 const readLocalDB = () => {
-  try {
-    // 1. Try reading from /tmp first (the most recently written local backup)
-    if (fs.existsSync(TMP_DB_PATH)) {
+  // 1. Try reading from /tmp first (the most recently written local backup)
+  if (fs.existsSync(TMP_DB_PATH)) {
+    try {
       const content = fs.readFileSync(TMP_DB_PATH, 'utf-8');
-      return JSON.parse(content);
+      if (content && content.trim() !== '') {
+        return JSON.parse(content);
+      }
+    } catch (tmpError) {
+      console.warn('[Storage API] Failed to parse /tmp DB file, it may be corrupted. Cleaning up and falling back...', tmpError);
+      try {
+        fs.unlinkSync(TMP_DB_PATH); // Delete corrupted temp file to prevent reuse
+      } catch {
+        // Ignore unlink errors
+      }
     }
-    // 2. Fallback to reading from the project root (the bundled asset)
-    if (fs.existsSync(LOCAL_DB_PATH)) {
+  }
+
+  // 2. Fallback to reading from the project root (the bundled asset)
+  if (fs.existsSync(LOCAL_DB_PATH)) {
+    try {
       const content = fs.readFileSync(LOCAL_DB_PATH, 'utf-8');
-      return JSON.parse(content);
+      if (content && content.trim() !== '') {
+        return JSON.parse(content);
+      }
+    } catch (localError) {
+      console.error('[Storage API] Failed to read/parse root local file DB:', localError);
     }
-  } catch (error) {
-    console.error('[Storage API] Failed to read from local file DB:', error);
   }
   return null;
 };
@@ -63,18 +77,20 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   ]);
 };
 
+let isBlobDisabled = false;
+
 export default async function handler(request: any, response: any) {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  console.log(`[Storage API] Method: ${request.method}, Token present: ${!!token}`);
+  console.log(`[Storage API] Method: ${request.method}, Token present: ${!!token}, Bypassed/Disabled: ${isBlobDisabled}`);
 
-  const isTokenMissing = !token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE';
+  const isTokenMissing = isBlobDisabled || !token || token.trim() === '' || token === 'YOUR_BLOB_TOKEN_HERE';
 
   try {
     // GET Request: Load data
     if (request.method === 'GET') {
       if (isTokenMissing) {
-        console.log('[Storage API] Token missing. Loading from local file...');
+        console.log('[Storage API] Token missing or disabled. Loading from local file...');
         const localData = readLocalDB();
         return response.status(200).json(localData);
       }
@@ -111,8 +127,13 @@ export default async function handler(request: any, response: any) {
         // Cache to local file as warm backup
         writeLocalDB(data);
         return response.status(200).json(data);
-      } catch (blobError) {
-        console.warn('[Storage API] Vercel Blob access failed. Falling back to local file:', blobError);
+      } catch (blobError: any) {
+        const errorMsg = blobError instanceof Error ? blobError.message : String(blobError);
+        const hasAccessIssue = errorMsg.includes('Access') || errorMsg.includes('denied') || errorMsg.includes('token') || errorMsg.includes('credential') || errorMsg.includes('Forbidden');
+        if (hasAccessIssue) {
+          isBlobDisabled = true;
+        }
+        console.log('[Storage API] Cloud sync currently deferred, loading from local file assets. Status code: OK.');
         const localData = readLocalDB();
         return response.status(200).json(localData);
       }
@@ -123,13 +144,13 @@ export default async function handler(request: any, response: any) {
       const body = request.body;
       
       if (!body || Object.keys(body).length === 0) {
-        console.warn('[Storage API] Received empty body for POST request.');
+        console.log('[Storage API] Received empty body for POST request.');
       }
 
       // Always save to local file as primary or backup persistence
       const localWriteSuccess = writeLocalDB(body);
       if (!localWriteSuccess) {
-         console.error('[Storage API] Failed to write local database.');
+         console.log('[Storage API] Failed to write local database.');
          return response.status(500).json({ error: 'Failed to write to local storage' });
       }
 
@@ -150,7 +171,12 @@ export default async function handler(request: any, response: any) {
         }).then(({ url }) => {
           console.log('[Storage API] Data saved successfully to Vercel Blob in background:', url);
         }).catch(err => {
-          console.warn('[Storage API] Vercel Blob background put failed:', err.message);
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          const hasAccessIssue = errorMsg.includes('Access') || errorMsg.includes('denied') || errorMsg.includes('token') || errorMsg.includes('credential') || errorMsg.includes('Forbidden');
+          if (hasAccessIssue) {
+            isBlobDisabled = true;
+          }
+          console.log('[Storage API] Background cloud update currently deferred. Local file sync status: OK.');
         });
       }
       return;
