@@ -346,6 +346,7 @@ export interface TrainingSession {
   isReviewRead?: boolean;
   coachFeedback?: string; // Repurposed as Overall Evaluation
   directorReview?: string;
+  planEvaluation?: 'exec_ok' | 'exec_fail' | 'no_plan'; // 教案考核: 'exec_ok' - 100% || 'exec_fail' - 70% || 'no_plan' - 50%
   linkedDesignId?: string;
   coachId?: string; // 创建该计划的教练ID
   assistantCheckInIds?: string[]; // 助教签到ID列表

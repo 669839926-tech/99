@@ -620,6 +620,16 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         }
         return copy;
     });
+
+    const isJuneOrLater = useMemo(() => {
+        if (!localSession.date) return false;
+        const d = new Date(localSession.date);
+        if (isNaN(d.getTime())) return false;
+        return d.getFullYear() > 2026 || (d.getFullYear() === 2026 && d.getMonth() >= 5);
+    }, [localSession.date]);
+
+    const currentPlanEvaluation = localSession.planEvaluation || (localSession.linkedDesignId ? 'exec_ok' : 'no_plan');
+
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -1235,6 +1245,90 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                     <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-5 h-5 mr-2 text-bvb-yellow" /> 总监审核意见 (WSZG Director Review)</h4>
                                     {localSession.submissionStatus === 'Reviewed' && <span className="text-[10px] bg-green-500 text-white px-3 py-1 rounded-full font-black flex items-center gap-1 shadow-sm"><CheckCircle className="w-3 h-3"/> 已阅准</span>}
                                 </div>
+
+                                {/* 教案考核标准 (Drill Plan Evaluation) */}
+                                {isJuneOrLater && (
+                                    <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl space-y-3 shadow-inner">
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="font-black text-xs text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+                                                <FileText className="w-4 h-4 text-slate-500" />
+                                                教案兑付课时费考核 (6月起执行新规)
+                                            </h5>
+                                            <span className="text-[10px] bg-slate-200 text-slate-600 px-2.5 py-0.5 rounded font-black">
+                                                {currentPlanEvaluation === 'exec_ok' ? '100% 兑付' : currentPlanEvaluation === 'exec_fail' ? '70% 兑付' : '50% 兑付'}
+                                            </span>
+                                        </div>
+                                        
+                                        {isDirector ? (
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLocalSession({ ...localSession, planEvaluation: 'exec_ok' })}
+                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                                        currentPlanEvaluation === 'exec_ok'
+                                                            ? 'border-green-500 bg-green-50/50 shadow-sm'
+                                                            : 'border-gray-200 bg-white hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] font-black text-gray-850">1. 有教案并按计划执行</span>
+                                                        <span className="text-[10px] font-mono font-black text-green-600 bg-green-100 px-1.5 rounded">100%</span>
+                                                    </div>
+                                                    <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed font-bold">关联有教案，无审核失败或已按调整执行</p>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLocalSession({ ...localSession, planEvaluation: 'exec_fail' })}
+                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                                        currentPlanEvaluation === 'exec_fail'
+                                                            ? 'border-amber-500 bg-amber-50/50 shadow-sm'
+                                                            : 'border-gray-200 bg-white hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] font-black text-gray-850">2. 审核不通过且未调整</span>
+                                                        <span className="text-[10px] font-mono font-black text-amber-600 bg-amber-100 px-1.5 rounded">70%</span>
+                                                    </div>
+                                                    <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed font-bold">原教案审核驳回，教练员未按要求纠偏</p>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setLocalSession({ ...localSession, planEvaluation: 'no_plan' })}
+                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                                                        currentPlanEvaluation === 'no_plan'
+                                                            ? 'border-rose-500 bg-rose-50/50 shadow-sm'
+                                                            : 'border-gray-200 bg-white hover:border-slate-300'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[11px] font-black text-gray-850">3. 无关联教案</span>
+                                                        <span className="text-[10px] font-mono font-black text-rose-600 bg-rose-100 px-1.5 rounded">50%</span>
+                                                    </div>
+                                                    <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed font-bold">未上传/关联教案，直接进行日常教学与签到</p>
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="p-4 rounded-xl border bg-white">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-xs font-black text-gray-805">当前考核:</span>
+                                                    <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-black ${
+                                                        currentPlanEvaluation === 'exec_ok' ? 'bg-green-100 text-green-700' :
+                                                        currentPlanEvaluation === 'exec_fail' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-rose-100 text-rose-700'
+                                                    }`}>
+                                                        {currentPlanEvaluation === 'exec_ok' ? '有教案，开课良好 100% 兑付本课时费' :
+                                                         currentPlanEvaluation === 'exec_fail' ? '教案审核未过未按要求调整 70% 兑付本课时费' :
+                                                         '无教案开课 50% 兑付本课时费'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-[9px] text-gray-400 mt-2 font-bold leading-normal">
+                                                    考核比例将直接影响月度薪酬核算里的本节课时费用兑付所得。
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {isDirector ? (
                                     <div className="relative">
                                         <textarea className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" placeholder="请对本次训练日志及教练表现进行评价..." value={localSession.directorReview || ''} onChange={e => setLocalSession({...localSession, directorReview: e.target.value})} />

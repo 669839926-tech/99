@@ -261,15 +261,46 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     // 助教新规则: 基础 + 超额 (与主教练一致)
                     const extraPlayers = Math.max(0, teamSize - salarySettings.assistantCoachMinPlayersForCalculation);
                     singleSessionFee = salarySettings.assistantCoachSessionBaseFee + (extraPlayers * salarySettings.assistantCoachIncrementalPlayerFee);
-                    sessionFeeFormula = `(¥${salarySettings.assistantCoachSessionBaseFee} + (${teamSize}人 - ${salarySettings.assistantCoachMinPlayersForCalculation}基准) * ¥${salarySettings.assistantCoachIncrementalPlayerFee}) * ${monthlySessions.length}课 (仅计已打卡课时)`;
                 } else {
                     // 主教练规则: 基础 + 超额
                     const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
                     singleSessionFee = levelConfig.sessionBaseFee + (extraPlayers * salarySettings.incrementalPlayerFee);
-                    sessionFeeFormula = `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee}) * ${monthlySessions.length}课`;
                 }
-                
-                const monthlySessionFeeTotal = monthlySessions.length * singleSessionFee;
+
+                let monthlySessionFeeTotal = 0;
+                const payoutDetails: string[] = [];
+                monthlySessions.forEach(t => {
+                    const { year: sYear, month: sMonth } = parseDateInfo(t.date);
+                    // June: month is 5 (0-indexed)
+                    const isJune2026OrLater = sYear > 2026 || (sYear === 2026 && sMonth >= 5);
+                    let ratio = 1.0;
+                    let label = "100%";
+                    if (isJune2026OrLater) {
+                        const evalVal = t.planEvaluation || (t.linkedDesignId ? 'exec_ok' : 'no_plan');
+                        if (evalVal === 'exec_fail') {
+                            ratio = 0.7;
+                            label = "70%";
+                        } else if (evalVal === 'no_plan') {
+                            ratio = 0.5;
+                            label = "50%";
+                        }
+                    }
+                    monthlySessionFeeTotal += singleSessionFee * ratio;
+                    payoutDetails.push(label);
+                });
+
+                const formulaTerm = isAssistant
+                    ? `(¥${salarySettings.assistantCoachSessionBaseFee} + (${teamSize}人 - ${salarySettings.assistantCoachMinPlayersForCalculation}基准) * ¥${salarySettings.assistantCoachIncrementalPlayerFee})`
+                    : `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee})`;
+
+                if (payoutDetails.length > 0 && (selectedYear > 2026 || (selectedYear === 2026 && selectedMonth >= 5))) {
+                    sessionFeeFormula = `${formulaTerm} * (${payoutDetails.join(' + ')}) [教案考核比例]`;
+                } else {
+                    sessionFeeFormula = `${formulaTerm} * ${monthlySessions.length}课`;
+                    if (isAssistant) {
+                        sessionFeeFormula += " (仅计已打卡课时)";
+                    }
+                }
 
                 let monthlyAttendanceRate = 0;
                 let attendanceReward = 0;
