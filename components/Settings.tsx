@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet } from 'lucide-react';
+import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet, Cloud, Database, RefreshCw, FileJson, AlertTriangle, History, ArrowRight } from 'lucide-react';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -22,6 +22,7 @@ interface SettingsProps {
   onUpdateFinanceCategories: (cats: FinanceCategoryDefinition[]) => void;
   salarySettings: SalarySettings;
   onUpdateSalarySettings: (settings: SalarySettings) => void;
+  onRestoreSystem?: (data: any) => void;
 }
 
 const MODULES: { id: ModuleId; label: string }[] = [
@@ -55,7 +56,8 @@ const Settings: React.FC<SettingsProps> = ({
     onAddUser, onUpdateUser, onDeleteUser, onResetUserPassword, onUpdateUserPassword,
     appLogo, onUpdateAppLogo, teams = [], permissions, onUpdatePermissions,
     financeCategories, onUpdateFinanceCategories,
-    salarySettings, onUpdateSalarySettings
+    salarySettings, onUpdateSalarySettings,
+    onRestoreSystem
 }) => {
   const isDirector = currentUser?.role === 'director';
 
@@ -64,7 +66,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
   const [localSalarySettings, setLocalSalarySettings] = useState<SalarySettings>(JSON.parse(JSON.stringify(salarySettings)));
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'profile_tags' | 'drills' | 'branding'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'profile_tags' | 'drills' | 'branding' | 'cloud'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
   const [activeTagGroup, setActiveTagGroup] = useState<'playerTypes' | 'technicalStrengths' | 'personalityTraits' | 'behavioralTraits' | 'coachingReminders'>('playerTypes');
   const [newItemName, setNewItemName] = useState('');
@@ -284,6 +286,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <button onClick={() => setActiveTab('profile_tags')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'profile_tags' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Zap className="w-4 h-4 mr-2" /> 球员画像标签</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
                 <button onClick={() => setActiveTab('branding')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ImageIcon className="w-4 h-4 mr-2" /> 品牌外观</button>
+                <button onClick={() => setActiveTab('cloud')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'cloud' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Cloud className="w-4 h-4 mr-2" /> 云端备份与数据恢复</button>
               </>
           )}
       </div>
@@ -946,8 +949,225 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
             </div>
         )}
+
+        {activeTab === 'cloud' && isDirector && (
+            <CloudManager onRestoreSystem={onRestoreSystem} />
+        )}
       </div>
     </div>
+  );
+};
+
+const CloudManager: React.FC<{ onRestoreSystem?: (data: any) => void }> = ({ onRestoreSystem }) => {
+  const [backups, setBackups] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isBackupActionPending, setIsBackupActionPending] = useState(false);
+
+  const fetchBackups = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/storage?listBackups=true');
+      const data = await res.json();
+      if (data.success) {
+        setBackups(data.blobs || []);
+      } else {
+        setError(data.message || '获取云端备份列表失败');
+      }
+    } catch (err: any) {
+      setError('无法与云端API建立连接: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchBackups();
+  }, []);
+
+  const handleCreateManualBackup = async () => {
+    setIsBackupActionPending(true);
+    try {
+      const res = await fetch('/api/storage?action=createManualBackup');
+      const data = await res.json();
+      if (data.success) {
+        alert('云端数据快照手动创建成功！备份文件名：' + data.pathname);
+        fetchBackups();
+      } else {
+        alert('创建备份失败: ' + (data.error || '未知原因'));
+      }
+    } catch (err: any) {
+      alert('发生通信错误: ' + err.message);
+    } finally {
+      setIsBackupActionPending(false);
+    }
+  };
+
+  const handleRestore = async (backupUrl: string, uploadedAt: string, size: number) => {
+    const formattedDate = new Date(uploadedAt).toLocaleString('zh-CN');
+    const formattedSize = (size / 1024 / 1024).toFixed(2) + ' MB';
+    
+    const doubleCheck = confirm(
+      `⚠️【数据恢复安全警告】\n\n` +
+      `确认覆盖并重置您当前的整个俱乐部数据库吗？\n\n` +
+      `您选择的备份快照信息:\n` +
+      `- 上传时间: ${formattedDate}\n` +
+      `- 备份大小: ${formattedSize}\n\n` +
+      `确认后，系统将自动从此还原全站数据（包括所有 95 名球员、训练课等）。该操作不可撤销，请确认。`
+    );
+
+    if (!doubleCheck) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/storage?restoreFromUrl=${encodeURIComponent(backupUrl)}`);
+      const data = await res.json();
+      if (data.success) {
+        alert('🎉 数据库结构恢复成功！全站球员成长记录已为您找回恢复完毕！');
+        if (onRestoreSystem) {
+          onRestoreSystem(data.data);
+        }
+      } else {
+        alert('系统还原失败: ' + (data.error || '未知网络问题'));
+      }
+    } catch (err: any) {
+       alert('系统还原执行过程中出现异常: ' + err.message);
+    } finally {
+       setIsLoading(false);
+    }
+  };
+
+  return (
+     <div className="flex-1 p-6 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50 p-4 rounded-xl border border-gray-200/60 gap-4">
+           <div>
+              <h3 className="text-lg font-bold text-gray-800 flex items-center md:text-xl">
+                 <Database className="w-5 h-5 mr-2 text-bvb-yellow" />
+                 云端备份恢复 & 数据库快照管理
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                 一键下载并覆盖当前的球员成长与俱乐部青训系统。可自由选择任何云端的有效数据恢复时间。
+              </p>
+           </div>
+           
+           <div className="flex gap-2 w-full md:w-auto shrink-0">
+              <button 
+                onClick={fetchBackups} 
+                disabled={isLoading}
+                className="flex items-center justify-center px-4 py-2 bg-white text-gray-700 font-bold border rounded-lg shadow-sm hover:bg-gray-50 transition-colors text-sm disabled:opacity-50"
+              >
+                 <RefreshCw className={`w-4 h-4 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+                 刷新备份列表
+              </button>
+              <button 
+                onClick={handleCreateManualBackup} 
+                disabled={isBackupActionPending}
+                className="flex items-center justify-center px-4 py-2 bg-bvb-yellow text-bvb-black font-black rounded-lg shadow-md hover:brightness-105 transition-colors text-sm disabled:opacity-50"
+              >
+                 <FileJson className="w-4 h-4 mr-1.5" />
+                 手动点云备份
+              </button>
+           </div>
+        </div>
+
+        {error && (
+            <div className="p-4 bg-amber-50 border-l-4 border-amber-500 rounded-lg flex items-start text-amber-800 gap-3">
+               <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+               <div>
+                  <h4 className="font-bold text-sm">云端连接受阻或Token配置不完整</h4>
+                  <p className="text-xs mt-1 text-amber-700">{error}</p>
+               </div>
+            </div>
+        )}
+
+        <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+           <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-widery flex items-center gap-1.5">
+                 <History className="w-4 h-4 text-gray-500" />
+                 可用于一键恢复的云端备份节点 ({backups.length})
+              </span>
+              <span className="text-[10px] text-gray-400 font-mono">VERCEL BLOB STORAGE STORAGE_STATUS: ENABLED</span>
+           </div>
+
+           {isLoading && backups.length === 0 ? (
+               <div className="p-12 flex flex-col items-center justify-center text-gray-400 gap-2">
+                  <RefreshCw className="w-8 h-8 animate-spin text-bvb-yellow" />
+                  <span className="text-xs font-bold text-gray-500">正在查询 Vercel Blob 云端存储节点...</span>
+               </div>
+           ) : backups.length === 0 ? (
+               <div className="p-12 flex flex-col items-center justify-center text-gray-400 text-center gap-3">
+                  <Database className="w-12 h-12 text-gray-300" />
+                  <div>
+                     <p className="text-sm font-bold text-gray-700">未发现云端备份</p>
+                     <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
+                        数据尚未上传，或是由于云端账户变动。建议点击右上方“手动点云备份”开始录入云端快照！
+                     </p>
+                  </div>
+               </div>
+           ) : (
+               <div className="divide-y divide-gray-100 max-h-[400px] overflow-y-auto">
+                   {backups.map((blob) => {
+                      const isPrimary = blob.pathname === 'football_manager_db.json';
+                      const isLargeBackup = blob.size > 2000000; // May 29th is 4.25 MB
+
+                      return (
+                         <div key={blob.url} className={`p-4 flex flex-col lg:flex-row justify-between items-start lg:items-center hover:bg-gray-50/50 transition-colors gap-3 ${isPrimary ? 'bg-yellow-50/20' : ''}`}>
+                            <div className="flex items-start gap-3">
+                               <div className="p-2 bg-gray-100 rounded-lg text-gray-500 shrink-0 mt-0.5">
+                                  <FileJson className="w-5 h-5 text-gray-600" />
+                               </div>
+                               <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                     <span className="font-bold text-gray-900 text-sm font-mono break-all max-w-[280px] lg:max-w-none">
+                                        {blob.pathname}
+                                     </span>
+                                     {isPrimary && (
+                                        <span className="bg-green-100 text-green-800 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1">
+                                           <span>● 线上主用主库 (系统当前读取)</span>
+                                        </span>
+                                     )}
+                                     {isLargeBackup && (
+                                        <span className="bg-indigo-100 text-indigo-800 text-[10px] font-black px-2 py-0.5 rounded-full">
+                                           ✨ 历史全量数据备份 (95名球员/122训练课)
+                                        </span>
+                                     )}
+                                  </div>
+                                  <div className="flex items-center gap-4 text-xs text-gray-500 mt-1.5 flex-wrap">
+                                     <span className="flex items-center gap-1">
+                                        <History className="w-3.5 h-3.5 text-gray-400" />
+                                        {new Date(blob.uploadedAt).toLocaleString('zh-CN')}
+                                     </span>
+                                     <span>•</span>
+                                     <span className="font-mono bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded">
+                                        {(blob.size / 1024 / 1024).toFixed(3)} MB
+                                     </span>
+                                  </div>
+                               </div>
+                            </div>
+
+                            <button 
+                              onClick={() => handleRestore(blob.url, blob.uploadedAt, blob.size)}
+                              className="w-full lg:w-auto px-4 py-1.5 bg-bvb-black text-white hover:bg-bvb-yellow hover:text-bvb-black font-black rounded-lg text-xs transition-all shadow-sm shrink-0 flex items-center justify-center gap-1"
+                            >
+                               <span>完全恢复该历史节点</span>
+                               <ArrowRight className="w-3.5 h-3.5" />
+                            </button>
+                         </div>
+                      );
+                   })}
+               </div>
+           )}
+        </div>
+        
+        <div className="p-4 bg-gray-50 rounded-xl border border-gray-200/50 flex items-start gap-3">
+           <AlertTriangle className="w-5 h-5 text-bvb-yellow shrink-0 mt-0.5" />
+           <div className="text-xs text-gray-600 leading-relaxed">
+              <span className="font-black text-gray-800">重要安全操作须知：</span>
+              恢复操作将更新本站所有教练角色可见的数据内容。系统会自动将此次更新推送到云端主服务器。建议您在还原旧数据之前，先进行一次“手动点云备份”来保存当前编辑。
+           </div>
+        </div>
+     </div>
   );
 };
 

@@ -54,6 +54,8 @@ function App() {
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
   const [cloudError, setCloudError] = useState<string | null>(null);
   const isFirstRun = useRef(true);
 
@@ -220,6 +222,8 @@ function App() {
         }
     } finally {
         setIsInitializing(false);
+        const now = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+        setLastSavedTime(now);
     }
   }, []);
 
@@ -234,6 +238,8 @@ function App() {
         isFirstRun.current = false;
         return;
     }
+
+    setHasUnsavedChanges(true);
 
     const timer = setTimeout(async () => {
         setIsSyncing(true);
@@ -273,10 +279,18 @@ function App() {
         }
 
         try {
-            await saveDataToCloud(dataPayload);
-            setCloudError(null);
+            const res = await saveDataToCloud(dataPayload);
+            if (res && res.cloudSynced === false) {
+                setCloudError(`数据已暂存本地。云端备份未就绪 (${res.message || '由于连接限制'})`);
+            } else {
+                setCloudError(null);
+                setHasUnsavedChanges(false);
+                const now = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                setLastSavedTime(now);
+            }
         } catch (e: any) {
             console.warn("Cloud persistence failed, data safely retained locally in file & browser:", e);
+            setCloudError(`云端同步异常: ${e.message || '网络连接有阻碍'}`);
         } finally {
             setIsSyncing(false);
         }
@@ -284,6 +298,103 @@ function App() {
 
     return () => clearTimeout(timer);
   }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, isInitializing]);
+
+  const handleRestoreSystem = (data: any) => {
+    if (!data) return;
+    
+    setIsInitializing(true);
+    
+    if (Array.isArray(data.players)) setPlayers(data.players);
+    if (Array.isArray(data.teams)) setTeams(data.teams);
+    if (Array.isArray(data.trainings)) setTrainings(data.trainings);
+    if (Array.isArray(data.matches)) setMatches(data.matches);
+    if (data.attributeConfig) setAttributeConfig(data.attributeConfig);
+    if (Array.isArray(data.announcements)) setAnnouncements(data.announcements);
+    if (data.appLogo) setAppLogo(data.appLogo);
+    if (Array.isArray(data.users)) setUsers(data.users);
+    if (Array.isArray(data.designs)) setDesigns(data.designs);
+    if (Array.isArray(data.transactions)) setTransactions(data.transactions);
+    if (data.permissions) setPermissions(data.permissions);
+    if (Array.isArray(data.financeCategories)) setFinanceCategories(data.financeCategories);
+    if (Array.isArray(data.techTests)) setTechTests(data.techTests);
+    if (data.salarySettings) setSalarySettings(data.salarySettings);
+    if (Array.isArray(data.periodizationPlans)) setPeriodizationPlans(data.periodizationPlans);
+    if (Array.isArray(data.accountingRecords)) setAccountingRecords(data.accountingRecords);
+    if (Array.isArray(data.tactics)) setTactics(data.tactics);
+    if (Array.isArray(data.pointItemDefinitions)) setPointItemDefinitions(data.pointItemDefinitions);
+    if (Array.isArray(data.playerPointRecords)) setPlayerPointRecords(data.playerPointRecords);
+    if (Array.isArray(data.travelingPlayerIds)) setTravelingPlayerIds(data.travelingPlayerIds);
+    if (Array.isArray(data.philosophyDocs)) setPhilosophyDocs(data.philosophyDocs);
+    if (Array.isArray(data.matchPrinciples)) setMatchPrinciples(data.matchPrinciples);
+    if (Array.isArray(data.basicTechThemes)) setBasicTechThemes(data.basicTechThemes);
+    if (Array.isArray(data.scenarioThemes)) setScenarioThemes(data.scenarioThemes);
+    if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
+
+    setTimeout(() => {
+        setIsInitializing(false);
+        setHasUnsavedChanges(false);
+        const now = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSavedTime(now);
+    }, 100);
+  };
+
+  const handleManualSave = async () => {
+    if (isInitializing || isSyncing) return;
+    setIsSyncing(true);
+    setCloudError(null);
+    
+    const dataPayload = {
+        players,
+        teams,
+        matches,
+        trainings,
+        attributeConfig,
+        announcements,
+        appLogo,
+        users,
+        designs,
+        transactions,
+        permissions,
+        financeCategories,
+        techTests,
+        salarySettings,
+        periodizationPlans,
+        accountingRecords,
+        tactics,
+        pointItemDefinitions,
+        playerPointRecords,
+        travelingPlayerIds,
+        philosophyDocs,
+        matchPrinciples,
+        basicTechThemes,
+        scenarioThemes,
+        philosophyOverview
+    };
+
+    // Mirror in local browser storage synchronously first
+    try {
+        localStorage.setItem('football_manager_local_cache', JSON.stringify(dataPayload));
+    } catch (e) {
+        console.warn('Failed to cache data in browser storage:', e);
+    }
+
+    try {
+        const res = await saveDataToCloud(dataPayload);
+        if (res && res.cloudSynced === false) {
+            setCloudError(`数据已本地保存。但未能上传备份至云端备份（Vercel Blob 暂时未就绪）。`);
+        } else {
+            setCloudError(null);
+            setHasUnsavedChanges(false);
+            const now = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            setLastSavedTime(now);
+        }
+    } catch (e: any) {
+        console.warn("Manual save failed:", e);
+        setCloudError(`手动云端同步失败: ${e.message || '网络超时'}`);
+    } finally {
+        setIsSyncing(false);
+    }
+  };
 
 
   const handleLogin = (user: User) => {
@@ -484,7 +595,7 @@ function App() {
           />
         );
       case 'settings':
-        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} />;
+        return <Settings attributeConfig={attributeConfig} onUpdateConfig={handleUpdateAttributeConfig} currentUser={currentUser} users={users} onAddUser={handleAddUser} onUpdateUser={handleUpdateUser} onDeleteUser={handleDeleteUser} onResetUserPassword={handleResetUserPassword} onUpdateUserPassword={handleUpdateUserPassword} appLogo={appLogo} onUpdateAppLogo={setAppLogo} teams={teams} permissions={permissions} onUpdatePermissions={setPermissions} financeCategories={financeCategories} onUpdateFinanceCategories={setFinanceCategories} salarySettings={salarySettings} onUpdateSalarySettings={setSalarySettings} onRestoreSystem={handleRestoreSystem} />;
       default:
         return null;
     }
@@ -499,6 +610,9 @@ function App() {
       currentUser={currentUser} 
       onLogout={handleLogout} 
       isSyncing={isSyncing} 
+      hasUnsavedChanges={hasUnsavedChanges}
+      lastSavedTime={lastSavedTime}
+      onManualSave={handleManualSave}
       hasNewAnnouncements={announcements.some(a => a.date === new Date().toISOString().split('T')[0])} 
       appLogo={appLogo} 
       permissions={permissions}

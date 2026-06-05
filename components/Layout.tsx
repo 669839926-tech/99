@@ -12,12 +12,30 @@ interface LayoutProps {
   currentUser: UserType | null;
   onLogout: () => void;
   isSyncing?: boolean;
+  hasUnsavedChanges?: boolean;
+  lastSavedTime?: string | null;
+  onManualSave?: () => void;
   hasNewAnnouncements?: boolean;
   appLogo?: string;
   permissions: RolePermissions;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, openedTabs, onCloseTab, currentUser, onLogout, isSyncing = false, hasNewAnnouncements = false, appLogo, permissions }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, 
+  activeTab, 
+  setActiveTab, 
+  openedTabs, 
+  onCloseTab, 
+  currentUser, 
+  onLogout, 
+  isSyncing = false, 
+  hasUnsavedChanges = false,
+  lastSavedTime = null,
+  onManualSave,
+  hasNewAnnouncements = false, 
+  appLogo, 
+  permissions 
+}) => {
   
   const hasViewPermission = (moduleId: ModuleId) => {
       if (!currentUser) return false;
@@ -76,19 +94,43 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, open
             </div>
         )}
 
-        <div className="px-6 py-2 border-b border-gray-800">
-             <div className="flex items-center text-xs text-gray-400">
-                 {isSyncing ? (
-                     <>
-                        <RefreshCw className="w-3 h-3 mr-2 animate-spin text-bvb-yellow" />
-                        <span className="text-bvb-yellow">正在同步到云端...</span>
-                     </>
-                 ) : (
-                     <>
-                        <Cloud className="w-3 h-3 mr-2" />
-                        <span>数据已同步</span>
-                        <Check className="w-3 h-3 ml-1 text-green-500" />
-                     </>
+                <div className="px-6 py-3 border-b border-gray-800 space-y-2">
+             <div className="flex flex-col gap-1.5">
+                 <div className="flex items-center text-xs justify-between">
+                     {isSyncing ? (
+                          <div className="flex items-center text-bvb-yellow">
+                             <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                             <span className="font-semibold text-bvb-yellow">云端正在同步...</span>
+                          </div>
+                      ) : hasUnsavedChanges ? (
+                          <div className="flex items-center text-yellow-500">
+                             <Cloud className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
+                             <span className="font-semibold text-yellow-500">有未同步的修改</span>
+                          </div>
+                      ) : (
+                          <div className="flex items-center text-green-400">
+                             <Cloud className="w-3.5 h-3.5 mr-1.5" />
+                             <span className="font-semibold text-green-400">云端已同步</span>
+                             <Check className="w-3 h-3 ml-1 text-green-400" />
+                          </div>
+                      )}
+                      
+                      {!isSyncing && hasUnsavedChanges && onManualSave && (
+                          <button 
+                              onClick={onManualSave}
+                              className="text-[10px] bg-bvb-yellow text-bvb-black px-2 py-0.5 rounded font-black hover:brightness-110 active:scale-95 transition-all shadow-md animate-bounce"
+                              title="点击立即上传保存数据"
+                          >
+                              立即同步
+                          </button>
+                      )}
+                 </div>
+                 
+                 {lastSavedTime && (
+                     <div className="text-[10px] text-gray-500 flex justify-between items-center bg-gray-900/40 px-2 py-0.5 rounded border border-gray-800/40 font-mono">
+                         <span>上次同步</span>
+                         <span className="font-semibold text-gray-400">{lastSavedTime}</span>
+                     </div>
                  )}
              </div>
         </div>
@@ -139,17 +181,30 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, open
       </aside>
 
       <div className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
-        <header className="md:hidden bg-bvb-black text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0 sticky top-0">
+                <header className="md:hidden bg-bvb-black text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0 sticky top-0">
              <div className="flex items-center">
-                <img src={appLogo} alt="Club Logo" className="w-8 h-8 object-contain mr-2" />
-                <div className="flex flex-col">
-                  <span className="font-bold text-bvb-yellow tracking-wider text-sm leading-tight">顽石之光</span>
-                  <span className="text-[10px] text-gray-400 leading-tight">青训管理</span>
-                </div>
+                 <img src={appLogo} alt="Club Logo" className="w-8 h-8 object-contain mr-2" />
+                 <div className="flex flex-col">
+                   <span className="font-bold text-bvb-yellow tracking-wider text-sm leading-tight">顽石之光</span>
+                   <span className="text-[10px] text-gray-400 leading-tight">青训管理</span>
+                 </div>
              </div>
              <div className="flex items-center gap-3">
-                 {isSyncing ? <RefreshCw className="w-4 h-4 text-bvb-yellow animate-spin" /> : <Cloud className="w-4 h-4 text-gray-500" />}
-                 <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
+                  {isSyncing ? (
+                      <RefreshCw className="w-4 h-4 text-bvb-yellow animate-spin" />
+                  ) : (
+                      <button 
+                        onClick={onManualSave} 
+                        title={hasUnsavedChanges ? "有未同步修改，点击手动同步" : `云端数据已同步 (上次保存: ${lastSavedTime || '未知'})`}
+                        className="relative p-1 rounded hover:bg-gray-800 transition-colors flex items-center"
+                      >
+                        <Cloud className={`w-4 h-4 ${hasUnsavedChanges ? 'text-yellow-500 animate-pulse' : 'text-green-400'}`} />
+                        {hasUnsavedChanges && (
+                          <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                        )}
+                      </button>
+                  )}
+                  <button onClick={onLogout} className="text-gray-400 hover:text-white"><LogOut className="w-5 h-5"/></button>
              </div>
         </header>
 
