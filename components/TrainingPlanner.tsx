@@ -35,6 +35,14 @@ interface ThemeSelectorModalProps {
   scenarioThemes?: ScenarioTheme[];
 }
 
+const getLocalDateString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
   isOpen,
   onClose,
@@ -620,16 +628,6 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         }
         return copy;
     });
-
-    const isJuneOrLater = useMemo(() => {
-        if (!localSession.date) return false;
-        const d = new Date(localSession.date);
-        if (isNaN(d.getTime())) return false;
-        return d.getFullYear() > 2026 || (d.getFullYear() === 2026 && d.getMonth() >= 5);
-    }, [localSession.date]);
-
-    const currentPlanEvaluation = localSession.planEvaluation || (localSession.linkedDesignId ? 'exec_ok' : 'no_plan');
-
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -991,6 +989,196 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                               </div>
                           )}
 
+                          {/* 助教监督管理 */}
+                          <div className="bg-amber-50/50 border border-amber-200/60 p-4 rounded-xl space-y-4">
+                              <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                                  <div className="flex items-center gap-1.5">
+                                      <ShieldCheck className="w-5 h-5 text-amber-600 animate-pulse" />
+                                      <div>
+                                          <div className="text-sm font-black text-gray-800">助教监督考评 (Supervisor Check)</div>
+                                          <p className="text-[10px] text-gray-500">规范监督教练员着装和器材整理情况。</p>
+                                      </div>
+                                  </div>
+                                  {(isAssistant || isDirector) && (
+                                      <label className="relative inline-flex items-center cursor-pointer select-none">
+                                          <input 
+                                              type="checkbox" 
+                                              checked={localSession.assistantSupervision?.evaluated || false} 
+                                              onChange={(e) => {
+                                                  const isChecked = e.target.checked;
+                                                  setLocalSession(prev => ({
+                                                      ...prev,
+                                                      assistantSupervision: {
+                                                          hasWatch: isChecked ? (prev.assistantSupervision?.hasWatch ?? true) : true,
+                                                          hasWhistle: isChecked ? (prev.assistantSupervision?.hasWhistle ?? true) : true,
+                                                          hasUniform: isChecked ? (prev.assistantSupervision?.hasUniform ?? true) : true,
+                                                          equipmentCleared: isChecked ? (prev.assistantSupervision?.equipmentCleared ?? true) : true,
+                                                          evaluated: isChecked
+                                                      }
+                                                  }));
+                                              }}
+                                              className="sr-only peer" 
+                                          />
+                                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                                          <span className="ml-2 text-xs font-bold text-gray-700">{localSession.assistantSupervision?.evaluated ? '已开启' : '未开启'}</span>
+                                      </label>
+                                  )}
+                              </div>
+
+                              {(!localSession.assistantSupervision?.evaluated) ? (
+                                  <div className="text-center py-2 text-xs text-gray-400 italic">
+                                      未进行本堂训练课的助教监督考评。
+                                  </div>
+                              ) : (
+                                  <div className="space-y-3">
+                                      {/* 1. 着装规范 */}
+                                      <div className="bg-white/60 p-3 rounded-xl border border-amber-100/45 space-y-2">
+                                          <div className="text-xs font-black text-gray-700 flex items-center justify-between">
+                                              <span>着装规范评估 (Dress Code & Accessories)</span>
+                                              <span className="text-[10px] text-gray-400 font-normal">未执行一项扣除10元</span>
+                                          </div>
+                                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                              {/* 佩戴手表 */}
+                                              <div className="flex items-center justify-between p-2 bg-gray-50/55 rounded-lg border border-gray-100">
+                                                  <span className="text-xs text-gray-600">佩戴手表</span>
+                                                  <button
+                                                      type="button"
+                                                      disabled={!(isAssistant || isDirector)}
+                                                      onClick={() => {
+                                                          setLocalSession(prev => ({
+                                                              ...prev,
+                                                              assistantSupervision: {
+                                                                  ...prev.assistantSupervision!,
+                                                                  hasWatch: !prev.assistantSupervision?.hasWatch
+                                                              }
+                                                          }));
+                                                      }}
+                                                      className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-colors ${
+                                                          localSession.assistantSupervision?.hasWatch
+                                                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                      }`}
+                                                  >
+                                                      {localSession.assistantSupervision?.hasWatch ? '是 (符合)' : '否 (扣10)'}
+                                                  </button>
+                                              </div>
+
+                                              {/* 佩戴口哨 */}
+                                              <div className="flex items-center justify-between p-2 bg-gray-50/55 rounded-lg border border-gray-100">
+                                                  <span className="text-xs text-gray-600">佩戴口哨</span>
+                                                  <button
+                                                      type="button"
+                                                      disabled={!(isAssistant || isDirector)}
+                                                      onClick={() => {
+                                                          setLocalSession(prev => ({
+                                                              ...prev,
+                                                              assistantSupervision: {
+                                                                  ...prev.assistantSupervision!,
+                                                                  hasWhistle: !prev.assistantSupervision?.hasWhistle
+                                                              }
+                                                          }));
+                                                      }}
+                                                      className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-colors ${
+                                                          localSession.assistantSupervision?.hasWhistle
+                                                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                      }`}
+                                                  >
+                                                      {localSession.assistantSupervision?.hasWhistle ? '是 (符合)' : '否 (扣10)'}
+                                                  </button>
+                                              </div>
+
+                                              {/* 着装规范 */}
+                                              <div className="flex items-center justify-between p-2 bg-gray-50/55 rounded-lg border border-gray-100">
+                                                  <span className="text-xs text-gray-600">合规着装</span>
+                                                  <button
+                                                      type="button"
+                                                      disabled={!(isAssistant || isDirector)}
+                                                      onClick={() => {
+                                                          setLocalSession(prev => ({
+                                                              ...prev,
+                                                              assistantSupervision: {
+                                                                  ...prev.assistantSupervision!,
+                                                                  hasUniform: !prev.assistantSupervision?.hasUniform
+                                                              }
+                                                          }));
+                                                      }}
+                                                      className={`px-2.5 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-colors ${
+                                                          localSession.assistantSupervision?.hasUniform
+                                                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                      }`}
+                                                  >
+                                                      {localSession.assistantSupervision?.hasUniform ? '是 (符合)' : '否 (扣10)'}
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      </div>
+
+                                      {/* 2. 器材回收整理 */}
+                                      <div className="bg-white/60 p-3 rounded-xl border border-amber-100/45 space-y-2">
+                                          <div className="text-xs font-black text-gray-700 flex items-center justify-between">
+                                              <span>器材回收与整理 (Equipment Recovery)</span>
+                                              <span className="text-[10px] text-gray-400 font-normal">未完成扣除10元</span>
+                                          </div>
+                                          <div className="flex items-center justify-between p-2.5 bg-gray-50/55 rounded-lg border border-gray-100">
+                                              <span className="text-xs text-gray-600">器材是否已按要求回收并整理完成</span>
+                                              <button
+                                                  type="button"
+                                                  disabled={!(isAssistant || isDirector)}
+                                                  onClick={() => {
+                                                      setLocalSession(prev => ({
+                                                          ...prev,
+                                                          assistantSupervision: {
+                                                              ...prev.assistantSupervision!,
+                                                              equipmentCleared: !prev.assistantSupervision?.equipmentCleared
+                                                          }
+                                                      }));
+                                                  }}
+                                                  className={`px-3 py-1 rounded text-[10px] font-black uppercase tracking-wider transition-colors ${
+                                                      localSession.assistantSupervision?.equipmentCleared
+                                                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                  }`}
+                                              >
+                                                  {localSession.assistantSupervision?.equipmentCleared ? '已回收 (全)' : '未完成 (扣10)'}
+                                              </button>
+                                          </div>
+                                      </div>
+
+                                      {/* 扣款小计统计 */}
+                                      {(() => {
+                                          let dressDeductions = 0;
+                                          if (!localSession.assistantSupervision?.hasWatch) dressDeductions += 10;
+                                          if (!localSession.assistantSupervision?.hasWhistle) dressDeductions += 10;
+                                          if (!localSession.assistantSupervision?.hasUniform) dressDeductions += 10;
+
+                                          let equipDeductions = 0;
+                                          if (!localSession.assistantSupervision?.equipmentCleared) equipDeductions += 10;
+
+                                          const totalDeductions = dressDeductions + equipDeductions;
+
+                                          return (
+                                              <div className="flex items-center justify-between p-3 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-900">
+                                                  <div className="flex items-center gap-1">
+                                                      <span>考评状态: <span className="text-green-700">已开启监督</span></span>
+                                                      {totalDeductions > 0 && (
+                                                          <span className="text-gray-400 font-normal"> (着装扣除: ¥{dressDeductions}, 器材扣除: ¥{equipDeductions})</span>
+                                                      )}
+                                                  </div>
+                                                  <div className="flex items-center gap-1.5 font-black text-xs">
+                                                      <span>教练薪酬扣除金额:</span>
+                                                      <span className="bg-red-100 border border-red-200 px-2.5 py-1 rounded-full text-red-800">
+                                                          - ¥ {totalDeductions} 元
+                                                      </span>
+                                                  </div>
+                                              </div>
+                                          );
+                                      })()}
+                                  </div>
+                              )}
+                          </div>
+
                           <div>
                               <div className="flex justify-between items-center mb-4">
                                   <h4 className="font-bold text-gray-800 flex items-center"><UserCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 考勤列表</h4>
@@ -1231,7 +1419,12 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                 </div>
                                 {canEdit && localSession.submissionStatus !== 'Reviewed' && (
                                     <button 
-                                        onClick={() => setLocalSession({...localSession, submissionStatus: 'Submitted', isReviewRead: false})}
+                                        onClick={() => setLocalSession({
+                                            ...localSession, 
+                                            submissionStatus: 'Submitted', 
+                                            isReviewRead: false,
+                                            logSubmittedAt: getLocalDateString()
+                                        })}
                                         className="bg-bvb-black text-bvb-yellow font-black px-8 py-3 rounded-2xl hover:brightness-110 shadow-xl transition-all flex items-center gap-2 uppercase italic text-sm tracking-widest"
                                     >
                                         <Send className="w-4 h-4" /> 提交日志进行审核
@@ -1245,112 +1438,104 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                     <h4 className="font-bold text-gray-800 flex items-center"><ShieldCheck className="w-5 h-5 mr-2 text-bvb-yellow" /> 总监审核意见 (WSZG Director Review)</h4>
                                     {localSession.submissionStatus === 'Reviewed' && <span className="text-[10px] bg-green-500 text-white px-3 py-1 rounded-full font-black flex items-center gap-1 shadow-sm"><CheckCircle className="w-3 h-3"/> 已阅准</span>}
                                 </div>
-
-                                {/* 教案考核标准 (Drill Plan Evaluation) */}
-                                {isJuneOrLater && (
-                                    <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl space-y-3 shadow-inner">
-                                        <div className="flex items-center justify-between">
-                                            <h5 className="font-black text-xs text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
-                                                <FileText className="w-4 h-4 text-slate-500" />
-                                                教案兑付课时费考核 (6月起执行新规)
-                                            </h5>
-                                            <span className="text-[10px] bg-slate-200 text-slate-600 px-2.5 py-0.5 rounded font-black">
-                                                {currentPlanEvaluation === 'exec_ok' ? '100% 兑付' : currentPlanEvaluation === 'exec_fail' ? '70% 兑付' : '50% 兑付'}
-                                            </span>
-                                        </div>
-                                        
-                                        {isDirector ? (
+                                {isDirector ? (
+                                    <div className="space-y-4">
+                                        <div className="space-y-2 bg-gray-50/50 p-4 rounded-2xl border border-gray-100">
+                                            <p className="text-xs font-black text-gray-700 flex items-center gap-1/5">
+                                                <ShieldCheck className="w-4 h-4 text-bvb-yellow" /> 教案考核评级 (Lesson Plan Evaluation Criteria)
+                                            </p>
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                                 <button
                                                     type="button"
-                                                    onClick={() => setLocalSession({ ...localSession, planEvaluation: 'exec_ok' })}
-                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                                                        currentPlanEvaluation === 'exec_ok'
-                                                            ? 'border-green-500 bg-green-50/50 shadow-sm'
-                                                            : 'border-gray-200 bg-white hover:border-slate-300'
+                                                    onClick={() => setLocalSession(prev => ({ ...prev, lessonPlanAssessment: 'implemented' }))}
+                                                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                                                        (localSession.lessonPlanAssessment || 'implemented') === 'implemented'
+                                                            ? 'border-green-500 bg-green-50/40 text-green-950 font-semibold ring-2 ring-green-400/10'
+                                                            : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[11px] font-black text-gray-850">1. 有教案并按计划执行</span>
-                                                        <span className="text-[10px] font-mono font-black text-green-600 bg-green-100 px-1.5 rounded">100%</span>
-                                                    </div>
-                                                    <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed font-bold">关联有教案，无审核失败或已按调整执行</p>
+                                                    <span className="text-xs font-black">1. 按教案执行</span>
+                                                    <span className="text-[10px] text-gray-500 mt-1">有教案，并按教案执行</span>
+                                                    <span className="text-xs font-black text-green-600 mt-2">100% 课时费兑付</span>
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setLocalSession({ ...localSession, planEvaluation: 'exec_fail' })}
-                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                                                        currentPlanEvaluation === 'exec_fail'
-                                                            ? 'border-amber-500 bg-amber-50/50 shadow-sm'
-                                                            : 'border-gray-200 bg-white hover:border-slate-300'
+                                                    onClick={() => setLocalSession(prev => ({ ...prev, lessonPlanAssessment: 'not_adjusted' }))}
+                                                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                                                        localSession.lessonPlanAssessment === 'not_adjusted'
+                                                            ? 'border-yellow-500 bg-yellow-50/40 text-yellow-950 font-semibold ring-2 ring-yellow-400/10'
+                                                            : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[11px] font-black text-gray-850">2. 审核不通过且未调整</span>
-                                                        <span className="text-[10px] font-mono font-black text-amber-600 bg-amber-100 px-1.5 rounded">70%</span>
-                                                    </div>
-                                                    <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed font-bold">原教案审核驳回，教练员未按要求纠偏</p>
+                                                    <span className="text-xs font-black">2. 未按要求调整</span>
+                                                    <span className="text-[10px] text-gray-500 mt-1">有教案，审核未过未按要求调整</span>
+                                                    <span className="text-xs font-black text-yellow-600 mt-2">70% 课时费兑付</span>
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => setLocalSession({ ...localSession, planEvaluation: 'no_plan' })}
-                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                                                        currentPlanEvaluation === 'no_plan'
-                                                            ? 'border-rose-500 bg-rose-50/50 shadow-sm'
-                                                            : 'border-gray-200 bg-white hover:border-slate-300'
+                                                    onClick={() => setLocalSession(prev => ({ ...prev, lessonPlanAssessment: 'no_plan' }))}
+                                                    className={`p-3 rounded-xl border text-left flex flex-col justify-between transition-all ${
+                                                        localSession.lessonPlanAssessment === 'no_plan'
+                                                            ? 'border-red-500 bg-red-50/40 text-red-950 font-semibold ring-2 ring-red-400/10'
+                                                            : 'border-gray-200 bg-white hover:bg-gray-50 text-gray-700'
                                                     }`}
                                                 >
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[11px] font-black text-gray-850">3. 无关联教案</span>
-                                                        <span className="text-[10px] font-mono font-black text-rose-600 bg-rose-100 px-1.5 rounded">50%</span>
-                                                    </div>
-                                                    <p className="text-[9px] text-gray-400 mt-1.5 leading-relaxed font-bold">未上传/关联教案，直接进行日常教学与签到</p>
+                                                    <span className="text-xs font-black">3. 无教案</span>
+                                                    <span className="text-[10px] text-gray-500 mt-1">无教案</span>
+                                                    <span className="text-xs font-black text-red-600 mt-2">50% 课时费兑付</span>
                                                 </button>
                                             </div>
-                                        ) : (
-                                            <div className="p-4 rounded-xl border bg-white">
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-xs font-black text-gray-805">当前考核:</span>
-                                                    <span className={`px-2 py-0.5 rounded font-mono text-[10px] font-black ${
-                                                        currentPlanEvaluation === 'exec_ok' ? 'bg-green-100 text-green-700' :
-                                                        currentPlanEvaluation === 'exec_fail' ? 'bg-amber-100 text-amber-700' :
-                                                        'bg-rose-100 text-rose-700'
-                                                    }`}>
-                                                        {currentPlanEvaluation === 'exec_ok' ? '有教案，开课良好 100% 兑付本课时费' :
-                                                         currentPlanEvaluation === 'exec_fail' ? '教案审核未过未按要求调整 70% 兑付本课时费' :
-                                                         '无教案开课 50% 兑付本课时费'}
-                                                    </span>
-                                                </div>
-                                                <p className="text-[9px] text-gray-400 mt-2 font-bold leading-normal">
-                                                    考核比例将直接影响月度薪酬核算里的本节课时费用兑付所得。
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {isDirector ? (
-                                    <div className="relative">
-                                        <textarea className="w-full h-32 p-4 border rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" placeholder="请对本次训练日志及教练表现进行评价..." value={localSession.directorReview || ''} onChange={e => setLocalSession({...localSession, directorReview: e.target.value})} />
-                                        <div className="absolute bottom-3 right-3"><button onClick={() => setLocalSession({...localSession, submissionStatus: 'Reviewed', isReviewRead: false})} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:bg-green-700 flex items-center gap-1.5 disabled:opacity-50 disabled:bg-gray-400 shadow-lg"><CheckCircle className="w-4 h-4" /> {localSession.submissionStatus === 'Reviewed' ? '已完成审核' : '确认并发布意见'}</button></div>
+                                        </div>
+                                        <div className="relative">
+                                            <textarea className="w-full h-32 p-4 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-bvb-yellow outline-none text-sm leading-relaxed bg-gray-50 focus:bg-white transition-all shadow-inner" placeholder="请对本次训练日志及教练表现进行评价..." value={localSession.directorReview || ''} onChange={e => setLocalSession(prev => ({...prev, directorReview: e.target.value}))} />
+                                            <div className="absolute bottom-3 right-3"><button onClick={() => setLocalSession(prev => ({...prev, submissionStatus: 'Reviewed', isReviewRead: false}))} disabled={!(localSession.directorReview || '').trim() || localSession.submissionStatus === 'Reviewed'} className="bg-green-600 text-white text-xs font-black px-5 py-2.5 rounded-xl hover:bg-green-700 flex items-center gap-1.5 disabled:opacity-50 disabled:bg-gray-400 shadow-lg"><CheckCircle className="w-4 h-4" /> {localSession.submissionStatus === 'Reviewed' ? '已完成审核' : '确认并发布意见'}</button></div>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className={`p-6 rounded-3xl border-2 transition-all ${localSession.directorReview ? 'bg-yellow-50/30 border-bvb-yellow/30 shadow-sm' : 'bg-gray-50 border-gray-100 border-dashed'}`}>
-                                        {localSession.directorReview ? (
-                                            <div className="relative">
-                                                <Quote className="absolute -top-3 -left-3 w-10 h-10 text-bvb-yellow/20" />
-                                                <div className="text-sm text-gray-700 leading-relaxed font-bold italic relative z-10 pl-2">
-                                                    {localSession.directorReview}
+                                    <div className="space-y-3">
+                                        <div className={`p-6 rounded-3xl border-2 transition-all ${localSession.directorReview ? 'bg-yellow-50/30 border-bvb-yellow/30 shadow-sm' : 'bg-gray-50 border-gray-100 border-dashed'}`}>
+                                            {localSession.directorReview ? (
+                                                <div className="relative">
+                                                    <Quote className="absolute -top-3 -left-3 w-10 h-10 text-bvb-yellow/20" />
+                                                    <div className="text-sm text-gray-700 leading-relaxed font-bold italic relative z-10 pl-2">
+                                                        {localSession.directorReview}
+                                                    </div>
+                                                    <div className="mt-5 flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-t border-bvb-yellow/10 pt-3">
+                                                        <ShieldCheck className="w-4 h-4 text-bvb-yellow" /> 
+                                                        OFFICIAL WSZG ACADEMY FEEDBACK
+                                                    </div>
                                                 </div>
-                                                <div className="mt-5 flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-t border-bvb-yellow/10 pt-3">
-                                                    <ShieldCheck className="w-4 h-4 text-bvb-yellow" /> 
-                                                    OFFICIAL WSZG ACADEMY FEEDBACK
+                                            ) : (
+                                                <div className="text-sm text-gray-400 italic text-center py-6 flex flex-col items-center gap-3">
+                                                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border border-gray-100 shadow-sm"><RefreshCw className="w-6 h-6 opacity-30 animate-spin" /></div>
+                                                    <span className="font-black uppercase tracking-widest">Waiting for director's review...</span>
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <div className="text-sm text-gray-400 italic text-center py-6 flex flex-col items-center gap-3">
-                                                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border border-gray-100 shadow-sm"><RefreshCw className="w-6 h-6 opacity-30 animate-spin" /></div>
-                                                <span className="font-black uppercase tracking-widest">Waiting for director's review...</span>
+                                            )}
+                                        </div>
+                                        {localSession.submissionStatus === 'Reviewed' && (
+                                            <div className="p-4 bg-gray-50/70 border border-gray-200/65 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-black text-gray-500">教案考核结果:</span>
+                                                    <span className={`text-xs font-bold ${
+                                                        (localSession.lessonPlanAssessment || 'implemented') === 'implemented' ? 'text-green-600' :
+                                                        localSession.lessonPlanAssessment === 'not_adjusted' ? 'text-yellow-600' : 'text-red-500'
+                                                    }`}>
+                                                        {(localSession.lessonPlanAssessment || 'implemented') === 'implemented' ? '有教案，并按教案执行' :
+                                                         localSession.lessonPlanAssessment === 'not_adjusted' ? '有教案，但审核未通过后未按要求进行相应调整' :
+                                                         '无教案'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <span className="text-[10px] text-gray-400 font-extrabold uppercase">课时费兑付比例:</span>
+                                                    <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                                                        (localSession.lessonPlanAssessment || 'implemented') === 'implemented' ? 'bg-green-100 text-green-700 border border-green-200' :
+                                                        localSession.lessonPlanAssessment === 'not_adjusted' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+                                                        'bg-red-100 text-red-700 border border-red-200'
+                                                    }`}>
+                                                        {(localSession.lessonPlanAssessment || 'implemented') === 'implemented' ? '100%' :
+                                                         localSession.lessonPlanAssessment === 'not_adjusted' ? '70%' : '50%'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -2278,7 +2463,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 focusedPlayerIds: formData.focusedPlayerIds,
                 focusedPlayerNotes: {},
                 performanceRatings: { technical: 5, application: 5, focus: 5, discipline: 5 },
-                planReflection: ''
+                planReflection: '',
+                planCreatedAt: getLocalDateString()
             };
             onAddTraining(newSession);
             setShowAddModal(false);
@@ -2321,7 +2507,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               attendance: [], 
               coachFeedback: '', 
               directorReview: '', 
-              focusedPlayerNotes: {} 
+              focusedPlayerNotes: {},
+              planCreatedAt: getLocalDateString()
           };
           onAddTraining(copy);
           setSessionToDuplicate(null);
