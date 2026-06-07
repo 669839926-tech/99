@@ -218,7 +218,30 @@ export default async function handler(request: any, response: any) {
         });
         clearTimeout(timeoutId);
         
-        const data = await res.json();
+        let data = await res.json();
+        
+        // Failsafe: If the local file database on this container actually has MORE players than
+        // the downloaded cloud database, prioritize the local database and synchronize the cloud as well.
+        const localData = readLocalDB();
+        if (localData && Array.isArray(localData.players) && data && Array.isArray(data.players)) {
+          if (localData.players.length > data.players.length) {
+            console.log(`[Storage API] Local DB has MORE players (${localData.players.length}) than downloaded cloud DB (${data.players.length}). Synchronizing cloud with local...`);
+            data = localData;
+            
+            // Sync richer local data to cloud immediately
+            try {
+              await put(DB_FILENAME, JSON.stringify(data), {
+                access: 'public',
+                addRandomSuffix: false,
+                allowOverwrite: true,
+                token
+              });
+              console.log('[Storage API] Failsafe cloud database sync completed successfully.');
+            } catch (syncErr) {
+              console.error('[Storage API] Failsafe cloud database alignment failed:', syncErr);
+            }
+          }
+        }
         
         response.setHeader('Cache-Control', 'no-store, max-age=0');
         // Cache to local file as warm backup

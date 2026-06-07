@@ -373,6 +373,13 @@ export interface TrainingSession {
 }
 
 // --- Periodization Plan Types ---
+export interface WeeklyPlanSubItem {
+    id: string;
+    physicalTheme: string;
+    trainingTheme: string;
+    trainingContent: string;
+}
+
 export interface WeeklyPlan {
     id: string;
     year: number;
@@ -385,6 +392,7 @@ export interface WeeklyPlan {
     trainingGoals: string;
     matchPlan: string;
     remarks: string;
+    subItems?: WeeklyPlanSubItem[];
 }
 
 export interface PeriodizationPlan {

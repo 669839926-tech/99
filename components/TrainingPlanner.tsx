@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -405,8 +405,12 @@ interface WeeklyPlanEditorProps {
 }
 
 const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES }) => {
-    const [localWeek, setLocalWeek] = useState<WeeklyPlan>({ ...week });
+    const [localWeek, setLocalWeek] = useState<WeeklyPlan>(() => ({
+        ...week,
+        subItems: week.subItems ? JSON.parse(JSON.stringify(week.subItems)) : []
+    }));
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
+    const [themeSelectorTarget, setThemeSelectorTarget] = useState<'main' | number>('main');
 
     const handlePaste = () => {
         if (clipboard) {
@@ -418,7 +422,8 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
                 oppositionContent: clipboard.oppositionContent,
                 trainingGoals: clipboard.trainingGoals,
                 matchPlan: clipboard.matchPlan,
-                remarks: clipboard.remarks
+                remarks: clipboard.remarks,
+                subItems: clipboard.subItems ? JSON.parse(JSON.stringify(clipboard.subItems)) : []
             });
         }
     };
@@ -581,30 +586,160 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
                         isOpen={isThemeSelectorOpen}
                         onClose={() => setIsThemeSelectorOpen(false)}
                         onSelect={(focus, content) => {
-                            setLocalWeek(prev => ({
-                                ...prev,
-                                trainingTheme: focus,
-                                trainingContent: content
-                            }));
+                            if (themeSelectorTarget === 'main') {
+                                setLocalWeek(prev => ({
+                                    ...prev,
+                                    trainingTheme: focus,
+                                    trainingContent: content
+                                }));
+                            } else {
+                                const index = themeSelectorTarget;
+                                setLocalWeek(prev => {
+                                    const nextSubs = [...(prev.subItems || [])];
+                                    if (nextSubs[index]) {
+                                        nextSubs[index] = {
+                                            ...nextSubs[index],
+                                            trainingTheme: focus,
+                                            trainingContent: content
+                                        };
+                                    }
+                                    return { ...prev, subItems: nextSubs };
+                                });
+                            }
                         }}
                         basicTechThemes={basicTechThemes}
                         scenarioThemes={scenarioThemes}
                     />
+
+                    {/* 子训练项目部分 */}
+                    <div className="pt-4 border-t border-gray-200/80">
+                        <div className="flex justify-between items-center mb-3">
+                            <label className="block text-xs font-black text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                                <span className="text-bvb-yellow font-black">★</span> 周内新增主题子课 / 多课次项目 ({localWeek.subItems?.length || 0})
+                            </label>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const nextSubs = [...(localWeek.subItems || [])];
+                                    nextSubs.push({
+                                        id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                                        physicalTheme: '',
+                                        trainingTheme: '',
+                                        trainingContent: ''
+                                    });
+                                    setLocalWeek({ ...localWeek, subItems: nextSubs });
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 hover:border-gray-400 text-xs font-bold rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+                            >
+                                <Plus className="w-3.5 h-3.5 text-bvb-yellow" /> 新增主题子课
+                            </button>
+                        </div>
+
+                        {localWeek.subItems && localWeek.subItems.length > 0 ? (
+                            <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+                                {localWeek.subItems.map((sub, index) => (
+                                    <div key={sub.id} className="p-3.5 bg-gray-50 border border-gray-200/80 rounded-xl relative space-y-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const nextSubs = localWeek.subItems?.filter((_, idx) => idx !== index) || [];
+                                                setLocalWeek({ ...localWeek, subItems: nextSubs });
+                                            }}
+                                            className="absolute top-2.5 right-2 text-gray-450 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+                                            title="删除此子项"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+
+                                        <div className="text-xs font-extrabold text-bvb-black flex items-center gap-1.5 pb-1 border-b border-gray-200/40">
+                                            <span className="w-2 h-2 rounded-full bg-bvb-yellow inline-block animate-ping"></span>
+                                            <span>新增子课次 #{index + 1}</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs pt-1">
+                                            <div>
+                                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">💪 子课体能主题</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="灵敏, 速度, 柔韧..."
+                                                    className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none text-gray-800"
+                                                    value={sub.physicalTheme}
+                                                    onChange={e => {
+                                                        const nextSubs = [...(localWeek.subItems || [])];
+                                                        nextSubs[index] = { ...nextSubs[index], physicalTheme: e.target.value };
+                                                        setLocalWeek({ ...localWeek, subItems: nextSubs });
+                                                    }}
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">🎯 子课重点分类 / 训练主题</label>
+                                                <div className="flex gap-1">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="例如：[基础技术] 运控球"
+                                                        className="flex-1 p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none text-gray-800"
+                                                        value={sub.trainingTheme}
+                                                        onChange={e => {
+                                                            const nextSubs = [...(localWeek.subItems || [])];
+                                                            nextSubs[index] = { ...nextSubs[index], trainingTheme: e.target.value };
+                                                            setLocalWeek({ ...localWeek, subItems: nextSubs });
+                                                        }}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setThemeSelectorTarget(index);
+                                                            setIsThemeSelectorOpen(true);
+                                                        }}
+                                                        className="p-2 bg-bvb-yellow hover:brightness-105 hover:scale-95 active:scale-90 rounded-lg shrink-0 flex items-center justify-center transition-all shadow-xs cursor-pointer"
+                                                        title="选择标准主题分类"
+                                                    >
+                                                        <Book className="w-3.5 h-3.5 text-bvb-black" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">📖 子课核心训练内容描述</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="主题课的具体动作难点或要求..."
+                                                    className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none text-gray-805"
+                                                    value={sub.trainingContent}
+                                                    onChange={e => {
+                                                        const nextSubs = [...(localWeek.subItems || [])];
+                                                        nextSubs[index] = { ...nextSubs[index], trainingContent: e.target.value };
+                                                        setLocalWeek({ ...localWeek, subItems: nextSubs });
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center p-5 py-8 border border-dashed border-gray-200 rounded-xl text-gray-400 text-xs bg-gray-50/50">
+                                当前每周仅含一门主主题课（常规青训大纲）。
+                            </div>
+                        )}
+                    </div>
+
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">情景对抗内容</label>
-                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.oppositionContent} onChange={e => setLocalWeek({...localWeek, oppositionContent: e.target.value})} placeholder="如：1v1、2v2" />
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800" value={localWeek.oppositionContent} onChange={e => setLocalWeek({...localWeek, oppositionContent: e.target.value})} placeholder="如：1v1、2v2" />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">训练目标 (当月共享)</label>
-                        <textarea rows={3} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold" value={localWeek.trainingGoals} onChange={e => setLocalWeek({...localWeek, trainingGoals: e.target.value})} placeholder="1. 强化基础... 2. 提高..." />
+                        <textarea rows={3} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold text-gray-800" value={localWeek.trainingGoals} onChange={e => setLocalWeek({...localWeek, trainingGoals: e.target.value})} placeholder="1. 强化基础... 2. 提高..." />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">赛事计划</label>
-                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.matchPlan} onChange={e => setLocalWeek({...localWeek, matchPlan: e.target.value})} placeholder="本周比赛安排..." />
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800" value={localWeek.matchPlan} onChange={e => setLocalWeek({...localWeek, matchPlan: e.target.value})} placeholder="本周比赛安排..." />
                     </div>
                     <div>
                         <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">备注</label>
-                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold" value={localWeek.remarks} onChange={e => setLocalWeek({...localWeek, remarks: e.target.value})} placeholder="如：春节假期" />
+                        <input className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800" value={localWeek.remarks} onChange={e => setLocalWeek({...localWeek, remarks: e.target.value})} placeholder="如：春节假期" />
                     </div>
                 </div>
                 <div className="p-4 bg-gray-50 border-t flex justify-end gap-3">
@@ -1598,6 +1733,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const [activeWeekPlan, setActiveWeekPlan] = useState<WeeklyPlan | null>(null);
   const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>('main');
 
   // 球员关注追踪子模块状态
   const [focusSearchTerm, setFocusSearchTerm] = useState('');
@@ -1699,7 +1835,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const plan = periodizationPlans.find(p => p.teamId === formData.teamId && p.year === weekInfo.year);
       if (!plan) return null;
       const weekPlan = plan.weeks.find(w => w.month === weekInfo.month && w.weekInMonth === weekInfo.weekInMonth);
-      if (weekPlan && (weekPlan.trainingTheme || weekPlan.trainingContent)) {
+      if (weekPlan && (weekPlan.trainingTheme || weekPlan.trainingContent || (weekPlan.subItems && weekPlan.subItems.length > 0))) {
           return {
               ...weekPlan,
               year: weekInfo.year,
@@ -1710,12 +1846,39 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       return null;
   }, [formData.teamId, formData.date, periodizationPlans]);
 
+  // 当日期或球队或模态框状态变化时，默认重置为同步主训练主题
+  useEffect(() => {
+      setSelectedThemeId('main');
+  }, [formData.date, formData.teamId, showAddModal]);
+
+  // 计算当前选择的周期训练重点/主要内容主题课计划
+  const activeSelectedTheme = useMemo(() => {
+      if (!matchedWeekPlanForForm) return null;
+      if (selectedThemeId === 'main') {
+          return {
+              theme: matchedWeekPlanForForm.trainingTheme || '',
+              content: matchedWeekPlanForForm.trainingContent || ''
+          };
+      }
+      const sub = matchedWeekPlanForForm.subItems?.find(s => s.id === selectedThemeId);
+      if (sub) {
+          return {
+              theme: sub.trainingTheme || '',
+              content: sub.trainingContent || ''
+          };
+      }
+      return {
+          theme: matchedWeekPlanForForm.trainingTheme || '',
+          content: matchedWeekPlanForForm.trainingContent || ''
+      };
+  }, [matchedWeekPlanForForm, selectedThemeId]);
+
   // 自动化同步周期训练计划中的重点与主题内容，在未建立周期计划时清除，且取消自主选择
   useEffect(() => {
       if (showAddModal) {
-          if (matchedWeekPlanForForm) {
-              const theme = matchedWeekPlanForForm.trainingTheme || '';
-              const content = matchedWeekPlanForForm.trainingContent || '';
+          if (activeSelectedTheme) {
+              const theme = activeSelectedTheme.theme || '';
+              const content = activeSelectedTheme.content || '';
               const isStandard = trainingFoci.includes(theme);
               setFormData(prev => {
                   if (prev.focus === (isStandard ? theme : 'Custom') &&
@@ -1744,7 +1907,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
               });
           }
       }
-  }, [matchedWeekPlanForForm, showAddModal, trainingFoci]);
+  }, [activeSelectedTheme, showAddModal, trainingFoci]);
 
   // 球员关注追踪视图逻辑
   const focusedPlayersSummary = useMemo(() => {
@@ -2257,10 +2420,42 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-bold text-gray-700">{weekPlan.physicalTheme || '-'}</td>
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-black text-bvb-black bg-yellow-50/20">{weekPlan.trainingTheme || '-'}</td>
-                                            <td className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-gray-600 text-left leading-snug md:leading-relaxed">
-                                                {weekPlan.trainingContent || '-'}
+                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-bold text-gray-700">
+                                                <div>{weekPlan.physicalTheme || '-'}</div>
+                                                {weekPlan.subItems && weekPlan.subItems.length > 0 && (
+                                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
+                                                        {weekPlan.subItems.map((sub, sIdx) => (
+                                                            <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-405 font-medium text-center">
+                                                                {sub.physicalTheme || '-'}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-black text-bvb-black bg-yellow-50/20">
+                                                <div>{weekPlan.trainingTheme || '-'}</div>
+                                                {weekPlan.subItems && weekPlan.subItems.length > 0 && (
+                                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
+                                                        {weekPlan.subItems.map((sub, sIdx) => (
+                                                            <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-500 font-extrabold text-center">
+                                                                {sub.trainingTheme || '-'}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </td>
+                                            <td className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-gray-605 text-left leading-snug md:leading-relaxed">
+                                                <div className="font-bold text-gray-800">{weekPlan.trainingContent || '-'}</div>
+                                                {weekPlan.subItems && weekPlan.subItems.length > 0 && (
+                                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
+                                                        {weekPlan.subItems.map((sub, sIdx) => (
+                                                            <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-500 font-normal flex items-start gap-1">
+                                                                <span className="bg-yellow-50 border border-yellow-200 text-yellow-800 shrink-0 px-1 py-0 rounded text-[8px] font-bold">子课主题 {sIdx + 1}</span>
+                                                                <span className="truncate">{sub.trainingContent || '-'}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-black text-blue-600">{weekPlan.oppositionContent || '-'}</td>
                                             {idx === 0 && (
@@ -2588,7 +2783,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             }));
                             setShowAddModal(true);
                         }} 
-                        className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all"
+                        className="flex items-center justify-center p-2.5 md:px-5 md:py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl shadow-lg hover:brightness-105 transition-all cursor-pointer"
                     >
                         <Plus className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">新建课次</span>
                     </button>
@@ -2651,7 +2846,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         )}
                     </div>
                  </div>
-             </div>
+              </div>
              )}
         </div>
 
@@ -2694,28 +2889,100 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3 shadow-xs animate-in slide-in-from-top-2 duration-200 text-sm">
                       <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs uppercase tracking-wider">
                         <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        <span>📅 周期训练计划已匹配并强制同步 (第 {matchedWeekPlanForForm.month}月 第{matchedWeekPlanForForm.weekInMonth}周)</span>
+                        <span>📅 周期性训练核心课次对齐 (第 {matchedWeekPlanForForm.month}月 第{matchedWeekPlanForForm.weekInMonth}周)</span>
                       </div>
                       
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="bg-white p-3 rounded-lg border border-emerald-100 flex flex-col justify-between shadow-xs">
-                          <div>
-                            <span className="text-gray-400 block text-[10px] font-black uppercase tracking-wider mb-1">重点分类 (强制同步)</span>
-                            <span className="font-extrabold text-gray-800 text-xs md:text-sm bg-gray-100/50 px-2.5 py-1.5 rounded border border-gray-200 block truncate">
-                              {matchedWeekPlanForForm.trainingTheme || '无重点'}
-                            </span>
+                      {/* 如果有子训练项目，显示主题选择器 */}
+                      {matchedWeekPlanForForm.subItems && matchedWeekPlanForForm.subItems.length > 0 ? (
+                        <div className="space-y-2 mt-1">
+                          <label className="block text-[11px] font-black text-gray-500 uppercase">
+                            🎯 选择本次训练要对齐的课次安排 (双击或点选即可)：
+                          </label>
+                          <div className="grid grid-cols-1 gap-2">
+                            {/* 主大纲课 option */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedThemeId('main')}
+                              className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-start gap-2.5 ${
+                                selectedThemeId === 'main'
+                                  ? 'border-emerald-500 bg-emerald-100/50 ring-1 ring-emerald-500 shadow-sm'
+                                  : 'border-gray-200 bg-white hover:bg-gray-100/50'
+                              }`}
+                            >
+                              <div className="mt-0.5 shrink-0">
+                                <input
+                                  type="radio"
+                                  checked={selectedThemeId === 'main'}
+                                  onChange={() => setSelectedThemeId('main')}
+                                  className="text-emerald-600 focus:ring-emerald-500"
+                                />
+                              </div>
+                              <div className="text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 rounded text-[8px] font-black bg-bvb-black text-white uppercase">
+                                    主大纲课
+                                  </span>
+                                  <span className="font-extrabold text-gray-800">{matchedWeekPlanForForm.trainingTheme || '无分类'}</span>
+                                </div>
+                                <p className="text-gray-500 font-bold mt-1 text-[11px] leading-snug">{matchedWeekPlanForForm.trainingContent || '无特定主题描述'}</p>
+                              </div>
+                            </button>
+
+                            {/* 子项课 options */}
+                            {matchedWeekPlanForForm.subItems.map((sub, sIdx) => (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => setSelectedThemeId(sub.id)}
+                                className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-start gap-2.5 ${
+                                  selectedThemeId === sub.id
+                                    ? 'border-emerald-500 bg-emerald-100/50 ring-1 ring-emerald-500 shadow-sm'
+                                    : 'border-gray-200 bg-white hover:bg-gray-100/50'
+                                }`}
+                              >
+                                <div className="mt-0.5 shrink-0">
+                                  <input
+                                    type="radio"
+                                    checked={selectedThemeId === sub.id}
+                                    onChange={() => setSelectedThemeId(sub.id)}
+                                    className="text-emerald-600 focus:ring-emerald-500"
+                                  />
+                                </div>
+                                <div className="text-xs">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-yellow-100 text-yellow-850 border border-yellow-250 uppercase">
+                                      新增子课次 #{sIdx + 1}
+                                    </span>
+                                    <span className="font-extrabold text-gray-800">{sub.trainingTheme || '无分类'}</span>
+                                  </div>
+                                  <p className="text-gray-500 font-bold mt-1 text-[11px] leading-snug">{sub.trainingContent || '无主题描述'}</p>
+                                </div>
+                              </button>
+                            ))}
                           </div>
                         </div>
-                        
-                        <div className="bg-white p-3 rounded-lg border border-emerald-100 flex flex-col justify-between shadow-xs">
-                          <div>
-                            <span className="text-gray-400 block text-[10px] font-black uppercase tracking-wider mb-1">主要主题 (强制同步)</span>
-                            <span className="font-extrabold text-gray-805 text-xs md:text-sm line-clamp-2" title={matchedWeekPlanForForm.trainingContent}>
-                              {matchedWeekPlanForForm.trainingContent || '无特定主题'}
-                            </span>
+                      ) : (
+                        // 没有任何子项目时的简洁同步展示
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="bg-white p-3 rounded-lg border border-emerald-100 flex flex-col justify-between shadow-xs">
+                            <div>
+                              <span className="text-gray-400 block text-[10px] font-black uppercase tracking-wider mb-1">重点分类 (强制同步)</span>
+                              <span className="font-extrabold text-gray-800 text-xs md:text-sm bg-gray-100/50 px-2.5 py-1.5 rounded border border-gray-200 block truncate">
+                                {matchedWeekPlanForForm.trainingTheme || '无重点'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-3 rounded-lg border border-emerald-100 flex flex-col justify-between shadow-xs">
+                            <div>
+                              <span className="text-gray-400 block text-[10px] font-black uppercase tracking-wider mb-1">主要主题 (强制同步)</span>
+                              <span className="font-extrabold text-gray-805 text-xs md:text-sm line-clamp-2" title={matchedWeekPlanForForm.trainingContent}>
+                                {matchedWeekPlanForForm.trainingContent || '无特定主题'}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                       {(matchedWeekPlanForForm.physicalTheme || matchedWeekPlanForForm.oppositionContent || matchedWeekPlanForForm.trainingGoals) && (
                         <div className="text-[10px] text-emerald-800 font-bold space-y-1 border-t border-emerald-200/50 pt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
