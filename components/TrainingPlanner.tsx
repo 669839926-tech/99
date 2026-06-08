@@ -2360,8 +2360,86 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         alert(`内容已成功粘贴到 ${month}月 第${weekNum}周`);
     };
 
+    const selectedTeamName = teams.find(t => t.id === currentPeriodization.teamId)?.name || '未选定梯队/球队';
+    const quarters = [
+        { key: 'Q1', label: '第一季度 (Q1)', monthsLabel: '1月 - 3月' },
+        { key: 'Q2', label: '第二季度 (Q2)', monthsLabel: '4月 - 6月' },
+        { key: 'Q3', label: '第三季度 (Q3)', monthsLabel: '7月 - 9月' },
+        { key: 'Q4', label: '第四季度 (Q4)', monthsLabel: '10月 - 12月' },
+    ];
+
     return (
         <div className="space-y-4 animate-in fade-in duration-500">
+            {/* 季度周期训练计划目标考核模块 */}
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                    <div>
+                        <h4 className="font-black text-gray-800 text-sm flex items-center gap-1.5">
+                            <Target className="w-4 h-4 text-bvb-yellow shrink-0" /> 
+                            <span>【{selectedTeamName}】季度周期计划目标录入考核</span>
+                        </h4>
+                        <p className="text-[10px] text-gray-405 font-bold uppercase mt-0.5 leading-normal">
+                            季末考核规则：如录入周期计划目标，则季末月发放100%基本工资；如未录入，则扣当月基础工资20%。扣薪在季末月（3、6、9、12月）底发放工资时执行。
+                        </p>
+                    </div>
+                    {isDirector ? (
+                        <span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black border border-yellow-200 shrink-0 self-start md:self-auto">
+                            👑 青训总监考核权限已启用
+                        </span>
+                    ) : (
+                        <span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold border shrink-0 self-start md:self-auto">
+                            👁️ 季度考核公示
+                        </span>
+                    )}
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    {quarters.map((q) => {
+                        const status = currentPeriodization.quarterAssessments?.[q.key] || 'entered';
+                        return (
+                            <div key={q.key} className={`border rounded-xl p-3 flex flex-col justify-between gap-2 transition-all ${status === 'not_entered' ? 'bg-red-50/20 border-red-100/80' : 'bg-green-50/10 border-green-100/60'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-extrabold text-xs text-gray-800">{q.label}</p>
+                                        <p className="text-[9px] text-gray-400 font-mono font-bold leading-none mt-0.5">{q.monthsLabel}</p>
+                                    </div>
+                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border leading-none ${status === 'not_entered' ? 'bg-red-100 text-red-800 border-red-200 animate-pulse' : 'bg-green-100 text-green-800 border-green-200'}`}>
+                                        {status === 'not_entered' ? '🔴 未录入 (扣20%)' : '🟢 已录入 (正常)'}
+                                    </span>
+                                </div>
+                                
+                                {isDirector && (
+                                    <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = { ...(currentPeriodization.quarterAssessments || {}) };
+                                                next[q.key] = 'entered';
+                                                onUpdatePeriodization?.({ ...currentPeriodization, quarterAssessments: next });
+                                            }}
+                                            className={`flex-1 text-[9px] py-1 font-black rounded border transition-all ${status === 'entered' ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                        >
+                                            已录入
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = { ...(currentPeriodization.quarterAssessments || {}) };
+                                                next[q.key] = 'not_entered';
+                                                onUpdatePeriodization?.({ ...currentPeriodization, quarterAssessments: next });
+                                            }}
+                                            className={`flex-1 text-[9px] py-1 font-black rounded border transition-all ${status === 'not_entered' ? 'bg-red-600 text-white border-red-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                        >
+                                            未录入
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto relative no-scrollbar">
                     <table className="w-full text-center border-collapse table-fixed min-w-[850px] md:min-w-[1200px]">

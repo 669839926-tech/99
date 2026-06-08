@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord } from '../types';
-import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { FinanceTransaction, FinanceCategoryDefinition, User, TrainingSession, Player, SalarySettings, Team, MonthlySalaryRecord, AccountingRecord, PeriodizationPlan } from '../types';
+import { Wallet, Plus, Trash2, FileText, Download, Calculator, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight, FileSpreadsheet, Upload, FileDown, CheckSquare, RefreshCw, Star, X, BarChart3, Save, Banknote, UserCheck, PieChart as PieChartIcon, AlignLeft, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, Clock, CheckCircle2, ShieldCheck, AlertCircle, Target } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, Cell, PieChart, Pie } from 'recharts';
 
 interface FinanceManagerProps {
@@ -22,6 +22,7 @@ interface FinanceManagerProps {
     onAddAccountingRecord: (r: AccountingRecord) => void;
     onUpdateAccountingRecord: (r: AccountingRecord) => void;
     onDeleteAccountingRecord: (id: string) => void;
+    periodizationPlans?: PeriodizationPlan[];
 }
 
 const parseDateInfo = (dateStr: string) => {
@@ -51,7 +52,8 @@ const getDaysBetween = (dateStr1: string, dateStr2: string): number => {
 const FinanceManager: React.FC<FinanceManagerProps> = ({ 
     transactions, financeCategories, onAddTransaction, onBulkAddTransactions, onDeleteTransaction, onBulkDeleteTransactions,
     users, players, teams, trainings, salarySettings, onUpdateUser,
-    accountingRecords, onAddAccountingRecord, onUpdateAccountingRecord, onDeleteAccountingRecord
+    accountingRecords, onAddAccountingRecord, onUpdateAccountingRecord, onDeleteAccountingRecord,
+    periodizationPlans = []
 }) => {
     const [viewMode, setViewMode] = useState<'journal' | 'summary' | 'salary' | 'accounting'>('summary');
     const [showAddModal, setShowAddModal] = useState(false);
@@ -227,6 +229,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
         const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
+        const quarterIndex = Math.floor(selectedMonth / 3);
+        const quarterKey = `Q${quarterIndex + 1}`;
 
         return staff.map(coach => {
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
@@ -437,7 +441,24 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
 
             const currentEdit = editPayroll[coach.id] || {};
             const baseSalaryDefault = isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary;
-             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : Math.max(0, baseSalaryDefault - totalSupervisorDeductions - totalLogAuditDeductions));
+
+            // Check if there is a periodization plan assessment of "not_entered" for any of the coach's teams in the current quarter
+            let periodizationDeduction = 0;
+            let periodizationDetailsString = "";
+            
+            if (isDistributionMonth && coachTeams.length > 0) {
+                const teamsWithNoPlan = coachTeams.filter(teamId => {
+                    const plan = periodizationPlans?.find(p => p.teamId === teamId && p.year === effectiveYear);
+                    return plan?.quarterAssessments?.[quarterKey] === 'not_entered';
+                });
+                if (teamsWithNoPlan.length > 0) {
+                    const teamNames = teamsWithNoPlan.map(tid => teams.find(t => t.id === tid)?.name || '未知梯队').join('、');
+                    periodizationDeduction = baseSalaryDefault * 0.2;
+                    periodizationDetailsString = `因负责的梯队 [${teamNames}] 在季度周期计划目标考核中被评定为“未录入”，按规定扣除20%基础工资 (${selectedMonth + 1}月季末执行)`;
+                }
+            }
+
+             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : Math.max(0, baseSalaryDefault - totalSupervisorDeductions - totalLogAuditDeductions - periodizationDeduction));
             const sessionFees = currentEdit.sessionFees !== undefined ? currentEdit.sessionFees : (savedRecord ? savedRecord.sessionFees : calcSessionFees);
             const attendanceReward = currentEdit.attendanceReward !== undefined ? currentEdit.attendanceReward : (savedRecord ? savedRecord.attendanceReward : calcAttendanceReward);
             const renewalReward = currentEdit.renewalReward !== undefined ? currentEdit.renewalReward : (savedRecord ? savedRecord.renewalReward : calcRenewalReward);
@@ -468,11 +489,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 supervisorDeductionSessionsCount,
                 totalLogAuditDeductions,
                 logAuditSessionsCount,
+                periodizationDeduction,
+                periodizationDetailsString,
                 isModified: Object.keys(currentEdit).length > 0 || Object.keys(overriddenTeamSizes).some(k => k.startsWith(`${selectedYear}-${selectedMonth}-${coach.id}-`)),
                 teamBreakdown
             };
         });
-    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams, overriddenTeamSizes]);
+    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams, overriddenTeamSizes, periodizationPlans]);
 
     const handleUpdatePayrollField = (coachId: string, field: keyof MonthlySalaryRecord, value: string) => {
         const numVal = parseFloat(value) || 0;
@@ -832,6 +855,38 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                                         <span>
                                                                                             考核优秀！本月训练课日志均按时在当天完成录入，无任何逾期扣款。
                                                                                         </span>
+                                                                                    )}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {(sal.role === 'coach' || sal.role === 'assistant_coach') && (
+                                                                <div className={`bg-amber-50/20 border ${sal.periodizationDeduction > 0 ? 'border-amber-250 bg-amber-50/30' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
+                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
+                                                                        <span className="flex items-center gap-1">
+                                                                            <Target className={`w-3.5 h-3.5 ${sal.periodizationDeduction > 0 ? 'text-amber-500 animate-pulse' : 'text-green-500'}`} />
+                                                                            季度周期训练计划目标考核 ({[2, 5, 8, 11].includes(selectedMonth) ? '当前季末考评' : '非季末月份'})
+                                                                        </span>
+                                                                        <span className={`font-black text-xs ${sal.periodizationDeduction > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                                                                            {sal.periodizationDeduction > 0 ? `- ¥${sal.periodizationDeduction}` : '正常'}
+                                                                        </span>
+                                                                    </p>
+                                                                    <div className="space-y-1">
+                                                                        <div className="flex items-start gap-1.5">
+                                                                            <AlertCircle className={`w-2.5 h-2.5 mt-0.5 ${sal.periodizationDeduction > 0 ? 'text-amber-500' : 'text-green-500'}`} />
+                                                                            <div>
+                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">考核结果与扣罚依据:</p>
+                                                                                <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                    {![2, 5, 8, 11].includes(selectedMonth) ? (
+                                                                                        <span>当前月份非季末考核月（3、6、9、12月为季末考核月），周期计划由总监考核，此其不进行基础工资扣除。</span>
+                                                                                    ) : sal.periodizationDeduction > 0 ? (
+                                                                                        <span className="text-amber-800 font-medium">
+                                                                                            {sal.periodizationDetailsString}。扣除当月基础工资20%。
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span>本季度所管理团队的季度计划制定考评已通过，已确认录入计划目标。本季末月底正常发放基本工资。</span>
                                                                                     )}
                                                                                 </p>
                                                                             </div>

@@ -189,6 +189,7 @@ export interface Player {
   personalityTraits?: string[];
   behavioralTraits?: string[];
   coachingReminders?: string[];
+  renewalLevel?: 1 | 2 | 3 | 4;
 }
 
 export type MatchEventType = 'Goal' | 'Assist' | 'YellowCard' | 'RedCard' | 'Sub' | 'OwnGoal';
@@ -400,6 +401,7 @@ export interface PeriodizationPlan {
     teamId: string;
     year: number;
     weeks: WeeklyPlan[];
+    quarterAssessments?: Record<string, 'entered' | 'not_entered'>;
 }
 
 export interface FinanceCategoryDefinition {

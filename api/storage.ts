@@ -191,7 +191,7 @@ export default async function handler(request: any, response: any) {
 
       try {
         console.log('[Storage API] Listing blobs with prefix to get latest database:', DB_PREFIX);
-        const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 4000);
+        const { blobs } = await withTimeout(list({ prefix: DB_PREFIX, token }), 10000);
         
         if (blobs.length === 0) {
           console.log('[Storage API] No blobs found. Loading from local file...');
@@ -281,7 +281,7 @@ export default async function handler(request: any, response: any) {
       if (!isTokenMissing) {
         try {
           console.log('[Storage API] Saving data to Vercel blob storage synchronously with a timeout...');
-          // Await the cloud upload with a 5-second timeout to prevent connection hangs, but ensure it completes
+          // Await the cloud upload with a 25-second timeout to prevent connection hangs, but ensure it completes
           const result = await withTimeout(
             put(DB_FILENAME, JSON.stringify(body), {
               access: 'public',
@@ -289,7 +289,7 @@ export default async function handler(request: any, response: any) {
               allowOverwrite: true,   
               token,
             }),
-            5000
+            25000
           );
           cloudUrl = result.url;
           cloudSynced = true;
@@ -301,7 +301,7 @@ export default async function handler(request: any, response: any) {
             isBlobDisabled = true;
           }
           cloudErrorMsg = errorMsg;
-          console.error('[Storage API] Cloud sync failed or timed out:', errorMsg);
+          console.log('[Storage API] Cloud sync notice: backup sync postponed (non-blocking). Reason:', errorMsg);
         }
       }
 

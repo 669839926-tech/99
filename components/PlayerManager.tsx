@@ -498,6 +498,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 
     const isCoach = currentUser?.role === 'coach';
     const isDirector = currentUser?.role === 'director';
+    const canSeeRenewalLevel = currentUser?.role === 'director' || currentUser?.role === 'assistant_coach';
 
     useEffect(() => {
         if (!isEditing && player && editedPlayer) {
@@ -1325,6 +1326,99 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                            {renderTagSelector('指导提醒', 'coachingReminders', 'coachingReminders')}
                         </div>
                       </div>
+
+                      {/* 球员收费/续费等级板块 */}
+                      {canSeeRenewalLevel && (
+                          <div className="border-t border-gray-100 pt-5 mt-4 space-y-3">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block flex items-center gap-1.5">
+                                  <CreditCard className="w-3.5 h-3.5 text-bvb-yellow" />
+                                  账户收费与续费等级设定
+                              </label>
+                              <div className="bg-gray-50 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border border-gray-100">
+                                  <div className="space-y-1 flex-1">
+                                      <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold text-gray-400">实到训练课时:</span>
+                                          <span className="bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full text-xs font-black font-mono">
+                                              {trainings.filter(t => t.attendance?.some(att => att.playerId === editedPlayer.id && att.status === 'Present')).length} 节
+                                          </span>
+                                          <span className="text-xs text-gray-400"> (自动匹配标准: 等级一: &lt;32 | 等级二: ≥32 | 等级三: ≥80) </span>
+                                      </div>
+                                      <div className="flex items-center gap-3 mt-1">
+                                          <span className="text-xs font-bold text-gray-400">核定收费等级:</span>
+                                          {(() => {
+                                              const attended = trainings.filter(t => t.attendance?.some(att => att.playerId === editedPlayer.id && att.status === 'Present')).length;
+                                              let autoL: 1 | 2 | 3 = 1;
+                                              if (attended < 32) autoL = 1;
+                                              else if (attended >= 32 && attended < 80) autoL = 2;
+                                              else autoL = 3;
+
+                                              const finalL = editedPlayer.renewalLevel || autoL;
+                                              const isOverridden = !!editedPlayer.renewalLevel;
+
+                                              const labels: Record<1 | 2 | 3 | 4, string> = {
+                                                  1: '收费等级一 (32节以下)',
+                                                  2: '收费等级二 (32节含以上)',
+                                                  3: '收费等级三 (80节含以上)',
+                                                  4: '收费等级四 (特殊自定义等级)'
+                                              };
+                                              const styles: Record<1 | 2 | 3 | 4, string> = {
+                                                  1: 'bg-blue-50 text-blue-700 border-blue-200',
+                                                  2: 'bg-green-50 text-green-700 border-green-200',
+                                                  3: 'bg-purple-100 text-purple-700 border-purple-200',
+                                                  4: 'bg-orange-50 text-orange-700 border-orange-200'
+                                              };
+
+                                              return (
+                                                  <div className="flex items-center gap-2">
+                                                      <span className={`px-2.5 py-1 rounded-lg text-xs font-black border uppercase tracking-wider ${styles[finalL]}`}>
+                                                          {labels[finalL]}
+                                                      </span>
+                                                      {isOverridden && (
+                                                          <span className="text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100 font-bold">
+                                                              总监手动锁定
+                                                          </span>
+                                                      )}
+                                                  </div>
+                                              );
+                                          })()}
+                                      </div>
+                                  </div>
+                                  <div className="shrink-0 flex flex-col gap-2 w-full md:w-auto">
+                                      {isEditing && isDirector ? (
+                                          <div className="space-y-1.5">
+                                              <span className="text-[9px] font-black uppercase text-gray-400 tracking-wider block">修改级别设定 (仅限总监)</span>
+                                              <div className="flex flex-wrap gap-1">
+                                                  {[
+                                                      { val: undefined, label: '自动计算' },
+                                                      { val: 1, label: '等级一' },
+                                                      { val: 2, label: '等级二' },
+                                                      { val: 3, label: '等级三' },
+                                                      { val: 4, label: '等级四' }
+                                                  ].map(opt => {
+                                                      const isSelected = editedPlayer.renewalLevel === opt.val;
+                                                      return (
+                                                          <button
+                                                              key={opt.label}
+                                                              onClick={() => setEditedPlayer({ ...editedPlayer, renewalLevel: opt.val as any })}
+                                                              className={`px-2 py-1 rounded text-xs font-black transition-all ${isSelected ? 'bg-bvb-black text-bvb-yellow border border-bvb-black shadow-sm' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-100'}`}
+                                                          >
+                                                              {opt.label}
+                                                          </button>
+                                                      );
+                                                  })}
+                                              </div>
+                                          </div>
+                                      ) : (
+                                          !isEditing && (
+                                              <p className="text-[10px] text-gray-400 italic text-right">
+                                                  {isDirector ? '点击右上角“编辑”按钮即可进行等级覆盖修改' : '等级一: <32课 | 等级二: ≥32课 | 等级三: ≥80课'}
+                                              </p>
+                                          )
+                                      )}
+                                  </div>
+                              </div>
+                          </div>
+                      )}
                    </div>
                <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2"><h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name="能力" dataKey="A" stroke="#000000" strokeWidth={3} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div></div></div>)}
              {activeTab === 'technical' && renderCategoryContent('technical')}

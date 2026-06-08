@@ -33,6 +33,38 @@ const parseLocalDate = (dateStr: string) => {
     return new Date(y, m - 1, d);
 };
 
+const getPlayerRenewalLevelDetails = (player: Player, trainings: TrainingSession[]) => {
+    const attendedCount = (trainings || []).filter(t => t.attendance?.some(att => att.playerId === player.id && att.status === 'Present')).length;
+    let autoLevel: 1 | 2 | 3 = 1;
+    if (attendedCount < 32) {
+        autoLevel = 1;
+    } else if (attendedCount >= 32 && attendedCount < 80) {
+        autoLevel = 2;
+    } else {
+        autoLevel = 3;
+    }
+    const currentLevel = player.renewalLevel || autoLevel;
+    const levelLabels: Record<1 | 2 | 3 | 4, string> = {
+        1: '等级一',
+        2: '等级二',
+        3: '等级三',
+        4: '等级四'
+    };
+    const levelStyles: Record<1 | 2 | 3 | 4, string> = {
+        1: 'bg-blue-50 border-blue-200 text-blue-700',
+        2: 'bg-green-50 border-green-200 text-green-700',
+        3: 'bg-purple-100 border-purple-200 text-purple-700',
+        4: 'bg-orange-50 border-orange-200 text-orange-700'
+    };
+    return {
+        attendedCount,
+        autoLevel,
+        currentLevel,
+        label: levelLabels[currentLevel],
+        style: levelStyles[currentLevel]
+    };
+};
+
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
     announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, appLogo,
@@ -87,6 +119,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   // Permission check
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
+  const canSeeRenewalLevel = currentUser?.role === 'director' || currentUser?.role === 'assistant_coach';
 
   // --- Filter Data for Coaches ---
   const managedTeamIds = useMemo(() => {
@@ -875,7 +908,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Compact Credit Alert Section: High density small cards */}
             <div className="lg:col-span-2">
-                {isDirector && (
+                {canSeeRenewalLevel && (
                     <div className={`bg-white rounded-xl shadow-sm border-l-4 p-4 md:p-6 h-full flex flex-col ${stats.lowCreditPlayers.length > 0 ? 'border-red-500' : 'border-green-500'}`}>
                         <div className="flex justify-between items-center mb-5 shrink-0">
                             <h3 className="font-black text-sm md:text-lg flex items-center text-gray-800">
@@ -913,19 +946,29 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 <span className="text-[8px] bg-gray-100 text-gray-400 px-1 rounded-full font-bold">({group.players.length})</span>
                                             </div>
                                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                                                {group.players.map(p => (
-                                                    <div 
-                                                        key={p.id} 
-                                                        onClick={() => handleLowCreditPlayerClick(p)} 
-                                                        className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer hover:scale-[1.02] ${p.credits <= 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50/50 border-orange-200'}`}
-                                                    >
-                                                        <span className="font-bold text-[11px] md:text-xs text-gray-800 truncate" title={p.name}>{p.name}</span>
-                                                        <div className={`flex items-baseline gap-0.5 ml-2 ${p.credits <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
-                                                            <span className="text-xs md:text-sm font-black tabular-nums">{p.credits}</span>
-                                                            <span className="text-[8px] font-bold opacity-70">节</span>
+                                                {group.players.map(p => {
+                                                    const rl = getPlayerRenewalLevelDetails(p, trainings);
+                                                    return (
+                                                        <div 
+                                                            key={p.id} 
+                                                            onClick={() => handleLowCreditPlayerClick(p)} 
+                                                            className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer hover:scale-[1.02] gap-2 ${p.credits <= 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50/50 border-orange-200'}`}
+                                                        >
+                                                            <div className="flex flex-col min-w-0 flex-1">
+                                                                <span className="font-bold text-[11px] md:text-xs text-gray-800 truncate" title={p.name}>{p.name}</span>
+                                                                {canSeeRenewalLevel && (
+                                                                    <span className={`text-[8px] font-black px-1 py-0.5 rounded w-max mt-0.5 border ${rl.style}`}>
+                                                                        {rl.label} ({rl.attendedCount}课)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className={`flex items-baseline gap-0.5 ml-2 shrink-0 ${p.credits <= 0 ? 'text-red-600' : 'text-orange-600'}`}>
+                                                                <span className="text-xs md:text-sm font-black tabular-nums">{p.credits}</span>
+                                                                <span className="text-[8px] font-bold opacity-70">节</span>
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     ))}
@@ -1463,6 +1506,54 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Birthday Card Customizer Modal - Optimized Size and Focus */}
+      {/* Hidden low-credits-export template for PDF generation */}
+      <div id="low-credits-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-[20mm] z-[-1000] font-sans">
+        <div className="border-b-4 border-bvb-yellow pb-4 mb-6">
+          <h2 className="text-2xl font-black text-gray-800 tracking-tight">顽石之光青训俱乐部 - 课时余额预警名单</h2>
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Class Hour Warning & Renewal Level Report • {new Date().toISOString().split('T')[0]}</p>
+        </div>
+        <div className="mb-6 bg-red-50 border border-red-100 rounded-xl p-4 flex justify-between items-center">
+            <div>
+                <p className="text-sm font-bold text-red-800">系统总计预警人数: {stats.lowCreditPlayers.length} 人</p>
+                <p className="text-[10px] text-red-600 mt-1">筛选梯队: {creditAlertTeamId === 'all' ? '全部梯队' : teams.find(t => t.id === creditAlertTeamId)?.name || '未知梯队'}</p>
+            </div>
+            <div className="bg-white border rounded p-2 text-center shadow-inner min-w-[100px]">
+                <p className="text-[8px] text-gray-400 font-bold">警告余额阈值</p>
+                <p className="text-xl font-mono font-black text-red-600">≤ 2 节</p>
+            </div>
+        </div>
+        <table className="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="bg-gray-100 text-gray-600 font-bold border-b border-gray-300">
+              <th className="px-3 py-2">姓名</th>
+              <th className="px-3 py-2">所属梯队</th>
+              <th className="px-3 py-2">球衣号码</th>
+              <th className="px-3 py-2 text-center">累计已上</th>
+              <th className="px-3 py-2 text-center">当前余额</th>
+              {canSeeRenewalLevel && <th className="px-3 py-2 text-right">设定收费等级</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 animate-none">
+            {stats.lowCreditPlayers.map(p => {
+              const rld = getPlayerRenewalLevelDetails(p, trainings);
+              return (
+                <tr key={p.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2.5 font-bold text-gray-800">{p.name}</td>
+                  <td className="px-3 py-2.5 text-gray-600">{teams.find(t => t.id === p.teamId)?.name || '未知梯队'}</td>
+                  <td className="px-3 py-2.5 font-mono text-gray-600">#{p.number}</td>
+                  <td className="px-3 py-2.5 text-center font-mono">{rld.attendedCount} 节</td>
+                  <td className="px-3 py-2.5 text-center font-mono font-bold text-red-600">{p.credits} 节</td>
+                  {canSeeRenewalLevel && <td className="px-3 py-2.5 text-right font-bold text-gray-800">{rld.label}</td>}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <div className="mt-12 pt-4 border-t text-right text-[10px] text-gray-400 font-medium">
+          <p>顽石之光足球青训学院 • 数字化管理云平台</p>
+          <p className="mt-1">报告导出时间: {new Date().toLocaleString()}</p>
+        </div>
+      </div>
       {selectedBirthdayPlayer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
             <div className="bg-white md:rounded-3xl shadow-2xl w-full md:max-w-5xl overflow-hidden flex flex-col md:flex-row h-full md:h-[500px]">
