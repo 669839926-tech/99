@@ -1009,7 +1009,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                             <AlignLeft className="w-3 h-3 text-bvb-yellow" /> 核算公式与规则核对 (Formulas)
                                                         </div>
                                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                            {sal.teamBreakdown.map(teamInfo => (
+                                                                                                                        {sal.teamBreakdown.map(teamInfo => (
                                                                 <div key={teamInfo.teamId} className="bg-white/50 border border-gray-100 p-2.5 rounded-xl space-y-1.5 shadow-sm">
                                                                     <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between items-center">
                                                                         <span className="flex items-center gap-1">
@@ -1071,132 +1071,172 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                     </div>
                                                                 </div>
                                                             ))}
-                                                            {sal.role === 'coach' && (
-                                                                <div className={`bg-red-50/30 border ${sal.totalSupervisorDeductions > 0 ? 'border-red-200' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
-                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
-                                                                        <span className="flex items-center gap-1">
-                                                                            <ShieldCheck className={`w-3.5 h-3.5 ${sal.totalSupervisorDeductions > 0 ? 'text-red-500 animate-pulse' : 'text-green-500'}`} />
-                                                                            助教监督考评扣款 (监督状态)
-                                                                        </span>
-                                                                        <span className={`font-black text-xs ${sal.totalSupervisorDeductions > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                                            - ¥{sal.totalSupervisorDeductions || 0}
-                                                                        </span>
-                                                                    </p>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <AlertCircle className="w-2.5 h-2.5 text-amber-500 mt-0.5" />
-                                                                            <div>
-                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">扣缴明细与政策核对:</p>
-                                                                                <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
-                                                                                    {sal.totalSupervisorDeductions > 0 ? (
-                                                                                        <span>
-                                                                                            本月共 <span className="text-red-600 font-black">{sal.supervisorDeductionSessionsCount}</span> 场训练课触发不合规项。根据监督规定（着装规范缺项扣10元，器材清理未清每次扣10元）扣减基本工资。
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        <span>
-                                                                                            状态优良。本月无任何着装缺项及教材器材丢放未清零的记录。
-                                                                                        </span>
-                                                                                    )}
-                                                                                </p>
+                                                            {(() => {
+                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                const isAssSupervisorApplies = rules.assistantSupervision.enabled && 
+                                                                    (isAssistant ? rules.assistantSupervision.assessAssistants : rules.assistantSupervision.assessCoaches);
+
+                                                                if (!isAssSupervisorApplies) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`bg-red-50/30 border ${sal.totalSupervisorDeductions > 0 ? 'border-red-200' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
+                                                                        <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <ShieldCheck className={`w-3.5 h-3.5 ${sal.totalSupervisorDeductions > 0 ? 'text-red-500 animate-pulse' : 'text-green-500'}`} />
+                                                                                助教监督考评扣款 (监督状态)
+                                                                            </span>
+                                                                            <span className={`font-black text-xs ${sal.totalSupervisorDeductions > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                                                - ¥{sal.totalSupervisorDeductions || 0}
+                                                                            </span>
+                                                                        </p>
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex items-start gap-1.5">
+                                                                                <AlertCircle className="w-2.5 h-2.5 text-amber-500 mt-0.5" />
+                                                                                <div>
+                                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">扣缴明细与政策核对:</p>
+                                                                                    <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                        {sal.totalSupervisorDeductions > 0 ? (
+                                                                                            <span>
+                                                                                                本月共 <span className="text-red-600 font-black">{sal.supervisorDeductionSessionsCount}</span> 场训练课触发不合规项。根据监督规定（着装规范缺项扣10元，器材清理未清每次扣10元）扣减基本工资。
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span>
+                                                                                                状态优良。本月无任何着装缺项及教材器材丢放未清零的记录。
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            {sal.role === 'coach' && (
-                                                                <div className={`bg-rose-50/30 border ${sal.totalLogAuditDeductions > 0 ? 'border-rose-200' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
-                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
-                                                                        <span className="flex items-center gap-1">
-                                                                            <FileText className={`w-3.5 h-3.5 ${sal.totalLogAuditDeductions > 0 ? 'text-rose-500 animate-pulse' : 'text-green-500'}`} />
-                                                                            青训总监日志考核扣款 (录入考评)
-                                                                        </span>
-                                                                        <span className={`font-black text-xs ${sal.totalLogAuditDeductions > 0 ? 'text-rose-600' : 'text-green-600'}`}>
-                                                                            - ¥{sal.totalLogAuditDeductions || 0}
-                                                                        </span>
-                                                                    </p>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <AlertCircle className="w-2.5 h-2.5 text-rose-500 mt-0.5" />
-                                                                            <div>
-                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">扣罚明细与考核结果:</p>
-                                                                                <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
-                                                                                    {sal.totalLogAuditDeductions > 0 ? (
-                                                                                        <span>
-                                                                                            本月共 <span className="text-rose-600 font-black">{sal.logAuditSessionsCount}</span> 场训练日志录入逾期。根据考核规程（逾期未录入每次课时扣10元，逾期2天及以上每次扣20元）扣减基本工资。
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        <span>
-                                                                                            考核优秀！本月训练课日志均按时在当天完成录入，无任何逾期扣款。
-                                                                                        </span>
-                                                                                    )}
-                                                                                </p>
+                                                                );
+                                                            })()}
+                                                            {(() => {
+                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                const isLogAuditApplies = rules.directorLogAudit.enabled && 
+                                                                    (isAssistant ? rules.directorLogAudit.assessAssistants : rules.directorLogAudit.assessCoaches);
+
+                                                                if (!isLogAuditApplies) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`bg-rose-50/30 border ${sal.totalLogAuditDeductions > 0 ? 'border-rose-200' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
+                                                                        <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <FileText className={`w-3.5 h-3.5 ${sal.totalLogAuditDeductions > 0 ? 'text-rose-500 animate-pulse' : 'text-green-500'}`} />
+                                                                                青训总监日志考核扣款 (录入考评)
+                                                                            </span>
+                                                                            <span className={`font-black text-xs ${sal.totalLogAuditDeductions > 0 ? 'text-rose-600' : 'text-green-600'}`}>
+                                                                                - ¥{sal.totalLogAuditDeductions || 0}
+                                                                            </span>
+                                                                        </p>
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex items-start gap-1.5">
+                                                                                <AlertCircle className="w-2.5 h-2.5 text-rose-500 mt-0.5" />
+                                                                                <div>
+                                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">扣罚明细与考核结果:</p>
+                                                                                    <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                        {sal.totalLogAuditDeductions > 0 ? (
+                                                                                            <span>
+                                                                                                本月共 <span className="text-rose-600 font-black">{sal.logAuditSessionsCount}</span> 场训练日志录入逾期。根据考核规程（逾期未录入每次课时扣10元，逾期2天及以上每次扣20元）扣减基本工资。
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span>
+                                                                                                考核优秀！本月训练课日志均按时在当天完成录入，无任何逾期扣款。
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            {(sal.role === 'coach' || sal.role === 'assistant_coach') && (
-                                                                <div className={`bg-amber-50/20 border ${sal.periodizationDeduction > 0 ? 'border-amber-250 bg-amber-50/30' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
-                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
-                                                                        <span className="flex items-center gap-1">
-                                                                            <Target className={`w-3.5 h-3.5 ${sal.periodizationDeduction > 0 ? 'text-amber-500 animate-pulse' : 'text-green-500'}`} />
-                                                                            季度周期训练计划目标考核 ({[2, 5, 8, 11].includes(selectedMonth) ? '当前季末考评' : '非季末月份'})
-                                                                        </span>
-                                                                        <span className={`font-black text-xs ${sal.periodizationDeduction > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                                                                            {sal.periodizationDeduction > 0 ? `- ¥${sal.periodizationDeduction}` : '正常'}
-                                                                        </span>
-                                                                    </p>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <AlertCircle className={`w-2.5 h-2.5 mt-0.5 ${sal.periodizationDeduction > 0 ? 'text-amber-500' : 'text-green-500'}`} />
-                                                                            <div>
-                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">考核结果与扣罚依据:</p>
-                                                                                <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
-                                                                                    {![2, 5, 8, 11].includes(selectedMonth) ? (
-                                                                                        <span>当前月份非季末考核月（3、6、9、12月为季末考核月），周期计划由总监考核，此其不进行基础工资扣除。</span>
-                                                                                    ) : sal.periodizationDeduction > 0 ? (
-                                                                                        <span className="text-amber-800 font-medium">
-                                                                                            {sal.periodizationDetailsString}。扣除当月基础工资20%。
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        <span>本季度所管理团队的季度计划制定考评已通过，已确认录入计划目标。本季末月底正常发放基本工资。</span>
-                                                                                    )}
-                                                                                </p>
+                                                                );
+                                                            })()}
+                                                            {(() => {
+                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                const isPeriodizationApplies = rules.periodizationPlan.enabled && 
+                                                                    (isAssistant ? rules.periodizationPlan.assessAssistants : rules.periodizationPlan.assessCoaches);
+
+                                                                if (!isPeriodizationApplies) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`bg-amber-50/20 border ${sal.periodizationDeduction > 0 ? 'border-amber-250 bg-amber-50/30' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
+                                                                        <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Target className={`w-3.5 h-3.5 ${sal.periodizationDeduction > 0 ? 'text-amber-500 animate-pulse' : 'text-green-500'}`} />
+                                                                                季度周期训练计划目标考核 ({[2, 5, 8, 11].includes(selectedMonth) ? '当前季末考评' : '非季末月份'})
+                                                                            </span>
+                                                                            <span className={`font-black text-xs ${sal.periodizationDeduction > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                                                                                {sal.periodizationDeduction > 0 ? `- ¥${sal.periodizationDeduction}` : '正常'}
+                                                                            </span>
+                                                                        </p>
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex items-start gap-1.5">
+                                                                                <AlertCircle className={`w-2.5 h-2.5 mt-0.5 ${sal.periodizationDeduction > 0 ? 'text-amber-500' : 'text-green-500'}`} />
+                                                                                <div>
+                                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">考核结果与扣罚依据:</p>
+                                                                                    <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                        {![2, 5, 8, 11].includes(selectedMonth) ? (
+                                                                                            <span>当前月份非季末考核月（3、6、9、12月为季末考核月），周期计划由总监考核，此其不进行基础工资扣除。</span>
+                                                                                        ) : sal.periodizationDeduction > 0 ? (
+                                                                                            <span className="text-amber-800 font-medium">
+                                                                                                {sal.periodizationDetailsString}。扣除当月基础工资20%。
+                                                                                            </span>
+                                                                                        ) : (
+                                                                                            <span>本季度所管理团队的季度计划制定考评已通过，已确认录入计划目标。本季末月底正常发放基本工资。</span>
+                                                                                        )}
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
-                                                            {(sal.role === 'coach' || sal.role === 'assistant_coach') && (
-                                                                <div className={`bg-rose-50/20 border ${sal.playerReviewDeduction > 0 ? 'border-red-200 bg-red-50/20' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
-                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
-                                                                        <span className="flex items-center gap-1">
-                                                                            <Clock className={`w-3.5 h-3.5 ${sal.playerReviewDeduction > 0 ? 'text-red-500 animate-pulse' : 'text-green-400'}`} />
-                                                                            季度球员跟踪录入考核 ({[0, 3, 6, 9].includes(selectedMonth) ? '季度次月考核月' : '非次月考核'})
-                                                                        </span>
-                                                                        <span className={`font-black text-xs ${sal.playerReviewDeduction > 0 ? 'text-red-600 font-extrabold animate-pulse' : 'text-green-600'}`}>
-                                                                            {sal.playerReviewDeduction > 0 ? `- ¥${sal.playerReviewDeduction}` : '满分/正常'}
-                                                                        </span>
-                                                                    </p>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <AlertCircle className={`w-2.5 h-2.5 mt-0.5 ${sal.playerReviewDeduction > 0 ? 'text-red-500' : 'text-green-500'}`} />
-                                                                            <div>
-                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">考核结果与扣减明细:</p>
-                                                                                <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
-                                                                                    {![0, 3, 6, 9].includes(selectedMonth) ? (
-                                                                                        <span>当前月份非季度次月考核月（1、4、7、10月为上季度录入结果考核月，首期自当前季度2026 Q2起由青训总监考核并在7月10日前执行完毕）。</span>
-                                                                                    ) : (
-                                                                                        <span>
-                                                                                            {sal.playerReviewAuditDetails}
-                                                                                        </span>
-                                                                                    )}
-                                                                                </p>
+                                                                );
+                                                            })()}
+                                                            {(() => {
+                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                const isPlayerReviewApplies = rules.playerReview.enabled && 
+                                                                    (isAssistant ? rules.playerReview.assessAssistants : rules.playerReview.assessCoaches);
+
+                                                                if (!isPlayerReviewApplies) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`bg-rose-50/20 border ${sal.playerReviewDeduction > 0 ? 'border-red-200 bg-red-50/20' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
+                                                                        <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Clock className={`w-3.5 h-3.5 ${sal.playerReviewDeduction > 0 ? 'text-red-500 animate-pulse' : 'text-green-400'}`} />
+                                                                                季度球员跟踪录入考核 ({[0, 3, 6, 9].includes(selectedMonth) ? '季度次月考核月' : '非次月考核'})
+                                                                            </span>
+                                                                            <span className={`font-black text-xs ${sal.playerReviewDeduction > 0 ? 'text-red-600 font-extrabold animate-pulse' : 'text-green-600'}`}>
+                                                                                {sal.playerReviewDeduction > 0 ? `- ¥${sal.playerReviewDeduction}` : '满分/正常'}
+                                                                            </span>
+                                                                        </p>
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex items-start gap-1.5">
+                                                                                <AlertCircle className={`w-2.5 h-2.5 mt-0.5 ${sal.playerReviewDeduction > 0 ? 'text-red-500' : 'text-green-500'}`} />
+                                                                                <div>
+                                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">考核结果与扣减明细:</p>
+                                                                                    <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                        {![0, 3, 6, 9].includes(selectedMonth) ? (
+                                                                                            <span>当前月份非季度次月考核月（1、4、7、10月为上季度录入结果考核月，首期自当前季度2026 Q2起由青训总监考核并在7月10日前执行完毕）。</span>
+                                                                                        ) : (
+                                                                                            <span>
+                                                                                                {sal.playerReviewAuditDetails}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </p>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
+                                                                );
+                                                            })()}
                                                             {(() => {
                                                                 const isAssistant = sal.role === 'assistant_coach';
                                                                 const isAttAwardApplies = rules.quarterlyAttendance.enabled && 
@@ -1245,7 +1285,6 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                                         <span className="text-gray-400">切换状态:</span>
                                                                                         <button
                                                                                             onClick={() => {
-                                                                                                const isAssistant = sal.role === 'assistant_coach';
                                                                                                 const attAmount = rules.quarterlyAttendance.amount || 200;
                                                                                                 handleUpdatePayrollField(sal.coachId, 'attendanceReward', sal.attendanceReward > 0 ? '0' : String(attAmount));
                                                                                             }}
@@ -1268,66 +1307,76 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                 </div>
                                                             );
                                                         })()}
-                                                            {(sal.role === 'coach' || sal.role === 'assistant_coach') && (
-                                                                <div className={`border p-2.5 rounded-xl space-y-1.5 shadow-sm transition-all ${
-                                                                    sal.monthlyExecutionLevel === 'Excellent' 
-                                                                        ? 'bg-emerald-50/20 border-emerald-200' 
-                                                                        : sal.monthlyExecutionLevel === 'Good' 
-                                                                            ? 'bg-blue-50/10 border-blue-200' 
-                                                                            : 'bg-gray-50/50 border-gray-200 opacity-80'
-                                                                }`}>
-                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-150 pb-1 flex justify-between">
-                                                                        <span className="flex items-center gap-1">
-                                                                            <Star className={`w-3.5 h-3.5 ${
+                                                            {(() => {
+                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                const isExecutionApplies = rules.monthlyExecution.enabled && 
+                                                                    (isAssistant ? rules.monthlyExecution.assessAssistants : rules.monthlyExecution.assessCoaches);
+
+                                                                if (!isExecutionApplies) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`border p-2.5 rounded-xl space-y-1.5 shadow-sm transition-all ${
+                                                                        sal.monthlyExecutionLevel === 'Excellent' 
+                                                                            ? 'bg-emerald-50/20 border-emerald-200' 
+                                                                            : sal.monthlyExecutionLevel === 'Good' 
+                                                                                ? 'bg-blue-50/10 border-blue-200' 
+                                                                                : 'bg-gray-50/50 border-gray-200 opacity-80'
+                                                                    }`}>
+                                                                        <p className="text-[10px] font-black text-gray-800 border-b border-gray-150 pb-1 flex justify-between">
+                                                                            <span className="flex items-center gap-1">
+                                                                                <Star className={`w-3.5 h-3.5 ${
+                                                                                    sal.monthlyExecutionLevel === 'Excellent' 
+                                                                                        ? 'text-yellow-500 fill-yellow-500' 
+                                                                                        : sal.monthlyExecutionLevel === 'Good' 
+                                                                                            ? 'text-blue-500' 
+                                                                                            : 'text-gray-400'
+                                                                                }`} />
+                                                                                月度执行奖 (总监正向激励)
+                                                                            </span>
+                                                                            <span className={`font-black text-xs ${
                                                                                 sal.monthlyExecutionLevel === 'Excellent' 
-                                                                                    ? 'text-yellow-500 fill-yellow-500' 
+                                                                                    ? 'text-emerald-600 font-extrabold' 
                                                                                     : sal.monthlyExecutionLevel === 'Good' 
-                                                                                        ? 'text-blue-500' 
-                                                                                        : 'text-gray-400'
-                                                                            }`} />
-                                                                            月度执行奖 (总监正向激励)
-                                                                        </span>
-                                                                        <span className={`font-black text-xs ${
-                                                                            sal.monthlyExecutionLevel === 'Excellent' 
-                                                                                ? 'text-emerald-600 font-extrabold' 
-                                                                                : sal.monthlyExecutionLevel === 'Good' 
-                                                                                    ? 'text-blue-600 font-extrabold' 
-                                                                                    : 'text-gray-500'
-                                                                        }`}>
-                                                                            {sal.monthlyExecutionReward > 0 ? `+ ¥${sal.monthlyExecutionReward}` : '不予奖励'}
-                                                                        </span>
-                                                                    </p>
-                                                                    <div className="space-y-1">
-                                                                        <div className="flex items-start gap-1.5">
-                                                                            <div className="text-[9px] text-gray-600 font-bold leading-relaxed w-full">
-                                                                                <div className="flex items-center gap-1 flex-wrap">
-                                                                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black leading-none ${
-                                                                                        sal.monthlyExecutionLevel === 'Excellent' 
-                                                                                            ? 'bg-emerald-100 text-emerald-800' 
-                                                                                            : sal.monthlyExecutionLevel === 'Good' 
-                                                                                                ? 'bg-blue-100 text-blue-800' 
-                                                                                                : 'bg-gray-200 text-gray-800'
-                                                                                    }`}>
-                                                                                        {sal.monthlyExecutionLevel === 'Excellent' ? '优秀 (考核满分)' : sal.monthlyExecutionLevel === 'Good' ? '良好 (累计扣款≤20元)' : '待改进 / 不予奖励'}
-                                                                                    </span>
-                                                                                    <span className="text-gray-400">
-                                                                                        (累计四项考核扣款: <span className="font-bold underline text-gray-700">¥{sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}</span> 元)
-                                                                                    </span>
+                                                                                        ? 'text-blue-600 font-extrabold' 
+                                                                                        : 'text-gray-500'
+                                                                            }`}>
+                                                                                {sal.monthlyExecutionReward > 0 ? `+ ¥${sal.monthlyExecutionReward}` : '不予奖励'}
+                                                                            </span>
+                                                                        </p>
+                                                                        <div className="space-y-1">
+                                                                            <div className="flex items-start gap-1.5">
+                                                                                <div className="text-[9px] text-gray-600 font-bold leading-relaxed w-full">
+                                                                                    <div className="flex items-center gap-1 flex-wrap">
+                                                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black leading-none ${
+                                                                                            sal.monthlyExecutionLevel === 'Excellent' 
+                                                                                                ? 'bg-emerald-100 text-emerald-800' 
+                                                                                                : sal.monthlyExecutionLevel === 'Good' 
+                                                                                                    ? 'bg-blue-100 text-blue-800' 
+                                                                                                    : 'bg-gray-200 text-gray-800'
+                                                                                        }`}>
+                                                                                            {sal.monthlyExecutionLevel === 'Excellent' ? '优秀 (考核满分)' : sal.monthlyExecutionLevel === 'Good' ? '良好 (累计扣款≤20元)' : '待改进 / 不予奖励'}
+                                                                                        </span>
+                                                                                        <span className="text-gray-400">
+                                                                                            (累计四项考核扣款: <span className="font-bold underline text-gray-700">¥{sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}</span> 元)
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <p className="mt-1 text-[9px] text-gray-500 leading-normal font-sans">
+                                                                                        {sal.monthlyExecutionLevel === 'Excellent' ? (
+                                                                                            <span>恭喜！四大考核项（助教考评、总监日志、周期计划、球员跟踪）本月无任何扣罚，特此正向激励奖励 <strong className="text-emerald-600">200元</strong>。优秀品质，继续保持！</span>
+                                                                                        ) : sal.monthlyExecutionLevel === 'Good' ? (
+                                                                                            <span>本月四大考核项合计被扣罚 <strong>¥{sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}</strong>，在 <strong>20元（含）以内</strong>，考核等级为良好，给予正向激励奖励 <strong className="text-blue-500">100元</strong>。积极进取，争取月月拿优秀！</span>
+                                                                                        ) : (
+                                                                                            <span>本月四大考核项累计扣罚已 <strong>超过了20元</strong>，考核等级为待改进。本月不予以发放月度执行奖，请教练员严格自律，规范记录。</span>
+                                                                                        )}
+                                                                                    </p>
                                                                                 </div>
-                                                                                <p className="mt-1 text-[9px] text-gray-500 leading-normal font-sans">
-                                                                                    {sal.monthlyExecutionLevel === 'Excellent' ? (
-                                                                                        <span>恭喜！四大考核项（助教考评、总监日志、周期计划、球员跟踪）本月无任何扣罚，特此正向激励奖励 <strong className="text-emerald-600">200元</strong>。优秀品质，继续保持！</span>
-                                                                                    ) : sal.monthlyExecutionLevel === 'Good' ? (
-                                                                                        <span>本月四大考核项合计被扣罚 <strong>¥{sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}</strong>，在 <strong>20元（含）以内</strong>，考核等级为良好，给予正向激励奖励 <strong className="text-blue-500">100元</strong>。积极进取，争取月月拿优秀！</span>
-                                                                                    ) : (
-                                                                                        <span>本月四大考核项累计扣罚已 <strong>超过了20元</strong>，考核等级为待改进。本月不予以发放月度执行奖，请教练员严格自律，规范记录。</span>
-                                                                                    )}
-                                                                                </p>
                                                                             </div>
                                                                         </div>
                                                                     </div>
-                                                                </div>
-                                                            )}
+                                                                );
+                                                            })()}
                                                             <div className="bg-orange-50/30 border border-orange-100/50 p-2.5 rounded-xl space-y-1.5 shadow-sm">
                                                                 <p className="text-[10px] font-black text-gray-800 border-b border-orange-100 pb-1 flex justify-between">
                                                                     <span>出差比赛补贴</span>
