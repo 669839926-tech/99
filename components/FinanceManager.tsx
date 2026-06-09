@@ -83,6 +83,62 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     });
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const defaultAssessmentRules = {
+        assistantSupervision: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: true,
+            amount: 10,
+            timing: '每场训练课后 (每日累积督考)',
+            content: '检查考核教练/助教的着装规范(缺项扣10元)、必备口哨、消音/秒表，以及器材清理规范完成情况(未清每次扣10元)。'
+        },
+        directorLogAudit: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: false,
+            amount: 10,
+            timing: '每日训练课后 (月度累积计算)',
+            content: '训练日志应在下课当天完成提交。逾期1天扣除10元，逾期2天及以上扣罚20元。'
+        },
+        periodizationPlan: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: false,
+            amount: 20, // 20%
+            timing: '季度末月 (Q1-Q4季末终审评定)',
+            content: '每季度底需及时更新录入所带梯队的周期计划与目标大纲，若季度考核评定为“未录入”将扣除基础底薪的20%。'
+        },
+        playerReview: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: false,
+            amount: 5,
+            timing: '每季度次月10日 24:00 截止',
+            content: '要求在次月10日前录入并提交学员上季度的全部成长评估，每漏录入1人扣罚5元。'
+        },
+        quarterlyAttendance: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: true,
+            amount: 200,
+            timing: '每季度末 (总监终评)',
+            content: '配合青训总监对教练员进行季度考核执勤，评定为优秀全勤者给予单次追加奖励200元。'
+        },
+        monthlyExecution: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: true,
+            amount: 200,
+            timing: '每月核算周期',
+            content: '对无严重违纪或前4项考核累计扣罚≤0元的发放优秀奖(¥200)；累计扣罚在 ¥20(含)以内的发放良好奖(¥100)；超过 ¥20 则不予以正向奖励。'
+        }
+    };
+
+    const rules = {
+        ...defaultAssessmentRules,
+        ...(salarySettings?.assessmentRules || {})
+    };
+
     const handleTypeChange = (type: 'income' | 'expense') => {
         setActiveType(type);
         const categoriesForType = financeCategories.filter(c => c.type === type);
@@ -372,100 +428,228 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             });
 
             calcSessionFees = teamBreakdown.reduce((sum, b) => sum + b.monthlySessionFee, 0);
-            calcAttendanceReward = teamBreakdown.reduce((sum, b) => sum + b.attendanceReward, 0);
+            calcAttendanceReward = 0; // 季度全勤奖由总监季评，默认0，选择全勤则奖励配置金额
             calcRenewalReward = teamBreakdown.reduce((sum, b) => sum + b.renewalReward, 0);
 
-             let totalSupervisorDeductions = 0;
-             let supervisorDeductionSessionsCount = 0;
-             let totalLogAuditDeductions = 0;
-             let logAuditSessionsCount = 0;
+            // 合并默认考核/奖励项目规则配置，以便向后兼容
+            const defaultAssessmentRules = {
+                assistantSupervision: {
+                    enabled: true,
+                    assessCoaches: true,
+                    assessAssistants: true,
+                    amount: 10,
+                    timing: '每场训练课后 (每日累积督考)',
+                    content: '检查考核教练/助教的着装规范(缺项扣10元)、必备口哨、消音/秒表，以及器材清理规范完成情况(未清每次扣10元)。'
+                },
+                directorLogAudit: {
+                    enabled: true,
+                    assessCoaches: true,
+                    assessAssistants: false,
+                    amount: 10,
+                    timing: '每日训练课后 (月度累积计算)',
+                    content: '训练日志应在下课当天完成提交。逾期1天扣除10元，逾期2天及以上扣罚20元。'
+                },
+                periodizationPlan: {
+                    enabled: true,
+                    assessCoaches: true,
+                    assessAssistants: false,
+                    amount: 20, // 20%
+                    timing: '季度末月 (Q1-Q4季末终审评定)',
+                    content: '每季度底需及时更新录入所带梯队的周期计划与目标大纲，若季度考核评定为“未录入”将扣除基础底薪的20%。'
+                },
+                playerReview: {
+                    enabled: true,
+                    assessCoaches: true,
+                    assessAssistants: false,
+                    amount: 5,
+                    timing: '每季度次月10日 24:00 截止',
+                    content: '要求在次月10日前录入并提交学员上季度的全部成长评估，每漏录入1人扣罚5元。'
+                },
+                quarterlyAttendance: {
+                    enabled: true,
+                    assessCoaches: true,
+                    assessAssistants: true,
+                    amount: 200,
+                    timing: '每季度末 (总监终评)',
+                    content: '配合青训总监对教练员进行季度考核执勤，评定为优秀全勤者给予单次追加奖励200元。'
+                },
+                monthlyExecution: {
+                    enabled: true,
+                    assessCoaches: true,
+                    assessAssistants: true,
+                    amount: 200,
+                    timing: '每月核算周期',
+                    content: '对无严重违纪或前4项考核累计扣罚≤0元的发放优秀奖(¥200)；累计扣罚在 ¥20(含)以内的发放良好奖(¥100)；超过 ¥20 则不予以正向奖励。'
+                }
+            };
 
-             if (!isAssistant) {
-                 const coachSessionsInMonth = trainings.filter(t => {
-                     const { year: sYear, month: sMonth } = parseDateInfo(t.date);
-                     return coachTeams.includes(t.teamId) && sYear === selectedYear && sMonth === selectedMonth;
-                 });
-                 const todayStr = new Date().toISOString().split('T')[0];
+            const rules = {
+                ...defaultAssessmentRules,
+                ...(salarySettings.assessmentRules || {})
+            };
 
-                 coachSessionsInMonth.forEach(s => {
-                     // Assistant supervision assessment
-                     if (s.assistantSupervision?.evaluated) {
-                         let currentDec = 0;
-                         if (!s.assistantSupervision.hasWatch) currentDec += 10;
-                         if (!s.assistantSupervision.hasWhistle) currentDec += 10;
-                         if (!s.assistantSupervision.hasUniform) currentDec += 10;
-                         if (!s.assistantSupervision.equipmentCleared) currentDec += 10;
-                         
-                         if (currentDec > 0) {
-                             totalSupervisorDeductions += currentDec;
-                             supervisorDeductionSessionsCount += 1;
-                         }
-                     }
+            let totalSupervisorDeductions = 0;
+            let supervisorDeductionSessionsCount = 0;
+            let totalLogAuditDeductions = 0;
+            let logAuditSessionsCount = 0;
 
-                     // Director training log recording assessment
-                     const isSubmitted = s.submissionStatus === 'Submitted' || s.submissionStatus === 'Reviewed';
-                     if (isSubmitted) {
-                         if (s.logSubmittedAt) {
-                             if (s.logSubmittedAt > s.date) {
-                                 const daysDiff = getDaysBetween(s.date, s.logSubmittedAt);
-                                 if (daysDiff >= 2) {
-                                     totalLogAuditDeductions += 20;
-                                     logAuditSessionsCount += 1;
-                                 } else if (daysDiff >= 1) {
-                                     totalLogAuditDeductions += 10;
-                                     logAuditSessionsCount += 1;
-                                 }
-                             }
-                         }
-                     } else {
-                         if (todayStr > s.date) {
-                             const daysDiff = getDaysBetween(s.date, todayStr);
-                             if (daysDiff >= 2) {
-                                 totalLogAuditDeductions += 20;
-                                 logAuditSessionsCount += 1;
-                             } else if (daysDiff >= 1) {
-                                 totalLogAuditDeductions += 10;
-                                 logAuditSessionsCount += 1;
-                             }
-                         }
-                     }
-                 });
-             }
+            const isAssSupervisorApplies = rules.assistantSupervision.enabled && 
+                (isAssistant ? rules.assistantSupervision.assessAssistants : rules.assistantSupervision.assessCoaches);
+            const isLogAuditApplies = rules.directorLogAudit.enabled && 
+                (isAssistant ? rules.directorLogAudit.assessAssistants : rules.directorLogAudit.assessCoaches);
+
+            const coachSessionsInMonth = trainings.filter(t => {
+                const { year: sYear, month: sMonth } = parseDateInfo(t.date);
+                return coachTeams.includes(t.teamId) && sYear === selectedYear && sMonth === selectedMonth;
+            });
+            const todayStr = new Date().toISOString().split('T')[0];
+
+            coachSessionsInMonth.forEach(s => {
+                // 1. 助教监督考评 (Assistant supervision assessment)
+                if (isAssSupervisorApplies && s.assistantSupervision?.evaluated) {
+                    let currentDec = 0;
+                    const unitFine = rules.assistantSupervision.amount;
+                    if (!s.assistantSupervision.hasWatch) currentDec += unitFine;
+                    if (!s.assistantSupervision.hasWhistle) currentDec += unitFine;
+                    if (!s.assistantSupervision.hasUniform) currentDec += unitFine;
+                    if (!s.assistantSupervision.equipmentCleared) currentDec += unitFine;
+                    
+                    if (currentDec > 0) {
+                        totalSupervisorDeductions += currentDec;
+                        supervisorDeductionSessionsCount += 1;
+                    }
+                }
+
+                // 2. 青训总监监督考评 (Director training log recording assessment)
+                if (isLogAuditApplies) {
+                    const unitFine = rules.directorLogAudit.amount;
+                    const isSubmitted = s.submissionStatus === 'Submitted' || s.submissionStatus === 'Reviewed';
+                    if (isSubmitted) {
+                        if (s.logSubmittedAt && s.logSubmittedAt > s.date) {
+                            const daysDiff = getDaysBetween(s.date, s.logSubmittedAt);
+                            if (daysDiff >= 2) {
+                                totalLogAuditDeductions += unitFine * 2;
+                                logAuditSessionsCount += 1;
+                            } else if (daysDiff >= 1) {
+                                totalLogAuditDeductions += unitFine;
+                                logAuditSessionsCount += 1;
+                            }
+                        }
+                    } else {
+                        if (todayStr > s.date) {
+                            const daysDiff = getDaysBetween(s.date, todayStr);
+                            if (daysDiff >= 2) {
+                                totalLogAuditDeductions += unitFine * 2;
+                                logAuditSessionsCount += 1;
+                            } else if (daysDiff >= 1) {
+                                totalLogAuditDeductions += unitFine;
+                                logAuditSessionsCount += 1;
+                            }
+                        }
+                    }
+                }
+            });
 
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
             
             // 取消对训练、关注、协同的主观评价绩效奖励组块，置为0
             const calcPerformanceReward = 0;
-            
             const performanceFormula = "主观评价绩效奖励已取消";
 
             const currentEdit = editPayroll[coach.id] || {};
             const baseSalaryDefault = isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary;
 
-            // Check if there is a periodization plan assessment of "not_entered" for any of the coach's teams in the current quarter
+            // 3. 季度周期计划目标考核录入 (periodizationPlan)
             let periodizationDeduction = 0;
             let periodizationDetailsString = "";
+            const isPeriodizationApplies = rules.periodizationPlan.enabled && 
+                (isAssistant ? rules.periodizationPlan.assessAssistants : rules.periodizationPlan.assessCoaches);
             
-            if (isDistributionMonth && coachTeams.length > 0) {
+            if (isPeriodizationApplies && isDistributionMonth && coachTeams.length > 0) {
                 const teamsWithNoPlan = coachTeams.filter(teamId => {
                     const plan = periodizationPlans?.find(p => p.teamId === teamId && p.year === effectiveYear);
                     return plan?.quarterAssessments?.[quarterKey] === 'not_entered';
                 });
                 if (teamsWithNoPlan.length > 0) {
                     const teamNames = teamsWithNoPlan.map(tid => teams.find(t => t.id === tid)?.name || '未知梯队').join('、');
-                    periodizationDeduction = baseSalaryDefault * 0.2;
-                    periodizationDetailsString = `因负责的梯队 [${teamNames}] 在季度周期计划目标考核中被评定为“未录入”，按规定扣除20%基础工资 (${selectedMonth + 1}月季末执行)`;
+                    const deductionRatio = rules.periodizationPlan.amount / 100;
+                    periodizationDeduction = baseSalaryDefault * deductionRatio;
+                    periodizationDetailsString = `因负责的梯队 [${teamNames}] 在季度周期计划目标考核中被评定为“未录入”，根据业务规则扣除底薪的 ${rules.periodizationPlan.amount}% (${selectedMonth + 1}月季末执行)`;
                 }
             }
 
-             const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : Math.max(0, baseSalaryDefault - totalSupervisorDeductions - totalLogAuditDeductions - periodizationDeduction));
+            // 4. 季度球员跟踪录入考核 (playerReview)
+            let playerReviewDeduction = 0;
+            let playerReviewAuditDetails = "";
+            let unreviewedCountForCoach = 0;
+            let totalCoachPlayersOfCoach = 0;
+
+            const isReviewAssessmentMonth = [0, 3, 6, 9].includes(selectedMonth);
+            const isPlayerReviewApplies = rules.playerReview.enabled && 
+                (isAssistant ? rules.playerReview.assessAssistants : rules.playerReview.assessCoaches);
+
+            if (isPlayerReviewApplies && isReviewAssessmentMonth && coachTeams.length > 0) {
+                const targetYearToCheck = typeof selectedYear === 'string' ? new Date().getFullYear() : (selectedYear || new Date().getFullYear());
+                const checkYear = selectedMonth === 0 ? (targetYearToCheck - 1) : targetYearToCheck;
+                let checkQuarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+                if (selectedMonth === 0) checkQuarter = 'Q4';
+                else if (selectedMonth === 3) checkQuarter = 'Q1';
+                else if (selectedMonth === 6) checkQuarter = 'Q2';
+                else checkQuarter = 'Q3';
+
+                const coachPlayers = players.filter(p => coachTeams.includes(p.teamId));
+                totalCoachPlayersOfCoach = coachPlayers.length;
+
+                const unreviewedPlayers = coachPlayers.filter(p => {
+                    return !p.reviews?.some(r => r.year === checkYear && r.quarter === checkQuarter && (r.status === 'Published' || r.status === 'Submitted'));
+                });
+
+                unreviewedCountForCoach = unreviewedPlayers.length;
+                playerReviewDeduction = unreviewedCountForCoach * rules.playerReview.amount;
+
+                if (unreviewedCountForCoach > 0) {
+                    const sampleNames = unreviewedPlayers.slice(0, 5).map(p => p.name).join('、') + (unreviewedCountForCoach > 5 ? `等 ${unreviewedCountForCoach} 人` : '');
+                    playerReviewAuditDetails = `${checkYear}年${checkQuarter}季度球员跟踪逾期未录入，共有 ${unreviewedCountForCoach} 名球员未按时在次月10日前完成跟踪评价录入 （未录入球员：${sampleNames}）。根据总监考核规定，每名球员扣罚 ${rules.playerReview.amount} 元，总计扣减基本薪资 ¥${playerReviewDeduction}。`;
+                } else {
+                    playerReviewAuditDetails = `季度球员跟踪考核100%通过！已及时在次月10日前完成了${checkYear}年${checkQuarter}季度全部 ${totalCoachPlayersOfCoach} 名球员的跟踪考评录入。`;
+                }
+            }
+
+            // 6. 月度执行奖：每月评选，在助教监督考评、青训总监监督考评，季度周期计划目标考核录入及球员跟踪录入考核未扣罚工资。则考核结果为优秀奖励配置金额(如200元)；如累计被罚款20元（含）以内，则评为良好奖励100元(或优秀的一半)，如罚款超过20元则不进行奖励。
+            const totalExecutionFines = totalSupervisorDeductions + totalLogAuditDeductions + periodizationDeduction + playerReviewDeduction;
+            let defaultExecutionLevel = 'NeedsImprovement';
+            let defaultExecutionReward = 0;
+
+            const isExecutionApplies = rules.monthlyExecution.enabled && 
+                (isAssistant ? rules.monthlyExecution.assessAssistants : rules.monthlyExecution.assessCoaches);
+
+            if (isExecutionApplies) {
+                const execLimitAmount = rules.monthlyExecution.amount;
+                if (totalExecutionFines === 0) {
+                    defaultExecutionLevel = 'Excellent';
+                    defaultExecutionReward = execLimitAmount;
+                } else if (totalExecutionFines <= 20) {
+                    defaultExecutionLevel = 'Good';
+                    defaultExecutionReward = Math.round(execLimitAmount / 2);
+                }
+            }
+
+            const monthlyExecutionReward = currentEdit.monthlyExecutionReward !== undefined 
+                ? currentEdit.monthlyExecutionReward 
+                : (savedRecord && savedRecord.monthlyExecutionReward !== undefined ? savedRecord.monthlyExecutionReward : defaultExecutionReward);
+            
+            const monthlyExecutionLevel = savedRecord && savedRecord.monthlyExecutionLevel 
+                ? savedRecord.monthlyExecutionLevel 
+                : (monthlyExecutionReward === rules.monthlyExecution.amount ? 'Excellent' : monthlyExecutionReward === Math.round(rules.monthlyExecution.amount / 2) ? 'Good' : defaultExecutionLevel);
+
+            const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : Math.max(0, baseSalaryDefault - totalSupervisorDeductions - totalLogAuditDeductions - periodizationDeduction - playerReviewDeduction));
             const sessionFees = currentEdit.sessionFees !== undefined ? currentEdit.sessionFees : (savedRecord ? savedRecord.sessionFees : calcSessionFees);
             const attendanceReward = currentEdit.attendanceReward !== undefined ? currentEdit.attendanceReward : (savedRecord ? savedRecord.attendanceReward : calcAttendanceReward);
             const renewalReward = currentEdit.renewalReward !== undefined ? currentEdit.renewalReward : (savedRecord ? savedRecord.renewalReward : calcRenewalReward);
             const performanceReward = currentEdit.performanceReward !== undefined ? currentEdit.performanceReward : (savedRecord ? savedRecord.performanceReward : calcPerformanceReward);
             const matchSubsidy = currentEdit.matchSubsidy !== undefined ? currentEdit.matchSubsidy : (savedRecord ? (savedRecord.matchSubsidy || 0) : 0);
             
-            const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward + matchSubsidy;
+            const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward + matchSubsidy + monthlyExecutionReward;
 
             return {
                 coachId: coach.id,
@@ -478,6 +662,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 renewalReward,
                 performanceReward,
                 matchSubsidy,
+                monthlyExecutionReward,
+                monthlyExecutionLevel,
                 totalSalary,
                 performanceFormula,
                 evaluationScore: evaluation?.score || 0,
@@ -491,6 +677,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 logAuditSessionsCount,
                 periodizationDeduction,
                 periodizationDetailsString,
+                playerReviewDeduction,
+                playerReviewAuditDetails,
+                unreviewedCountForCoach,
+                totalCoachPlayersOfCoach,
                 isModified: Object.keys(currentEdit).length > 0 || Object.keys(overriddenTeamSizes).some(k => k.startsWith(`${selectedYear}-${selectedMonth}-${coach.id}-`)),
                 teamBreakdown
             };
@@ -530,6 +720,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             renewalReward: row.renewalReward, 
             performanceReward: row.performanceReward, 
             matchSubsidy: row.matchSubsidy,
+            monthlyExecutionReward: row.monthlyExecutionReward,
+            monthlyExecutionLevel: row.monthlyExecutionLevel,
             totalSalary: row.totalSalary, 
             isDisbursed: row.isDisbursed,
             overriddenTeamSizes: teamOverrides
@@ -561,7 +753,22 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         if (row.isDisbursed && !confirm('该笔薪资已经发放过，确定要再次发放并记录支出吗？')) return;
         const records = coach.monthlySalaryRecords || [];
         const existingIdx = records.findIndex(r => r.year === yearNum && r.month === selectedMonth);
-        const newRecord: MonthlySalaryRecord = { id: `sal-${yearNum}-${selectedMonth}-${coachId}`, year: yearNum, month: selectedMonth, baseSalary: row.baseSalary, sessionFees: row.sessionFees, attendanceReward: row.attendanceReward, renewalReward: row.renewalReward, performanceReward: row.performanceReward, matchSubsidy: row.matchSubsidy, totalSalary: row.totalSalary, isDisbursed: true, disbursedDate: new Date().toISOString().split('T')[0] };
+        const newRecord: MonthlySalaryRecord = { 
+            id: `sal-${yearNum}-${selectedMonth}-${coachId}`, 
+            year: yearNum, 
+            month: selectedMonth, 
+            baseSalary: row.baseSalary, 
+            sessionFees: row.sessionFees, 
+            attendanceReward: row.attendanceReward, 
+            renewalReward: row.renewalReward, 
+            performanceReward: row.performanceReward, 
+            matchSubsidy: row.matchSubsidy, 
+            monthlyExecutionReward: row.monthlyExecutionReward,
+            monthlyExecutionLevel: row.monthlyExecutionLevel,
+            totalSalary: row.totalSalary, 
+            isDisbursed: true, 
+            disbursedDate: new Date().toISOString().split('T')[0] 
+        };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
@@ -687,10 +894,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                         <th className="px-2 py-3 md:px-4 md:py-4">职员信息</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">底薪</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">课时费</th>
-                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">参训奖</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right text-green-600 font-extrabold bg-green-50/10">全勤奖 (季评)</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">续费奖</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">月度执行奖</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right">比赛补贴</th>
-                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right">绩效</th>
+                                        <th className="px-2 py-3 md:px-4 md:py-4 text-right text-red-500 font-extrabold bg-red-50/10">月/季考核扣罚</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-right font-black text-bvb-black">应发总计</th>
                                         <th className="px-2 py-3 md:px-4 md:py-4 text-center">操作</th>
                                     </tr>
@@ -707,8 +915,61 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                 </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className={`w-12 md:w-20 p-1 border rounded text-right font-black text-[10px] md:text-xs bg-transparent focus:bg-white outline-none ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`} value={sal.baseSalary || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'baseSalary', e.target.value)} /></td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.sessionFees || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'sessionFees', e.target.value)} />{sal.teamBreakdown.length > 0 && <span className="text-[7px] md:text-[8px] text-gray-400 italic">按课计费</span>}</div></td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.attendanceReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'attendanceReward', e.target.value)} />{sal.attendanceReward > 0 && <span className="text-[7px] md:text-[8px] text-green-500 font-black uppercase">达标奖</span>}</div></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right bg-green-50/5">
+                                                    {(() => {
+                                                        const isAssistant = sal.role === 'assistant_coach';
+                                                        const isAttAwardApplies = rules.quarterlyAttendance.enabled && 
+                                                            (isAssistant ? rules.quarterlyAttendance.assessAssistants : rules.quarterlyAttendance.assessCoaches);
+                                                        const attAmount = rules.quarterlyAttendance.amount || 200;
+
+                                                        if (!isAttAwardApplies) {
+                                                            return (
+                                                                <span className="text-[10px] font-bold text-gray-400 block text-right">免考评/未启用</span>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <div className="flex flex-col items-end gap-1">
+                                                                <select
+                                                                    className={`p-1 border rounded text-right font-black text-[10px] md:text-xs bg-white outline-none focus:border-bvb-yellow transition-all ${
+                                                                        sal.attendanceReward > 0 ? 'border-green-300 text-green-700 bg-green-50/30' : 'border-gray-200 text-gray-400'
+                                                                    }`}
+                                                                    value={sal.attendanceReward > 0 ? 'yes' : 'no'}
+                                                                    onChange={(e) => {
+                                                                        const isPerfect = e.target.value === 'yes';
+                                                                        handleUpdatePayrollField(sal.coachId, 'attendanceReward', isPerfect ? String(attAmount) : '0');
+                                                                    }}
+                                                                >
+                                                                    <option value="no">非全勤 (¥0)</option>
+                                                                    <option value="yes">全勤 (¥{attAmount})</option>
+                                                                </select>
+                                                                {sal.attendanceReward > 0 && (
+                                                                    <span className="text-[7px] md:text-[8px] text-green-600 font-extrabold bg-green-50 px-1 py-0.5 rounded border border-green-200 whitespace-nowrap">
+                                                                        季度全勤
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.renewalReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'renewalReward', e.target.value)} /></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right">
+                                                    <div className="flex flex-col items-end">
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" 
+                                                            value={sal.monthlyExecutionReward || 0} 
+                                                            onChange={(e) => handleUpdatePayrollField(sal.coachId, 'monthlyExecutionReward', e.target.value)} 
+                                                        />
+                                                        {sal.monthlyExecutionReward > 0 && (
+                                                            <span className={`text-[7px] md:text-[8px] font-black uppercase ${
+                                                                sal.monthlyExecutionLevel === 'Excellent' ? 'text-green-500 font-extrabold' : 'text-blue-500 font-extrabold'
+                                                            }`}>
+                                                                {sal.monthlyExecutionLevel === 'Excellent' ? '优秀奖' : '良好奖'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right">
                                                     <div className="flex flex-col items-end">
                                                         <input 
@@ -720,7 +981,19 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                         {sal.matchSubsidy > 0 && <span className="text-[7px] md:text-[8px] text-orange-600 font-black">赛事补贴</span>}
                                                     </div>
                                                 </td>
-                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right"><div className="flex flex-col items-end"><input type="number" className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs hover:border-gray-200 focus:bg-white outline-none" value={sal.performanceReward || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'performanceReward', e.target.value)} />{sal.performanceReward > 0 && <span className="text-[7px] md:text-[8px] text-blue-500 font-black">绩效奖</span>}</div></td>
+                                                <td className="px-2 py-3 md:px-4 md:py-4 text-right bg-red-50/5">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className={`font-black text-[10px] md:text-sm leading-none ${(sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction) > 0 ? 'text-red-600 font-extrabold' : 'text-gray-400'}`}>
+                                                            {(sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction) > 0 
+                                                                ? `-¥${sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}` 
+                                                                : '¥0'
+                                                            }
+                                                        </span>
+                                                        {(sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction) > 0 && (
+                                                            <span className="text-[7px] md:text-[8px] text-red-500 font-black leading-none mt-1">月/季考核扣罚</span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right font-black text-bvb-black text-[11px] md:text-base tabular-nums leading-none">¥{sal.totalSalary.toLocaleString()}</td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-center">
                                                     <div className="flex justify-center gap-0.5 md:gap-1">
@@ -887,6 +1160,167 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                                         </span>
                                                                                     ) : (
                                                                                         <span>本季度所管理团队的季度计划制定考评已通过，已确认录入计划目标。本季末月底正常发放基本工资。</span>
+                                                                                    )}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {(sal.role === 'coach' || sal.role === 'assistant_coach') && (
+                                                                <div className={`bg-rose-50/20 border ${sal.playerReviewDeduction > 0 ? 'border-red-200 bg-red-50/20' : 'border-gray-200'} p-2.5 rounded-xl space-y-1.5 shadow-sm`}>
+                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-100 pb-1 flex justify-between">
+                                                                        <span className="flex items-center gap-1">
+                                                                            <Clock className={`w-3.5 h-3.5 ${sal.playerReviewDeduction > 0 ? 'text-red-500 animate-pulse' : 'text-green-400'}`} />
+                                                                            季度球员跟踪录入考核 ({[0, 3, 6, 9].includes(selectedMonth) ? '季度次月考核月' : '非次月考核'})
+                                                                        </span>
+                                                                        <span className={`font-black text-xs ${sal.playerReviewDeduction > 0 ? 'text-red-600 font-extrabold animate-pulse' : 'text-green-600'}`}>
+                                                                            {sal.playerReviewDeduction > 0 ? `- ¥${sal.playerReviewDeduction}` : '满分/正常'}
+                                                                        </span>
+                                                                    </p>
+                                                                    <div className="space-y-1">
+                                                                        <div className="flex items-start gap-1.5">
+                                                                            <AlertCircle className={`w-2.5 h-2.5 mt-0.5 ${sal.playerReviewDeduction > 0 ? 'text-red-500' : 'text-green-500'}`} />
+                                                                            <div>
+                                                                                <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">考核结果与扣减明细:</p>
+                                                                                <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                    {![0, 3, 6, 9].includes(selectedMonth) ? (
+                                                                                        <span>当前月份非季度次月考核月（1、4、7、10月为上季度录入结果考核月，首期自当前季度2026 Q2起由青训总监考核并在7月10日前执行完毕）。</span>
+                                                                                    ) : (
+                                                                                        <span>
+                                                                                            {sal.playerReviewAuditDetails}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {(() => {
+                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                const isAttAwardApplies = rules.quarterlyAttendance.enabled && 
+                                                                    (isAssistant ? rules.quarterlyAttendance.assessAssistants : rules.quarterlyAttendance.assessCoaches);
+
+                                                                if (!isAttAwardApplies) {
+                                                                    return null;
+                                                                }
+
+                                                                return (
+                                                                    <div className={`border p-2.5 rounded-xl space-y-1.5 shadow-sm transition-all ${
+                                                                        sal.attendanceReward > 0 
+                                                                            ? 'bg-green-50/25 border-green-200' 
+                                                                            : 'bg-gray-50/50 border-gray-200 opacity-80'
+                                                                    }`}>
+                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-150 pb-1 flex justify-between">
+                                                                        <span className="flex items-center gap-1">
+                                                                            <UserCheck className={`w-3.5 h-3.5 ${
+                                                                                sal.attendanceReward > 0 
+                                                                                    ? 'text-green-500 fill-green-100' 
+                                                                                    : 'text-gray-400'
+                                                                            }`} />
+                                                                            季度全勤奖 (总监季评)
+                                                                        </span>
+                                                                        <span className={`font-black text-xs ${
+                                                                            sal.attendanceReward > 0 
+                                                                                ? 'text-green-600 font-extrabold' 
+                                                                                : 'text-gray-500'
+                                                                        }`}>
+                                                                            {sal.attendanceReward > 0 ? `+ ¥${sal.attendanceReward}` : '不予以奖励'}
+                                                                        </span>
+                                                                    </p>
+                                                                    <div className="space-y-1">
+                                                                        <div className="flex items-start gap-1.5">
+                                                                            <div className="text-[9px] text-gray-600 font-bold leading-relaxed w-full">
+                                                                                <div className="flex items-center justify-between gap-1 flex-wrap">
+                                                                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black leading-none ${
+                                                                                        sal.attendanceReward > 0 
+                                                                                            ? 'bg-green-100 text-green-800' 
+                                                                                            : 'bg-gray-200 text-gray-800'
+                                                                                    }`}>
+                                                                                        {sal.attendanceReward > 0 ? '评定状态: 全勤' : '评定状态: 非全勤'}
+                                                                                    </span>
+                                                                                    
+                                                                                    <div className="flex items-center gap-1">
+                                                                                        <span className="text-gray-400">切换状态:</span>
+                                                                                        <button
+                                                                                            onClick={() => {
+                                                                                                const isAssistant = sal.role === 'assistant_coach';
+                                                                                                const attAmount = rules.quarterlyAttendance.amount || 200;
+                                                                                                handleUpdatePayrollField(sal.coachId, 'attendanceReward', sal.attendanceReward > 0 ? '0' : String(attAmount));
+                                                                                            }}
+                                                                                            className={`px-2 py-0.5 rounded text-[8px] font-black transition-colors ${
+                                                                                                sal.attendanceReward > 0
+                                                                                                    ? 'bg-rose-100 text-rose-750 hover:bg-rose-200'
+                                                                                                    : 'bg-green-100 text-green-750 hover:bg-green-200'
+                                                                                            }`}
+                                                                                        >
+                                                                                            {sal.attendanceReward > 0 ? '设为非全勤' : `设为全勤 (奖¥${rules.quarterlyAttendance.amount || 200})`}
+                                                                                        </button>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <p className="mt-1 text-[9px] text-gray-500 leading-normal font-sans">
+                                                                                    {rules.quarterlyAttendance.content || `全勤奖由青训总监每季度末根据全勤记录评定。选择全勤教练员将获得 ${rules.quarterlyAttendance.amount || 200} 元 的季度全勤奖励。`} (考核时间点: {rules.quarterlyAttendance.timing})
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                            {(sal.role === 'coach' || sal.role === 'assistant_coach') && (
+                                                                <div className={`border p-2.5 rounded-xl space-y-1.5 shadow-sm transition-all ${
+                                                                    sal.monthlyExecutionLevel === 'Excellent' 
+                                                                        ? 'bg-emerald-50/20 border-emerald-200' 
+                                                                        : sal.monthlyExecutionLevel === 'Good' 
+                                                                            ? 'bg-blue-50/10 border-blue-200' 
+                                                                            : 'bg-gray-50/50 border-gray-200 opacity-80'
+                                                                }`}>
+                                                                    <p className="text-[10px] font-black text-gray-800 border-b border-gray-150 pb-1 flex justify-between">
+                                                                        <span className="flex items-center gap-1">
+                                                                            <Star className={`w-3.5 h-3.5 ${
+                                                                                sal.monthlyExecutionLevel === 'Excellent' 
+                                                                                    ? 'text-yellow-500 fill-yellow-500' 
+                                                                                    : sal.monthlyExecutionLevel === 'Good' 
+                                                                                        ? 'text-blue-500' 
+                                                                                        : 'text-gray-400'
+                                                                            }`} />
+                                                                            月度执行奖 (总监正向激励)
+                                                                        </span>
+                                                                        <span className={`font-black text-xs ${
+                                                                            sal.monthlyExecutionLevel === 'Excellent' 
+                                                                                ? 'text-emerald-600 font-extrabold' 
+                                                                                : sal.monthlyExecutionLevel === 'Good' 
+                                                                                    ? 'text-blue-600 font-extrabold' 
+                                                                                    : 'text-gray-500'
+                                                                        }`}>
+                                                                            {sal.monthlyExecutionReward > 0 ? `+ ¥${sal.monthlyExecutionReward}` : '不予奖励'}
+                                                                        </span>
+                                                                    </p>
+                                                                    <div className="space-y-1">
+                                                                        <div className="flex items-start gap-1.5">
+                                                                            <div className="text-[9px] text-gray-600 font-bold leading-relaxed w-full">
+                                                                                <div className="flex items-center gap-1 flex-wrap">
+                                                                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black leading-none ${
+                                                                                        sal.monthlyExecutionLevel === 'Excellent' 
+                                                                                            ? 'bg-emerald-100 text-emerald-800' 
+                                                                                            : sal.monthlyExecutionLevel === 'Good' 
+                                                                                                ? 'bg-blue-100 text-blue-800' 
+                                                                                                : 'bg-gray-200 text-gray-800'
+                                                                                    }`}>
+                                                                                        {sal.monthlyExecutionLevel === 'Excellent' ? '优秀 (考核满分)' : sal.monthlyExecutionLevel === 'Good' ? '良好 (累计扣款≤20元)' : '待改进 / 不予奖励'}
+                                                                                    </span>
+                                                                                    <span className="text-gray-400">
+                                                                                        (累计四项考核扣款: <span className="font-bold underline text-gray-700">¥{sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}</span> 元)
+                                                                                    </span>
+                                                                                </div>
+                                                                                <p className="mt-1 text-[9px] text-gray-500 leading-normal font-sans">
+                                                                                    {sal.monthlyExecutionLevel === 'Excellent' ? (
+                                                                                        <span>恭喜！四大考核项（助教考评、总监日志、周期计划、球员跟踪）本月无任何扣罚，特此正向激励奖励 <strong className="text-emerald-600">200元</strong>。优秀品质，继续保持！</span>
+                                                                                    ) : sal.monthlyExecutionLevel === 'Good' ? (
+                                                                                        <span>本月四大考核项合计被扣罚 <strong>¥{sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}</strong>，在 <strong>20元（含）以内</strong>，考核等级为良好，给予正向激励奖励 <strong className="text-blue-500">100元</strong>。积极进取，争取月月拿优秀！</span>
+                                                                                    ) : (
+                                                                                        <span>本月四大考核项累计扣罚已 <strong>超过了20元</strong>，考核等级为待改进。本月不予以发放月度执行奖，请教练员严格自律，规范记录。</span>
                                                                                     )}
                                                                                 </p>
                                                                             </div>

@@ -490,6 +490,24 @@ export interface CoachLevelSetting {
     sessionBaseFee: number;
 }
 
+export interface CustomAssessmentRule {
+    enabled: boolean;
+    assessCoaches: boolean;
+    assessAssistants: boolean;
+    amount: number;       // 金额 (罚款基准、比例、或者正向激励底数)
+    timing: string;       // 考核时间点
+    content: string;      // 考核项目内容
+}
+
+export interface AssessmentRulesConfig {
+    assistantSupervision: CustomAssessmentRule; // 1. 助教监督考评
+    directorLogAudit: CustomAssessmentRule;     // 2. 青训总监监督考评
+    periodizationPlan: CustomAssessmentRule;     // 3. 季度周期计划目标考核录入
+    playerReview: CustomAssessmentRule;          // 4. 球员跟踪录入考核
+    quarterlyAttendance: CustomAssessmentRule;   // 5. 季度全勤奖
+    monthlyExecution: CustomAssessmentRule;      // 6. 月度执行奖
+}
+
 export interface SalarySettings {
     levels: CoachLevelSetting[];
     incrementalPlayerFee: number; // 5
@@ -508,6 +526,7 @@ export interface SalarySettings {
     };
     enableCoachPerformanceReward: boolean; // 是否向主教练开启公共绩效 (Master Switch)
     enableAssistantPerformanceReward: boolean; // 是否向助教开启公共绩效 (Master Switch)
+    assessmentRules?: AssessmentRulesConfig;  // 6个核心考评项目规则配置
 }
 
 export interface MonthlyEvaluation {
@@ -531,6 +550,8 @@ export interface MonthlySalaryRecord {
     renewalReward: number;
     performanceReward: number;
     matchSubsidy?: number;     // 比赛补贴 (可手动输入)
+    monthlyExecutionReward?: number; // 月度执行奖 (优秀 200, 良好 100)
+    monthlyExecutionLevel?: string;  // 月度执行等级 ("Excellent" | "Good" | "NeedsImprovement")
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;

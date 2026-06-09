@@ -64,7 +64,70 @@ const Settings: React.FC<SettingsProps> = ({
   const [localConfig, setLocalConfig] = useState<AttributeConfig>(JSON.parse(JSON.stringify(attributeConfig)));
   const [localPermissions, setLocalPermissions] = useState<RolePermissions>(JSON.parse(JSON.stringify(permissions)));
   const [localFinanceCategories, setLocalFinanceCategories] = useState<FinanceCategoryDefinition[]>(JSON.parse(JSON.stringify(financeCategories)));
-  const [localSalarySettings, setLocalSalarySettings] = useState<SalarySettings>(JSON.parse(JSON.stringify(salarySettings)));
+  
+  const defaultAssessmentRules = {
+      assistantSupervision: {
+          enabled: true,
+          assessCoaches: true,
+          assessAssistants: true,
+          amount: 10,
+          timing: '每场训练课后 (每日累积督考)',
+          content: '检查考核教练/助教的着装规范(缺项扣10元)、必备口哨、消音/秒表，以及器材清理规范完成情况(未清每次扣10元)。'
+      },
+      directorLogAudit: {
+          enabled: true,
+          assessCoaches: true,
+          assessAssistants: false,
+          amount: 10,
+          timing: '每日训练课后 (月度累积计算)',
+          content: '训练日志应在下课当天完成提交。逾期1天扣除10元，逾期2天及以上扣罚20元。'
+      },
+      periodizationPlan: {
+          enabled: true,
+          assessCoaches: true,
+          assessAssistants: false,
+          amount: 20, // 20%
+          timing: '季度末月 (Q1-Q4季末终审评定)',
+          content: '每季度底需及时更新录入所带梯队的周期计划与目标大纲，若季度考核评定为“未录入”将扣除基础底薪的20%。'
+      },
+      playerReview: {
+          enabled: true,
+          assessCoaches: true,
+          assessAssistants: false,
+          amount: 5,
+          timing: '每季度次月10日 24:00 截止',
+          content: '要求在次月10日前录入并提交学员上季度的全部成长评估，每漏录入1人扣罚5元。'
+      },
+      quarterlyAttendance: {
+          enabled: true,
+          assessCoaches: true,
+          assessAssistants: true,
+          amount: 200,
+          timing: '每季度末 (总监终评)',
+          content: '配合青训总监对教练员进行季度考核执勤，评定为优秀全勤者给予单次追加奖励200元。'
+      },
+      monthlyExecution: {
+          enabled: true,
+          assessCoaches: true,
+          assessAssistants: true,
+          amount: 200,
+          timing: '每月核算周期',
+          content: '对无严重违纪或前4项考核累计扣罚≤0元的发放优秀奖(¥200)；累计扣罚在 ¥20(含)以内的发放良好奖(¥100)；超过 ¥20 则不予以正向奖励。'
+      }
+  };
+
+  const [localSalarySettings, setLocalSalarySettings] = useState<SalarySettings>(() => {
+    const raw = JSON.parse(JSON.stringify(salarySettings));
+    if (!raw.assessmentRules) {
+        raw.assessmentRules = JSON.parse(JSON.stringify(defaultAssessmentRules));
+    } else {
+        raw.assessmentRules = {
+            ...JSON.parse(JSON.stringify(defaultAssessmentRules)),
+            ...raw.assessmentRules
+        };
+    }
+    return raw;
+  });
   
   const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'profile_tags' | 'drills' | 'branding' | 'cloud'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
@@ -571,6 +634,159 @@ const Settings: React.FC<SettingsProps> = ({
                                         <span className="text-xs font-bold text-gray-400">元</span>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* 六大核心业务考评与契约化奖卡开关规范 */}
+                        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                            <div className="flex items-center gap-2">
+                                <CheckSquare className="w-4 h-4 text-bvb-yellow" />
+                                <h4 className="font-black text-xs uppercase tracking-widest text-gray-800">业务考评与执行奖惩配置</h4>
+                            </div>
+                            <p className="text-[10px] text-gray-500 leading-normal">
+                                开启/关闭特定的青训业务督考和底线扣罚，设定考核角色对象（主教/助教），调整基准金额，并支持随时补充自定义考核点与明细。
+                            </p>
+                            
+                            <div className="space-y-4">
+                                {(Object.keys(localSalarySettings.assessmentRules || {}) as Array<keyof AssessmentRulesConfig>).map((key) => {
+                                    const rule = localSalarySettings.assessmentRules?.[key];
+                                    if (!rule) return null;
+                                    
+                                    const labelMap: Record<string, string> = {
+                                        assistantSupervision: '助教监督考评 (日常带训)',
+                                        directorLogAudit: '青训总监监督考评 (训练日志)',
+                                        periodizationPlan: '周期计划目标考核 (季度学期)',
+                                        playerReview: '球员跟踪录入考核 (Quarterly 跟踪)',
+                                        quarterlyAttendance: '季度全勤奖 (总监评定奖)',
+                                        monthlyExecution: '月度执行奖 (业务考核正向激励)'
+                                    };
+                                    
+                                    const amountLabelMap: Record<string, string> = {
+                                        assistantSupervision: '单次缺项扣罚金额 (元/次)',
+                                        directorLogAudit: '日志逾期扣罚金额 (元/天)',
+                                        periodizationPlan: '未录扣减底薪比例 (%)',
+                                        playerReview: '漏录未完成扣罚金额 (元/人)',
+                                        quarterlyAttendance: '评定全勤奖励金额 (元/季)',
+                                        monthlyExecution: '月度执行优秀奖上限 (元/月)'
+                                    };
+
+                                    return (
+                                        <div key={key} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3 transition-colors hover:border-gray-300">
+                                            {/* Switch Header */}
+                                            <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                                                <span className="font-extrabold text-[11px] text-gray-800">{labelMap[key]}</span>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="sr-only peer" 
+                                                        checked={rule.enabled}
+                                                        onChange={e => {
+                                                            const next = { ...localSalarySettings };
+                                                            if (next.assessmentRules?.[key]) {
+                                                                next.assessmentRules[key].enabled = e.target.checked;
+                                                            }
+                                                            setLocalSalarySettings(next);
+                                                        }}
+                                                    />
+                                                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-bvb-yellow"></div>
+                                                    <span className="ml-2 text-[9px] font-black text-gray-500 uppercase">{rule.enabled ? '已启用' : '已关闭'}</span>
+                                                </label>
+                                            </div>
+
+                                            {rule.enabled && (
+                                                <div className="space-y-3 pt-1">
+                                                    {/* Config Row */}
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">考核/奖励对象</label>
+                                                            <div className="flex gap-3 py-1.5 px-2 bg-gray-50 rounded border border-gray-200">
+                                                                <label className="flex items-center gap-1 cursor-pointer">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        className="w-3.5 h-3.5 rounded border-gray-300 text-bvb-yellow focus:ring-bvb-yellow"
+                                                                        checked={rule.assessCoaches}
+                                                                        onChange={e => {
+                                                                            const next = { ...localSalarySettings };
+                                                                            if (next.assessmentRules?.[key]) {
+                                                                                next.assessmentRules[key].assessCoaches = e.target.checked;
+                                                                            }
+                                                                            setLocalSalarySettings(next);
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-gray-700">教练员</span>
+                                                                </label>
+                                                                <label className="flex items-center gap-1 cursor-pointer">
+                                                                    <input 
+                                                                        type="checkbox" 
+                                                                        className="w-3.5 h-3.5 rounded border-gray-300 text-bvb-yellow focus:ring-bvb-yellow"
+                                                                        checked={rule.assessAssistants}
+                                                                        onChange={e => {
+                                                                            const next = { ...localSalarySettings };
+                                                                            if (next.assessmentRules?.[key]) {
+                                                                                next.assessmentRules[key].assessAssistants = e.target.checked;
+                                                                            }
+                                                                            setLocalSalarySettings(next);
+                                                                        }}
+                                                                    />
+                                                                    <span className="text-[10px] font-bold text-gray-700">助理教练/助教</span>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">{amountLabelMap[key]}</label>
+                                                            <input 
+                                                                type="number" 
+                                                                className="w-full p-1.5 border border-gray-200 rounded font-black text-xs bg-white text-right outline-none focus:border-bvb-yellow" 
+                                                                value={rule.amount}
+                                                                onChange={e => {
+                                                                    const next = { ...localSalarySettings };
+                                                                    if (next.assessmentRules?.[key]) {
+                                                                        next.assessmentRules[key].amount = parseInt(e.target.value) || 0;
+                                                                    }
+                                                                    setLocalSalarySettings(next);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Timing Row */}
+                                                    <div>
+                                                        <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">具体考核考评时间点</label>
+                                                        <input 
+                                                            type="text" 
+                                                            className="w-full p-1.5 border border-gray-200 rounded text-xs bg-white text-gray-700 font-medium outline-none focus:border-bvb-yellow" 
+                                                            value={rule.timing}
+                                                            onChange={e => {
+                                                                const next = { ...localSalarySettings };
+                                                                if (next.assessmentRules?.[key]) {
+                                                                    next.assessmentRules[key].timing = e.target.value;
+                                                                }
+                                                                setLocalSalarySettings(next);
+                                                            }}
+                                                        />
+                                                    </div>
+
+                                                    {/* Content Row */}
+                                                    <div>
+                                                        <label className="text-[9px] font-black text-gray-400 uppercase block mb-1">具体考核项目及明细内容</label>
+                                                        <textarea 
+                                                            rows={2}
+                                                            className="w-full p-1.5 border border-gray-200 rounded text-[11px] bg-white text-gray-600 font-medium resize-none leading-relaxed outline-none focus:border-bvb-yellow" 
+                                                            value={rule.content}
+                                                            onChange={e => {
+                                                                const next = { ...localSalarySettings };
+                                                                if (next.assessmentRules?.[key]) {
+                                                                    next.assessmentRules[key].content = e.target.value;
+                                                                }
+                                                                setLocalSalarySettings(next);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>

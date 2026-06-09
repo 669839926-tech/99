@@ -496,6 +496,16 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         return 'Q4';
     });
 
+    const [now, setNow] = useState(new Date());
+    const [isDemoCountdown, setIsDemoCountdown] = useState(false);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setNow(new Date());
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
+
     const isCoach = currentUser?.role === 'coach';
     const isDirector = currentUser?.role === 'director';
     const canSeeRenewalLevel = currentUser?.role === 'director' || currentUser?.role === 'assistant_coach';
@@ -878,8 +888,200 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         const homeLogs = (editedPlayer.homeTrainingLogs || []).filter(l => l.date >= start && l.date <= end);
         const totalHomeDuration = homeLogs.reduce((acc, log) => acc + (log.duration || 0), 0);
 
+        const getDeadlineInfo = () => {
+            const nowDate = isDemoCountdown 
+                ? new Date(2026, 6, 5, 14, 30, 0) // Mock July 5, 2026
+                : now;
+            const year = nowDate.getFullYear();
+            const month = nowDate.getMonth(); // 0-11
+            const date = nowDate.getDate();
+            
+            let deadlineDate: Date;
+            let quarterLabel: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+            let targetYear: number;
+            
+            if (month === 0) { // Jan
+                if (date <= 10) {
+                    deadlineDate = new Date(year, 0, 10, 23, 59, 59);
+                    quarterLabel = 'Q4';
+                    targetYear = year - 1;
+                } else {
+                    deadlineDate = new Date(year, 3, 10, 23, 59, 59);
+                    quarterLabel = 'Q1';
+                    targetYear = year;
+                }
+            } else if (month >= 1 && month <= 2) { // Feb, Mar
+                deadlineDate = new Date(year, 3, 10, 23, 59, 59);
+                quarterLabel = 'Q1';
+                targetYear = year;
+            } else if (month === 3) { // Apr
+                if (date <= 10) {
+                    deadlineDate = new Date(year, 3, 10, 23, 59, 59);
+                    quarterLabel = 'Q1';
+                    targetYear = year;
+                } else {
+                    deadlineDate = new Date(year, 6, 10, 23, 59, 59);
+                    quarterLabel = 'Q2';
+                    targetYear = year;
+                }
+            } else if (month >= 4 && month <= 5) { // May, Jun
+                deadlineDate = new Date(year, 6, 10, 23, 59, 59);
+                quarterLabel = 'Q2';
+                targetYear = year;
+            } else if (month === 6) { // Jul
+                if (date <= 10) {
+                    deadlineDate = new Date(year, 6, 10, 23, 59, 59);
+                    quarterLabel = 'Q2';
+                    targetYear = year;
+                } else {
+                    deadlineDate = new Date(year, 9, 10, 23, 59, 59);
+                    quarterLabel = 'Q3';
+                    targetYear = year;
+                }
+            } else if (month >= 7 && month <= 8) { // Aug, Sep
+                deadlineDate = new Date(year, 9, 10, 23, 59, 59);
+                quarterLabel = 'Q3';
+                targetYear = year;
+            } else if (month === 9) { // Oct
+                if (date <= 10) {
+                    deadlineDate = new Date(year, 9, 10, 23, 59, 59);
+                    quarterLabel = 'Q3';
+                    targetYear = year;
+                } else {
+                    deadlineDate = new Date(year + 1, 0, 10, 23, 59, 59);
+                    quarterLabel = 'Q4';
+                    targetYear = year;
+                }
+            } else { // Nov, Dec
+                deadlineDate = new Date(year + 1, 0, 10, 23, 59, 59);
+                quarterLabel = 'Q4';
+                targetYear = year;
+            }
+            
+            const diffMs = deadlineDate.getTime() - nowDate.getTime();
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+            const diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000);
+            
+            return {
+                nowDate,
+                deadlineDate,
+                quarterLabel,
+                targetYear,
+                diffMs,
+                diffDays,
+                diffHours,
+                diffMins,
+                diffSecs,
+                isWithinTenDays: diffDays <= 10 && diffMs > 0
+            };
+        };
+        
+        const deadlineInfo = getDeadlineInfo();
+        const teamPlayers = (allPlayers || []).filter(p => p.teamId === editedPlayer.teamId);
+        const reviewedTeamPlayers = teamPlayers.filter(p => p.reviews?.some(r => r.year === deadlineInfo.targetYear && r.quarter === deadlineInfo.quarterLabel && (r.status === 'Published' || r.status === 'Submitted')));
+        const isCurrentPlayerReviewed = editedPlayer.reviews?.some(r => r.year === deadlineInfo.targetYear && r.quarter === deadlineInfo.quarterLabel && (r.status === 'Published' || r.status === 'Submitted'));
+        
+        const teamName = teams.find(t => t.id === editedPlayer.teamId)?.name || '本梯队';
+        const expectedDeduction = (teamPlayers.length - reviewedTeamPlayers.length) * 5;
+
         return (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-6 pb-24 md:pb-10">
+                {/* 球员季度跟踪考核及倒计时提醒 */}
+                <div className={`border rounded-2xl p-5 shadow-md transition-all ${deadlineInfo.isWithinTenDays ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200 text-red-900 animate-pulse-slow font-sans' : 'bg-gray-50 border-gray-200 text-gray-800'}`}>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                                <span className={`flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${deadlineInfo.isWithinTenDays ? 'bg-red-500 text-white' : 'bg-bvb-black text-bvb-yellow'}`}>
+                                    <Zap className="w-3 h-3 fill-current" />
+                                    {deadlineInfo.isWithinTenDays ? '临近录入截止（10天内倒计时提醒中）' : '青训总监考核要求'}
+                                </span>
+                                <button 
+                                    type="button" 
+                                    onClick={() => setIsDemoCountdown(!isDemoCountdown)} 
+                                    className="text-[10px] underline font-bold text-gray-400 hover:text-bvb-black transition-colors"
+                                >
+                                    {isDemoCountdown ? '← 恢复真实时间' : '⚡ 模拟10天内倒计时效果'}
+                                </button>
+                            </div>
+                            <h4 className="font-extrabold text-sm mt-1.5 leading-relaxed">
+                                各梯队教练员必须于每季度次月10日前对上季度球员跟踪录入完毕（本期截止日期为：{deadlineInfo.deadlineDate.getFullYear()}年{deadlineInfo.deadlineDate.getMonth() + 1}月10日）。
+                            </h4>
+                            <p className="text-xs font-bold text-gray-500 flex items-center mt-1">
+                                <span className="text-red-600">★ 扣罚标准：</span>未按要求执行，每个球员扣除 <span className="text-red-600 font-extrabold text-sm ml-0.5 mr-0.5">5</span> 元。
+                            </p>
+                        </div>
+
+                        {/* Countdown display */}
+                        {deadlineInfo.diffMs > 0 ? (
+                            <div className="flex flex-col items-end shrink-0">
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                                    【{deadlineInfo.targetYear} {deadlineInfo.quarterLabel}】录入截止还剩：
+                                </span>
+                                <div className="flex gap-1.5 mt-1">
+                                    <div className="flex flex-col items-center">
+                                        <div className={`px-2.5 py-1.5 rounded-lg text-lg font-black font-mono shadow-sm ${deadlineInfo.isWithinTenDays ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                                            {String(deadlineInfo.diffDays).padStart(2, '0')}
+                                        </div>
+                                        <span className="text-[9px] text-gray-400 font-bold mt-0.5">天</span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <div className={`px-2.5 py-1.5 rounded-lg text-lg font-black font-mono shadow-sm ${deadlineInfo.isWithinTenDays ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                                            {String(deadlineInfo.diffHours).padStart(2, '0')}
+                                        </div>
+                                        <span className="text-[9px] text-gray-400 font-bold mt-0.5">时</span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <div className={`px-2.5 py-1.5 rounded-lg text-lg font-black font-mono shadow-sm ${deadlineInfo.isWithinTenDays ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                                            {String(deadlineInfo.diffMins).padStart(2, '0')}
+                                        </div>
+                                        <span className="text-[9px] text-gray-400 font-bold mt-0.5">分</span>
+                                    </div>
+                                    <div className="flex flex-col items-center">
+                                        <div className={`px-2.5 py-1.5 rounded-lg text-lg font-black font-mono shadow-sm ${deadlineInfo.isWithinTenDays ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+                                            {String(deadlineInfo.diffSecs).padStart(2, '0')}
+                                        </div>
+                                        <span className="text-[9px] text-gray-400 font-bold mt-0.5">秒</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-red-500 text-white font-black px-4 py-2 rounded-xl text-center shadow">
+                                录入已截止 ({deadlineInfo.deadlineDate.toISOString().split('T')[0]})
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Team wide status and current player status */}
+                    <div className="mt-4 pt-3 border-t border-dashed border-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold text-gray-600">
+                        <div className="flex items-center gap-2">
+                            <span className="text-gray-400">被选球员【{editedPlayer.name}】状态:</span>
+                            {isCurrentPlayerReviewed ? (
+                                <span className="text-green-600 flex items-center bg-green-50 px-2 py-0.5 rounded border border-green-100">
+                                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> 已录入完毕
+                                </span>
+                            ) : (
+                                <span className="text-red-500 flex items-center bg-red-50 px-2 py-0.5 rounded border border-red-100 animate-pulse">
+                                    <X className="w-3.5 h-3.5 mr-1" /> 未录入 (漏记扣除 5 元)
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center md:justify-end gap-3">
+                            <div>
+                                <span className="text-gray-400">【{teamName}】跟踪录入进度:</span>{' '}
+                                <span className="text-bvb-black font-black">{reviewedTeamPlayers.length} / {teamPlayers.length}</span>
+                            </div>
+                            <div className="h-3 w-px bg-gray-300"></div>
+                            <div>
+                                <span className="text-gray-400">预计将扣除金额:</span>{' '}
+                                <span className={`font-black ${expectedDeduction > 0 ? 'text-red-500 animate-pulse' : 'text-green-500'}`}>
+                                    ¥{expectedDeduction} 元
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {/* Tracking Dashboard Section */}
                 <div className="bg-gradient-to-br from-gray-900 to-bvb-black text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex-1 w-full space-y-4">

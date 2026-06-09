@@ -122,6 +122,56 @@ export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
     },
     enableCoachPerformanceReward: true,
     enableAssistantPerformanceReward: true,
+    assessmentRules: {
+        assistantSupervision: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: true,
+            amount: 10,
+            timing: '每场训练课后 (每日累积督考)',
+            content: '检查考核教练/助教的着装规范(缺项扣10元)、必备口哨、消音/秒表，以及器材清理规范完成情况(未清每次扣10元)。'
+        },
+        directorLogAudit: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: false,
+            amount: 10,
+            timing: '每日训练课后 (月度累积计算)',
+            content: '训练日志应在下课当天完成提交。逾期1天扣除10元，逾期2天及以上扣罚20元。'
+        },
+        periodizationPlan: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: false,
+            amount: 20, // 20%
+            timing: '季度末月 (Q1-Q4季末终审评定)',
+            content: '每季度底需及时更新录入所带梯队的周期计划与目标大纲，若季度考核评定为“未录入”将扣除基础底薪的20%。'
+        },
+        playerReview: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: false,
+            amount: 5,
+            timing: '每季度次月10日 24:00 截止',
+            content: '要求在次月10日前录入并提交学员上季度的全部成长评估，每漏录入1人扣罚5元。'
+        },
+        quarterlyAttendance: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: true,
+            amount: 200,
+            timing: '每季度末 (总监终评)',
+            content: '配合青训总监对教练员进行季度考核执勤，评定为优秀全勤者给予单次追加奖励200元。'
+        },
+        monthlyExecution: {
+            enabled: true,
+            assessCoaches: true,
+            assessAssistants: true,
+            amount: 200,
+            timing: '每月核算周期',
+            content: '对无严重违纪或前4项考核累计扣罚≤0元的发放优秀奖(¥200)；累计扣罚在 ¥20(含)以内的发放良好奖(¥100)；超过 ¥20 则不予以正向奖励。'
+        }
+    }
 };
 
 export const DEFAULT_FINANCE_CATEGORIES: FinanceCategoryDefinition[] = [
