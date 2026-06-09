@@ -169,7 +169,26 @@ function App() {
         }
         if (data.financeCategories) setFinanceCategories(data.financeCategories);
         if (data.techTests) setTechTests(data.techTests);
-        if (data.salarySettings) setSalarySettings(data.salarySettings);
+        if (data.salarySettings) {
+            let settings = data.salarySettings;
+            if (!settings.levels || settings.levels.length < 4 || !settings.levels.some((l: any) => l.level === 'Apprentice')) {
+                settings = {
+                    ...settings,
+                    levels: [
+                        { level: 'Apprentice', label: '见席', baseSalary: 200, sessionBaseFee: 70 },
+                        { level: 'Junior', label: '初级', baseSalary: 500, sessionBaseFee: 60 },
+                        { level: 'Intermediate', label: '常驻', baseSalary: 1000, sessionBaseFee: 70 },
+                        { level: 'Senior', label: '核心', baseSalary: 2000, sessionBaseFee: 90 },
+                    ]
+                };
+            }
+            // Ensure proper label for Apprentice
+            const appLvl = settings.levels.find((l: any) => l.level === 'Apprentice');
+            if (appLvl && appLvl.label === '见席') {
+                appLvl.label = '见习';
+            }
+            setSalarySettings(settings);
+        }
         if (data.periodizationPlans) setPeriodizationPlans(data.periodizationPlans);
         if (data.accountingRecords) setAccountingRecords(data.accountingRecords);
         if (data.tactics) setTactics(data.tactics);
@@ -317,7 +336,26 @@ function App() {
     if (data.permissions) setPermissions(data.permissions);
     if (Array.isArray(data.financeCategories)) setFinanceCategories(data.financeCategories);
     if (Array.isArray(data.techTests)) setTechTests(data.techTests);
-    if (data.salarySettings) setSalarySettings(data.salarySettings);
+    if (data.salarySettings) {
+        let settings = data.salarySettings;
+        if (!settings.levels || settings.levels.length < 4 || !settings.levels.some((l: any) => l.level === 'Apprentice')) {
+            settings = {
+                ...settings,
+                levels: [
+                    { level: 'Apprentice', label: '见习', baseSalary: 200, sessionBaseFee: 70 },
+                    { level: 'Junior', label: '初级', baseSalary: 500, sessionBaseFee: 60 },
+                    { level: 'Intermediate', label: '常驻', baseSalary: 1000, sessionBaseFee: 70 },
+                    { level: 'Senior', label: '核心', baseSalary: 2000, sessionBaseFee: 90 },
+                ]
+            };
+        }
+        // Ensure proper label for Apprentice
+        const appLvl = settings.levels.find((l: any) => l.level === 'Apprentice');
+        if (appLvl && appLvl.label === '见席') {
+            appLvl.label = '见习';
+        }
+        setSalarySettings(settings);
+    }
     if (Array.isArray(data.periodizationPlans)) setPeriodizationPlans(data.periodizationPlans);
     if (Array.isArray(data.accountingRecords)) setAccountingRecords(data.accountingRecords);
     if (Array.isArray(data.tactics)) setTactics(data.tactics);

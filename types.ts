@@ -481,7 +481,7 @@ export interface Announcement {
 export type UserRole = 'director' | 'coach' | 'assistant_coach' | 'parent';
 
 // --- Coach Salary Types ---
-export type CoachLevel = 'Junior' | 'Intermediate' | 'Senior';
+export type CoachLevel = 'Apprentice' | 'Junior' | 'Intermediate' | 'Senior';
 
 export interface CoachLevelSetting {
     level: CoachLevel;
@@ -597,6 +597,7 @@ export interface User {
   playerId?: string;
   // Salary fields
   level?: CoachLevel;
+  isTrial?: boolean;
   monthlyEvaluations?: MonthlyEvaluation[];
   monthlySalaryRecords?: MonthlySalaryRecord[];
 }

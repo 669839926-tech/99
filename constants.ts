@@ -98,9 +98,10 @@ export const DEFAULT_PERMISSIONS: RolePermissions = {
 
 export const DEFAULT_SALARY_SETTINGS: SalarySettings = {
     levels: [
-        { level: 'Junior', label: '初级', baseSalary: 3000, sessionBaseFee: 60 },
-        { level: 'Intermediate', label: '中级', baseSalary: 4500, sessionBaseFee: 70 },
-        { level: 'Senior', label: '高级', baseSalary: 6000, sessionBaseFee: 90 },
+        { level: 'Apprentice', label: '见习', baseSalary: 200, sessionBaseFee: 70 },
+        { level: 'Junior', label: '初级', baseSalary: 500, sessionBaseFee: 60 },
+        { level: 'Intermediate', label: '常驻', baseSalary: 1000, sessionBaseFee: 70 },
+        { level: 'Senior', label: '核心', baseSalary: 2000, sessionBaseFee: 90 },
     ],
     incrementalPlayerFee: 5,
     minPlayersForCalculation: 6,

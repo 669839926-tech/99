@@ -333,8 +333,12 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     singleSessionFee = salarySettings.assistantCoachSessionBaseFee + (extraPlayers * salarySettings.assistantCoachIncrementalPlayerFee);
                 } else {
                     // 主教练规则: 基础 + 超额
-                    const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
-                    singleSessionFee = levelConfig.sessionBaseFee + (extraPlayers * salarySettings.incrementalPlayerFee);
+                    if (coach.level === 'Apprentice' && coach.isTrial) {
+                        singleSessionFee = 50;
+                    } else {
+                        const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
+                        singleSessionFee = levelConfig.sessionBaseFee + (extraPlayers * salarySettings.incrementalPlayerFee);
+                    }
                 }
 
                 const countImplemented = monthlySessions.filter(s => (s.lessonPlanAssessment || 'implemented') === 'implemented').length;
@@ -359,7 +363,11 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     const ratioText = countNotAdjusted > 0 || countNoPlan > 0
                         ? ` [考核兑付: 100%兑付×${countImplemented}课, 70%兑付×${countNotAdjusted}课, 50%兑付×${countNoPlan}课]`
                         : ` [100%兑付×${monthlySessions.length}课]`;
-                    sessionFeeFormula = `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee}) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
+                    if (coach.level === 'Apprentice' && coach.isTrial) {
+                        sessionFeeFormula = `(见习试岗价 ¥50/课时) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
+                    } else {
+                        sessionFeeFormula = `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee}) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
+                    }
                 }
 
                 let monthlyAttendanceRate = 0;
@@ -557,7 +565,9 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const performanceFormula = "主观评价绩效奖励已取消";
 
             const currentEdit = editPayroll[coach.id] || {};
-            const baseSalaryDefault = isAssistant ? salarySettings.assistantCoachBaseSalary : levelConfig.baseSalary;
+            const baseSalaryDefault = isAssistant 
+                ? salarySettings.assistantCoachBaseSalary 
+                : (coach.level === 'Apprentice' && coach.isTrial ? 0 : levelConfig.baseSalary);
 
             // 3. 季度周期计划目标考核录入 (periodizationPlan)
             let periodizationDeduction = 0;
@@ -910,7 +920,14 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                 <td className="px-2 py-3 md:px-4 md:py-4">
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center gap-1"><span className="font-black text-gray-800 text-[11px] md:text-sm">{sal.coachName}</span>{sal.isDisbursed && <span className="text-[7px] md:text-[8px] bg-green-500 text-white px-1 rounded font-black uppercase">已发</span>}</div>
-                                                        <div className="flex items-center gap-1.5 mt-0.5"><span className={`text-[8px] font-black uppercase px-1 rounded border leading-tight ${sal.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>{sal.role === 'coach' ? '主教练' : '助教'}</span><span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">{sal.level}</span></div>
+                                                                                       <div className="flex items-center gap-1.5 mt-0.5">
+                                                             <span className={`text-[8px] font-black uppercase px-1 rounded border leading-tight ${sal.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                                                                 {sal.role === 'coach' ? '主教练' : '助教'}
+                                                             </span>
+                                                             <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">
+                                                                 {sal.level === 'Apprentice' ? '见习' : sal.level === 'Junior' ? '初级' : sal.level === 'Intermediate' ? '常驻' : sal.level === 'Senior' ? '核心' : sal.level}
+                                                             </span>
+                                                         </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right"><input type="number" className={`w-12 md:w-20 p-1 border rounded text-right font-black text-[10px] md:text-xs bg-transparent focus:bg-white outline-none ${sal.isModified ? 'border-bvb-yellow bg-yellow-50' : 'border-transparent hover:border-gray-200'}`} value={sal.baseSalary || 0} onChange={(e) => handleUpdatePayrollField(sal.coachId, 'baseSalary', e.target.value)} /></td>

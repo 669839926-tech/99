@@ -46,9 +46,10 @@ const ROLES: { id: UserRole; label: string }[] = [
 ];
 
 const COACH_LEVELS: { id: CoachLevel; label: string }[] = [
-    { id: 'Junior', label: '初级 (Junior)' },
-    { id: 'Intermediate', label: '中级 (Intermediate)' },
-    { id: 'Senior', label: '高级 (Senior)' },
+    { id: 'Apprentice', label: '见习教练 (Apprentice)' },
+    { id: 'Junior', label: '初级教练员 (Junior)' },
+    { id: 'Intermediate', label: '常驻教练员 (Intermediate)' },
+    { id: 'Senior', label: '核心教练员 (Senior)' },
 ];
 
 const Settings: React.FC<SettingsProps> = ({ 
@@ -134,7 +135,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [activeTagGroup, setActiveTagGroup] = useState<'playerTypes' | 'technicalStrengths' | 'personalityTraits' | 'behavioralTraits' | 'coachingReminders'>('playerTypes');
   const [newItemName, setNewItemName] = useState('');
 
-  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior' });
+  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
 
@@ -216,7 +217,7 @@ const Settings: React.FC<SettingsProps> = ({
               onAddUser(user);
               alert(`用户 ${user.name} 已创建，默认密码为 123`);
           }
-          setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior' });
+          setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false });
           setEditingUserId(null);
       }
   };
@@ -231,13 +232,13 @@ const Settings: React.FC<SettingsProps> = ({
 
   const startEditUser = (user: User) => {
       setEditingUserId(user.id);
-      setNewUser({ username: user.username, name: user.name, role: user.role, teamIds: user.teamIds || [], level: user.level || 'Junior' });
+      setNewUser({ username: user.username, name: user.name, role: user.role, teamIds: user.teamIds || [], level: user.level || 'Junior', isTrial: user.isTrial || false });
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEditUser = () => {
       setEditingUserId(null);
-      setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior' });
+      setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false });
   };
 
   const handleDeleteUserClick = (id: string) => {
@@ -881,11 +882,27 @@ const Settings: React.FC<SettingsProps> = ({
                                 </select>
                             </div>
                             {newUser.role === 'coach' && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">教练等级</label>
-                                    <select className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.level} onChange={e => setNewUser({...newUser, level: e.target.value as CoachLevel})}>
-                                        {COACH_LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
-                                    </select>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">教练等级</label>
+                                        <select className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.level} onChange={e => setNewUser({...newUser, level: e.target.value as CoachLevel})}>
+                                            {COACH_LEVELS.map(l => <option key={l.id} value={l.id}>{l.label}</option>)}
+                                        </select>
+                                    </div>
+                                    {newUser.level === 'Apprentice' && (
+                                        <div className="flex items-center gap-2 pt-5">
+                                            <input 
+                                                id="isTrial" 
+                                                type="checkbox" 
+                                                className="w-4 h-4 text-bvb-yellow border-gray-300 rounded focus:ring-bvb-yellow cursor-pointer"
+                                                checked={newUser.isTrial || false}
+                                                onChange={e => setNewUser({...newUser, isTrial: e.target.checked})}
+                                            />
+                                            <label htmlFor="isTrial" className="text-xs font-bold text-gray-700 cursor-pointer select-none">
+                                                处于试岗期间 (50元/课时且无底薪)
+                                            </label>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -939,7 +956,18 @@ const Settings: React.FC<SettingsProps> = ({
                                         <div className="flex items-center gap-3 mb-1">
                                             <span className="font-black text-gray-800 text-lg leading-none">{u.name}</span>
                                             <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-tighter ${u.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : u.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : u.role === 'assistant_coach' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-gray-50 text-gray-500'}`}>{u.role === 'coach' ? '主教练' : u.role === 'assistant_coach' ? '助教' : u.role}</span>
-                                            {u.role === 'coach' && <span className="text-[9px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{u.level || 'Junior'}</span>}
+                                            {u.role === 'coach' && (
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-[9px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                        {u.level === 'Apprentice' ? '见习' : u.level === 'Junior' ? '初级' : u.level === 'Intermediate' ? '常驻' : u.level === 'Senior' ? '核心' : u.level || 'Junior'}
+                                                    </span>
+                                                    {u.level === 'Apprentice' && (
+                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${u.isTrial ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
+                                                            {u.isTrial ? '试岗期 (50/课时)' : '正式 (底薪200)'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 font-bold">
                                             <span className="flex items-center gap-1 font-mono">ID: {u.username}</span>
