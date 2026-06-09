@@ -595,6 +595,7 @@ export interface User {
   role: UserRole;
   teamIds?: string[];
   playerId?: string;
+  joiningDate?: string; // 入职时间 YYYY-MM-DD
   // Salary fields
   level?: CoachLevel;
   isTrial?: boolean;

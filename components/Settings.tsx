@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet, Cloud, Database, RefreshCw, FileJson, AlertTriangle, History, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet, Cloud, Database, RefreshCw, FileJson, AlertTriangle, History, ArrowRight, Calendar as CalendarIcon } from 'lucide-react';
+import { getCoachingTenure } from './utils';
 
 interface SettingsProps {
   attributeConfig: AttributeConfig;
@@ -135,7 +136,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [activeTagGroup, setActiveTagGroup] = useState<'playerTypes' | 'technicalStrengths' | 'personalityTraits' | 'behavioralTraits' | 'coachingReminders'>('playerTypes');
   const [newItemName, setNewItemName] = useState('');
 
-  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false });
+  const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false, joiningDate: '' });
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
 
@@ -217,7 +218,7 @@ const Settings: React.FC<SettingsProps> = ({
               onAddUser(user);
               alert(`用户 ${user.name} 已创建，默认密码为 123`);
           }
-          setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false });
+          setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false, joiningDate: '' });
           setEditingUserId(null);
       }
   };
@@ -232,13 +233,13 @@ const Settings: React.FC<SettingsProps> = ({
 
   const startEditUser = (user: User) => {
       setEditingUserId(user.id);
-      setNewUser({ username: user.username, name: user.name, role: user.role, teamIds: user.teamIds || [], level: user.level || 'Junior', isTrial: user.isTrial || false });
+      setNewUser({ username: user.username, name: user.name, role: user.role, teamIds: user.teamIds || [], level: user.level || 'Junior', isTrial: user.isTrial || false, joiningDate: user.joiningDate || '' });
       window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const cancelEditUser = () => {
       setEditingUserId(null);
-      setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false });
+      setNewUser({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false, joiningDate: '' });
   };
 
   const handleDeleteUserClick = (id: string) => {
@@ -866,7 +867,7 @@ const Settings: React.FC<SettingsProps> = ({
                         {editingUserId && <button onClick={cancelEditUser} className="text-xs text-gray-400 hover:text-red-500 flex items-center font-bold"><X className="w-3 h-3 mr-1" /> 放弃修改</button>}
                     </div>
                     <form onSubmit={handleUserFormSubmit} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
                             <div>
                                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">用户名</label>
                                 <input placeholder="登录账号" className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} required />
@@ -881,8 +882,12 @@ const Settings: React.FC<SettingsProps> = ({
                                     {ROLES.map(r => <option key={r.id} value={r.id}>{r.label.split('(')[0].trim()}</option>)}
                                 </select>
                             </div>
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">入职时间</label>
+                                <input type="date" className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.joiningDate || ''} onChange={e => setNewUser({...newUser, joiningDate: e.target.value})} />
+                            </div>
                             {newUser.role === 'coach' && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2 lg:col-span-1">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">教练等级</label>
                                         <select className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.level} onChange={e => setNewUser({...newUser, level: e.target.value as CoachLevel})}>
@@ -949,8 +954,15 @@ const Settings: React.FC<SettingsProps> = ({
                         {users.map(u => (
                             <div key={u.id} className="flex flex-col md:flex-row justify-between items-start md:items-center p-5 bg-white border border-gray-100 rounded-2xl hover:shadow-md transition-all group relative overflow-hidden">
                                 <div className="flex items-center gap-6 z-10 w-full">
-                                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0 border-2 border-white shadow-sm">
-                                        <UsersIcon className="w-6 h-6 text-gray-400" />
+                                    <div className="flex flex-col items-center gap-1 shrink-0">
+                                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center border-2 border-white shadow-sm relative">
+                                            <UsersIcon className="w-6 h-6 text-gray-400" />
+                                        </div>
+                                        {u.joiningDate && (
+                                            <span className="text-[9px] bg-bvb-black text-bvb-yellow font-black px-2 py-0.5 rounded-full scale-90 whitespace-nowrap">
+                                                已执教 {getCoachingTenure(u.joiningDate)}
+                                            </span>
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
@@ -971,6 +983,11 @@ const Settings: React.FC<SettingsProps> = ({
                                         </div>
                                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 font-bold">
                                             <span className="flex items-center gap-1 font-mono">ID: {u.username}</span>
+                                            {u.joiningDate && (
+                                                <span className="flex items-center gap-1 text-emerald-600">
+                                                    <CalendarIcon className="w-3 h-3" /> 入职: {u.joiningDate}
+                                                </span>
+                                            )}
                                             {(u.teamIds && u.teamIds.length > 0) && (
                                                 <span className="flex items-center gap-1 text-blue-500">
                                                     <Shirt className="w-3 h-3" /> 负责: {u.teamIds.map(tid => teams.find(t => t.id === tid)?.name || tid).join(', ')}

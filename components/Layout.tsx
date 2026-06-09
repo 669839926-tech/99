@@ -2,6 +2,7 @@
 import React from 'react';
 import { LayoutDashboard, Calendar, Trophy, Settings, LogOut, Shirt, User, Cloud, Check, RefreshCw, PenTool, Wallet, TrendingUp, X, BookOpen } from 'lucide-react';
 import { User as UserType, RolePermissions, ModuleId } from '../types';
+import { getCoachingTenure } from './utils';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -82,14 +83,19 @@ const Layout: React.FC<LayoutProps> = ({
 
         {currentUser && (
             <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-3">
-                 <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-bvb-yellow">
+                 <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-bvb-yellow shrink-0">
                      <User className="w-5 h-5" />
                  </div>
-                 <div>
+                 <div className="min-w-0">
                      <p className="text-sm font-bold text-white truncate max-w-[120px]">{currentUser.name}</p>
                      <p className="text-[10px] text-gray-400 uppercase font-bold">
                          {currentUser.role === 'director' ? '青训总监' : currentUser.role === 'coach' ? '教练员' : currentUser.role === 'assistant_coach' ? '助教' : '家长'}
                      </p>
+                     {currentUser.joiningDate && (
+                         <p className="text-[9px] text-bvb-yellow font-bold mt-0.5">
+                             已执教 {getCoachingTenure(currentUser.joiningDate)}
+                         </p>
+                     )}
                  </div>
             </div>
         )}
