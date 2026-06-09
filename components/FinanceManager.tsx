@@ -333,8 +333,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     singleSessionFee = salarySettings.assistantCoachSessionBaseFee + (extraPlayers * salarySettings.assistantCoachIncrementalPlayerFee);
                 } else {
                     // 主教练规则: 基础 + 超额
-                    if (coach.level === 'Apprentice' && coach.isTrial) {
-                        singleSessionFee = 50;
+                    if (coach.level === 'Apprentice') {
+                        singleSessionFee = coach.isTrial ? 50 : levelConfig.sessionBaseFee;
                     } else {
                         const extraPlayers = Math.max(0, teamSize - salarySettings.minPlayersForCalculation);
                         singleSessionFee = levelConfig.sessionBaseFee + (extraPlayers * salarySettings.incrementalPlayerFee);
@@ -363,8 +363,12 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     const ratioText = countNotAdjusted > 0 || countNoPlan > 0
                         ? ` [考核兑付: 100%兑付×${countImplemented}课, 70%兑付×${countNotAdjusted}课, 50%兑付×${countNoPlan}课]`
                         : ` [100%兑付×${monthlySessions.length}课]`;
-                    if (coach.level === 'Apprentice' && coach.isTrial) {
-                        sessionFeeFormula = `(见习试岗价 ¥50/课时) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
+                    if (coach.level === 'Apprentice') {
+                        if (coach.isTrial) {
+                            sessionFeeFormula = `(见习试岗价 ¥50/课时，不享受人数递增) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
+                        } else {
+                            sessionFeeFormula = `(见习正式价 ¥${levelConfig.sessionBaseFee}/课时，不享受人数递增) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
+                        }
                     } else {
                         sessionFeeFormula = `(¥${levelConfig.sessionBaseFee} + (${teamSize}人 - ${salarySettings.minPlayersForCalculation}基准) * ¥${salarySettings.incrementalPlayerFee}) * 课时 = ¥${monthlySessionFeeTotal}${ratioText}`;
                     }
@@ -411,11 +415,17 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     }).length;
 
                     const dueForRenewalCount = renewedCount + expiredCount;
-                    renewalRate = dueForRenewalCount > 0 ? (renewedCount / dueForRenewalCount) * 100 : (teamSize > 0 ? 100 : 0);
-                    renewalReward = isRenewalEnabled ? (renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0) : 0;
-                    renewalFormula = isRenewalEnabled 
-                        ? `${renewedCount}实续(单次≥${salarySettings.quarterlyRenewalReward.minRechargeAmount}节) / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`
-                        : "该项绩效未开启";
+                    if (coach.level === 'Apprentice') {
+                        renewalRate = 0;
+                        renewalReward = 0;
+                        renewalFormula = "见习教练不享受季度续费率奖励";
+                    } else {
+                        renewalRate = dueForRenewalCount > 0 ? (renewedCount / dueForRenewalCount) * 100 : (teamSize > 0 ? 100 : 0);
+                        renewalReward = isRenewalEnabled ? (renewalRate >= salarySettings.quarterlyRenewalReward.threshold ? (renewedCount * salarySettings.quarterlyRenewalReward.amount) : 0) : 0;
+                        renewalFormula = isRenewalEnabled 
+                            ? `${renewedCount}实续(单次≥${salarySettings.quarterlyRenewalReward.minRechargeAmount}节) / ${dueForRenewalCount}到期 = ${renewalRate.toFixed(1)}% (阈值≥${salarySettings.quarterlyRenewalReward.threshold}% 奖 ¥${salarySettings.quarterlyRenewalReward.amount}/人 × ${renewedCount}人 = ¥${renewalReward})`
+                            : "该项绩效未开启";
+                    }
                 }
 
                 return { 
