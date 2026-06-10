@@ -496,25 +496,37 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
                             </div>
 
                             {/* Enable manual override */}
-                            <div className="pt-2 border-t border-gray-200/60 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订分类</label>
-                                    <input
-                                        type="text"
-                                        placeholder="分类, 例如 [基础技术] 运控球"
-                                        className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
-                                        value={localWeek.trainingTheme || ''}
-                                        onChange={e => setLocalWeek({ ...localWeek, trainingTheme: e.target.value })}
-                                    />
+                            <div className="pt-2 border-t border-gray-200/60 flex flex-col gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订分类</label>
+                                        <input
+                                            type="text"
+                                            placeholder="分类, 例如 [基础技术] 运控球"
+                                            className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                            value={localWeek.trainingTheme || ''}
+                                            onChange={e => setLocalWeek({ ...localWeek, trainingTheme: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订中心训练内容</label>
+                                        <input
+                                            type="text"
+                                            placeholder="主题具体描述描述..."
+                                            className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
+                                            value={localWeek.trainingContent || ''}
+                                            onChange={e => setLocalWeek({ ...localWeek, trainingContent: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5">手动校订中心训练内容</label>
+                                    <label className="block text-[9px] font-black text-gray-400 uppercase mb-0.5 flex items-center gap-1">💪 体能主题</label>
                                     <input
                                         type="text"
-                                        placeholder="主题具体描述描述..."
-                                        className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none"
-                                        value={localWeek.trainingContent || ''}
-                                        onChange={e => setLocalWeek({ ...localWeek, trainingContent: e.target.value })}
+                                        placeholder="主训练体能主题, 例如: 灵敏, 速度, 耐力, 柔韧..."
+                                        className="w-full p-2 border border-gray-200 bg-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-bvb-yellow outline-none text-gray-800"
+                                        value={localWeek.physicalTheme || ''}
+                                        onChange={e => setLocalWeek({ ...localWeek, physicalTheme: e.target.value })}
                                     />
                                 </div>
                             </div>
