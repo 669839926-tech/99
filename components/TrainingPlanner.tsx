@@ -402,15 +402,64 @@ interface WeeklyPlanEditorProps {
     focusSubjects?: Record<string, string[]>;
     basicTechThemes?: BasicTechItem[];
     scenarioThemes?: ScenarioTheme[];
+    trainings?: TrainingSession[];
+    teamId?: string;
 }
 
-const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClose, clipboard, onCopy, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES }) => {
+const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ 
+    week, onSave, onClose, clipboard, onCopy, 
+    basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES,
+    trainings = [], teamId
+}) => {
     const [localWeek, setLocalWeek] = useState<WeeklyPlan>(() => ({
         ...week,
         subItems: week.subItems ? JSON.parse(JSON.stringify(week.subItems)) : []
     }));
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
     const [themeSelectorTarget, setThemeSelectorTarget] = useState<'main' | number>('main');
+
+    // Dynamically retrieve the last training reflection matching the current week's chosen theme/content
+    const lastReflectionSession = useMemo(() => {
+        if (!trainings || trainings.length === 0) return null;
+        const currentTheme = (localWeek.trainingTheme || '').trim().toLowerCase();
+        const currentContent = (localWeek.trainingContent || '').trim().toLowerCase();
+        
+        if (!currentTheme && !currentContent) return null;
+
+        // Filter sessions that have active plan reflection
+        const sessionsWithReflection = trainings.filter(s => s.planReflection && s.planReflection.trim().length > 0);
+        
+        if (sessionsWithReflection.length === 0) return null;
+
+        const matchScore = (s: TrainingSession) => {
+            const sFocus = (s.focus || '').trim().toLowerCase();
+            const sTitle = (s.title || '').trim().toLowerCase();
+            
+            let score = 0;
+            // Content match is highest score
+            if (currentContent && sTitle.includes(currentContent)) score += 10;
+            if (currentContent && sFocus.includes(currentContent)) score += 8;
+            // Theme category match
+            if (currentTheme && sFocus.includes(currentTheme)) score += 6;
+            if (currentTheme && sTitle.includes(currentTheme)) score += 4;
+            
+            // Boost if matching the same soccer team
+            if (score > 0 && s.teamId === teamId) {
+                score += 5;
+            }
+            return score;
+        };
+
+        const matches = sessionsWithReflection
+            .map(s => ({ session: s, score: matchScore(s) }))
+            .filter(item => item.score > 0)
+            .sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return new Date(b.session.date).getTime() - new Date(a.session.date).getTime();
+            });
+
+        return matches.length > 0 ? matches[0].session : null;
+    }, [trainings, localWeek.trainingTheme, localWeek.trainingContent, teamId]);
 
     const handlePaste = () => {
         if (clipboard) {
@@ -530,6 +579,29 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({ week, onSave, onClo
                                     />
                                 </div>
                             </div>
+
+                            {/* 历史同名教案/主题反思回顾 */}
+                            {lastReflectionSession && (
+                                <div className="mt-3 bg-amber-50/70 border border-amber-200/60 p-3 rounded-xl space-y-1.5 animate-in fade-in duration-150 shadow-xs">
+                                    <div className="flex items-center justify-between text-[10px] font-black text-amber-800 uppercase tracking-tight">
+                                        <span className="flex items-center gap-1">
+                                            <History className="w-3.5 h-3.5 text-amber-600 inline" />
+                                            历史相同主题教案反思回顾
+                                        </span>
+                                        <span className="text-[9px] bg-white text-gray-400 px-1.5 py-0.5 rounded border border-amber-100 font-mono">
+                                            {lastReflectionSession.date}
+                                        </span>
+                                    </div>
+                                    <div className="text-xs text-amber-900 font-bold bg-white/50 p-2.5 rounded-lg border border-amber-100/60">
+                                        <div className="text-[10px] text-gray-400 font-bold mb-1">
+                                            关联课次：{lastReflectionSession.title}
+                                        </div>
+                                        <p className="italic font-normal text-amber-950 leading-relaxed">
+                                            "{lastReflectionSession.planReflection}"
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Integrated pedagogical prompt card */}
@@ -1885,6 +1957,44 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       };
   }, [matchedWeekPlanForForm, selectedThemeId]);
 
+  // Find historic reflection for the active selected theme in training session creation
+  const addModalLastReflectionSession = useMemo(() => {
+      if (!showAddModal || !trainings || trainings.length === 0 || !activeSelectedTheme) return null;
+      const currentTheme = (activeSelectedTheme.theme || '').trim().toLowerCase();
+      const currentContent = (activeSelectedTheme.content || '').trim().toLowerCase();
+      
+      if (!currentTheme && !currentContent) return null;
+
+      const sessionsWithReflection = trainings.filter(s => s.planReflection && s.planReflection.trim().length > 0);
+      if (sessionsWithReflection.length === 0) return null;
+
+      const matchScore = (s: TrainingSession) => {
+          const sFocus = (s.focus || '').trim().toLowerCase();
+          const sTitle = (s.title || '').trim().toLowerCase();
+          
+          let score = 0;
+          if (currentContent && sTitle.includes(currentContent)) score += 10;
+          if (currentContent && sFocus.includes(currentContent)) score += 8;
+          if (currentTheme && sFocus.includes(currentTheme)) score += 6;
+          if (currentTheme && sTitle.includes(currentTheme)) score += 4;
+          
+          if (score > 0 && s.teamId === formData.teamId) {
+              score += 5;
+          }
+          return score;
+      };
+
+      const matches = sessionsWithReflection
+          .map(s => ({ session: s, score: matchScore(s) }))
+          .filter(item => item.score > 0)
+          .sort((a, b) => {
+              if (b.score !== a.score) return b.score - a.score;
+              return new Date(b.session.date).getTime() - new Date(a.session.date).getTime();
+          });
+
+      return matches.length > 0 ? matches[0].session : null;
+  }, [showAddModal, trainings, activeSelectedTheme, formData.teamId]);
+
   // 自动化同步周期训练计划中的重点与主题内容，在未建立周期计划时清除，且取消自主选择
   useEffect(() => {
       if (showAddModal) {
@@ -2472,92 +2582,96 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             {months.map(month => {
                                 const monthWeeksCount = getSundaysInMonth(year, month);
                                 const monthWeeks = Array.from({length: monthWeeksCount}, (_, i) => i + 1);
-                                return monthWeeks.map((weekNum, idx) => {
-                                    const weekPlan = currentPeriodization.weeks.find(w => w.month === month && w.weekInMonth === weekNum) || {
-                                        id: `w-${month}-${weekNum}`,
-                                        year, month, weekInMonth: weekNum,
-                                        physicalTheme: '', trainingTheme: '', trainingContent: '', oppositionContent: '', trainingGoals: '', matchPlan: '', remarks: ''
-                                    };
-                                    const isClipboardSource = periodizationClipboard?.id === weekPlan.id;
-                                    
-                                    return (
-                                        <tr key={`${month}-${weekNum}`} className={`hover:bg-yellow-50/30 transition-colors group cursor-pointer ${isClipboardSource ? 'bg-yellow-50' : ''}`} onClick={() => setActiveWeekPlan(weekPlan)}>
-                                            {idx === 0 && (
-                                                <td rowSpan={monthWeeksCount} className="border-r font-black text-sm md:text-lg bg-gray-50/80 backdrop-blur-sm sticky left-0 z-20">
-                                                    {month}月
-                                                </td>
-                                            )}
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r font-bold text-[9px] md:text-xs text-gray-500 bg-gray-50/40 sticky left-12 md:left-16 z-20">
-                                                <div className="flex flex-col items-center gap-1">
-                                                    <span>第{weekNum}周</span>
-                                                    <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); handleCopyWeek(weekPlan); }}
-                                                            className="p-1 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow shadow-sm"
-                                                            title="复制此周"
-                                                        >
-                                                            <ClipboardCopy className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                                                        </button>
-                                                        {periodizationClipboard && !isClipboardSource && (
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); handlePasteToWeek(month, weekNum); }}
-                                                                className="p-1 bg-bvb-yellow border border-bvb-yellow rounded text-bvb-black shadow-sm"
-                                                                title="粘贴到此周"
-                                                            >
-                                                                <ClipboardPaste className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                                                            </button>
+                                return (
+                                    <React.Fragment key={month}>
+                                        {monthWeeks.map((weekNum, idx) => {
+                                            const weekPlan = currentPeriodization.weeks.find(w => w.month === month && w.weekInMonth === weekNum) || {
+                                                id: `w-${month}-${weekNum}`,
+                                                year, month, weekInMonth: weekNum,
+                                                physicalTheme: '', trainingTheme: '', trainingContent: '', oppositionContent: '', trainingGoals: '', matchPlan: '', remarks: ''
+                                            };
+                                            const isClipboardSource = periodizationClipboard?.id === weekPlan.id;
+                                            
+                                            return (
+                                                <tr key={`${month}-${weekNum}`} className={`hover:bg-yellow-50/30 transition-colors group cursor-pointer ${isClipboardSource ? 'bg-yellow-50' : ''}`} onClick={() => setActiveWeekPlan(weekPlan)}>
+                                                    {idx === 0 && (
+                                                        <td rowSpan={monthWeeksCount} className="border-r font-black text-sm md:text-lg bg-gray-50/80 backdrop-blur-sm sticky left-0 z-20">
+                                                            {month}月
+                                                        </td>
+                                                    )}
+                                                    <td className="px-1 md:px-2 py-3 md:py-4 border-r font-bold text-[9px] md:text-xs text-gray-500 bg-gray-50/40 sticky left-12 md:left-16 z-20">
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span>第{weekNum}周</span>
+                                                            <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); handleCopyWeek(weekPlan); }}
+                                                                    className="p-1 bg-white border border-gray-200 rounded text-gray-400 hover:text-bvb-black hover:border-bvb-yellow shadow-sm"
+                                                                    title="复制此周"
+                                                                >
+                                                                    <ClipboardCopy className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                                                </button>
+                                                                {periodizationClipboard && !isClipboardSource && (
+                                                                    <button 
+                                                                        onClick={(e) => { e.stopPropagation(); handlePasteToWeek(month, weekNum); }}
+                                                                        className="p-1 bg-bvb-yellow border border-bvb-yellow rounded text-bvb-black shadow-sm"
+                                                                        title="粘贴到此周"
+                                                                    >
+                                                                        <ClipboardPaste className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-bold text-gray-700">
+                                                        <div>{weekPlan.physicalTheme || '-'}</div>
+                                                        {weekPlan.subItems && weekPlan.subItems.length > 0 && (
+                                                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
+                                                                {weekPlan.subItems.map((sub, sIdx) => (
+                                                                    <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-455 font-medium text-center">
+                                                                        {sub.physicalTheme || '-'}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         )}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-bold text-gray-700">
-                                                <div>{weekPlan.physicalTheme || '-'}</div>
-                                                {weekPlan.subItems && weekPlan.subItems.length > 0 && (
-                                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
-                                                        {weekPlan.subItems.map((sub, sIdx) => (
-                                                            <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-405 font-medium text-center">
-                                                                {sub.physicalTheme || '-'}
+                                                    </td>
+                                                    <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-black text-bvb-black bg-yellow-50/20">
+                                                        <div>{weekPlan.trainingTheme || '-'}</div>
+                                                        {weekPlan.subItems && weekPlan.subItems.length > 0 && (
+                                                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
+                                                                {weekPlan.subItems.map((sub, sIdx) => (
+                                                                    <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-500 font-extrabold text-center">
+                                                                        {sub.trainingTheme || '-'}
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-xs font-black text-bvb-black bg-yellow-50/20">
-                                                <div>{weekPlan.trainingTheme || '-'}</div>
-                                                {weekPlan.subItems && weekPlan.subItems.length > 0 && (
-                                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
-                                                        {weekPlan.subItems.map((sub, sIdx) => (
-                                                            <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-500 font-extrabold text-center">
-                                                                {sub.trainingTheme || '-'}
+                                                        )}
+                                                    </td>
+                                                    <td className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-gray-605 text-left leading-snug md:leading-relaxed">
+                                                        <div className="font-bold text-gray-800">{weekPlan.trainingContent || '-'}</div>
+                                                        {weekPlan.subItems && weekPlan.subItems.length > 0 && (
+                                                            <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
+                                                                {weekPlan.subItems.map((sub, sIdx) => (
+                                                                    <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-500 font-normal flex items-start gap-1">
+                                                                        <span className="bg-yellow-50 border border-yellow-200 text-yellow-800 shrink-0 px-1 py-0 rounded text-[8px] font-bold">子课主题 {sIdx + 1}</span>
+                                                                        <span className="truncate">{sub.trainingContent || '-'}</span>
+                                                                    </div>
+                                                                ))}
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-gray-605 text-left leading-snug md:leading-relaxed">
-                                                <div className="font-bold text-gray-800">{weekPlan.trainingContent || '-'}</div>
-                                                {weekPlan.subItems && weekPlan.subItems.length > 0 && (
-                                                    <div className="mt-1.5 pt-1.5 border-t border-dashed border-gray-200/80 space-y-1">
-                                                        {weekPlan.subItems.map((sub, sIdx) => (
-                                                            <div key={sub.id || sIdx} className="text-[8px] md:text-[10px] text-gray-500 font-normal flex items-start gap-1">
-                                                                <span className="bg-yellow-50 border border-yellow-200 text-yellow-800 shrink-0 px-1 py-0 rounded text-[8px] font-bold">子课主题 {sIdx + 1}</span>
-                                                                <span className="truncate">{sub.trainingContent || '-'}</span>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-black text-blue-600">{weekPlan.oppositionContent || '-'}</td>
-                                            {idx === 0 && (
-                                                <td rowSpan={monthWeeksCount} className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-red-600 font-bold text-left align-top leading-snug md:leading-relaxed whitespace-pre-wrap">
-                                                    {weekPlan.trainingGoals || '-'}
-                                                </td>
-                                            )}
-                                            <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-bold text-gray-800">{weekPlan.matchPlan || '-'}</td>
-                                            <td className="px-1 md:px-2 py-3 md:py-4 text-[8px] md:text-[10px] text-gray-400 italic">{weekPlan.remarks || '-'}</td>
-                                        </tr>
-                                    );
-                                });
+                                                        )}
+                                                    </td>
+                                                    <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-black text-blue-600">{weekPlan.oppositionContent || '-'}</td>
+                                                    {idx === 0 && (
+                                                        <td rowSpan={monthWeeksCount} className="px-2 md:px-4 py-3 md:py-4 border-r text-[9px] md:text-[11px] text-red-600 font-bold text-left align-top leading-snug md:leading-relaxed whitespace-pre-wrap">
+                                                            {weekPlan.trainingGoals || '-'}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-1 md:px-2 py-3 md:py-4 border-r text-[9px] md:text-[11px] font-bold text-gray-800">{weekPlan.matchPlan || '-'}</td>
+                                                    <td className="px-1 md:px-2 py-3 md:py-4 text-[8px] md:text-[10px] text-gray-400 italic">{weekPlan.remarks || '-'}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                );
                             })}
                         </tbody>
                     </table>
@@ -2573,6 +2687,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         focusSubjects={focusSubjects}
                         basicTechThemes={basicTechThemes}
                         scenarioThemes={scenarioThemes}
+                        trainings={trainings}
+                        teamId={currentPeriodization.teamId}
                     />
                 )}
             </div>
@@ -2676,8 +2792,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       if (timeScope === 'month') return renderMonthGrid(year, month, false);
       else if (timeScope === 'quarter') {
           const startMonth = Math.floor(month / 3) * 3;
-          return (<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-y-auto p-1">{[0, 1, 2].map(offset => renderMonthGrid(year, startMonth + offset, true))}</div>);
-      } else return (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto p-1">{Array.from({ length: 12 }).map((_, i) => renderMonthGrid(year, i, true))}</div>);
+          return (<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-y-auto p-1">{[0, 1, 2].map(offset => <React.Fragment key={offset}>{renderMonthGrid(year, startMonth + offset, true)}</React.Fragment>)}</div>);
+      } else return (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto p-1">{Array.from({ length: 12 }).map((_, i) => <React.Fragment key={i}>{renderMonthGrid(year, i, true)}</React.Fragment>)}</div>);
   };
 
   const renderStats = () => (
@@ -3079,6 +3195,29 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                           {matchedWeekPlanForForm.physicalTheme && <div className="truncate"><span className="text-gray-450 font-medium">💪 体能：</span>{matchedWeekPlanForForm.physicalTheme}</div>}
                           {matchedWeekPlanForForm.oppositionContent && <div className="truncate"><span className="text-gray-450 font-medium">⚔️ 对抗：</span>{matchedWeekPlanForForm.oppositionContent}</div>}
                           {matchedWeekPlanForForm.trainingGoals && <div className="line-clamp-1" title={matchedWeekPlanForForm.trainingGoals}><span className="text-gray-450 font-medium">🎯 目标：</span>{matchedWeekPlanForForm.trainingGoals}</div>}
+                        </div>
+                      )}
+
+                      {/* 上期同名相同主题历史反思反馈 */}
+                      {addModalLastReflectionSession && (
+                        <div className="bg-amber-50/80 border border-amber-200/60 p-3 rounded-xl space-y-1.5 mt-2.5 animate-in fade-in duration-150 shadow-xs">
+                          <div className="flex items-center justify-between text-[10px] font-black text-amber-800 uppercase tracking-tight">
+                            <span className="flex items-center gap-1">
+                              <History className="w-3.5 h-3.5 text-amber-600 inline" />
+                              上次同主题训练反思回顾
+                            </span>
+                            <span className="text-[9px] bg-white text-gray-400 px-1.5 py-0.5 rounded border border-amber-100 font-mono">
+                              {addModalLastReflectionSession.date}
+                            </span>
+                          </div>
+                          <div className="text-xs text-amber-900 font-bold bg-white/50 p-2 rounded border border-amber-100/60">
+                            <div className="text-[10px] text-gray-400 font-bold mb-0.5">
+                              关联课次：{addModalLastReflectionSession.title}
+                            </div>
+                            <p className="italic font-normal text-amber-950 leading-relaxed">
+                              "{addModalLastReflectionSession.planReflection}"
+                            </p>
+                          </div>
                         </div>
                       )}
                     </div>
