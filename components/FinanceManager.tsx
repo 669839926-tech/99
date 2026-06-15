@@ -68,6 +68,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     const [filterCoachId, setFilterCoachId] = useState<string>('all');
     const [editPayroll, setEditPayroll] = useState<Record<string, Partial<MonthlySalaryRecord>>>({});
     const [overriddenTeamSizes, setOverriddenTeamSizes] = useState<Record<string, number>>({});
+    const [overriddenLogAuditCounts, setOverriddenLogAuditCounts] = useState<Record<string, number>>({});
     const [importSummary, setImportSummary] = useState<{ count: number, income: number, expense: number, tempTxs: FinanceTransaction[] } | null>(null);
     const [activeType, setActiveType] = useState<'income' | 'expense'>('income');
     const [formData, setFormData] = useState({ date: new Date().toISOString().split('T')[0], details: '', category: '', amount: '', account: '黔农云', attachment: '' as string });
@@ -568,6 +569,23 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 }
             });
 
+            const originalLogAuditSessionsCount = logAuditSessionsCount;
+            const auditCountKey = `${selectedYear}-${selectedMonth}-${coach.id}`;
+            const overriddenCount = overriddenLogAuditCounts[auditCountKey] !== undefined
+                ? overriddenLogAuditCounts[auditCountKey]
+                : (savedRecord?.overriddenLogAuditCount !== undefined ? savedRecord.overriddenLogAuditCount : undefined);
+
+            if (overriddenCount !== undefined) {
+                logAuditSessionsCount = overriddenCount;
+                if (overriddenCount === 0) {
+                    totalLogAuditDeductions = 0;
+                } else if (originalLogAuditSessionsCount > 0) {
+                    totalLogAuditDeductions = Math.round(overriddenCount * (totalLogAuditDeductions / originalLogAuditSessionsCount));
+                } else {
+                    totalLogAuditDeductions = overriddenCount * rules.directorLogAudit.amount;
+                }
+            }
+
             const evaluation = coach.monthlyEvaluations?.find(e => e.year === selectedYear && e.month === selectedMonth);
             
             // 取消对训练、关注、协同的主观评价绩效奖励组块，置为0
@@ -701,11 +719,13 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 playerReviewAuditDetails,
                 unreviewedCountForCoach,
                 totalCoachPlayersOfCoach,
-                isModified: Object.keys(currentEdit).length > 0 || Object.keys(overriddenTeamSizes).some(k => k.startsWith(`${selectedYear}-${selectedMonth}-${coach.id}-`)),
+                isModified: Object.keys(currentEdit).length > 0 || 
+                    Object.keys(overriddenTeamSizes).some(k => k.startsWith(`${selectedYear}-${selectedMonth}-${coach.id}-`)) ||
+                    overriddenLogAuditCounts[`${selectedYear}-${selectedMonth}-${coach.id}`] !== undefined,
                 teamBreakdown
             };
         });
-    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams, overriddenTeamSizes, periodizationPlans]);
+    }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams, overriddenTeamSizes, overriddenLogAuditCounts, periodizationPlans]);
 
     const handleUpdatePayrollField = (coachId: string, field: keyof MonthlySalaryRecord, value: string) => {
         const numVal = parseFloat(value) || 0;
@@ -730,6 +750,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             }
         });
 
+        const auditCountOverride = overriddenLogAuditCounts[`${yearNum}-${selectedMonth}-${coachId}`] !== undefined
+            ? overriddenLogAuditCounts[`${yearNum}-${selectedMonth}-${coachId}`]
+            : row.savedRecord?.overriddenLogAuditCount;
+
         const newRecord: MonthlySalaryRecord = { 
             id: `sal-${yearNum}-${selectedMonth}-${coachId}`, 
             year: yearNum, 
@@ -744,7 +768,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             monthlyExecutionLevel: row.monthlyExecutionLevel,
             totalSalary: row.totalSalary, 
             isDisbursed: row.isDisbursed,
-            overriddenTeamSizes: teamOverrides
+            overriddenTeamSizes: teamOverrides,
+            overriddenLogAuditCount: auditCountOverride
         };
         const nextRecords = [...records];
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
@@ -758,6 +783,10 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             }
         });
         setOverriddenTeamSizes(nextOverrides);
+
+        const nextLogAuditOverrides = { ...overriddenLogAuditCounts };
+        delete nextLogAuditOverrides[`${yearNum}-${selectedMonth}-${coachId}`];
+        setOverriddenLogAuditCounts(nextLogAuditOverrides);
         
         const nextEdit = { ...editPayroll }; delete nextEdit[coachId]; setEditPayroll(nextEdit);
         alert(`已保存 ${coach.name} 的薪酬快照。`);
@@ -1164,16 +1193,46 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                                             <div className="flex items-start gap-1.5">
                                                                                 <AlertCircle className="w-2.5 h-2.5 text-rose-500 mt-0.5" />
                                                                                 <div>
-                                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase leading-none">扣罚明细与考核结果:</p>
-                                                                                    <p className="text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                    <p className="text-[8px] text-gray-400 font-bold uppercase leading-none mb-1">扣罚明细与考核结果 (可手动修改逾期场次):</p>
+                                                                                    <div className="flex items-center gap-1.5 flex-wrap text-[9px] text-gray-600 font-bold leading-relaxed">
+                                                                                        <span>本月共核定逾期课次:</span>
+                                                                                        <input 
+                                                                                            type="number"
+                                                                                            min="0"
+                                                                                            className="w-10 bg-rose-100/50 hover:bg-white border border-transparent hover:border-rose-300 rounded text-center focus:ring-1 focus:ring-bvb-yellow outline-none font-black text-[10px] p-0"
+                                                                                            value={sal.logAuditSessionsCount}
+                                                                                            onChange={(e) => {
+                                                                                                const val = parseInt(e.target.value);
+                                                                                                const overriddenVal = isNaN(val) ? 0 : Math.max(0, val);
+                                                                                                setOverriddenLogAuditCounts(prev => ({
+                                                                                                    ...prev,
+                                                                                                    [`${selectedYear}-${selectedMonth}-${sal.coachId}`]: overriddenVal
+                                                                                                }));
+                                                                                            }}
+                                                                                            title="点击手动微调/修改逾期场次"
+                                                                                        />
+                                                                                        <span>场</span>
+                                                                                        {(overriddenLogAuditCounts[`${selectedYear}-${selectedMonth}-${sal.coachId}`] !== undefined || (sal.savedRecord?.overriddenLogAuditCount !== undefined)) && (
+                                                                                            <button 
+                                                                                                onClick={() => {
+                                                                                                    setOverriddenLogAuditCounts(prev => {
+                                                                                                        const next = { ...prev };
+                                                                                                        delete next[`${selectedYear}-${selectedMonth}-${sal.coachId}`];
+                                                                                                        return next;
+                                                                                                        });
+                                                                                                }}
+                                                                                                className="p-0.5 text-gray-450 hover:text-bvb-yellow transition-colors cursor-pointer"
+                                                                                                title="重置为系统计算值"
+                                                                                            >
+                                                                                                <RefreshCw className="w-2.5 h-2.5 inline" />
+                                                                                            </button>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <p className="text-[9px] text-gray-500 font-medium leading-normal mt-1">
                                                                                         {sal.totalLogAuditDeductions > 0 ? (
-                                                                                            <span>
-                                                                                                本月共 <span className="text-rose-600 font-black">{sal.logAuditSessionsCount}</span> 场训练日志录入逾期。根据考核规程（逾期未录入每次课时扣10元，逾期2天及以上每次扣20元）扣减基本工资。
-                                                                                            </span>
+                                                                                            <span>根据考核规程（逾期未录入每次课时扣10元，逾期2天及以上每次扣20元）扣减基本工资。</span>
                                                                                         ) : (
-                                                                                            <span>
-                                                                                                考核优秀！本月训练课日志均按时在当天完成录入，无任何逾期扣款。
-                                                                                            </span>
+                                                                                            <span>考核优秀！本月训练课日志均按时在当天完成录入，无任何逾期扣款。</span>
                                                                                         )}
                                                                                     </p>
                                                                                 </div>
