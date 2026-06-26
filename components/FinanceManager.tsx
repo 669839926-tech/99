@@ -727,6 +727,39 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         });
     }, [users, players, trainings, salarySettings, selectedYear, selectedMonth, editPayroll, filterCoachId, teams, overriddenTeamSizes, overriddenLogAuditCounts, periodizationPlans]);
 
+    const salaryTotals = useMemo(() => {
+        let totalBaseSalary = 0;
+        let totalSessionFees = 0;
+        let totalAttendanceReward = 0;
+        let totalRenewalReward = 0;
+        let totalExecutionReward = 0;
+        let totalMatchSubsidy = 0;
+        let totalDeductions = 0;
+        let totalPayable = 0;
+
+        coachSalaries.forEach(sal => {
+            totalBaseSalary += (sal.baseSalary || 0);
+            totalSessionFees += (sal.sessionFees || 0);
+            totalAttendanceReward += (sal.attendanceReward || 0);
+            totalRenewalReward += (sal.renewalReward || 0);
+            totalExecutionReward += (sal.monthlyExecutionReward || 0);
+            totalMatchSubsidy += (sal.matchSubsidy || 0);
+            totalDeductions += (sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction || 0);
+            totalPayable += (sal.totalSalary || 0);
+        });
+
+        return {
+            totalBaseSalary,
+            totalSessionFees,
+            totalAttendanceReward,
+            totalRenewalReward,
+            totalExecutionReward,
+            totalMatchSubsidy,
+            totalDeductions,
+            totalPayable
+        };
+    }, [coachSalaries]);
+
     const handleUpdatePayrollField = (coachId: string, field: keyof MonthlySalaryRecord, value: string) => {
         const numVal = parseFloat(value) || 0;
         setEditPayroll(prev => ({ ...prev, [coachId]: { ...prev[coachId], [field]: numVal } }));
@@ -935,6 +968,43 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             </div>
                         </div>
                     </div>
+
+                    {/* 薪酬核心数据汇总看板 (Payroll Summary Dashboard) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 animate-in fade-in duration-500">
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">底薪总额</p>
+                            <h4 className="text-xs md:text-sm font-black text-gray-800 mt-1 tabular-nums">¥{salaryTotals.totalBaseSalary.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">课时费总额</p>
+                            <h4 className="text-xs md:text-sm font-black text-gray-800 mt-1 tabular-nums">¥{salaryTotals.totalSessionFees.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">全勤奖总额</p>
+                            <h4 className="text-xs md:text-sm font-black text-green-600 mt-1 tabular-nums">¥{salaryTotals.totalAttendanceReward.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">续费奖总额</p>
+                            <h4 className="text-xs md:text-sm font-black text-blue-600 mt-1 tabular-nums">¥{salaryTotals.totalRenewalReward.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">月度执行奖</p>
+                            <h4 className="text-xs md:text-sm font-black text-emerald-600 mt-1 tabular-nums">¥{salaryTotals.totalExecutionReward.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">比赛补贴</p>
+                            <h4 className="text-xs md:text-sm font-black text-orange-600 mt-1 tabular-nums">¥{salaryTotals.totalMatchSubsidy.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-white p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-gray-450 uppercase tracking-wider">考核扣罚</p>
+                            <h4 className="text-xs md:text-sm font-black text-red-500 mt-1 tabular-nums">-¥{salaryTotals.totalDeductions.toLocaleString()}</h4>
+                        </div>
+                        <div className="bg-bvb-yellow/10 border-2 border-bvb-yellow p-3 md:p-4 rounded-xl shadow-sm flex flex-col justify-between">
+                            <p className="text-[8px] md:text-[9px] font-black text-bvb-black uppercase tracking-wider">应发总额</p>
+                            <h4 className="text-xs md:text-sm font-black text-bvb-black mt-1 tabular-nums">¥{salaryTotals.totalPayable.toLocaleString()}</h4>
+                        </div>
+                    </div>
+
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-xs text-left border-collapse">
@@ -1482,6 +1552,24 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                             </tr>
                                         </React.Fragment>
                                     ))}
+                                    {/* 汇总行 */}
+                                    <tr className="bg-yellow-50/30 font-black text-gray-900 border-t-2 border-gray-200">
+                                        <td className="px-2 py-4 md:px-4 md:py-4">
+                                            <div className="flex flex-col">
+                                                <span className="font-black text-[11px] md:text-sm text-gray-900">月度核算总计</span>
+                                                <span className="text-[8px] md:text-[9px] text-gray-400 font-bold uppercase tracking-wider">Total for Selected Month</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-gray-800">¥{salaryTotals.totalBaseSalary.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-gray-800">¥{salaryTotals.totalSessionFees.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-green-700 bg-green-50/10">¥{salaryTotals.totalAttendanceReward.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-blue-700">¥{salaryTotals.totalRenewalReward.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-emerald-700">¥{salaryTotals.totalExecutionReward.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-orange-700">¥{salaryTotals.totalMatchSubsidy.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-[10px] md:text-xs text-red-600 bg-red-50/10">-¥{salaryTotals.totalDeductions.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-right font-black tabular-nums text-bvb-black text-[11px] md:text-base bg-yellow-100/30">¥{salaryTotals.totalPayable.toLocaleString()}</td>
+                                        <td className="px-2 py-4 md:px-4 md:py-4 text-center text-gray-400 text-[10px]">-</td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>

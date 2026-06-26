@@ -326,6 +326,16 @@ const parseLocalDate = (dateStr: string) => {
 };
 
 // 辅助函数：计算球员关注统计
+const isNewPlayerThisMonth = (player: Player): boolean => {
+    if (!player.joinDate) return false;
+    const parts = player.joinDate.split('-');
+    if (parts.length < 2) return false;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const today = new Date();
+    return y === today.getFullYear() && m === (today.getMonth() + 1);
+};
+
 const calculateFocusStats = (playerId: string, allSessions: TrainingSession[]) => {
     const today = new Date();
     const curYear = today.getFullYear();
@@ -2266,7 +2276,12 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="font-black text-xs truncate">{entry.player.name}</h4>
+                                            <h4 className="font-black text-xs truncate flex items-center gap-1.5">
+                                                <span>{entry.player.name}</span>
+                                                {isNewPlayerThisMonth(entry.player) && (
+                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border inline-flex items-center ${isSelected ? 'bg-amber-950/40 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse'}`}>新入队</span>
+                                                )}
+                                            </h4>
                                             <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.name}</p>
                                         </div>
                                         <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
@@ -2303,10 +2318,20 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             <div className="absolute -bottom-1 -right-1 p-0.5 bg-gray-200 rounded-full border border-white"><UsersIcon className="w-2 h-2 text-gray-500" /></div>
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h4 className="font-black text-xs truncate">{player.name}</h4>
+                                            <h4 className="font-black text-xs truncate flex items-center gap-1.5">
+                                                <span>{player.name}</span>
+                                                {isNewPlayerThisMonth(player) && (
+                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border ${isSelected ? 'bg-amber-950/40 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse'}`}>新入队</span>
+                                                )}
+                                            </h4>
                                             <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{player.number} • {teams.find(t => t.id === player.teamId)?.name}</p>
                                         </div>
-                                        <div className="text-[8px] font-black uppercase text-red-500 bg-red-50 px-1.5 py-0.5 rounded">本月未关注</div>
+                                        <div className="flex flex-col items-end gap-1 shrink-0 select-none">
+                                            <div className="text-[8px] font-black uppercase text-red-500 bg-red-50 px-1.5 py-0.5 rounded">本月未关注</div>
+                                            {isNewPlayerThisMonth(player) && (
+                                                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full border tracking-wider uppercase animate-pulse ${isSelected ? 'bg-amber-400 text-bvb-black border-transparent' : 'bg-amber-500 text-white border-transparent'}`}>重点关注 ⭐</span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -3352,9 +3377,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                 )}
                                 <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-gray-100" />
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-1 flex-wrap">
                                     <div className="text-[11px] font-black text-gray-805 truncate">{p.name}</div>
                                     {isUnfocusedThisMonth && <span className="text-[7px] font-black text-red-500 bg-red-50 px-1 rounded-sm shrink-0">待关注</span>}
+                                    {isNewPlayerThisMonth(p) && <span className="text-[7px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-1 rounded-sm shrink-0 animate-pulse">新入队</span>}
                                   </div>
                                   <div className="flex gap-1 text-[8px] font-bold text-gray-400 mt-0.5">
                                     <span title="本月被关注次数">M:{stats.month}</span>

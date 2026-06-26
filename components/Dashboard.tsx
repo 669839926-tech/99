@@ -308,6 +308,84 @@ const Dashboard: React.FC<DashboardProps> = ({
     return Object.entries(groups).sort((a, b) => a[1].name.localeCompare(b[1].name));
   }, [stats.lowCreditPlayers, teams]);
 
+  // 新增：计算考勤异常关注预警球员
+  const playerAttentionWarnings = useMemo(() => {
+    const warned: Array<{
+      player: Player;
+      team: Team | undefined;
+      monthlyCount: number;
+      monthlyDates: string[];
+      quarterlyCount: number;
+      quarterlyDates: string[];
+      reasons: string[];
+    }> = [];
+
+    const today = new Date();
+    const nowYear = today.getFullYear();
+    const nowMonth = today.getMonth(); // 0-11
+    const nowQuarter = Math.floor(nowMonth / 3); // 0-3
+
+    const checkedTrainings = (trainings || []).filter(s => s.attendance && s.attendance.length > 0);
+    const sortedCompleted = [...checkedTrainings].sort((a, b) => a.date.localeCompare(b.date));
+
+    displayPlayers.forEach(p => {
+        // 包含该球员有出勤记录的所有场次，或者属于他当前梯队的场次
+        const pSessions = sortedCompleted.filter(s => s.teamId === p.teamId || s.attendance?.some(att => att.playerId === p.id));
+        const playerNotes = pSessions.map(s => {
+            const record = s.attendance?.find(att => att.playerId === p.id);
+            return {
+                id: s.id,
+                title: s.title,
+                date: s.date,
+                status: record ? record.status : 'Absent'
+            };
+        });
+
+        // 缺席不纳入统计，所以过滤掉缺席状态
+        const validSequence = playerNotes.filter(item => item.status !== 'Absent');
+
+        // 计算当前月份累计请假/伤停次数
+        const monthlyLeaveInjury = validSequence.filter(item => {
+            if (item.status !== 'Leave' && item.status !== 'Injury') return false;
+            const sDate = parseLocalDate(item.date);
+            return sDate.getFullYear() === nowYear && sDate.getMonth() === nowMonth;
+        });
+        const monthlyCount = monthlyLeaveInjury.length;
+        const monthlyDates = monthlyLeaveInjury.map(item => `${item.date} (${item.status === 'Leave' ? '请假' : '伤停'})`);
+
+        // 计算当前季度累积请假/伤停次数
+        const quarterlyLeaveInjury = validSequence.filter(item => {
+            if (item.status !== 'Leave' && item.status !== 'Injury') return false;
+            const sDate = parseLocalDate(item.date);
+            return sDate.getFullYear() === nowYear && Math.floor(sDate.getMonth() / 3) === nowQuarter;
+        });
+        const quarterlyCount = quarterlyLeaveInjury.length;
+        const quarterlyDates = quarterlyLeaveInjury.map(item => `${item.date} (${item.status === 'Leave' ? '请假' : '伤停'})`);
+
+        const reasons: string[] = [];
+        if (monthlyCount >= 4) {
+            reasons.push(`当月累计请/伤≥4次`);
+        }
+        if (quarterlyCount >= 8) {
+            reasons.push(`季度累计请/伤≥8次`);
+        }
+
+        if (reasons.length > 0) {
+            warned.push({
+                player: p,
+                team: teams.find(t => t.id === p.teamId),
+                monthlyCount,
+                monthlyDates,
+                quarterlyCount,
+                quarterlyDates,
+                reasons
+            });
+        }
+    });
+
+    return warned;
+  }, [displayPlayers, trainings, teams]);
+
   const { chartData, exportPlayersData, exportSessionsData, teamPlayersList, aggregateTotals } = useMemo(() => {
     const start = dateRange.start;
     const end = dateRange.end;
@@ -983,6 +1061,120 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 )}
             </div>
+        </div>
+
+        {/* 球员关注预警 (考勤异常监控) */}
+        <div className="bg-white rounded-xl shadow-sm border-l-4 border-rose-500 p-4 md:p-6 transition-all">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-rose-50 rounded-lg">
+                        <AlertTriangle className="w-5 h-5 text-rose-500" />
+                    </div>
+                    <div>
+                        <h3 className="font-black text-sm md:text-lg text-gray-800">
+                            球员考勤异常预警
+                        </h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Attendance Exception Alert</p>
+                    </div>
+                </div>
+                <span className="text-[10px] md:text-xs font-black bg-rose-50 text-rose-600 px-2.5 py-1 rounded-lg border border-rose-100 flex items-center gap-1.5">
+                    预警条件: 当月累计请假/伤停 ≥ 4次 或 本季度累计请假/伤停 ≥ 8次 (缺席不计)
+                </span>
+            </div>
+
+            {playerAttentionWarnings.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {playerAttentionWarnings.map(({ player, team, monthlyCount, monthlyDates, quarterlyCount, quarterlyDates, reasons }) => {
+                        const isBoth = monthlyCount >= 4 && quarterlyCount >= 8;
+                        return (
+                            <div 
+                                key={player.id} 
+                                className={`rounded-xl border p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between ${
+                                    isBoth 
+                                        ? 'bg-red-50/60 border-red-200' 
+                                        : monthlyCount >= 4 
+                                            ? 'bg-orange-50/50 border-orange-200' 
+                                            : 'bg-amber-50/40 border-amber-200'
+                                }`}
+                            >
+                                <div>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div>
+                                            <h4 className="font-extrabold text-sm text-gray-900 flex items-center gap-1.5">
+                                                <span className="bg-bvb-black text-bvb-yellow text-[10px] px-1.5 py-0.5 rounded font-black">
+                                                    #{player.number || '00'}
+                                                </span>
+                                                {player.name}
+                                            </h4>
+                                            <p className="text-[10px] text-gray-400 font-bold mt-1">
+                                                {team ? team.name : '未分配梯队'} • {player.position || '队员'}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col gap-1 items-end">
+                                            {monthlyCount >= 4 && (
+                                                <span className="bg-red-100/80 text-red-800 border border-red-200 text-[9px] font-black px-1.5 py-0.5 rounded">
+                                                    当月累计: {monthlyCount}次
+                                                </span>
+                                            )}
+                                            {quarterlyCount >= 8 && (
+                                                <span className="bg-amber-100/80 text-amber-800 border border-amber-200 text-[9px] font-black px-1.5 py-0.5 rounded">
+                                                    季度累计: {quarterlyCount}次
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 预警原因 */}
+                                    <div className="mt-3 bg-white/70 backdrop-blur-sm rounded-lg p-2.5 border border-black/5 space-y-2">
+                                        <div className="text-[10px] font-black text-rose-600 flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3" />
+                                            <span>加粗关注点:</span>
+                                            <span className="text-gray-700 font-semibold">{reasons.join(' 且 ')}</span>
+                                        </div>
+
+                                        {/* 月度明细 */}
+                                        {monthlyCount >= 4 && (
+                                            <div className="space-y-1">
+                                                <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                                    当月请/伤具体课次明细:
+                                                </div>
+                                                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                                                    {monthlyDates.map((dateStr, idx) => (
+                                                        <span key={idx} className="bg-gray-100/80 text-gray-650 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">
+                                                            {dateStr}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 季度明细 */}
+                                        {quarterlyCount >= 8 && (
+                                            <div className="space-y-1">
+                                                <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                                                    本季累积课次明细 (Q{Math.floor(new Date().getMonth() / 3) + 1}):
+                                                </div>
+                                                <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                                                    {quarterlyDates.map((dateStr, idx) => (
+                                                        <span key={idx} className="bg-gray-100/80 text-gray-650 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold">
+                                                            {dateStr}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div className="h-full flex flex-col items-center justify-center py-8 text-gray-300">
+                    <ShieldCheck className="w-10 h-10 opacity-20 mb-2 text-green-500" />
+                    <p className="text-xs font-black uppercase tracking-widest italic text-center text-green-600">正常 • 本月暂未发现符合预警条件的关注球员</p>
+                </div>
+            )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
