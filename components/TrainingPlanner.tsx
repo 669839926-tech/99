@@ -3,7 +3,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan } from '../types';
 import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import { BasicTechItem, ScenarioTheme, BASIC_TECH_THEMES, SCENARIO_THEMES } from '../src/philosophyData';
 
@@ -1876,7 +1876,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
   const [drillInput, setDrillInput] = useState('');
 
-  const { filteredSessions, dateLabel, statsData } = useMemo(() => {
+  const { filteredSessions, dateLabel } = useMemo(() => {
       const year = currentDate.getFullYear();
       const month = currentDate.getMonth();
       let startDate: Date;
@@ -1905,15 +1905,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
           return matchDate && matchTeam;
       }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-      const focusCounts: Record<string, number> = {};
-      sessions.forEach(s => {
-          focusCounts[s.focus] = (focusCounts[s.focus] || 0) + 1;
-      });
-      const chartData = Object.keys(focusCounts).map(key => ({
-          name: key,
-          value: focusCounts[key]
-      }));
-      return { filteredSessions: sessions, dateLabel: label, statsData: chartData };
+      return { filteredSessions: sessions, dateLabel: label };
   }, [currentDate, timeScope, userManagedSessions, statsTeamFilter]);
 
   const currentPeriodization = useMemo(() => {
@@ -1921,6 +1913,61 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const year = currentDate.getFullYear();
       return periodizationPlans.find(p => p.teamId === teamId && p.year === year) || { id: `p-${teamId}-${year}`, teamId, year, weeks: [] };
   }, [periodizationPlans, statsTeamFilter, availableTeams, currentDate]);
+
+  const periodizationStatsData = useMemo(() => {
+      const year = currentDate.getFullYear();
+      const months = timeScope === 'year' ? Array.from({length: 12}, (_, i) => i + 1) : 
+                     timeScope === 'quarter' ? Array.from({length: 3}, (_, i) => Math.floor(currentDate.getMonth() / 3) * 3 + i + 1) :
+                     [currentDate.getMonth() + 1];
+
+      const getFocusName = (theme: string): string => {
+          if (!theme) return '未指定主题';
+          if (theme.includes(']')) {
+              const parts = theme.split(']');
+              const main = parts[parts.length - 1].trim();
+              if (main.includes('·')) {
+                  return main.split('·')[0].trim();
+              }
+              return main || '未指定主题';
+          }
+          return theme.trim();
+      };
+
+      const focusCounts: Record<string, number> = {};
+      let totalCount = 0;
+
+      months.forEach(month => {
+          const monthWeeksCount = getSundaysInMonth(year, month);
+          for (let weekNum = 1; weekNum <= monthWeeksCount; weekNum++) {
+              const weekPlan = currentPeriodization.weeks.find(w => w.month === month && w.weekInMonth === weekNum);
+              if (weekPlan) {
+                  // Check main trainingTheme
+                  if (weekPlan.trainingTheme) {
+                      const focus = getFocusName(weekPlan.trainingTheme);
+                      focusCounts[focus] = (focusCounts[focus] || 0) + 1;
+                      totalCount++;
+                  }
+                  // Check subItems if any
+                  if (weekPlan.subItems && weekPlan.subItems.length > 0) {
+                      weekPlan.subItems.forEach(sub => {
+                          if (sub.trainingTheme) {
+                              const focus = getFocusName(sub.trainingTheme);
+                              focusCounts[focus] = (focusCounts[focus] || 0) + 1;
+                              totalCount++;
+                          }
+                      });
+                  }
+              }
+          }
+      });
+
+      const chartData = Object.keys(focusCounts).map(key => ({
+          name: key,
+          value: focusCounts[key]
+      }));
+
+      return { chartData, totalCount };
+  }, [currentPeriodization, currentDate, timeScope]);
 
   const matchedWeekPlanForForm = useMemo(() => {
       if (!formData.teamId || !formData.date || !periodizationPlans) return null;
@@ -2515,75 +2562,155 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         { key: 'Q4', label: '第四季度 (Q4)', monthsLabel: '10月 - 12月' },
     ];
 
-    return (
-        <div className="space-y-4 animate-in fade-in duration-500">
-            {/* 季度周期训练计划目标考核模块 */}
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-100 pb-2">
-                    <div>
-                        <h4 className="font-black text-gray-800 text-sm flex items-center gap-1.5">
-                            <Target className="w-4 h-4 text-bvb-yellow shrink-0" /> 
-                            <span>【{selectedTeamName}】季度周期计划目标录入考核</span>
+    const renderPeriodizationStats = () => {
+        const { chartData, totalCount } = periodizationStatsData;
+        const totalValue = chartData.reduce((sum, item) => sum + item.value, 0);
+        const colors = ['#FDE100', '#1F2937', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+
+        return (
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4 h-full w-full justify-between items-stretch">
+                <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
+                    <div className="flex flex-col gap-1 border-b border-gray-100 pb-2">
+                        <h4 className="font-black text-gray-800 text-xs uppercase flex items-center gap-1.5">
+                            <PieChartIcon className="w-4 h-4 text-bvb-yellow" /> 
+                            <span>周期训练重点分布</span>
                         </h4>
-                        <p className="text-[10px] text-gray-405 font-bold uppercase mt-0.5 leading-normal">
-                            季末考核规则：如录入周期计划目标，则季末月发放100%基本工资；如未录入，则扣当月基础工资20%。扣薪在季末月（3、6、9、12月）底发放工资时执行。
-                        </p>
+                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Periodization Focus</p>
                     </div>
-                    {isDirector ? (
-                        <span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black border border-yellow-200 shrink-0 self-start md:self-auto">
-                            👑 青训总监考核权限已启用
-                        </span>
+                    
+                    {/* Compact Custom Legend list */}
+                    <div className="mt-2.5 space-y-1 overflow-y-auto max-h-[110px] pr-1 no-scrollbar">
+                        {totalCount > 0 ? (
+                            chartData.map((entry, index) => {
+                                const percent = totalValue > 0 ? ((entry.value / totalValue) * 100).toFixed(0) : 0;
+                                return (
+                                    <div key={entry.name} className="flex items-center justify-between text-[10px] font-bold text-gray-600">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[index % colors.length] }}></span>
+                                            <span className="truncate">{entry.name}</span>
+                                        </div>
+                                        <span className="font-mono text-gray-400 shrink-0 ml-2">{entry.value}次 ({percent}%)</span>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <p className="text-[10px] text-gray-400 italic">暂无重点数据</p>
+                        )}
+                    </div>
+                </div>
+
+                {/* Pie/Donut Chart side */}
+                <div className="w-full sm:w-[130px] h-[110px] sm:h-full relative shrink-0 flex items-center justify-center">
+                    {totalCount > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie 
+                                    data={chartData} 
+                                    cx="50%" 
+                                    cy="50%" 
+                                    innerRadius={25} 
+                                    outerRadius={40} 
+                                    paddingAngle={3} 
+                                    dataKey="value"
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 2px 4px rgb(0 0 0 / 0.1)', padding: '6px', fontSize: '9px' }} 
+                                    formatter={(value: any, name: any) => [`${value}次`, name]}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
                     ) : (
-                        <span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold border shrink-0 self-start md:self-auto">
-                            👁️ 季度考核公示
-                        </span>
+                        <div className="flex flex-col items-center justify-center text-gray-300">
+                            <PieChartIcon className="w-5 h-5 mb-0.5 stroke-1" />
+                            <p className="text-[8px] font-bold">无重点数据</p>
+                        </div>
                     )}
                 </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {quarters.map((q) => {
-                        const status = currentPeriodization.quarterAssessments?.[q.key] || 'entered';
-                        return (
-                            <div key={q.key} className={`border rounded-xl p-3 flex flex-col justify-between gap-2 transition-all ${status === 'not_entered' ? 'bg-red-50/20 border-red-100/80' : 'bg-green-50/10 border-green-100/60'}`}>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-extrabold text-xs text-gray-800">{q.label}</p>
-                                        <p className="text-[9px] text-gray-400 font-mono font-bold leading-none mt-0.5">{q.monthsLabel}</p>
+            </div>
+        );
+    };
+
+    return (
+        <div className="space-y-4 animate-in fade-in duration-500">
+            {/* Grid Layout for Targets Assessment + Focus Pie Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                {/* 季度周期训练计划目标考核模块 */}
+                <div className="lg:col-span-7 xl:col-span-8 bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                        <div>
+                            <h4 className="font-black text-gray-800 text-sm flex items-center gap-1.5">
+                                <Target className="w-4 h-4 text-bvb-yellow shrink-0" /> 
+                                <span>【{selectedTeamName}】季度周期计划目标录入考核</span>
+                            </h4>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5 leading-normal">
+                                季末考核规则：如录入周期计划目标，则季末月发放100%基本工资；如未录入，则扣当月基础工资20%。扣薪在季末月（3、6、9、12月）底发放工资时执行。
+                            </p>
+                        </div>
+                        {isDirector ? (
+                            <span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black border border-yellow-200 shrink-0 self-start md:self-auto">
+                                👑 青训总监考核权限已启用
+                            </span>
+                        ) : (
+                            <span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold border shrink-0 self-start md:self-auto">
+                                👁️ 季度考核公示
+                            </span>
+                        )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-3">
+                        {quarters.map((q) => {
+                            const status = currentPeriodization.quarterAssessments?.[q.key] || 'entered';
+                            return (
+                                <div key={q.key} className={`border rounded-xl p-2.5 flex flex-col justify-between gap-1.5 transition-all ${status === 'not_entered' ? 'bg-red-50/20 border-red-100/80' : 'bg-green-50/10 border-green-100/60'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="font-extrabold text-xs text-gray-800">{q.label}</p>
+                                            <p className="text-[9px] text-gray-400 font-mono font-bold leading-none mt-0.5">{q.monthsLabel}</p>
+                                        </div>
+                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border leading-none ${status === 'not_entered' ? 'bg-red-100 text-red-800 border-red-200 animate-pulse' : 'bg-green-100 text-green-800 border-green-200'}`}>
+                                            {status === 'not_entered' ? '🔴 未录入 (扣20%)' : '🟢 已录入 (正常)'}
+                                        </span>
                                     </div>
-                                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border leading-none ${status === 'not_entered' ? 'bg-red-100 text-red-800 border-red-200 animate-pulse' : 'bg-green-100 text-green-800 border-green-200'}`}>
-                                        {status === 'not_entered' ? '🔴 未录入 (扣20%)' : '🟢 已录入 (正常)'}
-                                    </span>
+                                    
+                                    {isDirector && (
+                                        <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = { ...(currentPeriodization.quarterAssessments || {}) };
+                                                    next[q.key] = 'entered';
+                                                    onUpdatePeriodization?.({ ...currentPeriodization, quarterAssessments: next });
+                                                }}
+                                                className={`flex-1 text-[9px] py-1 font-black rounded border transition-all ${status === 'entered' ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                            >
+                                                已录入
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = { ...(currentPeriodization.quarterAssessments || {}) };
+                                                    next[q.key] = 'not_entered';
+                                                    onUpdatePeriodization?.({ ...currentPeriodization, quarterAssessments: next });
+                                                }}
+                                                className={`flex-1 text-[9px] py-1 font-black rounded border transition-all ${status === 'not_entered' ? 'bg-red-600 text-white border-red-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
+                                            >
+                                                未录入
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                                
-                                {isDirector && (
-                                    <div className="flex gap-1.5 mt-2 pt-2 border-t border-gray-100">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const next = { ...(currentPeriodization.quarterAssessments || {}) };
-                                                next[q.key] = 'entered';
-                                                onUpdatePeriodization?.({ ...currentPeriodization, quarterAssessments: next });
-                                            }}
-                                            className={`flex-1 text-[9px] py-1 font-black rounded border transition-all ${status === 'entered' ? 'bg-green-600 text-white border-green-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
-                                        >
-                                            已录入
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const next = { ...(currentPeriodization.quarterAssessments || {}) };
-                                                next[q.key] = 'not_entered';
-                                                onUpdatePeriodization?.({ ...currentPeriodization, quarterAssessments: next });
-                                            }}
-                                            className={`flex-1 text-[9px] py-1 font-black rounded border transition-all ${status === 'not_entered' ? 'bg-red-600 text-white border-red-600 shadow-sm' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}
-                                        >
-                                            未录入
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Training Focus Distribution Pie Chart */}
+                <div className="lg:col-span-5 xl:col-span-4 flex flex-col">
+                    {renderPeriodizationStats()}
                 </div>
             </div>
 
@@ -2821,27 +2948,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       } else return (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto p-1">{Array.from({ length: 12 }).map((_, i) => <React.Fragment key={i}>{renderMonthGrid(year, i, true)}</React.Fragment>)}</div>);
   };
 
-  const renderStats = () => (
-    <div className="bg-white p-4 rounded-xl border border-gray-200 h-64 md:h-80 flex flex-col">
-        <div className="flex flex-col gap-2 mb-4 shrink-0">
-            <h4 className="font-bold text-gray-800 text-xs uppercase flex items-center">
-                <PieChartIcon className="w-3.5 h-3.5 mr-1.5 text-bvb-yellow" /> 训练重点分布
-            </h4>
-            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Focus Area Distribution</p>
-        </div>
-        <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie data={statsData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} paddingAngle={5} dataKey="value">
-                        {statsData.map((entry, index) => (<Cell key={`cell-${index}`} fill={['#FDE100', '#000000', '#9CA3AF', '#D1D5DB'][index % 4]} />))}
-                    </Pie>
-                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', padding: '12px' }} />
-                    <Legend iconSize={8} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} verticalAlign="bottom" />
-                </PieChart>
-            </ResponsiveContainer>
-        </div>
-    </div>
-  );
+
 
   const handleExportPDF = async () => {
         setIsExporting(true);
@@ -3031,8 +3138,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
              </div>
              
              {viewType !== 'periodization' && viewType !== 'focus' && (
-             <div className="w-full lg:w-72 flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
-                 {renderStats()}
+             <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
                  <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-h-[300px]">
                     <h4 className="font-black text-gray-800 mb-4 text-[10px] uppercase tracking-widest flex justify-between items-center border-b pb-3 border-gray-50">
                         <span>{selectedDate} 当日详情</span>
