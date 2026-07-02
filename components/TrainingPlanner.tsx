@@ -3172,7 +3172,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
              </div>
              
              {viewType !== 'periodization' && viewType !== 'focus' && (
-             <div className="w-full lg:w-80 flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
+             <div className="w-full lg:w-[240px] flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
                  <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-h-[300px]">
                     <h4 className="font-black text-gray-800 mb-4 text-[10px] uppercase tracking-widest flex justify-between items-center border-b pb-3 border-gray-50">
                         <span>{selectedDate} 当日详情</span>
