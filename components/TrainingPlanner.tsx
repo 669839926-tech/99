@@ -1922,42 +1922,76 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
 
       const getFocusName = (theme: string): string => {
           if (!theme) return '未指定主题';
-          if (theme.includes(']')) {
-              const parts = theme.split(']');
+          const cleaned = theme.trim();
+          
+          // Try to handle Chinese brackets first
+          if (cleaned.includes('】')) {
+              const parts = cleaned.split('】');
               const main = parts[parts.length - 1].trim();
-              if (main.includes('·')) {
-                  return main.split('·')[0].trim();
+              if (main) {
+                  if (main.includes('·')) {
+                      return main.split('·')[0].trim();
+                  }
+                  return main;
               }
-              return main || '未指定主题';
           }
-          return theme.trim();
+          
+          // Try to handle English brackets
+          if (cleaned.includes(']')) {
+              const parts = cleaned.split(']');
+              const main = parts[parts.length - 1].trim();
+              if (main) {
+                  if (main.includes('·')) {
+                      return main.split('·')[0].trim();
+                  }
+                  return main;
+              }
+          }
+
+          // If there is any leading bracket-like prefix e.g. "【运控球】", and nothing after it
+          if (cleaned.startsWith('【') && cleaned.endsWith('】')) {
+              return cleaned.slice(1, -1).trim();
+          }
+          if (cleaned.startsWith('[') && cleaned.endsWith(']')) {
+              return cleaned.slice(1, -1).trim();
+          }
+
+          return cleaned;
       };
 
       const focusCounts: Record<string, number> = {};
       let totalCount = 0;
 
+      // When "all" is selected, aggregate weeks from all available teams' periodization plans.
+      // Otherwise, only compile from the currently selected team's plan.
+      const activePlans = statsTeamFilter === 'all'
+          ? periodizationPlans.filter(p => p.year === year && availableTeams.some(at => at.id === p.teamId))
+          : periodizationPlans.filter(p => p.teamId === statsTeamFilter && p.year === year);
+
       months.forEach(month => {
           const monthWeeksCount = getSundaysInMonth(year, month);
           for (let weekNum = 1; weekNum <= monthWeeksCount; weekNum++) {
-              const weekPlan = currentPeriodization.weeks.find(w => w.month === month && w.weekInMonth === weekNum);
-              if (weekPlan) {
-                  // Check main trainingTheme
-                  if (weekPlan.trainingTheme) {
-                      const focus = getFocusName(weekPlan.trainingTheme);
-                      focusCounts[focus] = (focusCounts[focus] || 0) + 1;
-                      totalCount++;
+              activePlans.forEach(plan => {
+                  const weekPlan = plan.weeks.find(w => w.month === month && w.weekInMonth === weekNum);
+                  if (weekPlan) {
+                      // Check main trainingTheme
+                      if (weekPlan.trainingTheme) {
+                          const focus = getFocusName(weekPlan.trainingTheme);
+                          focusCounts[focus] = (focusCounts[focus] || 0) + 1;
+                          totalCount++;
+                      }
+                      // Check subItems if any
+                      if (weekPlan.subItems && weekPlan.subItems.length > 0) {
+                          weekPlan.subItems.forEach(sub => {
+                              if (sub.trainingTheme) {
+                                  const focus = getFocusName(sub.trainingTheme);
+                                  focusCounts[focus] = (focusCounts[focus] || 0) + 1;
+                                  totalCount++;
+                              }
+                          });
+                      }
                   }
-                  // Check subItems if any
-                  if (weekPlan.subItems && weekPlan.subItems.length > 0) {
-                      weekPlan.subItems.forEach(sub => {
-                          if (sub.trainingTheme) {
-                              const focus = getFocusName(sub.trainingTheme);
-                              focusCounts[focus] = (focusCounts[focus] || 0) + 1;
-                              totalCount++;
-                          }
-                      });
-                  }
-              }
+              });
           }
       });
 
@@ -1967,7 +2001,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       }));
 
       return { chartData, totalCount };
-  }, [currentPeriodization, currentDate, timeScope]);
+  }, [periodizationPlans, availableTeams, statsTeamFilter, currentDate, timeScope]);
 
   const matchedWeekPlanForForm = useMemo(() => {
       if (!formData.teamId || !formData.date || !periodizationPlans) return null;
@@ -2568,7 +2602,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         const colors = ['#FDE100', '#1F2937', '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
         return (
-            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col sm:flex-row gap-4 h-full w-full justify-between items-stretch">
+            <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 h-full w-full justify-between items-stretch">
                 <div className="flex flex-col justify-between flex-1 min-w-0 py-0.5">
                     <div className="flex flex-col gap-1 border-b border-gray-100 pb-2">
                         <h4 className="font-black text-gray-800 text-xs uppercase flex items-center gap-1.5">
@@ -2578,15 +2612,15 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Periodization Focus</p>
                     </div>
                     
-                    {/* Compact Custom Legend list */}
-                    <div className="mt-2.5 space-y-1 overflow-y-auto max-h-[110px] pr-1 no-scrollbar">
+                    {/* Compact Custom Legend list that scales and fills the available space with correct scrolling and no clipping */}
+                    <div className="mt-3 space-y-2 overflow-y-auto max-h-[180px] md:max-h-[240px] pr-2 flex-1 scrollbar-thin">
                         {totalCount > 0 ? (
                             chartData.map((entry, index) => {
                                 const percent = totalValue > 0 ? ((entry.value / totalValue) * 100).toFixed(0) : 0;
                                 return (
-                                    <div key={entry.name} className="flex items-center justify-between text-[10px] font-bold text-gray-600">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colors[index % colors.length] }}></span>
+                                    <div key={entry.name} className="flex items-center justify-between text-xs font-bold text-gray-600 py-0.5 border-b border-gray-50 last:border-0">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colors[index % colors.length] }}></span>
                                             <span className="truncate">{entry.name}</span>
                                         </div>
                                         <span className="font-mono text-gray-400 shrink-0 ml-2">{entry.value}次 ({percent}%)</span>
@@ -2594,13 +2628,13 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                 );
                             })
                         ) : (
-                            <p className="text-[10px] text-gray-400 italic">暂无重点数据</p>
+                            <p className="text-xs text-gray-400 italic">暂无重点数据</p>
                         )}
                     </div>
                 </div>
 
-                {/* Pie/Donut Chart side */}
-                <div className="w-full sm:w-[130px] h-[110px] sm:h-full relative shrink-0 flex items-center justify-center">
+                {/* Pie/Donut Chart side - Larger container for high readability */}
+                <div className="w-full md:w-[170px] h-[130px] md:h-full relative shrink-0 flex items-center justify-center bg-gray-50/40 rounded-xl p-2 border border-gray-100/50">
                     {totalCount > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -2608,8 +2642,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                     data={chartData} 
                                     cx="50%" 
                                     cy="50%" 
-                                    innerRadius={25} 
-                                    outerRadius={40} 
+                                    innerRadius={32} 
+                                    outerRadius={52} 
                                     paddingAngle={3} 
                                     dataKey="value"
                                 >
@@ -2618,15 +2652,15 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                     ))}
                                 </Pie>
                                 <Tooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 2px 4px rgb(0 0 0 / 0.1)', padding: '6px', fontSize: '9px' }} 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgb(0 0 0 / 0.15)', padding: '8px', fontSize: '10px', fontWeight: 'bold' }} 
                                     formatter={(value: any, name: any) => [`${value}次`, name]}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
                         <div className="flex flex-col items-center justify-center text-gray-300">
-                            <PieChartIcon className="w-5 h-5 mb-0.5 stroke-1" />
-                            <p className="text-[8px] font-bold">无重点数据</p>
+                            <PieChartIcon className="w-6 h-6 mb-1 stroke-1" />
+                            <p className="text-[10px] font-bold">无重点数据</p>
                         </div>
                     )}
                 </div>
@@ -2639,23 +2673,23 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             {/* Grid Layout for Targets Assessment + Focus Pie Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                 {/* 季度周期训练计划目标考核模块 */}
-                <div className="lg:col-span-7 xl:col-span-8 bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
+                <div className="lg:col-span-6 xl:col-span-7 bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between space-y-3">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-gray-100 pb-2">
                         <div>
-                            <h4 className="font-black text-gray-800 text-sm flex items-center gap-1.5">
+                            <h4 className="font-extrabold text-gray-800 text-xs flex items-center gap-1.5">
                                 <Target className="w-4 h-4 text-bvb-yellow shrink-0" /> 
                                 <span>【{selectedTeamName}】季度周期计划目标录入考核</span>
                             </h4>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase mt-0.5 leading-normal">
+                            <p className="text-[9px] text-gray-400 font-bold uppercase mt-0.5 leading-normal">
                                 季末考核规则：如录入周期计划目标，则季末月发放100%基本工资；如未录入，则扣当月基础工资20%。扣薪在季末月（3、6、9、12月）底发放工资时执行。
                             </p>
                         </div>
                         {isDirector ? (
-                            <span className="text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black border border-yellow-200 shrink-0 self-start md:self-auto">
+                            <span className="text-[8px] md:text-[9px] bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded font-black border border-yellow-200 shrink-0 self-start md:self-auto">
                                 👑 青训总监考核权限已启用
                             </span>
                         ) : (
-                            <span className="text-[9px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold border shrink-0 self-start md:self-auto">
+                            <span className="text-[8px] md:text-[9px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-bold border shrink-0 self-start md:self-auto">
                                 👁️ 季度考核公示
                             </span>
                         )}
@@ -2671,8 +2705,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             <p className="font-extrabold text-xs text-gray-800">{q.label}</p>
                                             <p className="text-[9px] text-gray-400 font-mono font-bold leading-none mt-0.5">{q.monthsLabel}</p>
                                         </div>
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border leading-none ${status === 'not_entered' ? 'bg-red-100 text-red-800 border-red-200 animate-pulse' : 'bg-green-100 text-green-800 border-green-200'}`}>
-                                            {status === 'not_entered' ? '🔴 未录入 (扣20%)' : '🟢 已录入 (正常)'}
+                                        <span className={`text-[8px] md:text-[9px] font-black uppercase px-2 py-0.5 rounded border leading-none ${status === 'not_entered' ? 'bg-red-100 text-red-800 border-red-200 animate-pulse' : 'bg-green-100 text-green-800 border-green-200'}`}>
+                                            {status === 'not_entered' ? '🔴 未录入' : '🟢 已录入'}
                                         </span>
                                     </div>
                                     
@@ -2709,7 +2743,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 </div>
 
                 {/* Training Focus Distribution Pie Chart */}
-                <div className="lg:col-span-5 xl:col-span-4 flex flex-col">
+                <div className="lg:col-span-6 xl:col-span-5 flex flex-col">
                     {renderPeriodizationStats()}
                 </div>
             </div>
