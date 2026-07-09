@@ -1541,14 +1541,20 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                       <div className="flex items-center gap-2">
                                           <span className="text-xs font-bold text-gray-400">实到训练课时:</span>
                                           <span className="bg-gray-100 text-gray-700 px-2.5 py-0.5 rounded-full text-xs font-black font-mono">
-                                              {trainings.filter(t => t.attendance?.some(att => att.playerId === editedPlayer.id && att.status === 'Present')).length} 节
+                                              {trainings.reduce((acc, t) => {
+                                                  const record = t.attendance?.find(att => att.playerId === editedPlayer.id && att.status === 'Present');
+                                                  return acc + (record ? (record.creditCost ?? 1) : 0);
+                                              }, 0)} 节
                                           </span>
                                           <span className="text-xs text-gray-400"> (自动匹配标准: 等级一: &lt;32 | 等级二: ≥32 | 等级三: ≥80) </span>
                                       </div>
                                       <div className="flex items-center gap-3 mt-1">
                                           <span className="text-xs font-bold text-gray-400">核定收费等级:</span>
                                           {(() => {
-                                              const attended = trainings.filter(t => t.attendance?.some(att => att.playerId === editedPlayer.id && att.status === 'Present')).length;
+                                              const attended = trainings.reduce((acc, t) => {
+                                                  const record = t.attendance?.find(att => att.playerId === editedPlayer.id && att.status === 'Present');
+                                                  return acc + (record ? (record.creditCost ?? 1) : 0);
+                                              }, 0);
                                               let autoL: 1 | 2 | 3 = 1;
                                               if (attended < 32) autoL = 1;
                                               else if (attended >= 32 && attended < 80) autoL = 2;

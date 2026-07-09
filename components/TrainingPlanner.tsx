@@ -1998,7 +1998,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       const chartData = Object.keys(focusCounts).map(key => ({
           name: key,
           value: focusCounts[key]
-      }));
+      })).sort((a, b) => b.value - a.value);
 
       return { chartData, totalCount };
   }, [periodizationPlans, availableTeams, statsTeamFilter, currentDate, timeScope]);

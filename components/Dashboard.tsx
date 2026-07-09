@@ -34,7 +34,10 @@ const parseLocalDate = (dateStr: string) => {
 };
 
 const getPlayerRenewalLevelDetails = (player: Player, trainings: TrainingSession[]) => {
-    const attendedCount = (trainings || []).filter(t => t.attendance?.some(att => att.playerId === player.id && att.status === 'Present')).length;
+    const attendedCount = (trainings || []).reduce((acc, t) => {
+        const record = t.attendance?.find(att => att.playerId === player.id && att.status === 'Present');
+        return acc + (record ? (record.creditCost ?? 1) : 0);
+    }, 0);
     let autoLevel: 1 | 2 | 3 = 1;
     if (attendedCount < 32) {
         autoLevel = 1;
@@ -473,13 +476,17 @@ const Dashboard: React.FC<DashboardProps> = ({
              return isCurrentTeam || hasRecord;
          });
          
-         const pPresent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
+         const pPresent = pSessions.reduce((acc, t) => {
+             const record = t.attendance?.find(r => r.playerId === p.id && r.status === 'Present');
+             return acc + (record ? (record.creditCost ?? 1) : 0);
+         }, 0);
+         const pPresentSessions = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
          const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
          const pInjury = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Injury')).length;
          const pAbsent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Absent')).length;
          const pNoRecord = pSessions.filter(t => !t.attendance?.some(r => r.playerId === p.id)).length;
          
-         const rate = pSessions.length > 0 ? Math.round((pPresent / pSessions.length) * 100) : 0;
+         const rate = pSessions.length > 0 ? Math.round((pPresentSessions / pSessions.length) * 100) : 0;
          
          // 核心逻辑：汇总统计必须与选择的球员范围完全同步
          if (!isIndividualMode || p.id === attendancePlayerId) {
@@ -554,9 +561,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       }).map(s => {
           const record = s.attendance?.find(r => r.playerId === player.id);
           const teamName = teams.find(t => t.id === s.teamId)?.name || '';
-          return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', teamName };
+          return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', creditCost: record?.creditCost ?? 1, teamName };
       });
-      const present = sessionRecords.filter(r => r.status === 'Present').length;
+      const present = sessionRecords.reduce((acc, r) => {
+          if (r.status === 'Present') {
+              return acc + r.creditCost;
+          }
+          return acc;
+      }, 0);
+      const presentSessions = sessionRecords.filter(r => r.status === 'Present').length;
       const leave = sessionRecords.filter(r => r.status === 'Leave').length;
       const injury = sessionRecords.filter(r => r.status === 'Injury').length;
       const absent = sessionRecords.filter(r => r.status === 'Absent').length;
@@ -570,7 +583,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               leave,
               injury,
               absent,
-              rate: sessionRecords.length > 0 ? Math.round((present / sessionRecords.length) * 100) : 0 
+              rate: sessionRecords.length > 0 ? Math.round((presentSessions / sessionRecords.length) * 100) : 0 
           } 
       };
   }, [attendancePlayerId, displayTrainings, displayPlayers, dateRange, teams]);
