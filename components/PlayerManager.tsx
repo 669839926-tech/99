@@ -141,6 +141,9 @@ const calculateAttendanceRate = (player: Player, trainings: TrainingSession[], s
     else if (scope === 'quarter') { startDate.setMonth(now.getMonth() - 3); } 
     else { startDate.setFullYear(now.getFullYear() - 1); }
     const validSessions = trainings.filter(t => {
+        if (player.joinDate && t.date < player.joinDate) {
+            return false;
+        }
         const tDate = new Date(t.date);
         return t.teamId === player.teamId && tDate >= startDate && tDate <= now;
     });
@@ -872,7 +875,12 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             };
         })();
 
-        const quarterTrainings = trainings.filter(t => t.date >= start && t.date <= end && t.teamId === editedPlayer.teamId);
+        const quarterTrainings = trainings.filter(t => {
+            if (editedPlayer.joinDate && t.date < editedPlayer.joinDate) {
+                return false;
+            }
+            return t.date >= start && t.date <= end && t.teamId === editedPlayer.teamId;
+        });
         const attendedSessions = quarterTrainings.filter(t => t.attendance.some(a => a.playerId === editedPlayer.id && a.status === 'Present'));
         const attendanceRate = quarterTrainings.length > 0 ? (attendedSessions.length / quarterTrainings.length * 100).toFixed(1) : '0';
 

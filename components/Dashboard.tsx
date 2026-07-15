@@ -393,12 +393,23 @@ const Dashboard: React.FC<DashboardProps> = ({
     const start = dateRange.start;
     const end = dateRange.end;
 
+    // 是否选择了特定球员进行下钻分析
+    const isIndividualMode = attendancePlayerId !== 'all';
+    const playerObj = isIndividualMode ? displayPlayers.find(p => p.id === attendancePlayerId) : null;
+
     const filteredSessions = (displayTrainings || []).filter(s => {
         const d = parseLocalDate(s.date);
         const matchDate = d >= start && d <= end;
+        if (!matchDate) return false;
+
+        // NEW RULE: If individual mode, exclude sessions prior to their joinDate
+        if (playerObj && playerObj.joinDate && s.date < playerObj.joinDate) {
+            return false;
+        }
+
         const hasRecord = attendancePlayerId !== 'all' && s.attendance?.some(r => r.playerId === attendancePlayerId);
         const matchTeam = attendanceTeamId === 'all' || s.teamId === attendanceTeamId || hasRecord;
-        return matchDate && matchTeam;
+        return matchTeam;
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     
     // 核心更新：在出勤深度分析中，排除“待分配”球员
@@ -412,9 +423,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     let grandTotalRate = 0;
     let grandTotalCount = 0;
 
-    // 是否选择了特定球员进行下钻分析
-    const isIndividualMode = attendancePlayerId !== 'all';
-
     if (analysisView === 'session') {
         data = filteredSessions.map(s => {
              let rate = 0;
@@ -423,8 +431,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                  const playerRecord = s.attendance?.find(r => r.playerId === attendancePlayerId);
                  rate = playerRecord?.status === 'Present' ? 100 : 0;
              } else {
-                 // 全队模式：统计该场次到课率
-                 const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId).length;
+                 // 全队模式：统计该场次到课率（排除在该场次之后注册的新球员）
+                 const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId && (!p.joinDate || s.date >= p.joinDate)).length;
                  const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
                  rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
              }
@@ -432,7 +440,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              grandTotalCount++;
              const d = parseLocalDate(s.date);
              return { name: `${d.getMonth() + 1}/${d.getDate()}`, rate, fullDate: s.date, title: s.title, id: s.id };
-        });
+         });
     } else {
         const groupedData: Record<string, { totalRate: number; count: number }> = {};
         filteredSessions.forEach(session => {
@@ -444,7 +452,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 const playerRecord = session.attendance?.find(r => r.playerId === attendancePlayerId);
                 rate = playerRecord?.status === 'Present' ? 100 : 0;
             } else {
-                const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId).length;
+                // 全队模式：统计该周/月的到课率（排除在该场次之后注册的新球员）
+                const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId && (!p.joinDate || session.date >= p.joinDate)).length;
                 const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
                 rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
             }
@@ -466,6 +475,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     const exportList = teamPlayers.map(p => {
          // 包含该球员有出勤记录的所有场次，或者属于他当前梯队的场次
          const pSessions = (displayTrainings || []).filter(s => {
+             if (p.joinDate && s.date < p.joinDate) {
+                 return false;
+             }
              const d = parseLocalDate(s.date);
              const matchDate = d >= start && d <= end;
              if (!matchDate) return false;
@@ -501,7 +513,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const exportSessions = filteredSessions.map(s => {
          const recordedPlayerIds = s.attendance?.map(r => r.playerId) || [];
-         const sTeamPlayers = displayPlayers.filter(p => p.teamId === s.teamId || recordedPlayerIds.includes(p.id));
+         const sTeamPlayers = displayPlayers.filter(p => {
+             if (p.teamId === s.teamId || recordedPlayerIds.includes(p.id)) {
+                 if (p.joinDate && s.date < p.joinDate && !recordedPlayerIds.includes(p.id)) {
+                     return false;
+                 }
+                 return true;
+             }
+             return false;
+         });
          const total = sTeamPlayers.length;
          const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
          const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
