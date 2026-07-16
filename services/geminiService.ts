@@ -99,10 +99,10 @@ export const generatePlayerReview = async (player: Player, quarter: string, year
       
       Time Period: ${year} ${quarter}
       
-      Output 3 distinct sections in Chinese:
-      1. Technical & Tactical Improvement (技战术能力改善)
-      2. Mental Development (心理建设)
-      3. Quarterly Summary (本季总结)
+      Output 3 distinct sections in Chinese conforming to the following standards:
+      1. Key Objectives for This Quarter (本季度重点目标): Technical and tactical development goals.
+      2. Objective Achievement (目标完成情况): Must be exactly one of "明显改善" or "有一定改善" or "改善不明显".
+      3. Core Progress This Quarter (本季度核心进步): Main progress and achievements.
       
       Keep it encouraging but professional and specific.
     `;
@@ -116,10 +116,15 @@ export const generatePlayerReview = async (player: Player, quarter: string, year
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    tech: { type: Type.STRING, description: "Technical & Tactical Improvement analysis in Chinese" },
-                    mental: { type: Type.STRING, description: "Mental Development analysis in Chinese" },
-                    summary: { type: Type.STRING, description: "Quarterly Summary in Chinese" }
-                }
+                    tech: { type: Type.STRING, description: "Key Objectives for This Quarter (本季度重点目标) in Chinese" },
+                    mental: { 
+                        type: Type.STRING, 
+                        enum: ["明显改善", "有一定改善", "改善不明显"],
+                        description: "Objective Achievement (目标完成情况), choose strictly one from: 明显改善, 有一定改善, 改善不明显" 
+                    },
+                    summary: { type: Type.STRING, description: "Core Progress This Quarter (本季度核心进步) in Chinese" }
+                },
+                required: ["tech", "mental", "summary"]
             }
         }
     });

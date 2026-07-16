@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
+import html2canvas from 'html2canvas';
 
 // --- Shared Helper Functions ---
 
@@ -502,6 +503,11 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [now, setNow] = useState(new Date());
     const [isDemoCountdown, setIsDemoCountdown] = useState(false);
 
+    const [showEvaluationCardModal, setShowEvaluationCardModal] = useState(false);
+    const [selectedEvaluationReview, setSelectedEvaluationReview] = useState<PlayerReview | null>(null);
+    const [isCapturingEvaluationCard, setIsCapturingEvaluationCard] = useState(false);
+    const evaluationCardRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         const timer = setInterval(() => {
             setNow(new Date());
@@ -671,6 +677,93 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         const genderDigit = parseInt(id.charAt(16)); if (!isNaN(genderDigit)) { updates.gender = genderDigit % 2 === 1 ? '男' : '女'; }
       }
       setEditedPlayer(prev => ({ ...prev, ...updates }));
+    };
+
+    const getQuarterStats = (year: number, quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4') => {
+        let startMonth, endMonth;
+        switch (quarter) {
+            case 'Q1': startMonth = 0; endMonth = 2; break;
+            case 'Q2': startMonth = 3; endMonth = 5; break;
+            case 'Q3': startMonth = 6; endMonth = 8; break;
+            case 'Q4': startMonth = 9; endMonth = 11; break;
+            default: startMonth = 0; endMonth = 11;
+        }
+        const startDate = new Date(year, startMonth, 1);
+        const endDate = new Date(year, endMonth + 1, 0);
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
+
+        const qTrainings = trainings.filter(t => {
+            if (editedPlayer.joinDate && t.date < editedPlayer.joinDate) {
+                return false;
+            }
+            return t.date >= startStr && t.date <= endStr && t.teamId === editedPlayer.teamId;
+        });
+        const attSessions = qTrainings.filter(t => t.attendance.some(a => a.playerId === editedPlayer.id && a.status === 'Present'));
+        const attRate = qTrainings.length > 0 ? (attSessions.length / qTrainings.length * 100).toFixed(1) : '0';
+
+        const focEvents = qTrainings
+            .filter(t => t.focusedPlayerIds?.includes(editedPlayer.id))
+            .map(t => ({
+                date: t.date,
+                title: t.title,
+                notes: t.focusedPlayerNotes?.[editedPlayer.id]
+            }))
+            .filter(e => e.notes);
+
+        const logs = (editedPlayer.homeTrainingLogs || []).filter(l => l.date >= startStr && l.date <= endStr);
+        const homeDuration = logs.reduce((acc, log) => acc + (log.duration || 0), 0);
+
+        return {
+            trainingsCount: qTrainings.length,
+            attendanceCount: attSessions.length,
+            attendanceRate: attRate,
+            focusEvents: focEvents,
+            homeLogsCount: logs.length,
+            homeDuration
+        };
+    };
+
+    const handleOpenEvaluationCard = (year: number, quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4', specificReview?: PlayerReview) => {
+        const review = specificReview || (editedPlayer.reviews || []).find(r => r.year === year && r.quarter === quarter && r.status === 'Published');
+        
+        setSelectedEvaluationReview(review || {
+            id: 'temp-' + Date.now(),
+            date: new Date().toISOString().split('T')[0],
+            year,
+            quarter,
+            technicalTacticalImprovement: '（暂无本季度重点目标，可在该季度点评面板中录入并发布）',
+            mentalDevelopment: '（暂无目标完成情况）',
+            summary: '（暂无本季度核心进步，可在该季度点评面板中录入并发布）',
+            status: 'Draft'
+        });
+        
+        setShowEvaluationCardModal(true);
+    };
+
+    const handleDownloadEvaluationCard = async () => {
+        if (!evaluationCardRef.current || !editedPlayer) return;
+        setIsCapturingEvaluationCard(true);
+        try {
+            await new Promise(resolve => setTimeout(resolve, 300));
+            const canvas = await html2canvas(evaluationCardRef.current, {
+                useCORS: true,
+                scale: 3,
+                backgroundColor: '#111215',
+                logging: false,
+                allowTaint: true
+            });
+            const link = document.createElement('a');
+            const fileName = `顽石之光季度综合评估_${editedPlayer.name}_${selectedEvaluationReview?.year}_${selectedEvaluationReview?.quarter}.png`;
+            link.download = fileName;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (error) {
+            console.error("生成评价卡片失败", error);
+            alert('卡片生成失败，请稍后重试。部分外部头像图片可能由于跨域限制无法加载，建议您在更换为本地上传头像后重试。');
+        } finally {
+            setIsCapturingEvaluationCard(false);
+        }
     };
 
     const handleGenerateAiReview = async () => {
@@ -994,6 +1087,13 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         const teamName = teams.find(t => t.id === editedPlayer.teamId)?.name || '本梯队';
         const expectedDeduction = (teamPlayers.length - reviewedTeamPlayers.length) * 5;
 
+        const isFormNewStandard = !editingReviewId || ['明显改善', '有一定改善', '改善不明显'].includes(newReview.mentalDevelopment || '');
+        const formTechLabel = '本季度重点目标';
+        const formMentalLabel = '目标完成情况';
+        const formSummaryLabel = '本季度核心进步';
+        const formTechPlaceholder = "请填写本季度重点训练及考核目标...";
+        const formSummaryPlaceholder = "请填写本季度核心进步及成就总结...";
+
         return (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-6 pb-24 md:pb-10">
                 {/* 球员季度跟踪考核及倒计时提醒 */}
@@ -1093,15 +1193,25 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                 {/* Tracking Dashboard Section */}
                 <div className="bg-gradient-to-br from-gray-900 to-bvb-black text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row gap-6 items-center">
                     <div className="flex-1 w-full space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-bvb-yellow/20 rounded-lg"><Activity className="w-5 h-5 text-bvb-yellow" /></div>
                                 <div><h3 className="font-black text-lg uppercase tracking-wider">季度追踪总结</h3><p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest">{trackingYear} {trackingQuarter} ASSESSMENT DASHBOARD</p></div>
                             </div>
-                            <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-lg border border-white/5 shadow-inner">
-                                <select value={trackingYear} onChange={e => setTrackingYear(parseInt(e.target.value))} className="bg-transparent text-xs font-bold px-2 outline-none cursor-pointer"><option value={2026} className="text-black">2026</option><option value={2025} className="text-black">2025</option><option value={2024} className="text-black">2024</option></select>
-                                <div className="w-px h-3 bg-white/20"></div>
-                                <select value={trackingQuarter} onChange={e => setTrackingQuarter(e.target.value as any)} className="bg-transparent text-xs font-bold px-2 outline-none cursor-pointer"><option value="Q1" className="text-black">Q1 (第一季度)</option><option value="Q2" className="text-black">Q2 (第二季度)</option><option value="Q3" className="text-black">Q3 (第三季度)</option><option value="Q4" className="text-black">Q4 (第四季度)</option></select>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex items-center gap-2 bg-white/10 p-1.5 rounded-lg border border-white/5 shadow-inner">
+                                    <select value={trackingYear} onChange={e => setTrackingYear(parseInt(e.target.value))} className="bg-transparent text-xs font-bold px-2 outline-none cursor-pointer"><option value={2026} className="text-black">2026</option><option value={2025} className="text-black">2025</option><option value={2024} className="text-black">2024</option></select>
+                                    <div className="w-px h-3 bg-white/20"></div>
+                                    <select value={trackingQuarter} onChange={e => setTrackingQuarter(e.target.value as any)} className="bg-transparent text-xs font-bold px-2 outline-none cursor-pointer"><option value="Q1" className="text-black">Q1 (第一季度)</option><option value="Q2" className="text-black">Q2 (第二季度)</option><option value="Q3" className="text-black">Q3 (第三季度)</option><option value="Q4" className="text-black">Q4 (第四季度)</option></select>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleOpenEvaluationCard(trackingYear, trackingQuarter)}
+                                    className="bg-bvb-yellow hover:brightness-105 active:scale-95 text-bvb-black text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow transition-all shrink-0"
+                                >
+                                    <ImageIcon className="w-4 h-4 text-bvb-black" />
+                                    生成家长卡片
+                                </button>
                             </div>
                         </div>
 
@@ -1148,26 +1258,39 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                         {years.map(year => (
                             <div key={year} className="relative border-l-2 border-gray-200 pl-6 ml-2 space-y-6">
                                 <span className="absolute -left-[21px] top-0 bg-gray-100 text-gray-500 text-xs font-bold px-1.5 py-0.5 rounded border border-gray-300">{year}</span>
-                                {groupedReviews[year].map(review => (
-                                    <div key={review.id} className={`relative group ${review.status === 'Draft' ? 'opacity-80' : ''}`}>
-                                        <div className="absolute -left-[31px] top-1 w-3 h-3 bg-bvb-yellow rounded-full border-2 border-white shadow-sm group-hover:scale-125 transition-transform"></div>
-                                        <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
-                                            <div className="flex justify-between items-center mb-3">
-                                                <div className="flex items-center gap-2"><span className="text-sm font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getStatusColor(review.status)}`}>{getStatusLabel(review.status)}</span></div>
-                                                <div className="flex items-center gap-2"><span className="text-xs text-gray-400">{review.date}</span><button onClick={() => handleDeleteReview(review.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button></div>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">技战术能力改善</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.technicalTacticalImprovement || '（未填写）'}</p></div>
-                                                <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">心理建设</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.mentalDevelopment || '（未填写）'}</p></div>
-                                                <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">季度总结</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded italic border-l-2 border-bvb-yellow">{review.summary || '（未填写）'}</p></div>
-                                                <div className="flex justify-end pt-2 gap-2 border-t border-gray-100">
-                                                    {(review.status === 'Draft' || review.status === 'Submitted' || review.status === 'Published') && (<button onClick={() => handleEditReview(review)} className="text-xs bg-bvb-yellow text-bvb-black px-3 py-1.5 rounded font-bold hover:brightness-105 flex items-center shadow-sm"><Edit2 className="w-3 h-3 mr-1" /> 编辑</button>)}
-                                                    {review.status !== 'Published' && (<button onClick={() => updateReviewStatus(review.id, 'Published')} className="text-xs bg-green-50 text-green-600 px-2 py-1.5 rounded font-bold hover:bg-green-100 flex items-center"><CheckCircle className="w-3 h-3 mr-1" /> 发布</button>)}
+                                {groupedReviews[year].map(review => {
+                                    const techLabel = '本季度重点目标';
+                                    const mentalLabel = '目标完成情况';
+                                    const summaryLabel = '本季度核心进步';
+                                    return (
+                                        <div key={review.id} className={`relative group ${review.status === 'Draft' ? 'opacity-80' : ''}`}>
+                                            <div className="absolute -left-[31px] top-1 w-3 h-3 bg-bvb-yellow rounded-full border-2 border-white shadow-sm group-hover:scale-125 transition-transform"></div>
+                                            <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <div className="flex items-center gap-2"><span className="text-sm font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded">{review.quarter}</span><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${getStatusColor(review.status)}`}>{getStatusLabel(review.status)}</span></div>
+                                                    <div className="flex items-center gap-2"><span className="text-xs text-gray-400">{review.date}</span><button onClick={() => handleDeleteReview(review.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="w-3.5 h-3.5" /></button></div>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{techLabel}</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.technicalTacticalImprovement || '（未填写）'}</p></div>
+                                                    <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{mentalLabel}</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded">{review.mentalDevelopment || '（未填写）'}</p></div>
+                                                    <div><h4 className="text-xs font-bold text-gray-500 uppercase mb-1">{summaryLabel}</h4><p className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-2 rounded italic border-l-2 border-bvb-yellow">{review.summary || '（未填写）'}</p></div>
+                                                    <div className="flex justify-end pt-2 gap-2 border-t border-gray-100">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleOpenEvaluationCard(review.year, review.quarter, review)} 
+                                                            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-bold flex items-center shadow-sm transition-colors"
+                                                        >
+                                                            <ImageIcon className="w-3.5 h-3.5 mr-1 text-bvb-yellow" /> 
+                                                            家长卡片
+                                                        </button>
+                                                        {(review.status === 'Draft' || review.status === 'Submitted' || review.status === 'Published') && (<button onClick={() => handleEditReview(review)} className="text-xs bg-bvb-yellow text-bvb-black px-3 py-1.5 rounded font-bold hover:brightness-105 flex items-center shadow-sm"><Edit2 className="w-3 h-3 mr-1" /> 编辑</button>)}
+                                                        {review.status !== 'Published' && (<button onClick={() => updateReviewStatus(review.id, 'Published')} className="text-xs bg-green-50 text-green-600 px-2 py-1.5 rounded font-bold hover:bg-green-100 flex items-center"><CheckCircle className="w-3 h-3 mr-1" /> 发布</button>)}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>
@@ -1178,9 +1301,35 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                 <div><label className="block text-xs font-bold text-gray-500 mb-1">年份</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" value={newReview.year} onChange={e => setNewReview({...newReview, year: parseInt(e.target.value)})}>{[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}</select></div>
                                 <div><label className="block text-xs font-bold text-gray-500 mb-1">季度</label><select className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" value={newReview.quarter} onChange={e => setNewReview({...newReview, quarter: e.target.value as any})}><option value="Q1">Q1 (第一季度)</option><option value="Q2">Q2 (第二季度)</option><option value="Q3">Q3 (第三季度)</option><option value="Q4">Q4 (第四季度)</option></select></div>
                             </div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">技战术能力改善</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="描述球员本季度的技术和战术进步..." value={newReview.technicalTacticalImprovement} onChange={e => setNewReview({...newReview, technicalTacticalImprovement: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">心理建设</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="评价球员的心理状态、抗压能力和团队融入..." value={newReview.mentalDevelopment} onChange={e => setNewReview({...newReview, mentalDevelopment: e.target.value})} /></div>
-                            <div><label className="block text-xs font-bold text-gray-500 mb-1">季度总结</label><textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="综合评价与下季度目标..." value={newReview.summary} onChange={e => setNewReview({...newReview, summary: e.target.value})} /></div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">{formTechLabel}</label>
+                                <textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder={formTechPlaceholder} value={newReview.technicalTacticalImprovement || ''} onChange={e => setNewReview({...newReview, technicalTacticalImprovement: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">{formMentalLabel}</label>
+                                {isFormNewStandard ? (
+                                    <select 
+                                        required 
+                                        className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white cursor-pointer" 
+                                        value={newReview.mentalDevelopment || ''} 
+                                        onChange={e => setNewReview({...newReview, mentalDevelopment: e.target.value})}
+                                    >
+                                        <option value="">-- 请选择 --</option>
+                                        <option value="明显改善">明显改善</option>
+                                        <option value="有一定改善">有一定改善</option>
+                                        <option value="改善不明显">改善不明显</option>
+                                        {newReview.mentalDevelopment && !['明显改善', '有一定改善', '改善不明显'].includes(newReview.mentalDevelopment) && (
+                                            <option value={newReview.mentalDevelopment}>{newReview.mentalDevelopment}</option>
+                                        )}
+                                    </select>
+                                ) : (
+                                    <textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder="评价球员的心理状态、抗压能力和团队融入..." value={newReview.mentalDevelopment || ''} onChange={e => setNewReview({...newReview, mentalDevelopment: e.target.value})} />
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-1">{formSummaryLabel}</label>
+                                <textarea required rows={3} className="w-full p-2 border rounded focus:ring-2 focus:ring-bvb-yellow outline-none text-sm bg-white" placeholder={formSummaryPlaceholder} value={newReview.summary || ''} onChange={e => setNewReview({...newReview, summary: e.target.value})} />
+                            </div>
                             <div className="mt-auto grid grid-cols-2 gap-3 pb-16 md:pb-0">
                                 <button type="button" onClick={() => handleSaveReview('Draft')} className="py-2 bg-gray-200 text-gray-700 font-bold rounded hover:bg-gray-300 transition-colors">预览/保存草稿</button>
                                 <button type="button" onClick={() => handleSaveReview('Published')} className="py-2 bg-green-600 text-white font-bold rounded hover:bg-green-700 transition-colors flex items-center justify-center"><CheckCircle className="w-3 h-3 mr-1" /> {editingReviewId ? '更新并发布' : '直接发布'}</button>
@@ -1389,67 +1538,114 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         );
     };
 
-    const searchablePlayers = allPlayers.filter(p => 
+    const teamPlayers = allPlayers
+        .filter(p => p.teamId === editedPlayer.teamId)
+        .sort((a, b) => {
+            const numA = parseInt(a.number) || 0;
+            const numB = parseInt(b.number) || 0;
+            return numA - numB;
+        });
+
+    const activePlayersForSelection = teamPlayers.length > 0 ? teamPlayers : allPlayers;
+
+    const searchablePlayers = activePlayersForSelection.filter(p => 
         p.name.toLowerCase().includes(playerSearchTerm.toLowerCase()) || 
         p.number.toString().includes(playerSearchTerm)
-    ).slice(0, 10);
+    );
+
+    const handlePrevPlayer = () => {
+        if (teamPlayers.length <= 1) return;
+        const currentIndex = teamPlayers.findIndex(p => p.id === editedPlayer.id);
+        if (currentIndex === -1) return;
+        const prevIndex = (currentIndex - 1 + teamPlayers.length) % teamPlayers.length;
+        onSwitchPlayer(teamPlayers[prevIndex]);
+    };
+
+    const handleNextPlayer = () => {
+        if (teamPlayers.length <= 1) return;
+        const currentIndex = teamPlayers.findIndex(p => p.id === editedPlayer.id);
+        if (currentIndex === -1) return;
+        const nextIndex = (currentIndex + 1) % teamPlayers.length;
+        onSwitchPlayer(teamPlayers[nextIndex]);
+    };
 
     return (
-      <div className={`fixed inset-0 z-50 flex items-center justify-center p-0 ${isFullscreen ? '' : 'md:p-4'} bg-black/60 backdrop-blur-sm transition-all duration-300`}>
+      <>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center p-0 ${isFullscreen ? '' : 'md:p-4'} bg-black/60 backdrop-blur-sm transition-all duration-300`}>
         <div className={`bg-white w-full h-full flex flex-col transition-all duration-300 overflow-hidden ${isFullscreen ? 'rounded-none' : 'md:h-[90vh] md:max-w-6xl md:rounded-2xl shadow-2xl animate-in fade-in zoom-in'}`}>
           <div className="bg-bvb-black text-white p-4 flex justify-between items-center shrink-0">
              <div className="flex items-center space-x-3">
                 <button onClick={onClose} className="md:hidden mr-2 p-1"><ChevronLeft className="w-6 h-6" /></button>
                 
-                <div className="relative group/switcher">
-                    <button 
-                        onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                <div className="flex items-center gap-1.5 bg-gray-800/50 p-1 rounded-xl border border-gray-700/50">
+                    <button
+                        onClick={handlePrevPlayer}
+                        disabled={teamPlayers.length <= 1}
+                        className="p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="上一名球员"
                     >
-                        <UserIcon className="w-4 h-4 text-bvb-yellow" />
-                        <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
-                        <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronLeft className="w-4 h-4" />
                     </button>
                     
-                    {showPlayerDropdown && (
-                        <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="relative mb-2">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                <input 
-                                    autoFocus
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors font-bold"
-                                    placeholder="搜索球员姓名/号码..."
-                                    value={playerSearchTerm}
-                                    onChange={e => setPlayerSearchTerm(e.target.value)}
-                                />
-                                {playerSearchTerm && (
-                                    <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
-                                )}
+                    <div className="relative group/switcher">
+                        <button 
+                            onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                        >
+                            <UserIcon className="w-4 h-4 text-bvb-yellow" />
+                            <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
+                            <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+                        
+                        {showPlayerDropdown && (
+                            <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="relative mb-2">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                    <input 
+                                        autoFocus
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors font-bold"
+                                        placeholder="搜索球员姓名/号码..."
+                                        value={playerSearchTerm}
+                                        onChange={e => setPlayerSearchTerm(e.target.value)}
+                                    />
+                                    {playerSearchTerm && (
+                                        <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+                                    )}
+                                </div>
+                                <div className="max-h-[480px] md:max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
+                                    {searchablePlayers.map(p => (
+                                        <button 
+                                            key={p.id}
+                                            onClick={() => {
+                                                onSwitchPlayer(p);
+                                                setShowPlayerDropdown(false);
+                                                setPlayerSearchTerm('');
+                                            }}
+                                            className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                        >
+                                            <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold truncate">{p.name}</p>
+                                                <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {searchablePlayers.length === 0 && (
+                                        <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
+                                    )}
+                                </div>
                             </div>
-                            <div className="max-h-[480px] md:max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
-                                {searchablePlayers.map(p => (
-                                    <button 
-                                        key={p.id}
-                                        onClick={() => {
-                                            onSwitchPlayer(p);
-                                            setShowPlayerDropdown(false);
-                                            setPlayerSearchTerm('');
-                                        }}
-                                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
-                                    >
-                                        <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold truncate">{p.name}</p>
-                                            <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                                {searchablePlayers.length === 0 && (
-                                    <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+
+                    <button
+                        onClick={handleNextPlayer}
+                        disabled={teamPlayers.length <= 1}
+                        className="p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="下一名球员"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
                 </div>
 
                 {isEditing && (
@@ -1775,6 +1971,370 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             </div>
         </div>
       </div>
+      {showEvaluationCardModal && selectedEvaluationReview && (() => {
+          const stats = getQuarterStats(selectedEvaluationReview.year, selectedEvaluationReview.quarter);
+          const isNewStandard = ['明显改善', '有一定改善', '改善不明显'].includes(selectedEvaluationReview.mentalDevelopment || '');
+          const techLabel = '本季度重点目标';
+          const mentalLabel = '目标完成情况';
+          const summaryLabel = '本季度核心进步';
+          const teamName = teams.find(t => t.id === editedPlayer.teamId)?.name || '本梯队';
+          
+          return (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md overflow-y-auto text-white">
+                  <div className="bg-[#18191b] border border-white/10 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col md:flex-row md:max-h-[90vh]">
+                      
+                      {/* Left: Interactive controls & helpful tips */}
+                      <div className="w-full md:w-2/5 p-6 flex flex-col justify-between border-b md:border-b-0 md:border-r border-white/5 bg-[#121314] overflow-y-auto">
+                          <div className="space-y-6 text-left">
+                              <div>
+                                  <span className="text-[10px] font-extrabold uppercase bg-bvb-yellow text-bvb-black px-2.5 py-1 rounded-md">
+                                      Parent Exclusive Report
+                                  </span>
+                                  <h3 className="text-xl font-black text-white mt-2 flex items-center gap-2">
+                                      <ImageIcon className="w-5 h-5 text-bvb-yellow" />
+                                      家长续费评价卡片
+                                  </h3>
+                                  <p className="text-gray-400 text-xs mt-1.5 leading-relaxed">
+                                      此功能可自动抓取该球员在<strong>【{selectedEvaluationReview.year} 年 {selectedEvaluationReview.quarter}】</strong>的季度参训率、居家打卡数据、重点训练记录，并合并教练点评，生成一张高清晰度的专属电子评估卡片。便于您直接发送给家长，赋能有温度的闭环沟通，并有效提升续费意向率。
+                                  </p>
+                              </div>
+                              
+                              <div className="bg-white/5 border border-white/10 p-4 rounded-xl space-y-3">
+                                  <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                                      <Sparkles className="w-4 h-4 text-bvb-yellow" />
+                                      卡片样式与属性控制
+                                  </h4>
+                                  <div className="space-y-3 text-xs">
+                                      <div>
+                                          <label className="block text-gray-400 mb-1 font-bold">选择年份与季度</label>
+                                          <div className="grid grid-cols-2 gap-2">
+                                              <select 
+                                                  value={selectedEvaluationReview.year} 
+                                                  onChange={e => {
+                                                      const y = parseInt(e.target.value);
+                                                      const q = selectedEvaluationReview.quarter;
+                                                      const review = (editedPlayer.reviews || []).find(r => r.year === y && r.quarter === q && r.status === 'Published') || {
+                                                          id: 'temp-' + Date.now(),
+                                                          date: new Date().toISOString().split('T')[0],
+                                                          year: y,
+                                                          quarter: q,
+                                                          technicalTacticalImprovement: '（暂无本季度重点目标评语记录）',
+                                                          mentalDevelopment: '（暂无目标完成情况）',
+                                                          summary: '（暂无本季度核心进步评语记录）',
+                                                          status: 'Draft'
+                                                      };
+                                                      setSelectedEvaluationReview(review);
+                                                  }} 
+                                                  className="bg-white/10 border border-white/15 rounded px-2.5 py-1.5 text-white font-bold outline-none cursor-pointer"
+                                              >
+                                                  {[2026, 2025, 2024].map(y => <option key={y} value={y} className="text-black">{y} 年</option>)}
+                                              </select>
+                                              <select 
+                                                  value={selectedEvaluationReview.quarter} 
+                                                  onChange={e => {
+                                                      const q = e.target.value as any;
+                                                      const y = selectedEvaluationReview.year;
+                                                      const review = (editedPlayer.reviews || []).find(r => r.year === y && r.quarter === q && r.status === 'Published') || {
+                                                          id: 'temp-' + Date.now(),
+                                                          date: new Date().toISOString().split('T')[0],
+                                                          year: y,
+                                                          quarter: q,
+                                                          technicalTacticalImprovement: '（暂无本季度重点目标评语记录）',
+                                                          mentalDevelopment: '（暂无目标完成情况）',
+                                                          summary: '（暂无本季度核心进步评语记录）',
+                                                          status: 'Draft'
+                                                      };
+                                                      setSelectedEvaluationReview(review);
+                                                  }} 
+                                                  className="bg-white/10 border border-white/15 rounded px-2.5 py-1.5 text-white font-bold outline-none cursor-pointer"
+                                              >
+                                                  <option value="Q1" className="text-black">Q1 (第一季度)</option>
+                                                  <option value="Q2" className="text-black">Q2 (第二季度)</option>
+                                                  <option value="Q3" className="text-black">Q3 (第三季度)</option>
+                                                  <option value="Q4" className="text-black">Q4 (第四季度)</option>
+                                              </select>
+                                          </div>
+                                      </div>
+                                      
+                                      <div className="pt-2 text-gray-400 leading-relaxed space-y-1.5">
+                                          <p className="text-[10px] text-gray-500 font-mono">💡 小贴士：</p>
+                                          <p>• 如果当前季度尚未在<strong>【球员跟踪】</strong>发布对应点评，卡片会显示默认占位符。您可以随时去右侧面板录入新点评后，再次生成！</p>
+                                          <p>• 本图片已针对微信社交分享进行高清优化，完美支持手机屏幕展示。</p>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                          
+                          <div className="mt-8 flex flex-col gap-2 shrink-0">
+                              <button 
+                                  type="button" 
+                                  onClick={handleDownloadEvaluationCard}
+                                  disabled={isCapturingEvaluationCard}
+                                  className="w-full py-3.5 bg-bvb-yellow hover:brightness-105 active:scale-[0.98] text-bvb-black font-black rounded-xl shadow-lg transition-all flex items-center justify-center gap-2"
+                              >
+                                  {isCapturingEvaluationCard ? (
+                                      <>
+                                          <Loader2 className="w-5 h-5 animate-spin text-bvb-black" />
+                                          正在绘制高清大图...
+                                      </>
+                                  ) : (
+                                      <>
+                                          <Download className="w-5 h-5 text-bvb-black" />
+                                          下载高清综合评价图片
+                                      </>
+                                  )}
+                              </button>
+                              <button 
+                                  type="button" 
+                                  onClick={() => setShowEvaluationCardModal(false)}
+                                  className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-gray-300 font-bold rounded-xl transition-colors"
+                              >
+                                  关闭返回
+                              </button>
+                          </div>
+                      </div>
+                      
+                      {/* Right: High-fidelity Live Preview and Render Stage */}
+                      <div className="flex-1 p-6 bg-[#161719] flex items-center justify-center overflow-y-auto max-h-[80vh] md:max-h-none">
+                          <div className="w-full max-w-[500px] overflow-x-auto p-2 flex justify-center scrollbar-thin">
+                              
+                              {/* Capture container - This exact element will be rendered to PNG */}
+                              <div 
+                                  ref={evaluationCardRef}
+                                  className="w-[480px] shrink-0 bg-gradient-to-b from-[#181a1d] via-[#101113] to-[#0a0b0d] p-7 rounded-[24px] border-t-8 border-bvb-yellow shadow-2xl relative font-sans text-white overflow-hidden text-left"
+                              >
+                                  {/* Background soccer decorative graphics */}
+                                  <div className="absolute right-[-40px] top-[-40px] w-48 h-48 bg-bvb-yellow/5 rounded-full blur-2xl pointer-events-none"></div>
+                                  <div className="absolute left-[-50px] bottom-[-50px] w-64 h-64 bg-bvb-yellow/5 rounded-full blur-3xl pointer-events-none"></div>
+                                  
+                                  {/* Header brand block */}
+                                  <div className="flex justify-between items-center pb-5 border-b border-white/10 relative z-10">
+                                      <div className="flex items-center gap-2">
+                                          <div className="w-9 h-9 bg-bvb-yellow rounded-xl flex items-center justify-center font-black text-bvb-black shadow-md shadow-bvb-yellow/20">
+                                              <Shield className="w-5 h-5 text-bvb-black fill-current" />
+                                          </div>
+                                          <div>
+                                              <h1 className="text-sm font-black tracking-wide text-white">顽石之光足球俱乐部</h1>
+                                              <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">STONES OF LIGHT FOOTBALL CLUB</p>
+                                          </div>
+                                      </div>
+                                      <div className="text-right">
+                                          <span className="text-[9px] font-black uppercase text-bvb-yellow border border-bvb-yellow/40 px-2 py-0.5 rounded">
+                                              青训成长档案
+                                          </span>
+                                      </div>
+                                  </div>
+                                  
+                                  {/* Title block */}
+                                  <div className="text-center py-5 relative z-10">
+                                      <h2 className="text-xl font-black tracking-widest text-bvb-yellow italic uppercase">
+                                          球员季度综合评估报告
+                                      </h2>
+                                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">
+                                          {selectedEvaluationReview.year} • {selectedEvaluationReview.quarter} Quarter Comprehensive Development Report
+                                      </p>
+                                  </div>
+                                  
+                                  {/* Player Info Card */}
+                                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 flex gap-4 items-center relative z-10 mb-6 backdrop-blur-sm">
+                                      <div className="relative">
+                                          <img 
+                                              src={editedPlayer.image} 
+                                              alt={editedPlayer.name} 
+                                              className="w-16 h-16 rounded-full object-cover border-2 border-bvb-yellow shadow-inner" 
+                                              referrerPolicy="no-referrer"
+                                          />
+                                          {editedPlayer.isCaptain && (
+                                              <span className="absolute -top-1 -left-1 bg-bvb-yellow text-bvb-black font-black text-[9px] px-1 py-0.5 rounded-full shadow-md scale-90 border border-black">
+                                                  C
+                                              </span>
+                                          )}
+                                      </div>
+                                      <div className="flex-1 space-y-1">
+                                          <div className="flex items-baseline gap-2">
+                                              <h3 className="text-lg font-black text-white">{editedPlayer.name}</h3>
+                                              <span className="text-xs font-mono font-bold text-bvb-yellow bg-bvb-yellow/10 px-1.5 py-0.5 rounded border border-bvb-yellow/20">
+                                                  #{editedPlayer.number}
+                                              </span>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-y-1 gap-x-3 text-[11px] font-bold text-gray-300">
+                                              <div>
+                                                  <span className="text-gray-500">所属梯队：</span>
+                                                  <span className="text-white">{teamName}</span>
+                                              </div>
+                                              <div>
+                                                  <span className="text-gray-500">主司位置：</span>
+                                                  <span className="text-white">{editedPlayer.position}</span>
+                                              </div>
+                                              <div>
+                                                  <span className="text-gray-500">球员年龄：</span>
+                                                  <span className="text-white">{calculateAge(editedPlayer.birthDate) || editedPlayer.age || 0} 岁</span>
+                                              </div>
+                                              <div>
+                                                  <span className="text-gray-500">评估周期：</span>
+                                                  <span className="text-bvb-yellow">{selectedEvaluationReview.year} {selectedEvaluationReview.quarter}</span>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  {/* Performance Stats Section */}
+                                  <div className="space-y-3 mb-6 relative z-10">
+                                      <h4 className="text-[10px] font-black text-bvb-yellow uppercase tracking-widest border-l-2 border-bvb-yellow pl-2">
+                                          季度训练核心表现数据 / Training Statistics
+                                      </h4>
+                                      <div className="grid grid-cols-3 gap-3">
+                                          <div className="bg-[#1a1c1f]/80 border border-white/5 rounded-xl p-3 text-center">
+                                              <p className="text-[8px] font-bold text-blue-400 uppercase tracking-wider mb-1">训练参训率</p>
+                                              <div className="text-xl font-black text-white">{stats.attendanceRate}%</div>
+                                              <p className="text-[8px] text-gray-500 font-bold mt-0.5">{stats.attendanceCount} / {stats.trainingsCount} 课次</p>
+                                              
+                                              {/* Mini progress bar */}
+                                              <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                                                  <div className="bg-blue-500 h-full rounded-full" style={{ width: `${stats.attendanceRate}%` }}></div>
+                                              </div>
+                                          </div>
+                                          <div className="bg-[#1a1c1f]/80 border border-white/5 rounded-xl p-3 text-center">
+                                              <p className="text-[8px] font-bold text-green-400 uppercase tracking-wider mb-1">自主居家打卡</p>
+                                              <div className="text-xl font-black text-white">{stats.homeLogsCount} 次</div>
+                                              <p className="text-[8px] text-gray-500 font-bold mt-0.5">累计自训 {Math.round(stats.homeDuration / 60)} 小时</p>
+                                              
+                                              {/* Mini progress bar */}
+                                              <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                                                  <div className="bg-green-500 h-full rounded-full" style={{ width: `${Math.min(100, (stats.homeLogsCount / 10) * 100)}%` }}></div>
+                                              </div>
+                                          </div>
+                                          <div className="bg-[#1a1c1f]/80 border border-white/5 rounded-xl p-3 text-center">
+                                              <p className="text-[8px] font-bold text-orange-400 uppercase tracking-wider mb-1">专项跟踪辅导</p>
+                                              <div className="text-xl font-black text-white">{stats.focusEvents.length} 次</div>
+                                              <p className="text-[8px] text-gray-500 font-bold mt-0.5">获得重点关注反馈</p>
+                                              
+                                              {/* Mini progress bar */}
+                                              <div className="w-full bg-white/10 h-1 rounded-full mt-2 overflow-hidden">
+                                                  <div className="bg-orange-500 h-full rounded-full" style={{ width: `${stats.focusEvents.length > 0 ? 100 : 0}%` }}></div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  {/* Coaching assessment text fields */}
+                                  <div className="space-y-4 mb-6 relative z-10">
+                                      <h4 className="text-[10px] font-black text-bvb-yellow uppercase tracking-widest border-l-2 border-bvb-yellow pl-2">
+                                          教练组专业成长评语 / Coach Assessment
+                                      </h4>
+                                      
+                                      <div className="space-y-3">
+                                          <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
+                                              <div className="flex items-center justify-between mb-1.5">
+                                                  <span className="text-[10px] font-black text-bvb-yellow flex items-center gap-1">
+                                                      🎯 {techLabel}
+                                                  </span>
+                                              </div>
+                                              <p className="text-xs text-gray-200 leading-relaxed font-medium">
+                                                  {selectedEvaluationReview.technicalTacticalImprovement || '（暂无本季度重点目标评语记录）'}
+                                              </p>
+                                          </div>
+                                          
+                                          <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
+                                              <div className="flex items-center justify-between mb-1.5">
+                                                  <span className="text-[10px] font-black text-bvb-yellow flex items-center gap-1">
+                                                      📈 {mentalLabel}
+                                                  </span>
+                                                  {isNewStandard && selectedEvaluationReview.mentalDevelopment && (
+                                                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                                                          selectedEvaluationReview.mentalDevelopment === '明显改善' 
+                                                              ? 'bg-[#00D1A0]/10 text-[#00D1A0] border border-[#00D1A0]/20' 
+                                                              : selectedEvaluationReview.mentalDevelopment === '有一定改善'
+                                                              ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                                                              : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                                                      }`}>
+                                                          ★ {selectedEvaluationReview.mentalDevelopment}
+                                                      </span>
+                                                  )}
+                                              </div>
+                                              <p className="text-xs text-gray-200 leading-relaxed font-medium">
+                                                  {isNewStandard 
+                                                      ? `该球员在本季度训练考核中，对应的重点技战术与态度目标已达到【${selectedEvaluationReview.mentalDevelopment || '未填写'}】的评价。`
+                                                      : (selectedEvaluationReview.mentalDevelopment || '（暂无心理建设评语记录）')
+                                                  }
+                                              </p>
+                                          </div>
+                                          
+                                          <div className="bg-white/5 border border-white/5 p-3 rounded-xl">
+                                              <div className="flex items-center justify-between mb-1.5">
+                                                  <span className="text-[10px] font-black text-bvb-yellow flex items-center gap-1">
+                                                      🏆 {summaryLabel}
+                                                  </span>
+                                              </div>
+                                              <p className="text-xs text-gray-200 leading-relaxed italic font-medium border-l-2 border-bvb-yellow/50 pl-2">
+                                                  {selectedEvaluationReview.summary || '（暂无本季度核心进步评语记录）'}
+                                              </p>
+                                          </div>
+                                      </div>
+                                  </div>
+                                  
+                                  {/* Focus Events/Attention Details Section */}
+                                  <div className="bg-white/5 border border-white/5 p-4 rounded-xl space-y-3 mb-6 relative z-10">
+                                      <div className="flex items-center gap-1.5 text-bvb-yellow font-black text-xs">
+                                          <Search className="w-4 h-4 text-bvb-yellow" />
+                                          <span>重点关注详情</span>
+                                      </div>
+                                      <div className="space-y-3.5">
+                                          {stats.focusEvents && stats.focusEvents.length > 0 ? (
+                                              stats.focusEvents.map((evt, idx) => (
+                                                  <div key={idx} className="space-y-1.5">
+                                                      <div className="text-[10px] text-gray-400 font-black">
+                                                          {evt.date} • {evt.title}
+                                                      </div>
+                                                      <div className="space-y-1 text-xs text-gray-200 leading-relaxed font-semibold border-l-2 border-bvb-yellow pl-3">
+                                                          {evt.notes?.technical && (
+                                                              <div>
+                                                                  <span className="text-bvb-yellow/85 text-[10px] font-bold mr-1">【技战术】</span>
+                                                                  {evt.notes.technical}
+                                                              </div>
+                                                          )}
+                                                          {evt.notes?.mental && (
+                                                              <div>
+                                                                  <span className="text-bvb-yellow/85 text-[10px] font-bold mr-1">【心理/态度】</span>
+                                                                  {evt.notes.mental}
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  </div>
+                                              ))
+                                          ) : (
+                                              <p className="text-xs text-gray-400 font-semibold text-center py-2">本季度该球员暂无重点关注反馈记录</p>
+                                          )}
+                                      </div>
+                                  </div>
+                                  
+                                  {/* Stamp / Verification Signatures */}
+                                  <div className="mt-8 pt-4 border-t border-white/10 flex justify-between items-end relative z-10">
+                                      <div className="space-y-1">
+                                          <p className="text-[10px] font-bold text-gray-400">主教练员: __________________</p>
+                                          <p className="text-[10px] font-bold text-gray-400">发布日期: {selectedEvaluationReview.date || new Date().toISOString().split('T')[0]}</p>
+                                          <p className="text-[8px] text-gray-600 font-mono mt-1 uppercase tracking-tighter">Verified by Stones of Light Youth Development Office</p>
+                                      </div>
+                                      
+                                      {/* Official Stamps */}
+                                      <div className="relative pr-4">
+                                          <div className="w-20 h-20 border-2 border-red-500/40 rounded-full flex flex-col items-center justify-center text-[7px] text-red-500/40 font-black tracking-tight transform rotate-[-12deg] relative shrink-0 scale-95 origin-bottom-right">
+                                              <div className="absolute inset-0.5 border border-dashed border-red-500/30 rounded-full"></div>
+                                              <p className="text-[8px] font-extrabold uppercase scale-90">顽石之光</p>
+                                              <p className="scale-75 tracking-tighter my-0.5">青训发展部</p>
+                                              <p className="text-[6px] font-extrabold scale-75 tracking-widest text-red-500/40">APPROVED</p>
+                                          </div>
+                                      </div>
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                      
+                  </div>
+              </div>
+          );
+      })()}
+      </>
     );
 };
 
