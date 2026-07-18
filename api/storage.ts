@@ -128,6 +128,86 @@ const writeLocalDB = (data: any) => {
   return success;
 };
 
+const uploadBase64Image = async (base64Data: string, prefix: string, token: string): Promise<string> => {
+  const matches = base64Data.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/);
+  if (!matches) {
+    throw new Error('Invalid base64 format');
+  }
+  const contentType = matches[1];
+  const base64Str = matches[2];
+  const buffer = Buffer.from(base64Str, 'base64');
+  
+  const extension = contentType.split('/')[1] || 'png';
+  const randomSuffix = Math.random().toString(36).substring(2, 10);
+  const filename = `${prefix}_${Date.now()}_${randomSuffix}.${extension}`;
+  
+  const { url } = await put(filename, buffer, {
+    access: 'public',
+    token,
+    contentType,
+  });
+  return url;
+};
+
+const optimizeDatabaseImages = async (db: any, token: string): Promise<any> => {
+  if (!db) return db;
+
+  // 1. Optimize appLogo
+  if (db.appLogo && typeof db.appLogo === 'string' && db.appLogo.startsWith('data:image/')) {
+    try {
+      console.log('[Storage API] Optimizing appLogo from base64...');
+      const url = await uploadBase64Image(db.appLogo, 'app_logo', token);
+      db.appLogo = url;
+      console.log('[Storage API] appLogo optimized:', url);
+    } catch (e) {
+      console.error('[Storage API] Failed to optimize appLogo:', e);
+    }
+  }
+
+  // 2. Optimize players
+  if (db.players && Array.isArray(db.players)) {
+    const uploadTasks: { type: 'image' | 'gallery'; playerIndex: number; galleryIndex?: number; base64: string }[] = [];
+
+    db.players.forEach((player: any, pIdx: number) => {
+      if (player.image && typeof player.image === 'string' && player.image.startsWith('data:image/')) {
+        uploadTasks.push({ type: 'image', playerIndex: pIdx, base64: player.image });
+      }
+      if (player.gallery && Array.isArray(player.gallery)) {
+        player.gallery.forEach((item: any, gIdx: number) => {
+          if (item.url && typeof item.url === 'string' && item.url.startsWith('data:image/')) {
+            uploadTasks.push({ type: 'gallery', playerIndex: pIdx, galleryIndex: gIdx, base64: item.url });
+          }
+        });
+      }
+    });
+
+    if (uploadTasks.length > 0) {
+      console.log(`[Storage API] Found ${uploadTasks.length} new base64 images to upload during save.`);
+      
+      const chunkSize = 10;
+      for (let i = 0; i < uploadTasks.length; i += chunkSize) {
+        const chunk = uploadTasks.slice(i, i + chunkSize);
+        await Promise.all(chunk.map(async (task) => {
+          try {
+            const prefix = task.type === 'image' ? 'player_avatar' : 'player_gallery';
+            const url = await uploadBase64Image(task.base64, prefix, token);
+            if (task.type === 'image') {
+              db.players[task.playerIndex].image = url;
+            } else if (task.type === 'gallery' && task.galleryIndex !== undefined) {
+              db.players[task.playerIndex].gallery[task.galleryIndex].url = url;
+            }
+          } catch (uploadErr) {
+            console.error('[Storage API] Failed to upload image on save:', uploadErr);
+          }
+        }));
+      }
+      console.log('[Storage API] Base64 images successfully uploaded and URLs replaced.');
+    }
+  }
+
+  return db;
+};
+
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
   return Promise.race([
     promise,
@@ -323,6 +403,15 @@ export default async function handler(request: any, response: any) {
       
       if (!body || Object.keys(body).length === 0) {
         console.log('[Storage API] Received empty body for POST request.');
+      }
+
+      // Optimize incoming body images before writing
+      if (!isTokenMissing) {
+        try {
+          await optimizeDatabaseImages(body, token);
+        } catch (optErr) {
+          console.error('[Storage API] Image optimization on save failed (non-blocking):', optErr);
+        }
       }
 
       // Always save to local file as primary or backup persistence
