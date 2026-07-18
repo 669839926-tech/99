@@ -37,31 +37,89 @@ const readLocalDB = () => {
       console.error('[Storage API] Failed to read/parse root local file DB:', localError);
     }
   }
+
+  // 3. Fallback to searching for any valid local backup files (e.g. football_manager_db_backup_*.json)
+  try {
+    const parentDir = path.dirname(LOCAL_DB_PATH);
+    if (fs.existsSync(parentDir)) {
+      const files = fs.readdirSync(parentDir);
+      const backupFiles = files
+        .filter(f => f.startsWith('football_manager_db_backup_') && f.endsWith('.json'))
+        .map(f => path.join(parentDir, f));
+
+      // Sort backup files by modification time descending
+      const sortedBackups = backupFiles.sort((a, b) => {
+        try {
+          return fs.statSync(b).mtime.getTime() - fs.statSync(a).mtime.getTime();
+        } catch {
+          return b.localeCompare(a);
+        }
+      });
+
+      for (const backupPath of sortedBackups) {
+        try {
+          console.log('[Storage API] Attempting self-healing recovery from backup file:', backupPath);
+          const content = fs.readFileSync(backupPath, 'utf-8');
+          if (content && content.trim() !== '') {
+            const data = JSON.parse(content);
+            console.log('[Storage API] Self-healing success! Restoring active database from backup file.');
+            // Write to project root and temp to heal
+            try {
+              const tempRoot = LOCAL_DB_PATH + '.tmp';
+              fs.writeFileSync(tempRoot, content, 'utf-8');
+              fs.renameSync(tempRoot, LOCAL_DB_PATH);
+
+              const tmpDir = path.dirname(TMP_DB_PATH);
+              if (!fs.existsSync(tmpDir)) {
+                fs.mkdirSync(tmpDir, { recursive: true });
+              }
+              const tempTmp = TMP_DB_PATH + '.tmp';
+              fs.writeFileSync(tempTmp, content, 'utf-8');
+              fs.renameSync(tempTmp, TMP_DB_PATH);
+            } catch (writeErr) {
+              console.warn('[Storage API] Self-healing warning: failed to write healed files:', writeErr);
+            }
+            return data;
+          }
+        } catch (backupErr) {
+          console.warn(`[Storage API] Failed to read/parse backup file ${backupPath}:`, backupErr);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Storage API] Error while scanning for backup files:', err);
+  }
+
   return null;
 };
 
 const writeLocalDB = (data: any) => {
   let success = false;
+  const jsonStr = JSON.stringify(data, null, 2);
 
-  // 1. Attempt to write to project root (works in dev or standard writeable containers)
+  // 1. Attempt to write to project root atomically
   try {
     const dir = path.dirname(LOCAL_DB_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(LOCAL_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    const tempRootPath = LOCAL_DB_PATH + '.tmp';
+    fs.writeFileSync(tempRootPath, jsonStr, 'utf-8');
+    fs.renameSync(tempRootPath, LOCAL_DB_PATH);
     success = true;
   } catch (error) {
     console.warn('[Storage API] Write to project root failed (expected in read-only lambda/Vercel). Trying /tmp...', error);
   }
 
-  // 2. Always write to /tmp as a robust fallback/cache (writable in serverless, Cloud Run, Vercel)
+  // 2. Always write to /tmp atomically as a robust fallback/cache (writable in serverless, Cloud Run, Vercel)
   try {
     const tmpDir = path.dirname(TMP_DB_PATH);
     if (!fs.existsSync(tmpDir)) {
       fs.mkdirSync(tmpDir, { recursive: true });
     }
-    fs.writeFileSync(TMP_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+    const tempTmpPath = TMP_DB_PATH + '.tmp';
+    fs.writeFileSync(tempTmpPath, jsonStr, 'utf-8');
+    fs.renameSync(tempTmpPath, TMP_DB_PATH);
     success = true; // Mark as successful if we wrote to /tmp successfully
   } catch (error) {
     console.error('[Storage API] Failed to write DB to /tmp:', error);

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -1088,11 +1088,11 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         const expectedDeduction = (teamPlayers.length - reviewedTeamPlayers.length) * 5;
 
         const isFormNewStandard = !editingReviewId || ['明显改善', '有一定改善', '改善不明显'].includes(newReview.mentalDevelopment || '');
-        const formTechLabel = isFormNewStandard ? '本季度重点目标' : '技战术能力改善';
-        const formMentalLabel = isFormNewStandard ? '目标完成情况' : '心理建设';
-        const formSummaryLabel = isFormNewStandard ? '本季度核心进步' : '季度总结';
-        const formTechPlaceholder = isFormNewStandard ? "请填写本季度重点训练及考核目标..." : "描述球员本季度的技术和战术进步...";
-        const formSummaryPlaceholder = isFormNewStandard ? "请填写本季度核心进步及成就总结..." : "综合评价与下季度目标...";
+        const formTechLabel = '本季度重点目标';
+        const formMentalLabel = '目标完成情况';
+        const formSummaryLabel = '本季度核心进步';
+        const formTechPlaceholder = "请填写本季度重点训练及考核目标...";
+        const formSummaryPlaceholder = "请填写本季度核心进步及成就总结...";
 
         return (
             <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col gap-6 pb-24 md:pb-10">
@@ -1259,10 +1259,9 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             <div key={year} className="relative border-l-2 border-gray-200 pl-6 ml-2 space-y-6">
                                 <span className="absolute -left-[21px] top-0 bg-gray-100 text-gray-500 text-xs font-bold px-1.5 py-0.5 rounded border border-gray-300">{year}</span>
                                 {groupedReviews[year].map(review => {
-                                    const isNewStandard = ['明显改善', '有一定改善', '改善不明显'].includes(review.mentalDevelopment || '');
-                                    const techLabel = isNewStandard ? '本季度重点目标' : '技战术能力改善';
-                                    const mentalLabel = isNewStandard ? '目标完成情况' : '心理建设';
-                                    const summaryLabel = isNewStandard ? '本季度核心进步' : '季度总结';
+                                    const techLabel = '本季度重点目标';
+                                    const mentalLabel = '目标完成情况';
+                                    const summaryLabel = '本季度核心进步';
                                     return (
                                         <div key={review.id} className={`relative group ${review.status === 'Draft' ? 'opacity-80' : ''}`}>
                                             <div className="absolute -left-[31px] top-1 w-3 h-3 bg-bvb-yellow rounded-full border-2 border-white shadow-sm group-hover:scale-125 transition-transform"></div>
@@ -1539,10 +1538,36 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         );
     };
 
-    const searchablePlayers = allPlayers.filter(p => 
+    const teamPlayers = allPlayers
+        .filter(p => p.teamId === editedPlayer.teamId)
+        .sort((a, b) => {
+            const numA = parseInt(a.number) || 0;
+            const numB = parseInt(b.number) || 0;
+            return numA - numB;
+        });
+
+    const activePlayersForSelection = teamPlayers.length > 0 ? teamPlayers : allPlayers;
+
+    const searchablePlayers = activePlayersForSelection.filter(p => 
         p.name.toLowerCase().includes(playerSearchTerm.toLowerCase()) || 
         p.number.toString().includes(playerSearchTerm)
-    ).slice(0, 10);
+    );
+
+    const handlePrevPlayer = () => {
+        if (teamPlayers.length <= 1) return;
+        const currentIndex = teamPlayers.findIndex(p => p.id === editedPlayer.id);
+        if (currentIndex === -1) return;
+        const prevIndex = (currentIndex - 1 + teamPlayers.length) % teamPlayers.length;
+        onSwitchPlayer(teamPlayers[prevIndex]);
+    };
+
+    const handleNextPlayer = () => {
+        if (teamPlayers.length <= 1) return;
+        const currentIndex = teamPlayers.findIndex(p => p.id === editedPlayer.id);
+        if (currentIndex === -1) return;
+        const nextIndex = (currentIndex + 1) % teamPlayers.length;
+        onSwitchPlayer(teamPlayers[nextIndex]);
+    };
 
     return (
       <>
@@ -1552,55 +1577,75 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
              <div className="flex items-center space-x-3">
                 <button onClick={onClose} className="md:hidden mr-2 p-1"><ChevronLeft className="w-6 h-6" /></button>
                 
-                <div className="relative group/switcher">
-                    <button 
-                        onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                <div className="flex items-center gap-1.5 bg-gray-800/50 p-1 rounded-xl border border-gray-700/50">
+                    <button
+                        onClick={handlePrevPlayer}
+                        disabled={teamPlayers.length <= 1}
+                        className="p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="上一名球员"
                     >
-                        <UserIcon className="w-4 h-4 text-bvb-yellow" />
-                        <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
-                        <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronLeft className="w-4 h-4" />
                     </button>
                     
-                    {showPlayerDropdown && (
-                        <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="relative mb-2">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                <input 
-                                    autoFocus
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors font-bold"
-                                    placeholder="搜索球员姓名/号码..."
-                                    value={playerSearchTerm}
-                                    onChange={e => setPlayerSearchTerm(e.target.value)}
-                                />
-                                {playerSearchTerm && (
-                                    <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
-                                )}
+                    <div className="relative group/switcher">
+                        <button 
+                            onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                        >
+                            <UserIcon className="w-4 h-4 text-bvb-yellow" />
+                            <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
+                            <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+                        
+                        {showPlayerDropdown && (
+                            <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="relative mb-2">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                    <input 
+                                        autoFocus
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors font-bold"
+                                        placeholder="搜索球员姓名/号码..."
+                                        value={playerSearchTerm}
+                                        onChange={e => setPlayerSearchTerm(e.target.value)}
+                                    />
+                                    {playerSearchTerm && (
+                                        <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+                                    )}
+                                </div>
+                                <div className="max-h-[480px] md:max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
+                                    {searchablePlayers.map(p => (
+                                        <button 
+                                            key={p.id}
+                                            onClick={() => {
+                                                onSwitchPlayer(p);
+                                                setShowPlayerDropdown(false);
+                                                setPlayerSearchTerm('');
+                                            }}
+                                            className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                        >
+                                            <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold truncate">{p.name}</p>
+                                                <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {searchablePlayers.length === 0 && (
+                                        <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
+                                    )}
+                                </div>
                             </div>
-                            <div className="max-h-[480px] md:max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
-                                {searchablePlayers.map(p => (
-                                    <button 
-                                        key={p.id}
-                                        onClick={() => {
-                                            onSwitchPlayer(p);
-                                            setShowPlayerDropdown(false);
-                                            setPlayerSearchTerm('');
-                                        }}
-                                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
-                                    >
-                                        <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold truncate">{p.name}</p>
-                                            <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                                {searchablePlayers.length === 0 && (
-                                    <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+
+                    <button
+                        onClick={handleNextPlayer}
+                        disabled={teamPlayers.length <= 1}
+                        className="p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="下一名球员"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
                 </div>
 
                 {isEditing && (
@@ -1929,9 +1974,9 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
       {showEvaluationCardModal && selectedEvaluationReview && (() => {
           const stats = getQuarterStats(selectedEvaluationReview.year, selectedEvaluationReview.quarter);
           const isNewStandard = ['明显改善', '有一定改善', '改善不明显'].includes(selectedEvaluationReview.mentalDevelopment || '');
-          const techLabel = isNewStandard ? '本季度重点目标' : '技战术能力改善';
-          const mentalLabel = isNewStandard ? '目标完成情况' : '心理建设';
-          const summaryLabel = isNewStandard ? '本季度核心进步' : '季度总结';
+          const techLabel = '本季度重点目标';
+          const mentalLabel = '目标完成情况';
+          const summaryLabel = '本季度核心进步';
           const teamName = teams.find(t => t.id === editedPlayer.teamId)?.name || '本梯队';
           
           return (
@@ -1975,7 +2020,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                                           quarter: q,
                                                           technicalTacticalImprovement: '（暂无本季度重点目标评语记录）',
                                                           mentalDevelopment: '（暂无目标完成情况）',
-                                                          summary: '（暂无季度总结评语记录）',
+                                                          summary: '（暂无本季度核心进步评语记录）',
                                                           status: 'Draft'
                                                       };
                                                       setSelectedEvaluationReview(review);
@@ -1996,7 +2041,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                                           quarter: q,
                                                           technicalTacticalImprovement: '（暂无本季度重点目标评语记录）',
                                                           mentalDevelopment: '（暂无目标完成情况）',
-                                                          summary: '（暂无季度总结评语记录）',
+                                                          summary: '（暂无本季度核心进步评语记录）',
                                                           status: 'Draft'
                                                       };
                                                       setSelectedEvaluationReview(review);
@@ -2222,7 +2267,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                                   </span>
                                               </div>
                                               <p className="text-xs text-gray-200 leading-relaxed italic font-medium border-l-2 border-bvb-yellow/50 pl-2">
-                                                  {selectedEvaluationReview.summary || '（暂无季度总结评语记录）'}
+                                                  {selectedEvaluationReview.summary || '（暂无本季度核心进步评语记录）'}
                                               </p>
                                           </div>
                                       </div>
