@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -829,7 +829,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         if (file) {
             const reader = new FileReader();
             reader.onloadend = async () => {
-                const compressed = await compressImage(reader.result as string, 800, 600);
+                const compressed = await compressImage(reader.result as string, 250, 250);
                 const newPhoto: PlayerPhoto = { id: Date.now().toString(), url: compressed, date: new Date().toISOString().split('T')[0], caption: '点击修改描述' };
                 const updatedPlayer = { ...editedPlayer, gallery: [newPhoto, ...(editedPlayer.gallery || [])] };
                 setEditedPlayer(updatedPlayer);
@@ -1538,10 +1538,36 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         );
     };
 
-    const searchablePlayers = allPlayers.filter(p => 
+    const teamPlayers = allPlayers
+        .filter(p => p.teamId === editedPlayer.teamId)
+        .sort((a, b) => {
+            const numA = parseInt(a.number) || 0;
+            const numB = parseInt(b.number) || 0;
+            return numA - numB;
+        });
+
+    const activePlayersForSelection = teamPlayers.length > 0 ? teamPlayers : allPlayers;
+
+    const searchablePlayers = activePlayersForSelection.filter(p => 
         p.name.toLowerCase().includes(playerSearchTerm.toLowerCase()) || 
         p.number.toString().includes(playerSearchTerm)
-    ).slice(0, 10);
+    );
+
+    const handlePrevPlayer = () => {
+        if (teamPlayers.length <= 1) return;
+        const currentIndex = teamPlayers.findIndex(p => p.id === editedPlayer.id);
+        if (currentIndex === -1) return;
+        const prevIndex = (currentIndex - 1 + teamPlayers.length) % teamPlayers.length;
+        onSwitchPlayer(teamPlayers[prevIndex]);
+    };
+
+    const handleNextPlayer = () => {
+        if (teamPlayers.length <= 1) return;
+        const currentIndex = teamPlayers.findIndex(p => p.id === editedPlayer.id);
+        if (currentIndex === -1) return;
+        const nextIndex = (currentIndex + 1) % teamPlayers.length;
+        onSwitchPlayer(teamPlayers[nextIndex]);
+    };
 
     return (
       <>
@@ -1551,55 +1577,75 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
              <div className="flex items-center space-x-3">
                 <button onClick={onClose} className="md:hidden mr-2 p-1"><ChevronLeft className="w-6 h-6" /></button>
                 
-                <div className="relative group/switcher">
-                    <button 
-                        onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                <div className="flex items-center gap-1.5 bg-gray-800/50 p-1 rounded-xl border border-gray-700/50">
+                    <button
+                        onClick={handlePrevPlayer}
+                        disabled={teamPlayers.length <= 1}
+                        className="p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="上一名球员"
                     >
-                        <UserIcon className="w-4 h-4 text-bvb-yellow" />
-                        <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
-                        <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronLeft className="w-4 h-4" />
                     </button>
                     
-                    {showPlayerDropdown && (
-                        <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                            <div className="relative mb-2">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                                <input 
-                                    autoFocus
-                                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors font-bold"
-                                    placeholder="搜索球员姓名/号码..."
-                                    value={playerSearchTerm}
-                                    onChange={e => setPlayerSearchTerm(e.target.value)}
-                                />
-                                {playerSearchTerm && (
-                                    <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
-                                )}
+                    <div className="relative group/switcher">
+                        <button 
+                            onClick={() => setShowPlayerDropdown(!showPlayerDropdown)}
+                            className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded-lg border border-gray-700 hover:border-bvb-yellow transition-all"
+                        >
+                            <UserIcon className="w-4 h-4 text-bvb-yellow" />
+                            <span className="text-sm font-bold truncate max-w-[80px] md:max-w-[120px]">{editedPlayer.name}</span>
+                            <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${showPlayerDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+                        
+                        {showPlayerDropdown && (
+                            <div className="absolute top-full left-0 mt-2 w-72 sm:w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[60] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                <div className="relative mb-2">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                                    <input 
+                                        autoFocus
+                                        className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-9 pr-2 py-2 text-xs text-white focus:outline-none focus:border-bvb-yellow transition-colors font-bold"
+                                        placeholder="搜索球员姓名/号码..."
+                                        value={playerSearchTerm}
+                                        onChange={e => setPlayerSearchTerm(e.target.value)}
+                                    />
+                                    {playerSearchTerm && (
+                                        <button onClick={() => setPlayerSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"><X className="w-3.5 h-3.5" /></button>
+                                    )}
+                                </div>
+                                <div className="max-h-[480px] md:max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
+                                    {searchablePlayers.map(p => (
+                                        <button 
+                                            key={p.id}
+                                            onClick={() => {
+                                                onSwitchPlayer(p);
+                                                setShowPlayerDropdown(false);
+                                                setPlayerSearchTerm('');
+                                            }}
+                                            className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
+                                        >
+                                            <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-xs font-bold truncate">{p.name}</p>
+                                                <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {searchablePlayers.length === 0 && (
+                                        <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
+                                    )}
+                                </div>
                             </div>
-                            <div className="max-h-[480px] md:max-h-[60vh] overflow-y-auto custom-scrollbar space-y-1.5 p-1">
-                                {searchablePlayers.map(p => (
-                                    <button 
-                                        key={p.id}
-                                        onClick={() => {
-                                            onSwitchPlayer(p);
-                                            setShowPlayerDropdown(false);
-                                            setPlayerSearchTerm('');
-                                        }}
-                                        className={`w-full flex items-center gap-2 p-2 rounded-lg transition-colors text-left ${p.id === editedPlayer.id ? 'bg-bvb-yellow text-bvb-black' : 'text-gray-300 hover:bg-gray-800'}`}
-                                    >
-                                        <img src={p.image} className="w-8 h-8 rounded-full object-cover border border-white/10" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-xs font-bold truncate">{p.name}</p>
-                                            <p className={`text-[10px] ${p.id === editedPlayer.id ? 'text-bvb-black/70' : 'text-gray-500'}`}>#{p.number} • {teams.find(t => t.id === p.teamId)?.name || '未分配'}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                                {searchablePlayers.length === 0 && (
-                                    <p className="text-center py-4 text-xs text-gray-500 italic">未找到匹配球员</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
+
+                    <button
+                        onClick={handleNextPlayer}
+                        disabled={teamPlayers.length <= 1}
+                        className="p-1.5 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="下一名球员"
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
                 </div>
 
                 {isEditing && (
