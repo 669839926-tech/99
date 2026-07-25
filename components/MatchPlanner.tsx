@@ -1,9 +1,10 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Match, Player, Team, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic } from '../types';
-// Comment: Added 'Star' and 'Target' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, ClipboardList, PenTool, Coins, TrendingDown, ListPlus, Cloud, Star, Target, Printer } from 'lucide-react';
+// Comment: Added 'Star', 'Target', 'Download' to lucide-react imports
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, ClipboardList, PenTool, Coins, TrendingDown, ListPlus, Cloud, Star, Target, Printer, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import html2canvas from 'html2canvas';
 import { generateMatchStrategy } from '../services/geminiService';
 import TacticsModule from './TacticsModule';
 import MatchEditModal from './MatchEditModal';
@@ -693,6 +694,9 @@ interface MatchInfoCardModalProps {
 }
 
 const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players, teams, onClose }) => {
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [isExporting, setIsExporting] = useState(false);
+
     const team = teams.find(t => t.id === match.teamId);
     const details = match.details || {};
     const breakdown = details.summaryBreakdown || {};
@@ -709,6 +713,65 @@ const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players,
 
     const handlePrint = () => {
         window.print();
+    };
+
+    const handleExportImage = async () => {
+        if (!cardRef.current || isExporting) return;
+        try {
+            setIsExporting(true);
+            const element = cardRef.current;
+
+            // Store original styles to restore later
+            const origOverflow = element.style.overflow;
+            const origMaxHeight = element.style.maxHeight;
+            const origHeight = element.style.height;
+
+            // Temporarily unclip container so html2canvas measures full scroll height
+            element.style.overflow = 'visible';
+            element.style.maxHeight = 'none';
+            element.style.height = 'auto';
+
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#f9fafb',
+                logging: false,
+                windowWidth: 1280,
+                onclone: (clonedDoc) => {
+                    const clonedTarget = clonedDoc.querySelector('[data-card-export]') as HTMLElement;
+                    if (clonedTarget) {
+                        clonedTarget.style.overflow = 'visible';
+                        clonedTarget.style.maxHeight = 'none';
+                        clonedTarget.style.height = 'auto';
+                        clonedTarget.style.padding = '32px';
+                    }
+                    const modalParent = clonedDoc.querySelector('.max-h-\\[92vh\\]') as HTMLElement;
+                    if (modalParent) {
+                        modalParent.style.maxHeight = 'none';
+                        modalParent.style.height = 'auto';
+                        modalParent.style.overflow = 'visible';
+                    }
+                }
+            });
+
+            // Restore original styles
+            element.style.overflow = origOverflow;
+            element.style.maxHeight = origMaxHeight;
+            element.style.height = origHeight;
+
+            const image = canvas.toDataURL('image/png', 1.0);
+            const link = document.createElement('a');
+            const titleName = match.title || match.opponent || match.competition || '比赛';
+            link.download = `${titleName}_完整比赛信息卡片.png`;
+            link.href = image;
+            link.click();
+        } catch (err) {
+            console.error('Export image error:', err);
+            alert('导出图片失败，请稍后重试');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     return (
@@ -734,10 +797,19 @@ const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players,
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={handlePrint}
-                            className="px-3.5 py-2 bg-bvb-yellow text-bvb-black font-black text-xs rounded-xl hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 shadow-md"
+                            onClick={handleExportImage}
+                            disabled={isExporting}
+                            className="px-3.5 py-2 bg-bvb-yellow text-bvb-black font-black text-xs rounded-xl hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 shadow-md disabled:opacity-50"
                         >
-                            <Printer className="w-4 h-4" /> 打印 / 导出现场卡片
+                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                            {isExporting ? '正在生成图片...' : '导出图片卡片 (PNG)'}
+                        </button>
+                        <button
+                            onClick={handlePrint}
+                            className="px-3 py-2 bg-gray-800 text-gray-200 hover:text-white font-bold text-xs rounded-xl hover:bg-gray-700 transition-all flex items-center gap-1.5"
+                            title="打印网页或导出PDF"
+                        >
+                            <Printer className="w-4 h-4" /> 打印
                         </button>
                         <button
                             onClick={onClose}
@@ -749,7 +821,7 @@ const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players,
                 </div>
 
                 {/* Printable Card Area */}
-                <div className="p-4 md:p-8 overflow-y-auto flex-1 custom-scrollbar space-y-6 bg-gray-50 print:p-6 print:bg-white">
+                <div ref={cardRef} data-card-export="true" className="p-4 md:p-8 overflow-y-auto flex-1 custom-scrollbar space-y-6 bg-gray-50 print:p-6 print:bg-white">
                     {/* Header Banner */}
                     <div className="bg-gradient-to-r from-bvb-black via-gray-900 to-bvb-black text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden border border-gray-800">
                         {/* Decorative Background Elements */}
@@ -844,34 +916,40 @@ const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players,
                     </div>
 
                     {/* Section 1: 对阵列表 / 比分细则 */}
-                    {match.isSeries && (match.fixtures || []).length > 0 && (
+                    {(match.isSeries || (match.fixtures && match.fixtures.length > 0)) && (
                         <div className="bg-white rounded-3xl p-5 md:p-6 border border-gray-100 shadow-sm space-y-4">
                             <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
                                 <Activity className="w-4 h-4 text-bvb-yellow" />
-                                系列赛 / 锦标赛对阵明细列表 (共 {match.fixtures?.length} 场)
+                                系列赛 / 锦标赛对阵明细列表 (共 {match.fixtures?.length || 0} 场)
                             </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {match.fixtures?.map((fixture, idx) => (
-                                    <div key={fixture.id || idx} className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 flex items-center justify-between">
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-black bg-bvb-black text-bvb-yellow px-1.5 py-0.5 rounded">
-                                                    第 {idx + 1} 场
-                                                </span>
-                                                <span className="text-xs font-bold text-gray-500">{fixture.date || match.date}</span>
+                            {(!match.fixtures || match.fixtures.length === 0) ? (
+                                <p className="text-xs text-gray-400 font-bold italic py-2">
+                                    暂未录入分场明细（系列赛总结成绩：{match.seriesResult || '待录入'}）
+                                </p>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {match.fixtures.map((fixture, idx) => (
+                                        <div key={fixture.id || idx} className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 flex items-center justify-between">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-black bg-bvb-black text-bvb-yellow px-1.5 py-0.5 rounded">
+                                                        第 {idx + 1} 场
+                                                    </span>
+                                                    <span className="text-xs font-bold text-gray-500">{fixture.date || match.date}</span>
+                                                </div>
+                                                <h4 className="text-xs md:text-sm font-black text-gray-800 mt-1">
+                                                    VS {fixture.opponent}
+                                                </h4>
                                             </div>
-                                            <h4 className="text-xs md:text-sm font-black text-gray-800 mt-1">
-                                                VS {fixture.opponent}
-                                            </h4>
+                                            <div className="text-right">
+                                                <span className="text-base font-black text-bvb-black bg-white px-3 py-1 rounded-xl border border-gray-200 tabular-nums inline-block">
+                                                    {fixture.result || '-:-'}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="text-base font-black text-bvb-black bg-white px-3 py-1 rounded-xl border border-gray-200 tabular-nums inline-block">
-                                                {fixture.result || '-:-'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -894,6 +972,8 @@ const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players,
                                         <div key={pid} className="bg-gray-50 p-2.5 rounded-2xl border border-gray-100 flex items-center gap-2.5">
                                             <img
                                                 src={p?.image || 'https://images.unsplash.com/photo-1533107862482-0e6974b06ec4?q=80&w=200&h=200&fit=crop'}
+                                                crossOrigin="anonymous"
+                                                referrerPolicy="no-referrer"
                                                 className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm shrink-0"
                                                 alt={p?.name}
                                             />
@@ -937,6 +1017,8 @@ const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players,
                                                 <div className="flex items-center gap-2.5">
                                                     <img
                                                         src={p?.image || 'https://images.unsplash.com/photo-1533107862482-0e6974b06ec4?q=80&w=200&h=200&fit=crop'}
+                                                        crossOrigin="anonymous"
+                                                        referrerPolicy="no-referrer"
                                                         className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
                                                         alt={p?.name}
                                                     />
