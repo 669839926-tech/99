@@ -466,7 +466,7 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                 <h4 className="font-bold text-sm md:text-base text-gray-800 flex items-center gap-2">
                                     <Plus className="w-4 h-4 text-bvb-yellow" /> 新增系列赛对阵场次
                                 </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end">
                                     <div className="md:col-span-2">
                                         <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">对手名称</label>
                                         <input 
@@ -476,6 +476,17 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                             value={newFixture.opponent}
                                             onChange={e => setNewFixture({ ...newFixture, opponent: e.target.value })}
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">主客场</label>
+                                        <select 
+                                            className="w-full p-2.5 border rounded-xl font-bold text-xs bg-white focus:ring-2 focus:ring-bvb-yellow outline-none cursor-pointer"
+                                            value={newFixture.location || 'Home'}
+                                            onChange={e => setNewFixture({ ...newFixture, location: e.target.value as 'Home' | 'Away' })}
+                                        >
+                                            <option value="Home">🏠 主场</option>
+                                            <option value="Away">🚩 客场</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛日期</label>

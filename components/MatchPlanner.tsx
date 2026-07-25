@@ -99,9 +99,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   useEffect(() => {
     if (!editingMatch) return;
     const timer = setTimeout(() => {
-        setSaveStatus('saving');
         onUpdateMatch(editingMatch);
-        setTimeout(() => setSaveStatus('saved'), 800);
     }, 3000); 
     return () => clearTimeout(timer);
   }, [editingMatch, onUpdateMatch]);
@@ -167,7 +165,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
 
   const startEditing = (match: Match) => {
     setEditingMatch(ensureDetails(match));
-    setActiveTab('info');
   };
 
   const seasonStats = useMemo(() => {
