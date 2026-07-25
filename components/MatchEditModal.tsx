@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, User, SeriesFixture } from '../types';
+import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, User, SeriesFixture, OrgRating } from '../types';
 import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, FileText, TrendingUp, AlertCircle, Target, Flag, UserMinus, PenTool, Trophy } from 'lucide-react';
 
 interface MatchEditModalProps {
@@ -932,10 +932,107 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                         </div>
                     )}
 
-                    {activeTab === 'report' && (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                            <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-                                <div className="space-y-1.5 md:space-y-2 md:col-span-2">
+                    {activeTab === 'report' && (() => {
+                        const currentOrgRating = editingMatch.details?.summaryBreakdown?.orgRating || {
+                            eventOrganization: 5,
+                            refereeLevel: 5,
+                            venueCondition: 5,
+                            accommodation: 5,
+                            transportation: 5,
+                            recommendParticipation: '是'
+                        };
+
+                        const updateOrgRatingField = (field: keyof OrgRating, val: any) => {
+                            const current = ensureDetails(editingMatch);
+                            setEditingMatch({
+                                ...current,
+                                details: {
+                                    ...current.details!,
+                                    summaryBreakdown: {
+                                        ...current.details!.summaryBreakdown!,
+                                        orgRating: {
+                                            ...currentOrgRating,
+                                            [field]: val
+                                        }
+                                    }
+                                }
+                            });
+                        };
+
+                        return (
+                            <div className="space-y-6 animate-in fade-in duration-300">
+                                <div className="grid md:grid-cols-2 gap-4 md:gap-6">
+                                    {/* 赛事组织评价 */}
+                                    <div className="space-y-2 md:col-span-2 bg-amber-50/60 p-4 rounded-2xl border border-amber-200/80">
+                                        <label className="text-xs md:text-sm font-black text-amber-900 flex items-center uppercase tracking-widest gap-2 mb-2">
+                                            <Star className="w-4 h-4 text-amber-500 fill-amber-400" /> 赛事组织评价
+                                        </label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {[
+                                                { key: 'eventOrganization', label: '赛事组织' },
+                                                { key: 'refereeLevel', label: '裁判水平' },
+                                                { key: 'venueCondition', label: '场地条件' },
+                                                { key: 'accommodation', label: '住宿环境' },
+                                                { key: 'transportation', label: '交通配备' },
+                                            ].map((item) => {
+                                                const val = (currentOrgRating[item.key as keyof OrgRating] as number) ?? 5;
+                                                return (
+                                                    <div key={item.key} className="bg-white p-3 rounded-xl border border-amber-100/80 flex items-center justify-between shadow-2xs">
+                                                        <span className="text-xs font-bold text-gray-700">{item.label}</span>
+                                                        <div className="flex items-center gap-0.5">
+                                                            {[1, 2, 3, 4, 5].map((star) => (
+                                                                <button
+                                                                    key={star}
+                                                                    type="button"
+                                                                    onClick={() => updateOrgRatingField(item.key as keyof OrgRating, star)}
+                                                                    className="p-0.5 hover:scale-110 transition-transform cursor-pointer"
+                                                                    title={`${star} 颗星`}
+                                                                >
+                                                                    <Star
+                                                                        className={`w-4 h-4 ${
+                                                                            star <= val
+                                                                                ? 'text-amber-400 fill-amber-400'
+                                                                                : 'text-gray-200 fill-gray-100'
+                                                                        }`}
+                                                                    />
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            <div className="bg-white p-3 rounded-xl border border-amber-100/80 flex items-center justify-between shadow-2xs">
+                                                <span className="text-xs font-bold text-gray-700">推荐再次参赛</span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateOrgRatingField('recommendParticipation', '是')}
+                                                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer border ${
+                                                            currentOrgRating.recommendParticipation === '是' || currentOrgRating.recommendParticipation === true
+                                                                ? 'bg-green-600 text-white border-green-600 shadow-2xs'
+                                                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-green-300'
+                                                        }`}
+                                                    >
+                                                        👍 是
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateOrgRatingField('recommendParticipation', '否')}
+                                                        className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer border ${
+                                                            currentOrgRating.recommendParticipation === '否' || currentOrgRating.recommendParticipation === false
+                                                                ? 'bg-red-600 text-white border-red-600 shadow-2xs'
+                                                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-red-300'
+                                                        }`}
+                                                    >
+                                                        👎 否
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5 md:space-y-2 md:col-span-2">
                                     <label className="text-xs md:text-sm font-black text-gray-800 flex items-center uppercase tracking-widest gap-2">
                                         <FileText className="w-4 h-4 text-bvb-yellow" /> 比赛整体评价
                                     </label>
@@ -1036,7 +1133,8 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                 </div>
                             </div>
                         </div>
-                    )}
+                    );
+                })()}
                 </div>
                 
                 <div className="bg-gray-50 p-3 md:p-4 border-t flex justify-end shrink-0">
