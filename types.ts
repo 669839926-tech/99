@@ -277,13 +277,29 @@ export interface MatchPlan {
     createdAt: string;
 }
 
+export interface OrgRating {
+    eventOrganization?: number; // 1-5 颗星
+    refereeLevel?: number;      // 1-5 颗星
+    venueCondition?: number;    // 1-5 颗星
+    accommodation?: number;     // 1-5 颗星
+    transportation?: number;    // 1-5 颗星
+    recommendParticipation?: '是' | '否' | boolean; // 是否推荐再次参赛
+}
+
 export interface MatchSummaryBreakdown {
-    overall: string;
-    technicalTactical: string;
-    individual: string;
-    gapAnalysis: string;
-    trainingPriorities: string;
-    management: string;
+    overall?: string;             // 比赛整体评价
+    highlights?: string;          // 表现亮点
+    issuesExposed?: string;       // 暴露的问题
+    matchReview?: string;         // 比赛复盘（表现亮点与暴露的问题 - 旧版兼容）
+    nextStageTraining?: string;   // 下一阶段训练重点
+    orgRating?: OrgRating;        // 赛事组织评价
+
+    // Legacy fields kept optional for backwards compatibility
+    technicalTactical?: string;
+    individual?: string;
+    gapAnalysis?: string;
+    trainingPriorities?: string;
+    management?: string;
 }
 
 export interface SeriesFixture {
@@ -297,6 +313,11 @@ export interface SeriesFixture {
     events: MatchEvent[];
 }
 
+export interface PlayerPerformanceEvaluation {
+    rating?: number;  // 1-5 颗星
+    comment?: string; // 个人点评
+}
+
 export interface MatchDetails {
     weather: string;
     pitch: string;
@@ -307,6 +328,7 @@ export interface MatchDetails {
     summaryBreakdown?: MatchSummaryBreakdown;
     teamRequirements?: MatchPlanRequirement[];
     playerRequirements?: Record<string, MatchPlanRequirement[]>;
+    playerPerformances?: Record<string, PlayerPerformanceEvaluation>;
 }
 
 export interface Match {

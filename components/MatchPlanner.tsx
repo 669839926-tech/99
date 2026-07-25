@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic } from '../types';
-// Comment: Added 'Coins', 'TrendingDown', 'ListPlus' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Cloud, Maximize2, Minimize2 } from 'lucide-react';
+import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic, OrgRating } from '../types';
+// Comment: Added 'Star' and 'Target' to the lucide-react imports
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Cloud, Maximize2, Minimize2, Star, Target, Printer } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 import TacticsModule from './TacticsModule';
+import MatchEditModal from './MatchEditModal';
 
 interface MatchPlannerProps {
   matches: Match[];
@@ -65,6 +66,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string>('');
   const [showAddPointItemModal, setShowAddPointItemModal] = useState(false);
+  const [selectedMatchForCard, setSelectedMatchForCard] = useState<Match | null>(null);
 
   const isDirector = currentUser?.role === 'director';
 
@@ -110,6 +112,18 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   }, [editingMatch, onUpdateMatch]);
 
   const ensureDetails = (match: Match): Match => {
+    const existingBreakdown = match.details?.summaryBreakdown;
+    const legacyReviewParts = [
+        existingBreakdown?.technicalTactical,
+        existingBreakdown?.individual,
+        existingBreakdown?.gapAnalysis,
+        existingBreakdown?.management
+    ].filter(Boolean);
+    const highlightsFallback = existingBreakdown?.highlights ?? existingBreakdown?.individual ?? '';
+    const issuesExposedFallback = existingBreakdown?.issuesExposed ?? existingBreakdown?.gapAnalysis ?? '';
+    const matchReviewFallback = existingBreakdown?.matchReview ?? (legacyReviewParts.length > 0 ? legacyReviewParts.join('\n\n') : '');
+    const nextStageTrainingFallback = existingBreakdown?.nextStageTraining ?? existingBreakdown?.trainingPriorities ?? '';
+
     const defaultDetails: MatchDetails = {
         weather: '晴朗',
         pitch: '天然草',
@@ -118,15 +132,23 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
         events: [],
         summary: '',
         summaryBreakdown: {
-            overall: '',
-            technicalTactical: '',
-            individual: '',
-            gapAnalysis: '',
-            trainingPriorities: '',
-            management: ''
+            overall: existingBreakdown?.overall || '',
+            highlights: highlightsFallback,
+            issuesExposed: issuesExposedFallback,
+            matchReview: matchReviewFallback,
+            nextStageTraining: nextStageTrainingFallback,
+            orgRating: {
+                eventOrganization: existingBreakdown?.orgRating?.eventOrganization ?? 5,
+                refereeLevel: existingBreakdown?.orgRating?.refereeLevel ?? 5,
+                venueCondition: existingBreakdown?.orgRating?.venueCondition ?? 5,
+                accommodation: existingBreakdown?.orgRating?.accommodation ?? 5,
+                transportation: existingBreakdown?.orgRating?.transportation ?? 5,
+                recommendParticipation: existingBreakdown?.orgRating?.recommendParticipation ?? '是'
+            }
         },
         teamRequirements: [],
-        playerRequirements: {}
+        playerRequirements: {},
+        playerPerformances: {}
     };
     return {
         ...match,
@@ -135,10 +157,15 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
             ...(match.details || {}),
             summaryBreakdown: {
                 ...defaultDetails.summaryBreakdown!,
-                ...(match.details?.summaryBreakdown || {})
+                ...(match.details?.summaryBreakdown || {}),
+                orgRating: {
+                    ...defaultDetails.summaryBreakdown!.orgRating!,
+                    ...(match.details?.summaryBreakdown?.orgRating || {})
+                }
             },
             teamRequirements: match.details?.teamRequirements || defaultDetails.teamRequirements,
-            playerRequirements: match.details?.playerRequirements || defaultDetails.playerRequirements
+            playerRequirements: match.details?.playerRequirements || defaultDetails.playerRequirements,
+            playerPerformances: match.details?.playerPerformances || defaultDetails.playerPerformances
         }
     };
   };
@@ -206,11 +233,18 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                   summary: '',
                   summaryBreakdown: {
                       overall: '',
-                      technicalTactical: '',
-                      individual: '',
-                      gapAnalysis: '',
-                      trainingPriorities: '',
-                      management: ''
+                      highlights: '',
+                      issuesExposed: '',
+                      matchReview: '',
+                      nextStageTraining: '',
+                      orgRating: {
+                          eventOrganization: 5,
+                          refereeLevel: 5,
+                          venueCondition: 5,
+                          accommodation: 5,
+                          transportation: 5,
+                          recommendParticipation: '是'
+                      }
                   }
               }
           };
@@ -406,6 +440,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                             onDeleteMatch={onDeleteMatch}
                             startEditing={startEditing}
                             handleGenerateStrategy={handleGenerateStrategy}
+                            onShowCard={(m) => setSelectedMatchForCard(m)}
                         />
                       )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No scheduled matches</div>}
                   </div>
@@ -423,6 +458,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                             onDeleteMatch={onDeleteMatch}
                             startEditing={startEditing}
                             handleGenerateStrategy={handleGenerateStrategy}
+                            onShowCard={(m) => setSelectedMatchForCard(m)}
                         />
                       )) : <div className="bg-gray-100/50 border-2 border-dashed border-gray-200 rounded-3xl py-12 md:py-16 text-center text-gray-400 italic font-black uppercase text-xs md:text-sm tracking-widest">No match records found</div>}
                   </div>
@@ -506,629 +542,14 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
       )}
 
       {editingMatch && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-0 ${isFullscreen ? '' : 'md:p-4'} bg-black/60 backdrop-blur-sm`}>
-            <div className={`bg-white w-full ${isFullscreen ? 'h-full' : 'h-full md:h-[90vh] md:max-w-4xl md:rounded-2xl'} shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200`}>
-                <div className="bg-bvb-black p-3 md:p-4 flex justify-between items-center text-white shrink-0">
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <button 
-                            onClick={() => {
-                                if (editingMatch) onUpdateMatch(editingMatch);
-                                setEditingMatch(null);
-                                setIsFullscreen(false);
-                            }} 
-                            className="md:hidden"
-                        >
-                            <ChevronLeft className="w-6 h-6" />
-                        </button>
-                        <div>
-                            <h3 className="font-bold text-base md:text-lg leading-tight">比赛录入: VS {editingMatch.opponent}</h3>
-                            <p className="text-[10px] md:text-xs text-gray-400 font-mono uppercase">{editingMatch.date} • {editingMatch.competition}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 md:gap-4">
-                         {saveStatus === 'saving' && <span className="hidden sm:flex text-[10px] md:text-xs text-bvb-yellow items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 同步中</span>}
-                         {saveStatus === 'saved' && <span className="hidden sm:flex text-[10px] md:text-xs text-green-400 items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 云端已存</span>}
-                         <button 
-                            onClick={() => setIsFullscreen(!isFullscreen)} 
-                            className="hidden md:flex items-center gap-1 px-2 py-1 hover:bg-gray-800 rounded transition-colors text-gray-400 hover:text-white"
-                            title={isFullscreen ? "退出全屏" : "全屏显示"}
-                        >
-                            {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
-                        </button>
-                         <button 
-                            onClick={() => {
-                                if (editingMatch) onUpdateMatch(editingMatch);
-                                setEditingMatch(null);
-                                setIsFullscreen(false);
-                            }} 
-                            className="hidden md:block hover:bg-gray-800 p-1 rounded"
-                        >
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto no-scrollbar shrink-0">
-                    {[
-                        { id: 'info', label: '基础信息', icon: Info },
-                        ...(editingMatch.isSeries ? [{ id: 'fixtures', label: '对阵列表', icon: Activity }] : []),
-                        { id: 'lineup', label: '阵容', icon: UsersIcon },
-                        { id: 'objectives', label: '个人目标', icon: ClipboardList },
-                        { id: 'events', label: '事件记录', icon: Tag },
-                        { id: 'report', label: '总结复盘', icon: ClipboardList }
-                    ].map(tab => (
-                        <button 
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as TabType)}
-                            className={`px-4 md:px-6 py-3 md:py-4 text-xs md:text-sm font-bold flex items-center transition-all border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
-                        >
-                            <tab.icon className={`w-3.5 h-3.5 md:w-4 h-4 mr-1.5 md:mr-2 ${activeTab === tab.id ? 'text-bvb-yellow' : ''}`} />
-                            {tab.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pb-24 md:pb-8">
-                    {activeTab === 'info' && (
-                        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-300">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                                <div className="space-y-4 md:space-y-6">
-                                    <h4 className="font-black text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest border-b pb-1.5 md:pb-2">核心比赛信息</h4>
-                                    <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                        <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛状态</label>
-                                            <select className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" value={editingMatch.status} onChange={e => setEditingMatch({...editingMatch, status: e.target.value as any})}>
-                                                <option value="Upcoming">未开始</option><option value="Completed">已完赛</option><option value="Cancelled">已取消</option>
-                                            </select>
-                                        </div>
-                                        {!editingMatch.isSeries && (
-                                            <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">最终比分</label>
-                                                <input className="w-full p-2.5 md:p-3 border rounded-xl font-black text-center text-lg md:text-xl bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" placeholder="如: 3-1" value={editingMatch.result} onChange={e => setEditingMatch({...editingMatch, result: e.target.value})} />
-                                            </div>
-                                        )}
-                                    </div>
-                                    {editingMatch.isSeries && (
-                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                            <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">系列赛赛果</label>
-                                                <input 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
-                                                    placeholder="如: 9胜3负" 
-                                                    value={editingMatch.seriesResult || ''} 
-                                                    onChange={e => setEditingMatch({...editingMatch, seriesResult: e.target.value})} 
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">系列赛名次</label>
-                                                <input 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
-                                                    placeholder="如: 挑战组第三名" 
-                                                    value={editingMatch.seriesRanking || ''} 
-                                                    onChange={e => setEditingMatch({...editingMatch, seriesRanking: e.target.value})} 
-                                                />
-                                            </div>
-                                        </div>
-                                    )}
-                                    {!editingMatch.isSeries && (
-                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                            <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">天气</label>
-                                                <select 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" 
-                                                    value={editingMatch.details?.weather || '晴朗'} 
-                                                    onChange={e => {
-                                                        const current = ensureDetails(editingMatch);
-                                                        setEditingMatch({...current, details: {...current.details!, weather: e.target.value}});
-                                                    }}
-                                                >
-                                                    <option value="Sunny">晴朗</option><option value="Cloudy">多云</option><option value="Rainy">有雨</option><option value="Snow">雪天</option><option value="Windy">大风</option>
-                                                </select>
-                                            </div>
-                                            <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">场地</label>
-                                                <select 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" 
-                                                    value={editingMatch.details?.pitch || '天然草'} 
-                                                    onChange={e => {
-                                                        const current = ensureDetails(editingMatch);
-                                                        setEditingMatch({...current, details: {...current.details!, pitch: e.target.value}});
-                                                    }}
-                                                >
-                                                    <option value="Natural Grass">天然草</option><option value="Artificial Turf">人造草</option><option value="Indoor">室内场</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-4 md:space-y-6">
-                                    <h4 className="font-black text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest border-b pb-1.5 md:pb-2">赛程时间与地点</h4>
-                                    <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛名称</label><input className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.title} onChange={e => setEditingMatch({...editingMatch, title: e.target.value})} /></div>
-                                    <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                        <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">日期</label><input type="date" className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.date} onChange={e => setEditingMatch({...editingMatch, date: e.target.value})} /></div>
-                                        <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">开球时间</label><input type="time" className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.time} onChange={e => setEditingMatch({...editingMatch, time: e.target.value})} /></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'lineup' && (
-                        <div className="animate-in fade-in duration-300 space-y-4 md:space-y-6">
-                            <div className="bg-yellow-50 p-3 md:p-4 rounded-xl border border-yellow-100 flex items-center gap-2 md:gap-3">
-                                <Info className="w-4 h-4 md:w-5 md:h-5 text-yellow-600 shrink-0" />
-                                <p className="text-[10px] md:text-xs text-yellow-800 font-bold">请选拔参赛球员名单。已选中球员将记入个人“出场次数”统计。</p>
-                            </div>
-                            <div className="grid grid-cols-1 gap-6 md:gap-8">
-                                <div className="space-y-3 md:space-y-4">
-                                    <h4 className="font-black text-[10px] md:text-xs text-gray-800 flex items-center uppercase tracking-widest"><CheckCircle className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 text-green-500" /> 参赛人员名单 ({editingMatch.details?.lineup.length})</h4>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                        {players.filter(p => p.teamId === editingMatch.teamId).map(p => {
-                                            const isSelected = editingMatch.details?.lineup.includes(p.id);
-                                            return (
-                                                <button key={p.id} onClick={() => toggleLineupPlayer(p.id)} className={`p-2 md:p-3 rounded-xl border-2 flex items-center gap-2 md:gap-3 transition-all ${isSelected ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-lg' : 'bg-white text-gray-400 border-gray-100 hover:border-gray-300'}`}>
-                                                    <img src={p.image} className="w-5 h-5 md:w-6 md:h-6 rounded-full object-cover shrink-0" /><span className="text-[10px] md:text-xs font-bold truncate">{p.name}</span>
-                                                    {isSelected ? <UserMinus className="w-3 h-3 md:w-4 md:h-4 ml-auto opacity-40" /> : <Plus className="w-3 h-3 md:w-4 md:h-4 ml-auto" />}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'objectives' && (
-                        <div className="animate-in fade-in duration-300 space-y-6">
-                            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center gap-3">
-                                <ClipboardList className="w-5 h-5 text-blue-600" />
-                                <div>
-                                    <h4 className="text-sm font-black text-blue-900 uppercase">比赛个人目标制定</h4>
-                                    <p className="text-[10px] text-blue-700 font-bold">针对已入选阵容的球员，请设定具体的比赛目标并评估达成情况 (1-10分)。</p>
-                                </div>
-                            </div>
-
-                            <div className="space-y-4">
-                                {editingMatch.details?.lineup.length === 0 ? (
-                                    <div className="py-20 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl">
-                                        <UsersIcon className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-                                        <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic">请先在“阵容”标签中选择参赛球员</p>
-                                    </div>
-                                ) : (
-                                    editingMatch.details?.lineup.map(pid => {
-                                        const p = players.find(player => player.id === pid);
-                                        const playerReqs = editingMatch.details?.playerRequirements?.[pid] || [];
-                                        return (
-                                            <div key={pid} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm">
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <img src={p?.image || 'https://images.unsplash.com/photo-1533107862482-0e6974b06ec4?q=80&w=200&h=200&fit=crop'} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                        <div>
-                                                            <h5 className="font-black text-gray-800 text-sm">{p?.name || '未知球员'}</h5>
-                                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                                                                已设定目标: {playerReqs.length}个
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="space-y-3">
-                                                    <div className="flex gap-2">
-                                                        <input 
-                                                            type="text" 
-                                                            placeholder="输入新的比赛目标..."
-                                                            className="flex-1 p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-bvb-yellow transition-all"
-                                                            onKeyDown={e => {
-                                                                if (e.key === 'Enter') {
-                                                                    const val = (e.target as HTMLInputElement).value;
-                                                                    if (val.trim()) {
-                                                                        const newReq = { id: Math.random().toString(36).slice(2, 11), text: val.trim(), completed: false, score: 5 };
-                                                                        const current = ensureDetails(editingMatch);
-                                                                        const playerReqs = { ...(current.details?.playerRequirements || {}) };
-                                                                        playerReqs[pid] = [...(playerReqs[pid] || []), newReq];
-                                                                        setEditingMatch({ ...current, details: { ...current.details!, playerRequirements: playerReqs } });
-                                                                        (e.target as HTMLInputElement).value = '';
-                                                                    }
-                                                                }
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    
-                                                    <div className="grid gap-2">
-                                                        {playerReqs.map(req => (
-                                                            <div key={req.id} className="flex flex-col md:flex-row md:items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 group">
-                                                                <div className="flex items-center gap-2 flex-1">
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            const current = ensureDetails(editingMatch);
-                                                                            const playerReqs = { ...(current.details?.playerRequirements || {}) };
-                                                                            playerReqs[pid] = playerReqs[pid].map(r => r.id === req.id ? { ...r, completed: !r.completed } : r);
-                                                                            setEditingMatch({ ...current, details: { ...current.details!, playerRequirements: playerReqs } });
-                                                                        }} 
-                                                                        className={`p-1 rounded-full transition-colors ${req.completed ? 'bg-green-500 text-white' : 'bg-white text-gray-200 border border-gray-200'}`}
-                                                                    >
-                                                                        <CheckCircle className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                    <span className={`text-[11px] font-bold flex-1 ${req.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{req.text}</span>
-                                                                </div>
-                                                                
-                                                                <div className="flex items-center gap-3 pl-7 md:pl-0">
-                                                                    <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                                                                        {[
-                                                                            { value: 'Excellent', label: '优秀', color: 'bg-green-500 text-white', hover: 'hover:bg-green-50' },
-                                                                            { value: 'Good', label: '良好', color: 'bg-blue-500 text-white', hover: 'hover:bg-blue-50' },
-                                                                            { value: 'Normal', label: '一般', color: 'bg-gray-500 text-white', hover: 'hover:bg-gray-100' }
-                                                                        ].map((r) => (
-                                                                            <button
-                                                                                key={r.value}
-                                                                                onClick={() => {
-                                                                                    const current = ensureDetails(editingMatch);
-                                                                                    const playerReqs = { ...(current.details?.playerRequirements || {}) };
-                                                                                    playerReqs[pid] = playerReqs[pid].map(o => o.id === req.id ? { ...o, rating: r.value as any, completed: true } : o);
-                                                                                    setEditingMatch({ ...current, details: { ...current.details!, playerRequirements: playerReqs } });
-                                                                                }}
-                                                                                className={`px-2 py-1 text-[10px] font-black transition-all ${req.rating === r.value ? r.color : `text-gray-400 ${r.hover}`}`}
-                                                                            >
-                                                                                {r.label}
-                                                                            </button>
-                                                                        ))}
-                                                                    </div>
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            const current = ensureDetails(editingMatch);
-                                                                            const playerReqs = { ...(current.details?.playerRequirements || {}) };
-                                                                            playerReqs[pid] = playerReqs[pid].filter(r => r.id !== req.id);
-                                                                            setEditingMatch({ ...current, details: { ...current.details!, playerRequirements: playerReqs } });
-                                                                        }} 
-                                                                        className="p-1 text-gray-300 hover:text-red-500"
-                                                                    >
-                                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'events' && (
-                        <div className="animate-in fade-in duration-300 space-y-4 md:space-y-6">
-                            {editingMatch.isSeries && (
-                                <div className="bg-white border-2 border-gray-100 p-4 rounded-2xl flex flex-col md:flex-row md:items-center gap-4">
-                                    <div className="shrink-0 flex items-center gap-2">
-                                        <div className="w-8 h-8 rounded-lg bg-bvb-yellow flex items-center justify-center">
-                                            <Activity className="w-4 h-4 text-bvb-black" />
-                                        </div>
-                                        <label className="text-xs font-black text-gray-800 uppercase italic">选择具体场次进行记录</label>
-                                    </div>
-                                    <select 
-                                        className="flex-1 p-2.5 border rounded-xl font-bold text-xs md:text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-bvb-yellow outline-none transition-all"
-                                        value={selectedFixtureId}
-                                        onChange={e => setSelectedFixtureId(e.target.value)}
-                                    >
-                                        <option value="">-- 请选择系列赛场次 --</option>
-                                        {(editingMatch.fixtures || []).map((f, i) => (
-                                            <option key={f.id} value={f.id}>
-                                                场次 #{i+1}: vs {f.opponent || '未命名对手'} ({f.date})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
-                            {(!editingMatch.isSeries || selectedFixtureId) ? (
-                                <>
-                                    <div className="bg-gray-50 p-4 md:p-6 rounded-2xl border border-gray-200">
-                                        <h4 className="font-bold text-sm md:text-base text-gray-800 mb-3 md:mb-4 flex items-center"><Plus className="w-4 h-4 mr-2 text-bvb-yellow" /> 新增关键事件 {selectedFixtureId && <span className="ml-2 text-[10px] text-gray-400 italic">(当前场次)</span>}</h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 items-end">
-                                            <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">球员</label>
-                                                <select className="w-full p-2 md:p-2.5 border rounded-xl text-[11px] md:text-sm font-bold bg-white" value={newEvent.playerId} onChange={e => setNewEvent({...newEvent, playerId: e.target.value})}>
-                                                    <option value="">选择球员...</option>
-                                                    {players.filter(p => p.teamId === editingMatch.teamId).filter(p => editingMatch.details?.lineup.includes(p.id)).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                                </select>
-                                            </div>
-                                            <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">类型</label>
-                                                <select className="w-full p-2 md:p-2.5 border rounded-xl text-[11px] md:text-sm font-bold bg-white" value={newEvent.type} onChange={e => setNewEvent({...newEvent, type: e.target.value as any})}>
-                                                    <option value="Goal">进球 (Goal)</option><option value="Assist">助攻 (Assist)</option><option value="YellowCard">黄牌 (Yellow)</option><option value="RedCard">红牌 (Red)</option><option value="Sub">换人 (Sub)</option>
-                                                </select>
-                                            </div>
-                                            <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">时间 (分)</label><input type="number" className="w-full p-2 md:p-2.5 border rounded-xl font-bold text-xs md:text-sm" value={newEvent.minute} onChange={e => setNewEvent({...newEvent, minute: parseInt(e.target.value) || 0})} /></div>
-                                            <button onClick={addEvent} disabled={!newEvent.playerId} className="bg-bvb-black text-white font-black py-2.5 rounded-xl hover:bg-gray-800 disabled:opacity-50 text-xs md:text-sm">添加</button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2 md:space-y-3">
-                                        <h4 className="font-black text-[10px] md:text-xs text-gray-400 uppercase tracking-widest px-1">本场事件流</h4>
-                                        {(() => {
-                                            const currentEvents = editingMatch.isSeries 
-                                                ? (editingMatch.fixtures?.find(f => f.id === selectedFixtureId)?.events || [])
-                                                : (editingMatch.details?.events || []);
-                                            
-                                            if (currentEvents.length === 0) {
-                                                return <div className="py-12 md:py-20 text-center text-[11px] md:text-sm text-gray-300 italic border-2 border-dashed border-gray-100 rounded-2xl">暂无记录</div>;
-                                            }
-
-                                            return (
-                                                <div className="space-y-2">
-                                                    {[...currentEvents].sort((a,b) => a.minute - b.minute).map(event => (
-                                                        <div key={event.id} className="bg-white border border-gray-100 p-3 md:p-4 rounded-xl flex items-center justify-between group shadow-sm">
-                                                            <div className="flex items-center gap-3 md:gap-4">
-                                                                <span className="w-8 h-8 md:w-10 md:h-10 bg-gray-50 rounded-lg flex items-center justify-center font-mono font-black text-gray-400 text-xs md:text-sm">{event.minute}'</span>
-                                                                <div className={`p-1.5 md:p-2 rounded-lg ${event.type === 'Goal' ? 'bg-green-50 text-green-600' : event.type === 'YellowCard' ? 'bg-yellow-50 text-yellow-600' : event.type === 'RedCard' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                                                    {event.type === 'Goal' ? <Trophy className="w-3.5 h-3.5 md:w-4 md:h-4" /> : event.type === 'YellowCard' ? <Flag className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Activity className="w-3.5 h-3.5 md:w-4 md:h-4" />}
-                                                                </div>
-                                                                <div>
-                                                                    <p className="font-bold text-gray-800 text-xs md:text-sm">{event.playerName}</p>
-                                                                    <p className="text-[8px] md:text-[10px] text-gray-400 font-black uppercase">{event.type === 'Goal' ? '进球' : event.type === 'Assist' ? '助攻' : event.type === 'YellowCard' ? '黄牌' : '事件'}</p>
-                                                                </div>
-                                                            </div>
-                                                            <button onClick={() => removeEvent(event.id)} className="p-2 text-gray-300 hover:text-red-500 md:opacity-0 group-hover:opacity-100 transition-all">
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="py-20 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                                    <Activity className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-                                    <p className="text-sm font-black text-gray-400 uppercase tracking-widest italic">请先在上方选择一个场次以记录事件</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'fixtures' && editingMatch.isSeries && (
-                        <div className="space-y-6 animate-in fade-in duration-300">
-                            <div className="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                                <div>
-                                    <h4 className="font-black text-gray-800 text-sm italic uppercase tracking-widest">系列赛对阵管理</h4>
-                                    <p className="text-[10px] text-gray-400 font-bold">在此添加系列赛中的每一场具体比赛结果</p>
-                                </div>
-                                <button 
-                                    onClick={() => {
-                                        const newFixture: SeriesFixture = {
-                                            id: Math.random().toString(36).slice(2, 11),
-                                            opponent: '',
-                                            result: '0-0',
-                                            location: 'Away',
-                                            date: editingMatch.date,
-                                            weather: 'Sunny',
-                                            pitch: 'Natural Grass',
-                                            events: []
-                                        };
-                                        setEditingMatch({
-                                            ...editingMatch,
-                                            fixtures: [...(editingMatch.fixtures || []), newFixture]
-                                        });
-                                    }}
-                                    className="px-4 py-2 bg-bvb-black text-bvb-yellow rounded-xl text-xs font-black shadow-lg hover:scale-105 transition-all flex items-center gap-2"
-                                >
-                                    <Plus className="w-4 h-4" /> 添加对阵
-                                </button>
-                            </div>
-
-                            <div className="grid gap-4">
-                                {(editingMatch.fixtures || []).map((fixture, idx) => (
-                                    <div key={fixture.id} className="bg-white border-2 border-gray-100 rounded-2xl p-4 space-y-4 hover:border-bvb-yellow/50 transition-all">
-                                        <div className="flex justify-between items-center">
-                                            <span className="bg-bvb-black text-bvb-yellow px-2 py-0.5 rounded text-[10px] font-black italic">FIXTURE #{idx + 1}</span>
-                                            <button 
-                                                onClick={() => {
-                                                    setEditingMatch({
-                                                        ...editingMatch,
-                                                        fixtures: editingMatch.fixtures?.filter(f => f.id !== fixture.id)
-                                                    });
-                                                }}
-                                                className="text-gray-300 hover:text-red-500 transition-colors"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="grid md:grid-cols-4 gap-4">
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">对手名称</label>
-                                                <input 
-                                                    className="w-full p-2 border rounded-xl font-bold text-xs"
-                                                    value={fixture.opponent}
-                                                    onChange={e => {
-                                                        const nextFixtures = [...(editingMatch.fixtures || [])];
-                                                        nextFixtures[idx] = { ...fixture, opponent: e.target.value };
-                                                        setEditingMatch({ ...editingMatch, fixtures: nextFixtures });
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">比分结果</label>
-                                                <input 
-                                                    className="w-full p-2 border rounded-xl font-black text-center text-sm"
-                                                    placeholder="如: 2-1"
-                                                    value={fixture.result}
-                                                    onChange={e => {
-                                                        const nextFixtures = [...(editingMatch.fixtures || [])];
-                                                        nextFixtures[idx] = { ...fixture, result: e.target.value };
-                                                        setEditingMatch({ ...editingMatch, fixtures: nextFixtures });
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">比赛日期</label>
-                                                <input 
-                                                    type="date"
-                                                    className="w-full p-2 border rounded-xl font-bold text-xs"
-                                                    value={fixture.date}
-                                                    onChange={e => {
-                                                        const nextFixtures = [...(editingMatch.fixtures || [])];
-                                                        nextFixtures[idx] = { ...fixture, date: e.target.value };
-                                                        setEditingMatch({ ...editingMatch, fixtures: nextFixtures });
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">主/客场</label>
-                                                <select 
-                                                    className="w-full p-2 border rounded-xl font-bold text-xs bg-white"
-                                                    value={fixture.location}
-                                                    onChange={e => {
-                                                        const nextFixtures = [...(editingMatch.fixtures || [])];
-                                                        nextFixtures[idx] = { ...fixture, location: e.target.value as any };
-                                                        setEditingMatch({ ...editingMatch, fixtures: nextFixtures });
-                                                    }}
-                                                >
-                                                    <option value="Home">主场</option>
-                                                    <option value="Away">客场</option>
-                                                </select>
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">天气</label>
-                                                <select 
-                                                    className="w-full p-2 border rounded-xl font-bold text-xs bg-white"
-                                                    value={fixture.weather || 'Sunny'}
-                                                    onChange={e => {
-                                                        const nextFixtures = [...(editingMatch.fixtures || [])];
-                                                        nextFixtures[idx] = { ...fixture, weather: e.target.value };
-                                                        setEditingMatch({ ...editingMatch, fixtures: nextFixtures });
-                                                    }}
-                                                >
-                                                    <option value="Sunny">晴朗</option><option value="Cloudy">多云</option><option value="Rainy">有雨</option><option value="Snow">雪天</option><option value="Windy">大风</option>
-                                                </select>
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase mb-1 block">场地</label>
-                                                <select 
-                                                    className="w-full p-2 border rounded-xl font-bold text-xs bg-white"
-                                                    value={fixture.pitch || 'Natural Grass'}
-                                                    onChange={e => {
-                                                        const nextFixtures = [...(editingMatch.fixtures || [])];
-                                                        nextFixtures[idx] = { ...fixture, pitch: e.target.value };
-                                                        setEditingMatch({ ...editingMatch, fixtures: nextFixtures });
-                                                    }}
-                                                >
-                                                    <option value="Natural Grass">天然草</option><option value="Artificial Turf">人造草</option><option value="Indoor">室内场</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                {(!editingMatch.fixtures || editingMatch.fixtures.length === 0) && (
-                                    <div className="py-12 text-center bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-                                        <Activity className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-                                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest italic font-black">暂无对阵记录，点击上方按钮添加</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'report' && (
-                        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-300">
-                            <div className="grid md:grid-cols-2 gap-4 md:gap-6">
-                                {[
-                                    { key: 'overall', label: '比赛整体评价', placeholder: '对本次比赛/系列赛的总体印象...' },
-                                    { key: 'technicalTactical', label: '技战术复盘', placeholder: '战术执行、阵型表现等分析...' },
-                                    { key: 'individual', label: '球员个人表现', placeholder: '亮点球员、个别表现点评...' },
-                                    { key: 'gapAnalysis', label: '差距分析', placeholder: '与对手的差距、目前存在的核心问题...' },
-                                    { key: 'trainingPriorities', label: '下一步训练重点', placeholder: '针对暴露问题后续的训练改进方案...' },
-                                    { key: 'management', label: '管理与组织复盘', placeholder: '赛前准备、后勤、沟通等管理工作记录...' }
-                                ].map((field) => (
-                                    <div key={field.key} className="space-y-1.5 md:space-y-2">
-                                        <label className="text-[10px] md:text-xs font-black text-gray-800 flex items-center uppercase tracking-widest">
-                                            {field.label}
-                                        </label>
-                                        <textarea 
-                                            className="w-full p-3 md:p-4 border rounded-2xl font-bold text-xs md:text-sm h-32 md:h-40 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-bvb-yellow outline-none transition-all"
-                                            placeholder={field.placeholder}
-                                            value={(editingMatch.details?.summaryBreakdown as any)?.[field.key] || ''}
-                                            onChange={e => {
-                                                const val = e.target.value;
-                                                const current = ensureDetails(editingMatch);
-                                                const breakdown = current.details!.summaryBreakdown || { overall: '', technicalTactical: '', individual: '', gapAnalysis: '', trainingPriorities: '', management: '' };
-                                                setEditingMatch({
-                                                    ...current,
-                                                    details: {
-                                                        ...current.details!,
-                                                        summaryBreakdown: {
-                                                            ...breakdown,
-                                                            [field.key]: val
-                                                        }
-                                                    }
-                                                });
-                                            }}
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-
-                            {editingMatch.isSeries && (editingMatch.fixtures || []).length > 0 && (
-                                <div className="mt-8 space-y-4">
-                                    <h4 className="font-black text-[10px] md:text-xs text-gray-800 flex items-center uppercase tracking-widest border-b pb-2">系列赛场次详情与事件</h4>
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {editingMatch.fixtures!.map((fixture, idx) => (
-                                            <div key={fixture.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-                                                <div className="flex justify-between items-center mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="bg-bvb-black text-bvb-yellow px-2 py-0.5 rounded text-[10px] font-black italic">场次 #{idx + 1}</span>
-                                                        <span className="text-sm font-black text-gray-800">vs {fixture.opponent || '未记录对手'}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-bold text-gray-400">{fixture.date}</span>
-                                                        <span className="bg-gray-100 text-bvb-black px-3 py-1 rounded-xl font-black text-sm border border-gray-200">{fixture.result || '-:-'}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-4 mb-4 text-[10px] font-bold text-gray-500 bg-gray-50 p-2 rounded-lg">
-                                                    <span className="flex items-center gap-1.5"><Cloud className="w-3 h-3 text-bvb-yellow" /> 天气: {fixture.weather || '晴朗'}</span>
-                                                    <span className="flex items-center gap-1.5"><MapPin className="w-3 h-3 text-bvb-yellow" /> 场地: {fixture.pitch || '天然草'}</span>
-                                                </div>
-                                                {fixture.events && fixture.events.length > 0 ? (
-                                                    <div className="space-y-2">
-                                                        {fixture.events.sort((a,b) => a.minute - b.minute).map(event => (
-                                                            <div key={event.id} className="flex items-center justify-between bg-gray-50/50 px-3 py-2 rounded-xl border border-gray-50">
-                                                                <div className="flex items-center gap-3">
-                                                                    <span className="font-mono text-[10px] text-gray-400 font-black w-6 text-center">{event.minute}'</span>
-                                                                    <div className={`p-1 rounded-md ${event.type === 'Goal' ? 'bg-green-100 text-green-600' : event.type === 'YellowCard' ? 'bg-yellow-100 text-yellow-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                                        {event.type === 'Goal' ? <Trophy className="w-3 h-3" /> : <Tag className="w-3 h-3" />}
-                                                                    </div>
-                                                                    <div>
-                                                                        <span className="font-bold text-xs text-gray-800">{event.playerName}</span>
-                                                                        <span className="ml-2 text-[9px] text-gray-400 font-black uppercase tracking-tighter">
-                                                                            {event.type === 'Goal' ? '进球' : event.type === 'Assist' ? '助攻' : event.type === 'Sub' ? '换人' : '事件'}
-                                                                        </span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-center py-4 text-[10px] text-gray-300 italic font-bold uppercase tracking-widest border border-dashed rounded-xl border-gray-100">无事件记录</div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-                
-                <div className="bg-gray-50 p-3 md:p-4 border-t flex justify-end shrink-0 hidden md:flex">
-                    <button 
-                        onClick={() => {
-                            if (editingMatch) {
-                                onUpdateMatch(editingMatch);
-                            }
-                            setEditingMatch(null);
-                        }} 
-                        className="px-6 md:px-10 py-2.5 md:py-3 bg-bvb-black text-white font-black rounded-xl shadow-xl hover:bg-gray-800 transition-all uppercase italic text-xs md:text-sm"
-                    >
-                        确认并退出
-                    </button>
-                </div>
-            </div>
-        </div>
+        <MatchEditModal
+          match={editingMatch}
+          players={players}
+          teams={teams}
+          currentUser={currentUser}
+          onUpdateMatch={onUpdateMatch}
+          onClose={() => setEditingMatch(null)}
+        />
       )}
 
       {selectedMatchForAi && (
@@ -1151,8 +572,391 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
               }}
           />
       )}
+
+      {selectedMatchForCard && (
+          <MatchInfoCardModal
+              match={selectedMatchForCard}
+              players={players}
+              teams={teams}
+              onClose={() => setSelectedMatchForCard(null)}
+          />
+      )}
     </div>
   );
+};
+
+interface MatchInfoCardModalProps {
+    match: Match;
+    players: Player[];
+    teams: Team[];
+    onClose: () => void;
+}
+
+const MatchInfoCardModal: React.FC<MatchInfoCardModalProps> = ({ match, players, teams, onClose }) => {
+    const team = teams.find(t => t.id === match.teamId);
+    const details = match.details || {};
+    const breakdown = details.summaryBreakdown || {};
+    const orgRating = breakdown.orgRating || {};
+    const performances = details.playerPerformances || {};
+    const lineupPlayerIds = details.lineup || [];
+    const substitutesIds = details.substitutes || [];
+
+    const getFullAddress = (m: Match) => {
+        if (m.location === 'Home') return '俱乐部主球场';
+        const parts = [m.province, m.city, m.district].filter(Boolean);
+        return parts.length > 0 ? parts.join(' - ') : (m.city || '客场');
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 md:p-6 bg-black/75 backdrop-blur-md overflow-y-auto print:p-0 print:bg-white">
+            <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] my-auto print:max-h-none print:shadow-none print:rounded-none">
+                {/* Modal Toolbar (hidden when printing) */}
+                <div className="bg-bvb-black p-4 md:p-5 flex justify-between items-center text-white shrink-0 print:hidden">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-bvb-yellow flex items-center justify-center text-bvb-black font-black">
+                            <FileText className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="font-black text-base md:text-lg leading-tight flex items-center gap-2">
+                                比赛信息卡片
+                                <span className="text-xs bg-bvb-yellow text-bvb-black px-2 py-0.5 rounded font-black italic">
+                                    MATCH CARD
+                                </span>
+                            </h3>
+                            <p className="text-[11px] text-gray-400 font-medium">
+                                综合呈现基础信息、对阵结果、出场阵容、个人表现与总结复盘
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handlePrint}
+                            className="px-3.5 py-2 bg-bvb-yellow text-bvb-black font-black text-xs rounded-xl hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 shadow-md"
+                        >
+                            <Printer className="w-4 h-4" /> 打印 / 导出现场卡片
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="p-2 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl transition-colors"
+                        >
+                            <X className="w-6 h-6" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Printable Card Area */}
+                <div className="p-4 md:p-8 overflow-y-auto flex-1 custom-scrollbar space-y-6 bg-gray-50 print:p-6 print:bg-white">
+                    {/* Header Banner */}
+                    <div className="bg-gradient-to-r from-bvb-black via-gray-900 to-bvb-black text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden border border-gray-800">
+                        {/* Decorative Background Elements */}
+                        <div className="absolute -right-8 -bottom-8 w-48 h-48 bg-bvb-yellow/10 rounded-full blur-2xl pointer-events-none" />
+                        <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 border-b border-gray-800 pb-5">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-2xl bg-bvb-yellow flex items-center justify-center text-bvb-black font-black text-xl shadow-lg">
+                                    🪨
+                                </div>
+                                <div>
+                                    <h2 className="text-lg md:text-xl font-black italic uppercase tracking-wider text-bvb-yellow">
+                                        顽石之光足球俱乐部 • 比赛报告卡
+                                    </h2>
+                                    <p className="text-xs text-gray-400 font-bold mt-0.5">
+                                        {team?.name || '青训梯队'} • {match.competition || '官方赛事'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 self-start md:self-auto">
+                                <span className="text-xs font-black bg-gray-800 text-gray-300 px-3 py-1 rounded-full border border-gray-700">
+                                    {match.date} {match.isSeries && match.endDate ? `～ ${match.endDate}` : `• ${match.time}`}
+                                </span>
+                                <span className={`text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider ${
+                                    match.location === 'Home' ? 'bg-bvb-yellow text-bvb-black' : 'bg-blue-600 text-white'
+                                }`}>
+                                    {match.location === 'Home' ? '主场' : '客场'}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Match Title & Score Banner */}
+                        <div className="mt-6 flex flex-col md:flex-row items-center justify-between gap-6">
+                            <div className="text-center md:text-left">
+                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-1">
+                                    {match.isSeries ? '赛事主体 / 对阵系列' : '比赛对阵对手'}
+                                </span>
+                                <h1 className="text-2xl md:text-3xl font-black text-white flex items-center justify-center md:justify-start gap-3">
+                                    {match.isSeries ? (
+                                        <>
+                                            <Activity className="w-7 h-7 text-bvb-yellow" />
+                                            {match.opponent || '多方对手'}
+                                        </>
+                                    ) : (
+                                        <>VS {match.opponent}</>
+                                    )}
+                                </h1>
+                            </div>
+
+                            {/* Score Display */}
+                            <div className="flex flex-col items-center md:items-end">
+                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">
+                                    比赛结果 / 比分
+                                </span>
+                                {match.isSeries ? (
+                                    <div className="flex items-center gap-3">
+                                        <div className="text-2xl md:text-3xl font-black text-bvb-yellow bg-gray-800/90 px-5 py-2 rounded-2xl border border-bvb-yellow/30 shadow-inner">
+                                            {match.seriesResult || '未录入'}
+                                        </div>
+                                        {match.seriesRanking && (
+                                            <span className="text-xs font-black text-bvb-black bg-bvb-yellow px-3 py-1.5 rounded-xl uppercase tracking-wider">
+                                                {match.seriesRanking}
+                                            </span>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-3xl md:text-4xl font-black text-bvb-yellow bg-gray-800/90 px-6 py-2 rounded-2xl border border-bvb-yellow/30 shadow-inner tabular-nums">
+                                        {match.result || '- : -'}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Environment & Location Info Bar */}
+                        <div className="mt-6 pt-4 border-t border-gray-800/80 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-bold text-gray-300">
+                            <div className="flex items-center gap-2">
+                                <MapPin className="w-4 h-4 text-bvb-yellow shrink-0" />
+                                <span className="truncate">{getFullAddress(match)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-bvb-yellow shrink-0" />
+                                <span>场地: {details.pitch || '天然草'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Cloud className="w-4 h-4 text-bvb-yellow shrink-0" />
+                                <span>天气: {details.weather || '晴朗'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Trophy className="w-4 h-4 text-bvb-yellow shrink-0" />
+                                <span>比赛性质: {match.competition || '未声明'}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Section 1: 对阵列表 / 比分细则 */}
+                    {match.isSeries && (match.fixtures || []).length > 0 && (
+                        <div className="bg-white rounded-3xl p-5 md:p-6 border border-gray-100 shadow-sm space-y-4">
+                            <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+                                <Activity className="w-4 h-4 text-bvb-yellow" />
+                                系列赛 / 锦标赛对阵明细列表 (共 {match.fixtures?.length} 场)
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {match.fixtures?.map((fixture, idx) => (
+                                    <div key={fixture.id || idx} className="bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100 flex items-center justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-black bg-bvb-black text-bvb-yellow px-1.5 py-0.5 rounded">
+                                                    第 {idx + 1} 场
+                                                </span>
+                                                <span className="text-xs font-bold text-gray-500">{fixture.date || match.date}</span>
+                                            </div>
+                                            <h4 className="text-xs md:text-sm font-black text-gray-800 mt-1">
+                                                VS {fixture.opponent}
+                                            </h4>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-base font-black text-bvb-black bg-white px-3 py-1 rounded-xl border border-gray-200 tabular-nums inline-block">
+                                                {fixture.result || '-:-'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Section 2: 参赛阵容 */}
+                    <div className="bg-white rounded-3xl p-5 md:p-6 border border-gray-100 shadow-sm space-y-4">
+                        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                            <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2">
+                                <UsersIcon className="w-4 h-4 text-bvb-yellow" />
+                                参赛名单与阵容 ({lineupPlayerIds.length} 人)
+                            </h3>
+                        </div>
+                        {lineupPlayerIds.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-bold italic py-2">暂未录入出场阵容</p>
+                        ) : (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                {lineupPlayerIds.map(pid => {
+                                    const p = players.find(player => player.id === pid);
+                                    const isSub = substitutesIds.includes(pid);
+                                    return (
+                                        <div key={pid} className="bg-gray-50 p-2.5 rounded-2xl border border-gray-100 flex items-center gap-2.5">
+                                            <img
+                                                src={p?.image || 'https://images.unsplash.com/photo-1533107862482-0e6974b06ec4?q=80&w=200&h=200&fit=crop'}
+                                                className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm shrink-0"
+                                                alt={p?.name}
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-xs font-black text-gray-900 truncate">{p?.name || '球员'}</span>
+                                                    {p?.number && <span className="text-[9px] font-black text-gray-400">#{p.number}</span>}
+                                                </div>
+                                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded inline-block ${
+                                                    isSub ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                                                }`}>
+                                                    {isSub ? '替补' : '首发'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Section 3: 个人表现评估 */}
+                    <div className="bg-white rounded-3xl p-5 md:p-6 border border-gray-100 shadow-sm space-y-4">
+                        <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <Star className="w-4 h-4 text-amber-500 fill-amber-400" />
+                            球员个人表现点评与评分
+                        </h3>
+                        {lineupPlayerIds.length === 0 ? (
+                            <p className="text-xs text-gray-400 font-bold italic py-2">暂无球员信息</p>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                {lineupPlayerIds.map(pid => {
+                                    const p = players.find(player => player.id === pid);
+                                    const perf = performances[pid] || {};
+                                    const rating = perf.rating || 0;
+                                    const comment = perf.comment || '';
+
+                                    return (
+                                        <div key={pid} className="bg-gradient-to-br from-gray-50 to-amber-50/10 p-3.5 rounded-2xl border border-gray-100 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <img
+                                                        src={p?.image || 'https://images.unsplash.com/photo-1533107862482-0e6974b06ec4?q=80&w=200&h=200&fit=crop'}
+                                                        className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
+                                                        alt={p?.name}
+                                                    />
+                                                    <div>
+                                                        <span className="text-xs font-black text-gray-900">{p?.name || '未知球员'}</span>
+                                                        {p?.number && <span className="text-[10px] text-gray-400 ml-1">#{p.number}</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-gray-100 shadow-xs">
+                                                    {[1, 2, 3, 4, 5].map(star => (
+                                                        <Star
+                                                            key={star}
+                                                            className={`w-3.5 h-3.5 ${
+                                                                star <= rating ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-100'
+                                                            }`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-gray-700 font-medium bg-white/80 p-2.5 rounded-xl border border-gray-100/80 leading-relaxed italic">
+                                                {comment ? `“${comment}”` : '暂无录入个人点评'}
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Section 4: 总结与复盘 */}
+                    <div className="bg-white rounded-3xl p-5 md:p-6 border border-gray-100 shadow-sm space-y-4">
+                        <h3 className="text-sm md:text-base font-black text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <ClipboardList className="w-4 h-4 text-bvb-yellow" />
+                            比赛总结与团队复盘
+                        </h3>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* 比赛整体评价 */}
+                            <div className="bg-gray-50/80 p-4 rounded-2xl border border-gray-100 md:col-span-2">
+                                <h4 className="text-xs font-black text-gray-800 flex items-center gap-1.5 uppercase mb-1.5">
+                                    <FileText className="w-3.5 h-3.5 text-bvb-yellow" /> 比赛整体评价
+                                </h4>
+                                <p className="text-xs text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
+                                    {breakdown.overall || '未填写'}
+                                </p>
+                            </div>
+
+                            {/* 表现亮点 */}
+                            <div className="bg-green-50/30 p-4 rounded-2xl border border-green-100">
+                                <h4 className="text-xs font-black text-green-900 flex items-center gap-1.5 uppercase mb-1.5">
+                                    <TrendingUp className="w-3.5 h-3.5 text-green-600" /> 表现亮点
+                                </h4>
+                                <p className="text-xs text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
+                                    {breakdown.highlights || breakdown.matchReview || '未填写'}
+                                </p>
+                            </div>
+
+                            {/* 暴露的问题 */}
+                            <div className="bg-red-50/30 p-4 rounded-2xl border border-red-100">
+                                <h4 className="text-xs font-black text-red-900 flex items-center gap-1.5 uppercase mb-1.5">
+                                    <AlertCircle className="w-3.5 h-3.5 text-red-500" /> 暴露的问题
+                                </h4>
+                                <p className="text-xs text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
+                                    {breakdown.issuesExposed || '未填写'}
+                                </p>
+                            </div>
+
+                            {/* 下一阶段训练重点 */}
+                            <div className="bg-amber-50/30 p-4 rounded-2xl border border-amber-100 md:col-span-2">
+                                <h4 className="text-xs font-black text-amber-900 flex items-center gap-1.5 uppercase mb-1.5">
+                                    <Target className="w-3.5 h-3.5 text-amber-500" /> 下一阶段训练重点
+                                </h4>
+                                <p className="text-xs text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
+                                    {breakdown.nextStageTraining || '未填写'}
+                                </p>
+                            </div>
+
+                            {/* 赛事组织评价 */}
+                            <div className="bg-gradient-to-br from-amber-50/20 to-gray-50 p-4 rounded-2xl border border-amber-200/60 md:col-span-2 space-y-3">
+                                <h4 className="text-xs font-black text-gray-900 flex items-center gap-1.5 uppercase">
+                                    <Star className="w-4 h-4 text-amber-500 fill-amber-400" /> 赛事组织综合评分
+                                </h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    {[
+                                        { label: '赛事组织', val: orgRating.eventOrganization ?? 5 },
+                                        { label: '裁判水平', val: orgRating.refereeLevel ?? 5 },
+                                        { label: '场地条件', val: orgRating.venueCondition ?? 5 },
+                                        { label: '住宿环境', val: orgRating.accommodation ?? 5 },
+                                        { label: '交通配备', val: orgRating.transportation ?? 5 },
+                                    ].map((item, idx) => (
+                                        <div key={idx} className="bg-white p-2.5 rounded-xl border border-gray-100 flex items-center justify-between">
+                                            <span className="text-xs font-bold text-gray-700">{item.label}</span>
+                                            <div className="flex items-center gap-0.5">
+                                                {[1, 2, 3, 4, 5].map(s => (
+                                                    <Star
+                                                        key={s}
+                                                        className={`w-3 h-3 ${s <= item.val ? 'text-amber-400 fill-amber-400' : 'text-gray-200 fill-gray-100'}`}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div className="bg-white p-2.5 rounded-xl border border-gray-100 flex items-center justify-between">
+                                        <span className="text-xs font-bold text-gray-700">推荐再次参赛</span>
+                                        <span className={`text-xs font-black px-2 py-0.5 rounded ${
+                                            orgRating.recommendParticipation === '是' || orgRating.recommendParticipation === true
+                                                ? 'bg-green-100 text-green-800'
+                                                : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {orgRating.recommendParticipation === '是' || orgRating.recommendParticipation === true ? '推荐 (是)' : '不推荐 (否)'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export default MatchPlanner;
@@ -1163,9 +967,10 @@ interface MatchCardProps {
     onDeleteMatch: (id: string) => void;
     startEditing: (match: Match) => void;
     handleGenerateStrategy: (match: Match) => void;
+    onShowCard: (match: Match) => void;
 }
 
-const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, startEditing, handleGenerateStrategy }) => {
+const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, startEditing, handleGenerateStrategy, onShowCard }) => {
     const team = teams.find(t => t.id === match.teamId);
     
     const getLocationLabel = (loc: string) => loc === 'Home' ? '主场' : '客场';
@@ -1185,6 +990,7 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, star
             )
         ) : 'border-gray-300'}`}>
             <div className="absolute top-2.5 md:top-3 right-2.5 md:right-3 flex gap-1.5 md:gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <button onClick={(e) => { e.stopPropagation(); onShowCard(match); }} className="p-1 md:p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-600 rounded" title="查看比赛卡片"><FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                 <button onClick={(e) => { e.stopPropagation(); onDeleteMatch(match.id); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-red-100 text-gray-400 hover:text-red-500 rounded"><Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4" /></button>
                 <button onClick={(e) => { e.stopPropagation(); startEditing(match); }} className="p-1 md:p-1.5 bg-gray-100 hover:bg-yellow-50 text-gray-400 hover:text-bvb-black rounded">
                     {match.status === 'Completed' ? <FileText className="w-3.5 h-3.5 md:w-4 md:h-4" /> : <Edit2 className="w-3.5 h-3.5 md:w-4 md:h-4" />}
@@ -1222,9 +1028,14 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, star
                 </div>
                 {match.status === 'Completed' ? (
                     match.isSeries ? (
-                        <div className="flex flex-col items-end gap-1">
-                            <div className="text-base md:text-xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">
-                                {match.seriesResult || '-'}
+                        <div className="flex flex-col items-end gap-1.5">
+                            <div className="flex items-center gap-2">
+                                <div className="text-base md:text-xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">
+                                    {match.seriesResult || '-'}
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); onShowCard(match); }} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-2.5 py-1 rounded-lg shadow-xs hover:brightness-105 active:scale-95 transition-all">
+                                    <FileText className="w-3 h-3 mr-1" /> 卡片
+                                </button>
                             </div>
                             {match.seriesRanking && (
                                 <span className="text-[8px] md:text-[10px] font-black text-gray-400 bg-gray-200/50 px-1.5 py-0.5 rounded italic truncate max-w-[120px]">
@@ -1233,11 +1044,19 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, star
                             )}
                         </div>
                     ) : (
-                        <div className="text-xl md:text-3xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">{match.result || '-:-'}</div>
+                        <div className="flex items-center gap-2">
+                            <div className="text-xl md:text-3xl font-black text-bvb-black bg-gray-100 px-3 md:px-4 py-1 md:py-1.5 rounded-xl border border-gray-200 tabular-nums leading-none">{match.result || '-:-'}</div>
+                            <button onClick={(e) => { e.stopPropagation(); onShowCard(match); }} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-2.5 py-1.5 rounded-lg shadow-xs hover:brightness-105 active:scale-95 transition-all">
+                                <FileText className="w-3 h-3 mr-1" /> 卡片
+                            </button>
+                        </div>
                     )
                 ) : (
                     <div className="flex flex-col items-end gap-1.5 md:gap-2">
-                         <button onClick={() => startEditing(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-3 py-1 md:py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all">录入赛果 <PenTool className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1 md:ml-1.5" /></button>
+                         <div className="flex items-center gap-1.5">
+                            <button onClick={() => onShowCard(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-gray-100 text-gray-700 px-2 md:px-2.5 py-1 md:py-1.5 rounded-lg hover:bg-gray-200 transition-all">卡片 <FileText className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" /></button>
+                            <button onClick={() => startEditing(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-bvb-yellow text-bvb-black px-2 md:px-3 py-1 md:py-1.5 rounded-lg shadow-sm hover:brightness-105 active:scale-95 transition-all">录入赛果 <PenTool className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1 md:ml-1.5" /></button>
+                         </div>
                          <button onClick={() => handleGenerateStrategy(match)} className="text-[9px] md:text-[10px] font-black flex items-center bg-black text-white px-2 md:px-3 py-1 md:py-1.5 rounded-lg hover:bg-gray-800 transition-all"><Bot className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1 md:mr-1.5 text-bvb-yellow" /> 助手</button>
                     </div>
                 )}
