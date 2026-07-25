@@ -1881,7 +1881,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, matches = [], onUpdateMatch, onAddMatch 
+    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, matches = [], onUpdateMatch 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';

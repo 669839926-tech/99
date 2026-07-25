@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, OrgRating, User, SeriesFixture } from '../types';
-import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, Edit2, FileText, TrendingUp, AlertCircle, Target, MapPin, Cloud, Flag, UserMinus, PenTool } from 'lucide-react';
+import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, User, SeriesFixture } from '../types';
+import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, FileText, TrendingUp, AlertCircle, Target, Flag, UserMinus, PenTool, Trophy } from 'lucide-react';
 
 interface MatchEditModalProps {
     match: Match;
@@ -17,6 +17,49 @@ interface MatchEditModalProps {
 }
 
 type TabType = 'info' | 'fixtures' | 'lineup' | 'objectives' | 'events' | 'report';
+
+const calcSeriesStats = (fixtures: SeriesFixture[] = []) => {
+    if (!fixtures || fixtures.length === 0) return { wins: 0, draws: 0, losses: 0, text: '' };
+    let wins = 0;
+    let draws = 0;
+    let losses = 0;
+    
+    fixtures.forEach(f => {
+        if (!f.result || !f.result.trim()) return;
+        const res = f.result.trim();
+
+        // 1. Check numeric score e.g. "3-1", "3:1", "3 - 1"
+        const scoreMatch = res.match(/(\d+)\s*[-:]\s*(\d+)/);
+        if (scoreMatch) {
+            const myScore = parseInt(scoreMatch[1], 10);
+            const oppScore = parseInt(scoreMatch[2], 10);
+            if (myScore > oppScore) wins++;
+            else if (myScore < oppScore) losses++;
+            else draws++;
+            return;
+        }
+
+        // 2. Check explicit Chinese outcome keywords
+        if (res.includes('胜')) { wins++; return; }
+        if (res.includes('负')) { losses++; return; }
+        if (res.includes('平')) { draws++; return; }
+    });
+
+    const total = wins + draws + losses;
+    if (total === 0) return { wins: 0, draws: 0, losses: 0, text: '' };
+    
+    const parts: string[] = [];
+    if (wins > 0 || total > 0) parts.push(`${wins}胜`);
+    if (draws > 0) parts.push(`${draws}平`);
+    if (losses > 0 || (wins === 0 && draws === 0)) parts.push(`${losses}负`);
+
+    return {
+        wins,
+        draws,
+        losses,
+        text: parts.join('')
+    };
+};
 
 const ensureDetails = (match: Match): Match => {
     const existingBreakdown = match.details?.summaryBreakdown;
@@ -58,6 +101,7 @@ const ensureDetails = (match: Match): Match => {
 
     return {
         ...match,
+        fixtures: match.fixtures || [],
         details: {
             ...defaultDetails,
             ...match.details,
@@ -76,8 +120,6 @@ const ensureDetails = (match: Match): Match => {
 export const MatchEditModal: React.FC<MatchEditModalProps> = ({
     match,
     players,
-    teams,
-    currentUser,
     onUpdateMatch,
     onClose
 }) => {
@@ -86,13 +128,24 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
     const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [selectedMatchForCard, setSelectedMatchForCard] = useState<Match | null>(null);
 
     const [newEvent, setNewEvent] = useState<{ playerId: string; type: MatchEventType; minute: number; details: string }>({
         playerId: '',
         type: 'Goal',
         minute: 1,
         details: ''
+    });
+
+    const [newFixture, setNewFixture] = useState<{
+        opponent: string;
+        date: string;
+        location: 'Home' | 'Away';
+        result: string;
+    }>({
+        opponent: '',
+        date: '',
+        location: 'Home',
+        result: ''
     });
 
     useEffect(() => {
@@ -283,7 +336,24 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                     {editingMatch.isSeries && (
                                         <div className="grid grid-cols-2 gap-3 md:gap-4">
                                             <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">系列赛赛果</label>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase block">系列赛赛果</label>
+                                                    {(editingMatch.fixtures || []).length > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const stats = calcSeriesStats(editingMatch.fixtures || []);
+                                                                if (stats.text) {
+                                                                    setEditingMatch({ ...editingMatch, seriesResult: stats.text });
+                                                                }
+                                                            }}
+                                                            className="text-[9px] font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded hover:brightness-110 transition-all flex items-center gap-1 shadow-2xs"
+                                                            title="根据对阵列表中的各场比分自动统计胜/平/负"
+                                                        >
+                                                            <RefreshCw className="w-2.5 h-2.5" /> 自动统计
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 <input 
                                                     className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
                                                     placeholder="如: 9胜3负" 
@@ -347,6 +417,268 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                         <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">开球时间</label><input type="time" className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.time} onChange={e => setEditingMatch({...editingMatch, time: e.target.value})} /></div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'fixtures' && (
+                        <div className="animate-in fade-in duration-300 space-y-6">
+                            {/* Header & Auto Stats Banner */}
+                            <div className="bg-gradient-to-r from-bvb-black via-gray-900 to-bvb-black text-white p-4 md:p-6 rounded-2xl shadow-lg border border-gray-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="bg-bvb-yellow text-bvb-black font-black text-[10px] uppercase px-2 py-0.5 rounded-md">
+                                            系列赛对阵明细
+                                        </span>
+                                        <span className="text-xs text-gray-300 font-bold">
+                                            共 {(editingMatch.fixtures || []).length} 场对阵
+                                        </span>
+                                    </div>
+                                    <h4 className="text-base md:text-lg font-black text-white flex items-center gap-2">
+                                        <Trophy className="w-5 h-5 text-bvb-yellow" />
+                                        系列赛总赛果: <span className="text-bvb-yellow font-black">{editingMatch.seriesResult || '尚未统计'}</span>
+                                    </h4>
+                                    <p className="text-[10px] md:text-xs text-gray-400">
+                                        录入每场对阵比分后，系统将自动汇总胜/平/负统计并生成系列赛战绩。
+                                    </p>
+                                </div>
+                                
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const stats = calcSeriesStats(editingMatch.fixtures || []);
+                                        if (stats.text) {
+                                            setEditingMatch({
+                                                ...editingMatch,
+                                                seriesResult: stats.text
+                                            });
+                                        }
+                                    }}
+                                    className="w-full md:w-auto px-5 py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl text-xs md:text-sm hover:brightness-110 shadow-lg transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                                >
+                                    <RefreshCw className="w-4 h-4 text-bvb-black" />
+                                    一键统计系列赛赛果
+                                </button>
+                            </div>
+
+                            {/* Add New Fixture Form */}
+                            <div className="bg-gray-50 p-4 md:p-6 rounded-2xl border border-gray-200 space-y-3">
+                                <h4 className="font-bold text-sm md:text-base text-gray-800 flex items-center gap-2">
+                                    <Plus className="w-4 h-4 text-bvb-yellow" /> 新增系列赛对阵场次
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                                    <div className="md:col-span-2">
+                                        <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">对手名称</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-2.5 border rounded-xl font-bold text-xs bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
+                                            placeholder={editingMatch.opponent || "例如: 贵州仁怀队"}
+                                            value={newFixture.opponent}
+                                            onChange={e => setNewFixture({ ...newFixture, opponent: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛日期</label>
+                                        <input 
+                                            type="date"
+                                            className="w-full p-2.5 border rounded-xl font-bold text-xs bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
+                                            value={newFixture.date || editingMatch.date}
+                                            onChange={e => setNewFixture({ ...newFixture, date: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比分/赛果 (可选)</label>
+                                        <input 
+                                            type="text"
+                                            className="w-full p-2.5 border rounded-xl font-bold text-xs bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
+                                            placeholder="如: 3-1"
+                                            value={newFixture.result}
+                                            onChange={e => setNewFixture({ ...newFixture, result: e.target.value })}
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const newF: SeriesFixture = {
+                                                id: 'f_' + Math.random().toString(36).slice(2, 9),
+                                                opponent: newFixture.opponent || editingMatch.opponent || '对手',
+                                                date: newFixture.date || editingMatch.date || new Date().toISOString().split('T')[0],
+                                                location: newFixture.location || 'Home',
+                                                result: newFixture.result || '',
+                                                events: []
+                                            };
+                                            const updatedFixtures = [...(editingMatch.fixtures || []), newF];
+                                            const stats = calcSeriesStats(updatedFixtures);
+                                            setEditingMatch({
+                                                ...editingMatch,
+                                                fixtures: updatedFixtures,
+                                                seriesResult: stats.text || editingMatch.seriesResult
+                                            });
+                                            setNewFixture({
+                                                opponent: '',
+                                                date: '',
+                                                location: 'Home',
+                                                result: ''
+                                            });
+                                        }}
+                                        className="bg-bvb-black text-white font-black py-2.5 px-4 rounded-xl hover:bg-gray-800 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                                    >
+                                        <Plus className="w-4 h-4 text-bvb-yellow" /> 添加场次
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Fixtures List */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between px-1">
+                                    <h4 className="font-black text-xs text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                                        <Activity className="w-3.5 h-3.5 text-bvb-yellow" />
+                                        已录入对阵场次列表 ({(editingMatch.fixtures || []).length})
+                                    </h4>
+                                    <span className="text-[10px] text-gray-400 font-bold">录入比分后自动实时更新系列赛战绩</span>
+                                </div>
+
+                                {(editingMatch.fixtures || []).length === 0 ? (
+                                    <div className="py-16 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl space-y-2">
+                                        <Activity className="w-10 h-10 text-gray-200 mx-auto" />
+                                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest italic">暂无对阵场次</p>
+                                        <p className="text-[10px] text-gray-400 font-bold">请在上方输入对手与日期添加系列赛各场比赛</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3">
+                                        {(editingMatch.fixtures || []).map((fixture, idx) => {
+                                            return (
+                                                <div key={fixture.id || idx} className="bg-white p-4 rounded-2xl border border-gray-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-bvb-yellow/50 transition-all">
+                                                    <div className="flex items-center gap-3 shrink-0">
+                                                        <span className="w-8 h-8 rounded-xl bg-bvb-black text-bvb-yellow font-black text-xs flex items-center justify-center shrink-0">
+                                                            #{idx + 1}
+                                                        </span>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <input 
+                                                                    type="text"
+                                                                    className="font-black text-sm text-gray-900 bg-transparent border-b border-gray-200 hover:border-gray-400 focus:border-bvb-yellow outline-none px-1 py-0.5"
+                                                                    value={fixture.opponent}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        const updated = (editingMatch.fixtures || []).map((f, i) => i === idx ? { ...f, opponent: val } : f);
+                                                                        setEditingMatch({ ...editingMatch, fixtures: updated });
+                                                                    }}
+                                                                    placeholder="对手名称"
+                                                                />
+                                                                <select
+                                                                    className="text-[10px] font-bold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md outline-none border-0"
+                                                                    value={fixture.location || 'Home'}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value as 'Home' | 'Away';
+                                                                        const updated = (editingMatch.fixtures || []).map((f, i) => i === idx ? { ...f, location: val } : f);
+                                                                        setEditingMatch({ ...editingMatch, fixtures: updated });
+                                                                    }}
+                                                                >
+                                                                    <option value="Home">主场</option>
+                                                                    <option value="Away">客场</option>
+                                                                </select>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[10px] text-gray-400 font-bold mt-1">
+                                                                <input 
+                                                                    type="date"
+                                                                    className="bg-transparent border-b border-gray-200 hover:border-gray-400 outline-none text-[10px] text-gray-500 font-bold"
+                                                                    value={fixture.date || editingMatch.date}
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        const updated = (editingMatch.fixtures || []).map((f, i) => i === idx ? { ...f, date: val } : f);
+                                                                        setEditingMatch({ ...editingMatch, fixtures: updated });
+                                                                    }}
+                                                                />
+                                                                <span>•</span>
+                                                                <span>包含 {(fixture.events || []).length} 条事件记录</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Score Entry & Quick Outcome */}
+                                                    <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap justify-between md:justify-end">
+                                                        <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                                                            <span className="text-[10px] font-black text-gray-500 uppercase">比分:</span>
+                                                            <input 
+                                                                type="text"
+                                                                className="w-20 p-1.5 border rounded-lg font-black text-center text-xs bg-white focus:ring-2 focus:ring-bvb-yellow outline-none"
+                                                                placeholder="如: 2-1"
+                                                                value={fixture.result || ''}
+                                                                onChange={e => {
+                                                                    const val = e.target.value;
+                                                                    const updated = (editingMatch.fixtures || []).map((f, i) => i === idx ? { ...f, result: val } : f);
+                                                                    const stats = calcSeriesStats(updated);
+                                                                    setEditingMatch({ 
+                                                                        ...editingMatch, 
+                                                                        fixtures: updated,
+                                                                        seriesResult: stats.text || editingMatch.seriesResult
+                                                                    });
+                                                                }}
+                                                            />
+                                                            <div className="flex items-center gap-1">
+                                                                {['胜', '平', '负'].map(outcome => (
+                                                                    <button
+                                                                        key={outcome}
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            const updated = (editingMatch.fixtures || []).map((f, i) => i === idx ? { ...f, result: outcome } : f);
+                                                                            const stats = calcSeriesStats(updated);
+                                                                            setEditingMatch({
+                                                                                ...editingMatch,
+                                                                                fixtures: updated,
+                                                                                seriesResult: stats.text || editingMatch.seriesResult
+                                                                            });
+                                                                        }}
+                                                                        className={`px-1.5 py-0.5 text-[9px] font-black rounded transition-all cursor-pointer ${
+                                                                            fixture.result === outcome 
+                                                                                ? 'bg-bvb-black text-bvb-yellow shadow-2xs' 
+                                                                                : 'bg-white border text-gray-600 hover:bg-gray-100'
+                                                                        }`}
+                                                                    >
+                                                                        {outcome}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedFixtureId(fixture.id);
+                                                                    setActiveTab('events');
+                                                                }}
+                                                                className="p-2 text-gray-500 hover:text-bvb-black hover:bg-yellow-50 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                                                                title="录入该场关键事件(进球/黄牌等)"
+                                                            >
+                                                                <Tag className="w-3.5 h-3.5 text-bvb-yellow" />
+                                                                <span className="hidden sm:inline">事件</span>
+                                                            </button>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const updated = (editingMatch.fixtures || []).filter((_, i) => i !== idx);
+                                                                    const stats = calcSeriesStats(updated);
+                                                                    setEditingMatch({
+                                                                        ...editingMatch,
+                                                                        fixtures: updated,
+                                                                        seriesResult: stats.text || editingMatch.seriesResult
+                                                                    });
+                                                                }}
+                                                                className="p-2 text-gray-300 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                                                                title="删除此对阵场次"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}

@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, Team, MatchEvent, MatchEventType, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic, OrgRating } from '../types';
+import { Match, Player, Team, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic } from '../types';
 // Comment: Added 'Star' and 'Target' to the lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Flag, Tag, Loader2, RefreshCw, ChevronLeft, TrendingUp, AlertCircle, Filter, UserMinus, ClipboardList, PenTool, Info, Coins, TrendingDown, ListPlus, Cloud, Maximize2, Minimize2, Star, Target, Printer } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, ClipboardList, PenTool, Coins, TrendingDown, ListPlus, Cloud, Star, Target, Printer } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { generateMatchStrategy } from '../services/geminiService';
 import TacticsModule from './TacticsModule';
@@ -30,7 +30,6 @@ interface MatchPlannerProps {
   onUpdateTactics: (tactics: Tactic[]) => void;
 }
 
-type TabType = 'info' | 'lineup' | 'objectives' | 'events' | 'report' | 'fixtures';
 type ViewMode = 'matches' | 'points' | 'tactics';
 
 const MatchPlanner: React.FC<MatchPlannerProps> = ({ 
@@ -54,17 +53,13 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   onUpdateTactics
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
   const [strategy, setStrategy] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   
   const [filterTeamId, setFilterTeamId] = useState<string>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMatch, setEditingMatch] = useState<Match | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('info');
-  const [selectedFixtureId, setSelectedFixtureId] = useState<string>('');
   const [showAddPointItemModal, setShowAddPointItemModal] = useState(false);
   const [selectedMatchForCard, setSelectedMatchForCard] = useState<Match | null>(null);
 
@@ -251,77 +246,6 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
           onAddMatch(match);
           setShowAddModal(false);
           setNewMatchForm({ teamId: availableTeams[0]?.id || '', opponent: '', date: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], time: '14:00', location: 'Home', competition: '联赛', isSeries: false });
-      }
-  };
-
-  const [newEvent, setNewEvent] = useState<Partial<MatchEvent>>({ minute: 0, type: 'Goal', playerId: '' });
-
-  const addEvent = () => {
-      if (editingMatch && newEvent.playerId && newEvent.minute !== undefined) {
-          const player = players.find(p => p.id === newEvent.playerId);
-          const event: MatchEvent = {
-              id: Date.now().toString(),
-              minute: newEvent.minute,
-              type: newEvent.type as MatchEventType,
-              playerId: newEvent.playerId,
-              playerName: player?.name || '未知球员',
-              description: newEvent.description || ''
-          };
-          
-          const currentMatch = ensureDetails(editingMatch);
-          
-          if (currentMatch.isSeries && selectedFixtureId) {
-              const updatedFixtures = (currentMatch.fixtures || []).map(f => {
-                  if (f.id === selectedFixtureId) {
-                      return { ...f, events: [...(f.events || []), event] };
-                  }
-                  return f;
-              });
-              setEditingMatch({ ...currentMatch, fixtures: updatedFixtures });
-          } else {
-              const updatedDetails = {
-                  ...currentMatch.details!,
-                  events: [...(currentMatch.details?.events || []), event]
-              };
-              setEditingMatch({ ...currentMatch, details: updatedDetails });
-          }
-          
-          setNewEvent({ minute: 0, type: 'Goal', playerId: '' });
-      }
-  };
-
-  const removeEvent = (id: string) => {
-      if (editingMatch) {
-          const currentMatch = ensureDetails(editingMatch);
-          if (currentMatch.isSeries && selectedFixtureId) {
-              const updatedFixtures = (currentMatch.fixtures || []).map(f => {
-                  if (f.id === selectedFixtureId) {
-                      return { ...f, events: (f.events || []).filter(e => e.id !== id) };
-                  }
-                  return f;
-              });
-              setEditingMatch({ ...currentMatch, fixtures: updatedFixtures });
-          } else {
-              const updatedEvents = currentMatch.details?.events.filter(e => e.id !== id) || [];
-              setEditingMatch({ ...currentMatch, details: { ...currentMatch.details!, events: updatedEvents } });
-          }
-      }
-  };
-
-  const toggleLineupPlayer = (playerId: string, isSub: boolean = false) => {
-      if (!editingMatch) return;
-      const currentMatch = ensureDetails(editingMatch);
-      const details = currentMatch.details!;
-      if (isSub) {
-          const nextSubs = details.substitutes.includes(playerId) 
-            ? details.substitutes.filter(id => id !== playerId)
-            : [...details.substitutes, playerId];
-          setEditingMatch({ ...currentMatch, details: { ...details, substitutes: nextSubs } });
-      } else {
-          const nextLineup = details.lineup.includes(playerId) 
-            ? details.lineup.filter(id => id !== playerId)
-            : [...details.lineup, playerId];
-          setEditingMatch({ ...currentMatch, details: { ...details, lineup: nextLineup } });
       }
   };
 
