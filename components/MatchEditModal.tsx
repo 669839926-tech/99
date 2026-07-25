@@ -326,7 +326,7 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                             matchDates.push(editingMatch.date);
                         }
                         if (editingMatch.isSeries && editingMatch.endDate && editingMatch.endDate > editingMatch.date) {
-                            let curr = new Date(editingMatch.date);
+                            const curr = new Date(editingMatch.date);
                             const end = new Date(editingMatch.endDate);
                             let count = 0;
                             while (curr <= end && count < 30) {
@@ -373,7 +373,7 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                 [dateStr]: weatherVal
                             };
                             const summaryList = Object.entries(newDaily).map(([d, w]) => `${d} ${w}`);
-                            const summaryText = summaryList.length > 0 ? summaryList.map(([d, w]) => `${w}`).join(' / ') : weatherVal;
+                            const summaryText = summaryList.length > 0 ? Object.values(newDaily).join(' / ') : weatherVal;
 
                             setEditingMatch({
                                 ...current,

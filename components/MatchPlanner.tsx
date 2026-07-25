@@ -168,14 +168,78 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   };
 
   const seasonStats = useMemo(() => {
-      const completed = displayMatches.filter(m => m.status === 'Completed' && m.result);
       let wins = 0, draws = 0, losses = 0;
-      
-      completed.forEach(m => {
-          const scores = m.result!.split('-').map(Number);
-          if (scores[0] > scores[1]) wins++;
-          else if (scores[0] < scores[1]) losses++;
-          else draws++;
+
+      const parseScore = (resStr?: string) => {
+          if (!resStr || !resStr.trim()) return null;
+          const res = resStr.trim();
+          const scoreMatch = res.match(/(\d+)\s*[-:]\s*(\d+)/);
+          if (scoreMatch) {
+              const myScore = parseInt(scoreMatch[1], 10);
+              const oppScore = parseInt(scoreMatch[2], 10);
+              if (myScore > oppScore) return 'win';
+              if (myScore < oppScore) return 'loss';
+              return 'draw';
+          }
+          if (res.includes('胜')) return 'win';
+          if (res.includes('负')) return 'loss';
+          if (res.includes('平')) return 'draw';
+          return null;
+      };
+
+      const parseSeriesResultText = (text?: string) => {
+          if (!text) return null;
+          const winMatch = text.match(/(\d+)\s*胜/);
+          const drawMatch = text.match(/(\d+)\s*平/);
+          const lossMatch = text.match(/(\d+)\s*负/);
+          if (winMatch || drawMatch || lossMatch) {
+              return {
+                  wins: winMatch ? parseInt(winMatch[1], 10) : 0,
+                  draws: drawMatch ? parseInt(drawMatch[1], 10) : 0,
+                  losses: lossMatch ? parseInt(lossMatch[1], 10) : 0,
+              };
+          }
+          return null;
+      };
+
+      displayMatches.forEach(m => {
+          if (m.isSeries) {
+              let seriesCounted = 0;
+              // 1. Try fixtures inside series
+              if (m.fixtures && m.fixtures.length > 0) {
+                  m.fixtures.forEach(f => {
+                      const res = parseScore(f.result);
+                      if (res === 'win') { wins++; seriesCounted++; }
+                      else if (res === 'loss') { losses++; seriesCounted++; }
+                      else if (res === 'draw') { draws++; seriesCounted++; }
+                  });
+              }
+              // 2. If no individual fixtures yielded stats, try seriesResult string
+              if (seriesCounted === 0 && m.seriesResult) {
+                  const sRes = parseSeriesResultText(m.seriesResult);
+                  if (sRes && (sRes.wins + sRes.draws + sRes.losses > 0)) {
+                      wins += sRes.wins;
+                      draws += sRes.draws;
+                      losses += sRes.losses;
+                      seriesCounted = sRes.wins + sRes.draws + sRes.losses;
+                  }
+              }
+              // 3. Fallback to m.result if still no stats counted
+              if (seriesCounted === 0 && m.result) {
+                  const res = parseScore(m.result);
+                  if (res === 'win') wins++;
+                  else if (res === 'loss') losses++;
+                  else if (res === 'draw') draws++;
+              }
+          } else {
+              // Single match
+              if (m.result || m.status === 'Completed') {
+                  const res = parseScore(m.result);
+                  if (res === 'win') wins++;
+                  else if (res === 'loss') losses++;
+                  else if (res === 'draw') draws++;
+              }
+          }
       });
 
       const total = wins + draws + losses;
