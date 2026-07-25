@@ -434,14 +434,55 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
     const [themeSelectorTarget, setThemeSelectorTarget] = useState<'main' | number>('main');
 
-    const monthMatches = useMemo(() => {
+    const [showOtherMatches, setShowOtherMatches] = useState(false);
+
+    // 仅筛选属于当前球队 (teamId) 的比赛
+    const teamMatches = useMemo(() => {
         if (!matches || matches.length === 0) return [];
         return matches.filter(m => {
             if (!m.date) return false;
-            const matchMonth = parseInt(m.date.split('-')[1], 10);
-            return matchMonth === localWeek.month;
+            if (teamId && m.teamId && m.teamId !== teamId) return false;
+            return true;
         });
-    }, [matches, localWeek.month]);
+    }, [matches, teamId]);
+
+    // 仅筛选本周属于该球队的比赛
+    const thisWeekMatches = useMemo(() => {
+        return teamMatches.filter(m => {
+            const weekInfo = getWeekInMonthOfDate(m.date);
+            if (!weekInfo) return false;
+            return weekInfo.month === localWeek.month && weekInfo.weekInMonth === localWeek.weekInMonth;
+        });
+    }, [teamMatches, localWeek.month, localWeek.weekInMonth]);
+
+    // 本月该球队其他周的比赛（便于跨周补选）
+    const otherMonthMatches = useMemo(() => {
+        return teamMatches.filter(m => {
+            const matchMonth = parseInt(m.date.split('-')[1], 10);
+            if (matchMonth !== localWeek.month) return false;
+            const weekInfo = getWeekInMonthOfDate(m.date);
+            return !weekInfo || weekInfo.weekInMonth !== localWeek.weekInMonth;
+        });
+    }, [teamMatches, localWeek.month, localWeek.weekInMonth]);
+
+    const toggleMatchInPlan = (m: Match) => {
+        const matchStr = `VS ${m.opponent} (${m.date})`;
+        const fullMatchStr = `${m.title || '比赛'}: ${matchStr}`;
+        if (!localWeek.matchPlan) {
+            setLocalWeek({ ...localWeek, matchPlan: fullMatchStr });
+        } else if (localWeek.matchPlan.includes(m.opponent) || localWeek.matchPlan.includes(m.date)) {
+            const updated = localWeek.matchPlan
+                .replace(fullMatchStr, '')
+                .replace(matchStr, '')
+                .replace(`${m.title || '比赛'}: `, '')
+                .replace(/；\s*；/g, '；')
+                .replace(/^；|；$/g, '')
+                .trim();
+            setLocalWeek({ ...localWeek, matchPlan: updated });
+        } else {
+            setLocalWeek({ ...localWeek, matchPlan: `${localWeek.matchPlan}；${matchStr}` });
+        }
+    };
 
     // Dynamically retrieve the last training reflection matching the current week's chosen theme/content
     const lastReflectionSession = useMemo(() => {
@@ -843,49 +884,49 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
                         <textarea rows={3} className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none text-sm font-bold text-gray-800" value={localWeek.trainingGoals} onChange={e => setLocalWeek({...localWeek, trainingGoals: e.target.value})} placeholder="1. 强化基础... 2. 提高..." />
                     </div>
                     <div>
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
-                            <Trophy className="w-3.5 h-3.5 text-bvb-yellow" /> 赛事计划与日程链接
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                                <Trophy className="w-3.5 h-3.5 text-bvb-yellow" /> 赛事计划与日程链接
+                            </span>
+                            <span className="text-[9px] text-gray-400 font-normal">须选定本周赛事信息以确定周赛事计划</span>
                         </label>
                         <div className="space-y-2">
                             <input 
                                 className="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-800 text-xs" 
                                 value={localWeek.matchPlan} 
                                 onChange={e => setLocalWeek({...localWeek, matchPlan: e.target.value})} 
-                                placeholder="本周比赛安排..." 
+                                placeholder="本周比赛安排 (点击下方本周赛事快速勾选关联)..." 
                             />
-                            {monthMatches.length > 0 ? (
-                                <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200/60 space-y-2">
+
+                            {/* 本周球队比赛 */}
+                            {thisWeekMatches.length > 0 ? (
+                                <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-black text-amber-900 uppercase flex items-center gap-1">
                                             <CalendarDays className="w-3.5 h-3.5 text-amber-600" />
-                                            {localWeek.month}月份已录入比赛日程 ({monthMatches.length} 场)
+                                            本周 (第{localWeek.weekInMonth}周) 该球队赛事日程 ({thisWeekMatches.length} 场)
                                         </span>
-                                        <span className="text-[9px] text-amber-700 font-bold">点击快速关联，点击图标直接弹出比赛录入界面</span>
+                                        <span className="text-[9px] text-amber-700 font-bold">点击选择/取消关联</span>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        {monthMatches.map(m => {
+                                        {thisWeekMatches.map(m => {
                                             const isLinked = localWeek.matchPlan?.includes(m.opponent) || localWeek.matchPlan?.includes(m.date);
                                             return (
                                                 <div key={m.id} className="flex items-center gap-1">
                                                     <button
                                                         type="button"
-                                                        onClick={() => {
-                                                            if (!localWeek.matchPlan) {
-                                                                setLocalWeek({ ...localWeek, matchPlan: `${m.title || '比赛'}: VS ${m.opponent} (${m.date})` });
-                                                            } else if (!localWeek.matchPlan.includes(m.opponent)) {
-                                                                setLocalWeek({ ...localWeek, matchPlan: `${localWeek.matchPlan}；VS ${m.opponent} (${m.date})` });
-                                                            }
-                                                        }}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                                                        onClick={() => toggleMatchInPlan(m)}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
                                                             isLinked 
                                                                 ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-xs' 
                                                                 : 'bg-white text-gray-700 border-amber-200 hover:border-bvb-yellow'
                                                         }`}
-                                                        title="点击添加到赛事计划文本"
+                                                        title={isLinked ? "已关联，点击取消关联" : "点击关联到本周赛事计划"}
                                                     >
                                                         <Trophy className="w-3 h-3 text-bvb-yellow" />
                                                         <span>VS {m.opponent}</span>
                                                         <span className="text-[9px] opacity-75">{m.date}</span>
+                                                        {isLinked && <CheckCircle className="w-3 h-3 text-bvb-yellow ml-0.5" />}
                                                     </button>
                                                     {onOpenMatchModal && (
                                                         <button
@@ -903,8 +944,43 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="bg-gray-50 p-2 rounded-lg border border-dashed border-gray-200 text-[10px] text-gray-400 font-bold flex items-center justify-between">
-                                    <span>{localWeek.month}月份暂无已录入的比赛日程，可在“比赛管理”模块录入比赛。</span>
+                                <div className="bg-gray-50 p-2.5 rounded-xl border border-dashed border-gray-200 text-[10px] text-gray-400 font-bold flex items-center justify-between">
+                                    <span>本周 (第{localWeek.weekInMonth}周) 暂无该球队录入的比赛日程。请在本周录入比赛或手填安排。</span>
+                                </div>
+                            )}
+
+                            {/* 备选：同月其他周赛事 */}
+                            {otherMonthMatches.length > 0 && (
+                                <div className="pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowOtherMatches(!showOtherMatches)}
+                                        className="text-[10px] font-bold text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors cursor-pointer"
+                                    >
+                                        <span>{showOtherMatches ? '▼ 隐藏' : '► 查看'} {localWeek.month}月份该球队其他周赛事 ({otherMonthMatches.length} 场)</span>
+                                    </button>
+                                    {showOtherMatches && (
+                                        <div className="mt-1.5 p-2 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap gap-1.5 animate-in fade-in duration-150">
+                                            {otherMonthMatches.map(m => {
+                                                const isLinked = localWeek.matchPlan?.includes(m.opponent) || localWeek.matchPlan?.includes(m.date);
+                                                return (
+                                                    <button
+                                                        key={m.id}
+                                                        type="button"
+                                                        onClick={() => toggleMatchInPlan(m)}
+                                                        className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all border flex items-center gap-1 cursor-pointer ${
+                                                            isLinked 
+                                                                ? 'bg-bvb-black text-bvb-yellow border-bvb-black' 
+                                                                : 'bg-white text-gray-600 border-gray-200 hover:border-bvb-yellow'
+                                                        }`}
+                                                    >
+                                                        <span>VS {m.opponent} ({m.date})</span>
+                                                        {isLinked && <CheckCircle className="w-2.5 h-2.5 text-bvb-yellow" />}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -2934,30 +3010,46 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                                         <div className="flex flex-col gap-1 items-center">
                                                             <div>{weekPlan.matchPlan || '-'}</div>
                                                             {(() => {
-                                                                const mMatches = (matches || []).filter(m => {
+                                                                const thisWeekTeamMatches = (matches || []).filter(m => {
                                                                     if (!m.date) return false;
-                                                                    const mMonth = parseInt(m.date.split('-')[1], 10);
-                                                                    return mMonth === month;
+                                                                    if (currentPeriodization.teamId && m.teamId && m.teamId !== currentPeriodization.teamId) return false;
+                                                                    const wInfo = getWeekInMonthOfDate(m.date);
+                                                                    return wInfo && wInfo.month === month && wInfo.weekInMonth === weekNum;
                                                                 });
-                                                                if (mMatches.length === 0) return null;
+                                                                if (thisWeekTeamMatches.length === 0) return null;
                                                                 return (
                                                                     <div className="flex flex-wrap gap-1 justify-center mt-1">
-                                                                        {mMatches.map(m => (
-                                                                            <button
-                                                                                key={m.id}
-                                                                                type="button"
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    setEditingMatchForModal(m);
-                                                                                }}
-                                                                                className="px-1.5 py-0.5 bg-bvb-black text-bvb-yellow hover:brightness-125 rounded text-[8px] md:text-[9px] font-black flex items-center gap-1 shadow-xs transition-transform hover:scale-105 cursor-pointer"
-                                                                                title="点击一键弹出该比赛录入界面"
-                                                                            >
-                                                                                <Trophy className="w-2.5 h-2.5 text-bvb-yellow shrink-0" />
-                                                                                <span className="truncate">VS {m.opponent}</span>
-                                                                                <ExternalLink className="w-2.5 h-2.5 opacity-75" />
-                                                                            </button>
-                                                                        ))}
+                                                                        {thisWeekTeamMatches.map(m => {
+                                                                            const isLinked = weekPlan.matchPlan?.includes(m.opponent) || weekPlan.matchPlan?.includes(m.date);
+                                                                            return (
+                                                                                <button
+                                                                                    key={m.id}
+                                                                                    type="button"
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (!weekPlan.matchPlan || !weekPlan.matchPlan.includes(m.opponent)) {
+                                                                                            const matchStr = `VS ${m.opponent} (${m.date})`;
+                                                                                            const newPlan = weekPlan.matchPlan 
+                                                                                                ? `${weekPlan.matchPlan}；${matchStr}`
+                                                                                                : `${m.title || '比赛'}: ${matchStr}`;
+                                                                                            handleSaveWeek({ ...weekPlan, matchPlan: newPlan });
+                                                                                        } else {
+                                                                                            setEditingMatchForModal(m);
+                                                                                        }
+                                                                                    }}
+                                                                                    className={`px-1.5 py-0.5 rounded text-[8px] md:text-[9px] font-black flex items-center gap-1 shadow-xs transition-transform hover:scale-105 cursor-pointer border ${
+                                                                                        isLinked 
+                                                                                            ? 'bg-bvb-black text-bvb-yellow border-bvb-black' 
+                                                                                            : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-bvb-yellow hover:text-bvb-black'
+                                                                                    }`}
+                                                                                    title={isLinked ? "已关联，点击直接弹出该比赛详情" : "点击快速关联到本周赛事计划"}
+                                                                                >
+                                                                                    <Trophy className="w-2.5 h-2.5 text-bvb-yellow shrink-0" />
+                                                                                    <span className="truncate">VS {m.opponent}</span>
+                                                                                    <ExternalLink className="w-2.5 h-2.5 opacity-75" />
+                                                                                </button>
+                                                                            );
+                                                                        })}
                                                                     </div>
                                                                 );
                                                             })()}
