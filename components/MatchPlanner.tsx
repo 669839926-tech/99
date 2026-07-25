@@ -187,7 +187,20 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
       return { wins, draws, losses, topScorer, winRate, total };
   }, [displayMatches, displayPlayers]);
 
-  const [newMatchForm, setNewMatchForm] = useState<Partial<Match>>({
+  const [newMatchForm, setNewMatchForm] = useState<{
+      teamId: string;
+      opponent: string;
+      title?: string;
+      date: string;
+      endDate: string;
+      time: string;
+      location: 'Home' | 'Away';
+      competition: string;
+      status: string;
+      isSeries: boolean;
+      pitch: string;
+      weather: string;
+  }>({
       teamId: availableTeams[0]?.id || '',
       opponent: '',
       date: new Date().toISOString().split('T')[0],
@@ -196,17 +209,22 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
       location: 'Home',
       competition: '联赛',
       status: 'Upcoming',
-      isSeries: false
+      isSeries: false,
+      pitch: '天然草',
+      weather: '晴朗'
   });
 
   const handleAddSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       if(newMatchForm.opponent && newMatchForm.date && newMatchForm.teamId) {
+          const matchTitle = newMatchForm.isSeries ? newMatchForm.opponent : (newMatchForm.title || `${newMatchForm.competition} VS ${newMatchForm.opponent}`);
+          const matchOpponent = newMatchForm.isSeries ? '' : newMatchForm.opponent;
+
           const match: Match = {
               id: Date.now().toString(),
               teamId: newMatchForm.teamId,
-              title: newMatchForm.title || `${newMatchForm.competition} VS ${newMatchForm.opponent}`,
-              opponent: newMatchForm.opponent,
+              title: matchTitle,
+              opponent: matchOpponent,
               date: newMatchForm.date,
               endDate: newMatchForm.isSeries ? newMatchForm.endDate : undefined,
               time: newMatchForm.time || '10:00',
@@ -217,8 +235,8 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
               isSeries: newMatchForm.isSeries,
               fixtures: newMatchForm.isSeries ? [] : undefined,
               details: {
-                  weather: '晴朗',
-                  pitch: '天然草',
+                  weather: newMatchForm.weather || '晴朗',
+                  pitch: newMatchForm.pitch || '天然草',
                   lineup: [],
                   substitutes: [],
                   events: [],
@@ -242,7 +260,19 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
           };
           onAddMatch(match);
           setShowAddModal(false);
-          setNewMatchForm({ teamId: availableTeams[0]?.id || '', opponent: '', date: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0], time: '14:00', location: 'Home', competition: '联赛', isSeries: false });
+          setNewMatchForm({
+              teamId: availableTeams[0]?.id || '',
+              opponent: '',
+              date: new Date().toISOString().split('T')[0],
+              endDate: new Date().toISOString().split('T')[0],
+              time: '14:00',
+              location: 'Home',
+              competition: '联赛',
+              status: 'Upcoming',
+              isSeries: false,
+              pitch: '天然草',
+              weather: '晴朗'
+          });
       }
   };
 
@@ -426,7 +456,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                     </button>
                     <button 
                         type="button"
-                        onClick={() => setNewMatchForm({...newMatchForm, isSeries: true, opponent: '系列赛对手'})}
+                        onClick={() => setNewMatchForm({...newMatchForm, isSeries: true})}
                         className={`flex-1 py-2 text-xs font-black rounded-lg transition-all ${newMatchForm.isSeries ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-400'}`}
                     >
                         系列赛 / 锦标赛
@@ -450,11 +480,96 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                         <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">开球时间</label><input type="time" required className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold text-xs md:text-sm" value={newMatchForm.time} onChange={e => setNewMatchForm({...newMatchForm, time: e.target.value})} /></div>
                     )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 md:gap-4">
-                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">主/客场</label>
-                        <select className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold bg-white text-xs md:text-sm" value={newMatchForm.location} onChange={e => setNewMatchForm({...newMatchForm, location: e.target.value as any})}><option value="Home">主场</option><option value="Away">客场</option></select>
+                <div className="space-y-3">
+                    <div>
+                        <label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">主/客场选择</label>
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setNewMatchForm({...newMatchForm, location: 'Home'})}
+                                className={`flex-1 py-2.5 rounded-2xl font-black text-xs transition-all border ${
+                                    newMatchForm.location === 'Home'
+                                        ? 'bg-bvb-yellow text-bvb-black border-bvb-yellow shadow-2xs'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                                }`}
+                            >
+                                🏠 主场
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setNewMatchForm({...newMatchForm, location: 'Away'})}
+                                className={`flex-1 py-2.5 rounded-2xl font-black text-xs transition-all border ${
+                                    newMatchForm.location === 'Away'
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                                }`}
+                            >
+                                ✈️ 客场
+                            </button>
+                        </div>
                     </div>
-                    <div><label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">赛事名称</label><input className="w-full p-2.5 md:p-3.5 border rounded-2xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" placeholder="例如: 地区青少年联赛" value={newMatchForm.competition} onChange={e => setNewMatchForm({...newMatchForm, competition: e.target.value})} /></div>
+
+                    {/* 比赛性质 */}
+                    <div>
+                        <label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-1.5">比赛性质 / 赛事类型</label>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                            {['友谊赛', '杯赛', '联赛', '邀请赛'].map(preset => (
+                                <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={() => setNewMatchForm({...newMatchForm, competition: preset})}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border ${
+                                        newMatchForm.competition === preset
+                                            ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-2xs'
+                                            : 'bg-white text-gray-600 border-gray-200 hover:border-bvb-yellow'
+                                    }`}
+                                >
+                                    {preset}
+                                </button>
+                            ))}
+                        </div>
+                        <input className="w-full p-2.5 md:p-3 border rounded-2xl font-bold focus:ring-2 focus:ring-bvb-yellow outline-none text-xs md:text-sm" placeholder="自由输入赛事性质 (如: 2026贵阳林城之星邀请赛)" value={newMatchForm.competition} onChange={e => setNewMatchForm({...newMatchForm, competition: e.target.value})} />
+                    </div>
+
+                    {/* 场地与天气 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                        <div>
+                            <label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">场地类型</label>
+                            <div className="flex flex-wrap gap-1 mb-1.5">
+                                {['天然草', '人工草', '室内场'].map(p => (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        onClick={() => setNewMatchForm({...newMatchForm, pitch: p})}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                            newMatchForm.pitch === p ? 'bg-emerald-700 text-white border-emerald-700' : 'bg-white text-gray-600 border-gray-200'
+                                        }`}
+                                    >
+                                        {p}
+                                    </button>
+                                ))}
+                            </div>
+                            <input className="w-full p-2 border rounded-xl font-bold text-xs bg-white" placeholder="场地描述" value={newMatchForm.pitch} onChange={e => setNewMatchForm({...newMatchForm, pitch: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">天气概况</label>
+                            <div className="flex flex-wrap gap-1 mb-1.5">
+                                {[{ l: '晴朗', i: '☀️' }, { l: '多云', i: '⛅' }, { l: '小雨', i: '🌧️' }, { l: '大风', i: '💨' }].map(w => (
+                                    <button
+                                        key={w.l}
+                                        type="button"
+                                        onClick={() => setNewMatchForm({...newMatchForm, weather: w.l})}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                                            newMatchForm.weather === w.l ? 'bg-sky-600 text-white border-sky-600' : 'bg-white text-gray-600 border-gray-200'
+                                        }`}
+                                    >
+                                        {w.i} {w.l}
+                                    </button>
+                                ))}
+                            </div>
+                            <input className="w-full p-2 border rounded-xl font-bold text-xs bg-white" placeholder="天气描述" value={newMatchForm.weather} onChange={e => setNewMatchForm({...newMatchForm, weather: e.target.value})} />
+                        </div>
+                    </div>
                 </div>
                 <button type="submit" className="w-full py-4 md:py-5 bg-bvb-black text-white font-black rounded-2xl shadow-xl hover:bg-gray-800 transition-all flex items-center justify-center gap-2 uppercase italic tracking-widest text-xs md:text-sm"><Save className="w-4 h-4 md:w-5 md:h-5 text-bvb-yellow" /> Create Match Event</button>
             </form>

@@ -320,6 +320,7 @@ export interface PlayerPerformanceEvaluation {
 
 export interface MatchDetails {
     weather: string;
+    dailyWeather?: Record<string, string>; // 按日期选择的天气: { "2026-07-20": "晴朗", "2026-07-21": "小雨" }
     pitch: string;
     lineup: string[];
     substitutes: string[];

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, User, SeriesFixture, OrgRating } from '../types';
-import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, FileText, TrendingUp, AlertCircle, Target, Flag, UserMinus, PenTool, Trophy } from 'lucide-react';
+import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, FileText, TrendingUp, AlertCircle, Target, Flag, UserMinus, PenTool, Trophy, Shield, Cloud } from 'lucide-react';
 
 interface MatchEditModalProps {
     match: Match;
@@ -262,7 +262,9 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                             <ChevronLeft className="w-6 h-6" />
                         </button>
                         <div>
-                            <h3 className="font-bold text-base md:text-lg leading-tight">比赛录入: VS {editingMatch.opponent || editingMatch.title}</h3>
+                            <h3 className="font-bold text-base md:text-lg leading-tight">
+                                比赛录入: {editingMatch.isSeries || !editingMatch.opponent ? (editingMatch.title || editingMatch.competition || '比赛') : `VS ${editingMatch.opponent}`}
+                            </h3>
                             <p className="text-[10px] md:text-xs text-gray-400 font-mono uppercase">{editingMatch.date} • {editingMatch.competition}</p>
                         </div>
                     </div>
@@ -312,114 +314,350 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pb-24 md:pb-8">
-                    {activeTab === 'info' && (
-                        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-300">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                                <div className="space-y-4 md:space-y-6">
-                                    <h4 className="font-black text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest border-b pb-1.5 md:pb-2">核心比赛信息</h4>
-                                    <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    {activeTab === 'info' && (() => {
+                        const currentDetails = ensureDetails(editingMatch);
+                        const currentPitch = currentDetails.details?.pitch || '天然草';
+                        const currentWeather = currentDetails.details?.weather || '晴朗';
+                        const dailyWeather = currentDetails.details?.dailyWeather || {};
+
+                        // Calculate match date list
+                        const matchDates: string[] = [];
+                        if (editingMatch.date) {
+                            matchDates.push(editingMatch.date);
+                        }
+                        if (editingMatch.isSeries && editingMatch.endDate && editingMatch.endDate > editingMatch.date) {
+                            let curr = new Date(editingMatch.date);
+                            const end = new Date(editingMatch.endDate);
+                            let count = 0;
+                            while (curr <= end && count < 30) {
+                                const dStr = curr.toISOString().split('T')[0];
+                                if (!matchDates.includes(dStr)) matchDates.push(dStr);
+                                curr.setDate(curr.getDate() + 1);
+                                count++;
+                            }
+                        }
+                        (editingMatch.fixtures || []).forEach(f => {
+                            if (f.date && !matchDates.includes(f.date)) {
+                                matchDates.push(f.date);
+                            }
+                        });
+                        matchDates.sort();
+
+                        const weatherOptions = [
+                            { id: '晴朗', label: '晴朗', icon: '☀️' },
+                            { id: '多云', label: '多云', icon: '⛅' },
+                            { id: '阴天', label: '阴天', icon: '☁️' },
+                            { id: '小雨', label: '小雨', icon: '🌧️' },
+                            { id: '大雨', label: '大雨', icon: '⛈️' },
+                            { id: '雷阵雨', label: '雷阵雨', icon: '🌩️' },
+                            { id: '下雪', label: '下雪', icon: '❄️' },
+                            { id: '大风', label: '大风', icon: '💨' },
+                            { id: '雾霾', label: '雾霾', icon: '🌫️' },
+                        ];
+
+                        const pitchPresets = ['天然草', '人工草', '室内场', '沙地/泥地'];
+                        const competitionPresets = ['友谊赛', '杯赛', '联赛', '邀请赛', '热身赛'];
+
+                        const updatePitch = (val: string) => {
+                            const current = ensureDetails(editingMatch);
+                            setEditingMatch({
+                                ...current,
+                                details: { ...current.details!, pitch: val }
+                            });
+                        };
+
+                        const updateDailyWeather = (dateStr: string, weatherVal: string) => {
+                            const current = ensureDetails(editingMatch);
+                            const newDaily = {
+                                ...(current.details!.dailyWeather || {}),
+                                [dateStr]: weatherVal
+                            };
+                            const summaryList = Object.entries(newDaily).map(([d, w]) => `${d} ${w}`);
+                            const summaryText = summaryList.length > 0 ? summaryList.map(([d, w]) => `${w}`).join(' / ') : weatherVal;
+
+                            setEditingMatch({
+                                ...current,
+                                details: {
+                                    ...current.details!,
+                                    weather: summaryText,
+                                    dailyWeather: newDaily
+                                }
+                            });
+                        };
+
+                        return (
+                            <div className="space-y-6 md:space-y-8 animate-in fade-in duration-300">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                                    {/* Column 1: 核心比赛信息 */}
+                                    <div className="space-y-4 md:space-y-6">
+                                        <h4 className="font-black text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest border-b pb-1.5 md:pb-2 flex items-center justify-between">
+                                            <span>核心比赛信息</span>
+                                            <span className="text-[10px] text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded font-bold">
+                                                {editingMatch.isSeries ? '系列赛 / 锦标赛' : '单场比赛'}
+                                            </span>
+                                        </h4>
+
+                                        {/* 比分与状态 */}
+                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                            <div>
+                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛状态</label>
+                                                <select 
+                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none transition-all cursor-pointer" 
+                                                    value={editingMatch.status} 
+                                                    onChange={e => setEditingMatch({...editingMatch, status: e.target.value as any})}
+                                                >
+                                                    <option value="Upcoming">⏳ 未开始</option>
+                                                    <option value="Completed">✅ 已完赛</option>
+                                                    <option value="Cancelled">❌ 已取消</option>
+                                                </select>
+                                            </div>
+                                            {!editingMatch.isSeries && (
+                                                <div>
+                                                    <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">最终比分</label>
+                                                    <input 
+                                                        className="w-full p-2.5 md:p-3 border rounded-xl font-black text-center text-lg md:text-xl bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
+                                                        placeholder="如: 3-1" 
+                                                        value={editingMatch.result || ''} 
+                                                        onChange={e => setEditingMatch({...editingMatch, result: e.target.value})} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 系列赛统计 */}
+                                        {editingMatch.isSeries && (
+                                            <div className="grid grid-cols-2 gap-3 md:gap-4 bg-amber-50/50 p-3 rounded-2xl border border-amber-200/60">
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <label className="text-[9px] md:text-[10px] font-black text-amber-900 uppercase block">系列赛赛果</label>
+                                                        {(editingMatch.fixtures || []).length > 0 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const stats = calcSeriesStats(editingMatch.fixtures || []);
+                                                                    if (stats.text) {
+                                                                        setEditingMatch({ ...editingMatch, seriesResult: stats.text });
+                                                                    }
+                                                                }}
+                                                                className="text-[9px] font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded hover:brightness-110 transition-all flex items-center gap-1 shadow-2xs"
+                                                                title="根据对阵列表中的各场比分自动统计"
+                                                            >
+                                                                <RefreshCw className="w-2.5 h-2.5" /> 自动统计
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <input 
+                                                        className="w-full p-2.5 border rounded-xl font-bold text-xs md:text-sm bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
+                                                        placeholder="如: 3胜1平3负" 
+                                                        value={editingMatch.seriesResult || ''} 
+                                                        onChange={e => setEditingMatch({...editingMatch, seriesResult: e.target.value})} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[9px] md:text-[10px] font-black text-amber-900 uppercase mb-1 block">系列赛名次 / 奖项</label>
+                                                    <input 
+                                                        className="w-full p-2.5 border rounded-xl font-bold text-xs md:text-sm bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
+                                                        placeholder="如: 优胜组亚军" 
+                                                        value={editingMatch.seriesRanking || ''} 
+                                                        onChange={e => setEditingMatch({...editingMatch, seriesRanking: e.target.value})} 
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 比赛性质 (Match Nature / Competition) */}
+                                        <div className="space-y-2 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                                            <label className="text-[10px] md:text-xs font-black text-gray-800 uppercase flex items-center gap-1.5">
+                                                <Trophy className="w-3.5 h-3.5 text-bvb-yellow" /> 比赛性质 / 赛事类型
+                                            </label>
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {competitionPresets.map(preset => (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => setEditingMatch({ ...editingMatch, competition: preset })}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                                                            editingMatch.competition === preset
+                                                                ? 'bg-bvb-black text-bvb-yellow border-bvb-black shadow-2xs'
+                                                                : 'bg-white text-gray-600 border-gray-200 hover:border-bvb-yellow'
+                                                        }`}
+                                                    >
+                                                        {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <input 
+                                                className="w-full p-2.5 border rounded-xl font-bold text-xs md:text-sm bg-white focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" 
+                                                placeholder="自由录入赛事名称/性质 (如: 2026贵阳林城之星邀请赛)" 
+                                                value={editingMatch.competition || ''} 
+                                                onChange={e => setEditingMatch({...editingMatch, competition: e.target.value})} 
+                                            />
+                                        </div>
+
+                                        {/* 场地 (Pitch) */}
+                                        <div className="space-y-2 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                                            <label className="text-[10px] md:text-xs font-black text-gray-800 uppercase flex items-center gap-1.5">
+                                                <Shield className="w-3.5 h-3.5 text-bvb-yellow" /> 场地类型
+                                            </label>
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {pitchPresets.map(preset => (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => updatePitch(preset)}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                                                            currentPitch === preset
+                                                                ? 'bg-emerald-700 text-white border-emerald-700 shadow-2xs'
+                                                                : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-500'
+                                                        }`}
+                                                    >
+                                                        🏟️ {preset}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <input 
+                                                className="w-full p-2.5 border rounded-xl font-bold text-xs md:text-sm bg-white focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" 
+                                                placeholder="自定义场地描述 (如: 天然草/高清皮, 人工草 5人制)" 
+                                                value={currentPitch} 
+                                                onChange={e => updatePitch(e.target.value)} 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Column 2: 赛程时间、地点 & 天气信息 */}
+                                    <div className="space-y-4 md:space-y-6">
+                                        <h4 className="font-black text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest border-b pb-1.5 md:pb-2">
+                                            赛程时间与地点
+                                        </h4>
                                         <div>
-                                            <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛状态</label>
-                                            <select className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" value={editingMatch.status} onChange={e => setEditingMatch({...editingMatch, status: e.target.value as any})}>
-                                                <option value="Upcoming">未开始</option>
-                                                <option value="Completed">已完赛</option>
-                                                <option value="Cancelled">已取消</option>
-                                            </select>
+                                            <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛主体名称</label>
+                                            <input 
+                                                className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                                                value={editingMatch.title || ''} 
+                                                onChange={e => setEditingMatch({...editingMatch, title: e.target.value})} 
+                                            />
                                         </div>
                                         {!editingMatch.isSeries && (
                                             <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">最终比分</label>
-                                                <input className="w-full p-2.5 md:p-3 border rounded-xl font-black text-center text-lg md:text-xl bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" placeholder="如: 3-1" value={editingMatch.result} onChange={e => setEditingMatch({...editingMatch, result: e.target.value})} />
+                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">对手名称</label>
+                                                <input 
+                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm focus:ring-2 focus:ring-bvb-yellow outline-none" 
+                                                    value={editingMatch.opponent || ''} 
+                                                    onChange={e => setEditingMatch({...editingMatch, opponent: e.target.value})} 
+                                                />
                                             </div>
                                         )}
-                                    </div>
-                                    {editingMatch.isSeries && (
                                         <div className="grid grid-cols-2 gap-3 md:gap-4">
                                             <div>
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase block">系列赛赛果</label>
-                                                    {(editingMatch.fixtures || []).length > 0 && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                const stats = calcSeriesStats(editingMatch.fixtures || []);
-                                                                if (stats.text) {
-                                                                    setEditingMatch({ ...editingMatch, seriesResult: stats.text });
-                                                                }
-                                                            }}
-                                                            className="text-[9px] font-black text-bvb-black bg-bvb-yellow px-2 py-0.5 rounded hover:brightness-110 transition-all flex items-center gap-1 shadow-2xs"
-                                                            title="根据对阵列表中的各场比分自动统计胜/平/负"
-                                                        >
-                                                            <RefreshCw className="w-2.5 h-2.5" /> 自动统计
-                                                        </button>
-                                                    )}
+                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">
+                                                    {editingMatch.isSeries ? '起始日期' : '日期'}
+                                                </label>
+                                                <input 
+                                                    type="date" 
+                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm outline-none focus:ring-2 focus:ring-bvb-yellow" 
+                                                    value={editingMatch.date || ''} 
+                                                    onChange={e => setEditingMatch({...editingMatch, date: e.target.value})} 
+                                                />
+                                            </div>
+                                            {editingMatch.isSeries ? (
+                                                <div>
+                                                    <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">结束日期</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm outline-none focus:ring-2 focus:ring-bvb-yellow" 
+                                                        value={editingMatch.endDate || editingMatch.date || ''} 
+                                                        onChange={e => setEditingMatch({...editingMatch, endDate: e.target.value})} 
+                                                    />
                                                 </div>
-                                                <input 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
-                                                    placeholder="如: 9胜3负" 
-                                                    value={editingMatch.seriesResult || ''} 
-                                                    onChange={e => setEditingMatch({...editingMatch, seriesResult: e.target.value})} 
-                                                />
+                                            ) : (
+                                                <div>
+                                                    <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">开球时间</label>
+                                                    <input 
+                                                        type="time" 
+                                                        className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm outline-none focus:ring-2 focus:ring-bvb-yellow" 
+                                                        value={editingMatch.time || ''} 
+                                                        onChange={e => setEditingMatch({...editingMatch, time: e.target.value})} 
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 天气信息 (按日期选择各种天气，并展示天气情况) */}
+                                        <div className="space-y-3 bg-sky-50/60 p-4 rounded-2xl border border-sky-100">
+                                            <div className="flex items-center justify-between border-b border-sky-200/60 pb-2">
+                                                <label className="text-[10px] md:text-xs font-black text-sky-900 uppercase flex items-center gap-1.5">
+                                                    <Cloud className="w-4 h-4 text-sky-600" /> 天气录入与日期明细
+                                                </label>
+                                                <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">
+                                                    按日期设置天气
+                                                </span>
                                             </div>
-                                            <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">系列赛名次</label>
+
+                                            {/* Date selection & weather selector */}
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] text-sky-800 font-medium">
+                                                    选择对应日期，并点击匹配的天气状况：
+                                                </p>
+                                                <div className="space-y-2.5">
+                                                    {matchDates.map(dateStr => {
+                                                        const dateWeather = dailyWeather[dateStr] || currentWeather || '晴朗';
+                                                        return (
+                                                            <div key={dateStr} className="bg-white p-3 rounded-xl border border-sky-100 space-y-2 shadow-2xs">
+                                                                <div className="flex items-center justify-between text-xs font-black text-gray-800">
+                                                                    <span className="flex items-center gap-1.5">
+                                                                        📅 {dateStr}
+                                                                    </span>
+                                                                    <span className="bg-sky-50 text-sky-800 px-2.5 py-0.5 rounded-md border border-sky-200 font-bold">
+                                                                        当前: {dateWeather}
+                                                                    </span>
+                                                                </div>
+
+                                                                {/* Weather choice buttons for this date */}
+                                                                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                                                                    {weatherOptions.map(w => (
+                                                                        <button
+                                                                            key={w.id}
+                                                                            type="button"
+                                                                            onClick={() => updateDailyWeather(dateStr, w.label)}
+                                                                            className={`p-1.5 rounded-lg text-[10px] font-black flex items-center justify-center gap-1 transition-all cursor-pointer border ${
+                                                                                dateWeather === w.label || dateWeather.includes(w.label)
+                                                                                    ? 'bg-sky-600 text-white border-sky-600 shadow-2xs scale-102'
+                                                                                    : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-sky-300'
+                                                                            }`}
+                                                                        >
+                                                                            <span>{w.icon}</span>
+                                                                            <span>{w.label}</span>
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Summary display card of overall weather */}
+                                            <div className="bg-white p-3 rounded-xl border border-sky-100/80 space-y-1">
+                                                <span className="text-[9px] font-black text-sky-700 uppercase block">天气概况汇总</span>
                                                 <input 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm bg-gray-50 focus:bg-white outline-none focus:ring-2 focus:ring-bvb-yellow transition-all" 
-                                                    placeholder="如: 挑战组第三名" 
-                                                    value={editingMatch.seriesRanking || ''} 
-                                                    onChange={e => setEditingMatch({...editingMatch, seriesRanking: e.target.value})} 
+                                                    className="w-full p-2 border rounded-lg text-xs font-bold bg-sky-50/50 text-sky-900 outline-none" 
+                                                    value={editingMatch.details?.weather || ''} 
+                                                    onChange={e => {
+                                                        const current = ensureDetails(editingMatch);
+                                                        setEditingMatch({
+                                                            ...current,
+                                                            details: { ...current.details!, weather: e.target.value }
+                                                        });
+                                                    }} 
+                                                    placeholder="例如: 晴朗 / 多云 / 有雨"
                                                 />
                                             </div>
                                         </div>
-                                    )}
-                                    {!editingMatch.isSeries && (
-                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                            <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">天气</label>
-                                                <select 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" 
-                                                    value={editingMatch.details?.weather || '晴朗'} 
-                                                    onChange={e => {
-                                                        const current = ensureDetails(editingMatch);
-                                                        setEditingMatch({...current, details: {...current.details!, weather: e.target.value}});
-                                                    }}
-                                                >
-                                                    <option value="Sunny">晴朗</option>
-                                                    <option value="Cloudy">多云</option>
-                                                    <option value="Rainy">有雨</option>
-                                                    <option value="Snow">雪天</option>
-                                                    <option value="Windy">大风</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">场地</label>
-                                                <select 
-                                                    className="w-full p-2.5 md:p-3 border rounded-xl font-bold bg-white text-xs md:text-sm outline-none" 
-                                                    value={editingMatch.details?.pitch || '天然草'} 
-                                                    onChange={e => {
-                                                        const current = ensureDetails(editingMatch);
-                                                        setEditingMatch({...current, details: {...current.details!, pitch: e.target.value}});
-                                                    }}
-                                                >
-                                                    <option value="Natural Grass">天然草</option>
-                                                    <option value="Artificial Turf">人造草</option>
-                                                    <option value="Indoor">室内场</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-4 md:space-y-6">
-                                    <h4 className="font-black text-gray-400 text-[9px] md:text-[10px] uppercase tracking-widest border-b pb-1.5 md:pb-2">赛程时间与地点</h4>
-                                    <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">比赛名称</label><input className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.title} onChange={e => setEditingMatch({...editingMatch, title: e.target.value})} /></div>
-                                    <div className="grid grid-cols-2 gap-3 md:gap-4">
-                                        <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">日期</label><input type="date" className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.date} onChange={e => setEditingMatch({...editingMatch, date: e.target.value})} /></div>
-                                        <div><label className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase mb-1 block">开球时间</label><input type="time" className="w-full p-2.5 md:p-3 border rounded-xl font-bold text-xs md:text-sm" value={editingMatch.time} onChange={e => setEditingMatch({...editingMatch, time: e.target.value})} /></div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {activeTab === 'fixtures' && (
                         <div className="animate-in fade-in duration-300 space-y-6">
