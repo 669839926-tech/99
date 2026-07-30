@@ -29,8 +29,21 @@ type AnalysisView = 'player' | 'session';
 // 辅助函数：修复 JS new Date(str) 在不同浏览器和时区下的解析偏差
 const parseLocalDate = (dateStr: string) => {
     if (!dateStr) return new Date();
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return new Date(y, m - 1, d);
+    const cleanStr = dateStr.trim().replace(/\//g, '-');
+    const parts = cleanStr.split('-').map(Number);
+    const y = parts[0] || new Date().getFullYear();
+    const m = parts.length >= 2 ? parts[1] - 1 : 0;
+    const d = parts.length >= 3 ? parts[2] : 1;
+    return new Date(y, m, d);
+};
+
+const isBeforeJoinDate = (sessionDateStr: string, joinDateStr?: string) => {
+    if (!joinDateStr) return false;
+    const sDate = parseLocalDate(sessionDateStr);
+    const jDate = parseLocalDate(joinDateStr);
+    sDate.setHours(0, 0, 0, 0);
+    jDate.setHours(0, 0, 0, 0);
+    return sDate < jDate;
 };
 
 const getPlayerRenewalLevelDetails = (player: Player, trainings: TrainingSession[]) => {
@@ -403,7 +416,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (!matchDate) return false;
 
         // NEW RULE: If individual mode, exclude sessions prior to their joinDate
-        if (playerObj && playerObj.joinDate && s.date < playerObj.joinDate) {
+        if (playerObj && isBeforeJoinDate(s.date, playerObj.joinDate)) {
             return false;
         }
 
@@ -432,7 +445,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                  rate = playerRecord?.status === 'Present' ? 100 : 0;
              } else {
                  // 全队模式：统计该场次到课率（排除在该场次之后注册的新球员）
-                 const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId && (!p.joinDate || s.date >= p.joinDate)).length;
+                 const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId && !isBeforeJoinDate(s.date, p.joinDate)).length;
                  const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
                  rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
              }
@@ -453,7 +466,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 rate = playerRecord?.status === 'Present' ? 100 : 0;
             } else {
                 // 全队模式：统计该周/月的到课率（排除在该场次之后注册的新球员）
-                const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId && (!p.joinDate || session.date >= p.joinDate)).length;
+                const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId && !isBeforeJoinDate(session.date, p.joinDate)).length;
                 const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
                 rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
             }
@@ -475,7 +488,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const exportList = teamPlayers.map(p => {
          // 包含该球员有出勤记录的所有场次，或者属于他当前梯队的场次
          const pSessions = (displayTrainings || []).filter(s => {
-             if (p.joinDate && s.date < p.joinDate) {
+             if (isBeforeJoinDate(s.date, p.joinDate)) {
                  return false;
              }
              const d = parseLocalDate(s.date);
@@ -515,7 +528,7 @@ const Dashboard: React.FC<DashboardProps> = ({
          const recordedPlayerIds = s.attendance?.map(r => r.playerId) || [];
          const sTeamPlayers = displayPlayers.filter(p => {
              if (p.teamId === s.teamId || recordedPlayerIds.includes(p.id)) {
-                 if (p.joinDate && s.date < p.joinDate && !recordedPlayerIds.includes(p.id)) {
+                 if (isBeforeJoinDate(s.date, p.joinDate) && !recordedPlayerIds.includes(p.id)) {
                      return false;
                  }
                  return true;
@@ -575,6 +588,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       const start = dateRange.start;
       const end = dateRange.end;
       const sessionRecords = displayTrainings.filter(s => {
+          if (isBeforeJoinDate(s.date, player.joinDate)) {
+              return false;
+          }
           const d = parseLocalDate(s.date);
           const hasRecord = s.attendance?.some(r => r.playerId === player.id);
           return d >= start && d <= end && (s.teamId === player.teamId || hasRecord);
