@@ -373,7 +373,9 @@ export interface TrainingSession {
   lessonPlanAssessment?: 'implemented' | 'not_adjusted' | 'no_plan';
   linkedDesignId?: string;
   coachId?: string; // 创建该计划的教练ID
+  logCoachName?: string; // 录入日志的操作员（教练员）
   assistantCheckInIds?: string[]; // 助教签到ID列表
+  assistantCheckInNames?: string[]; // 打卡的操作员（助教）姓名列表
   // --- New Focus Fields ---
   focusedPlayerIds?: string[]; // 1-2 重点关注球员
   focusedPlayerNotes?: Record<string, { technical: string; mental: string; resolved?: boolean }>; // 重点关注笔记

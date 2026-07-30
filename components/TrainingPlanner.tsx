@@ -1,12 +1,41 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan, Match } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink, FileSpreadsheet } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
+import * as XLSX from 'xlsx';
 import { BasicTechItem, ScenarioTheme, BASIC_TECH_THEMES, SCENARIO_THEMES } from '../src/philosophyData';
 import MatchEditModal from './MatchEditModal';
+import { MOCK_USERS } from '../constants';
+
+const getLogOperatorName = (s: TrainingSession, usersList?: User[]): string => {
+  if (s.logCoachName) return s.logCoachName;
+  const list = (usersList && usersList.length > 0) ? usersList : MOCK_USERS;
+  if (s.coachId) {
+    const u = list.find(user => user.id === s.coachId);
+    if (u) return u.name;
+  }
+  const teamCoach = list.find(u => (u.role === 'coach' || u.role === 'director') && u.teamIds?.includes(s.teamId));
+  if (teamCoach) return teamCoach.name;
+  return '未记录';
+};
+
+const getCheckInAssistantNames = (s: TrainingSession, usersList?: User[]): string => {
+  if (s.assistantCheckInNames && s.assistantCheckInNames.length > 0) {
+    return s.assistantCheckInNames.join('、');
+  }
+  const list = (usersList && usersList.length > 0) ? usersList : MOCK_USERS;
+  if (s.assistantCheckInIds && s.assistantCheckInIds.length > 0) {
+    const names = s.assistantCheckInIds.map(id => {
+      const u = list.find(user => user.id === id);
+      return u ? u.name : id;
+    });
+    if (names.length > 0) return names.join('、');
+  }
+  return '未打卡';
+};
 
 interface TrainingPlannerProps {
   trainings: TrainingSession[];
@@ -17,6 +46,7 @@ interface TrainingPlannerProps {
   focusSubjects?: Record<string, string[]>;
   designs?: DrillDesign[];
   currentUser: User | null;
+  users?: User[];
   onAddTraining: (session: TrainingSession) => void;
   onUpdateTraining: (session: TrainingSession, attendance: AttendanceRecord[]) => void;
   onDeleteTraining: (id: string) => void;
@@ -999,7 +1029,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, onUpdate, onDuplicate, onDelete, onClose }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -1042,10 +1072,19 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         if (!currentUser) return;
         setLocalSession(prev => {
             const currentIds = prev.assistantCheckInIds || [];
+            const currentNames = prev.assistantCheckInNames || [];
             if (currentIds.includes(currentUser.id)) {
-                return { ...prev, assistantCheckInIds: currentIds.filter(id => id !== currentUser.id) };
+                return { 
+                    ...prev, 
+                    assistantCheckInIds: currentIds.filter(id => id !== currentUser.id),
+                    assistantCheckInNames: currentNames.filter(n => n !== currentUser.name)
+                };
             } else {
-                return { ...prev, assistantCheckInIds: [...currentIds, currentUser.id] };
+                return { 
+                    ...prev, 
+                    assistantCheckInIds: [...currentIds, currentUser.id],
+                    assistantCheckInNames: [...currentNames, currentUser.name]
+                };
             }
         });
     };
@@ -1108,6 +1147,69 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         }));
     };
 
+    const [isExportingSession, setIsExportingSession] = useState(false);
+
+    const handleExportSingleSessionExcel = () => {
+        try {
+            const logCoach = getLogOperatorName(localSession, users);
+            const assistantCheckIns = getCheckInAssistantNames(localSession, users);
+            const statusCn = localSession.submissionStatus === 'Reviewed' ? '已审核' : localSession.submissionStatus === 'Submitted' ? '待审核' : '已计划';
+
+            const sessionOverview = [{
+                '训练日期': localSession.date,
+                '梯队': team?.name || '',
+                '训练标题': localSession.title,
+                '训练主题': localSession.focus,
+                '训练时长': `${localSession.duration}分钟`,
+                '训练强度': localSession.intensity === 'High' ? '高' : localSession.intensity === 'Medium' ? '中' : '低',
+                '录入日志教练': logCoach,
+                '打卡助教': assistantCheckIns,
+                '审核状态': statusCn,
+                '训练教案/主要科目': Array.isArray(localSession.drills) ? localSession.drills.join('； ') : (localSession.drills || '-'),
+                '训练总结与反思': localSession.planReflection || localSession.coachFeedback || '-',
+                '总监批复': localSession.directorReview || '-'
+            }];
+
+            const attendanceRows = (localSession.attendance || []).map(r => {
+                const player = players.find(p => p.id === r.playerId);
+                const statusCn = r.status === 'Present' ? '出勤' : r.status === 'Leave' ? '请假' : r.status === 'Injury' ? '伤病' : '缺席';
+                return {
+                    '球员姓名': player?.name || '未知球员',
+                    '球衣号码': player?.number ? `#${player.number}` : '-',
+                    '考勤状态': statusCn,
+                    '扣除课时': r.creditCost ?? 1,
+                    '备注说明': r.notes || '-'
+                };
+            });
+
+            const workbook = XLSX.utils.book_new();
+            const ws1 = XLSX.utils.json_to_sheet(sessionOverview);
+            XLSX.utils.book_append_sheet(workbook, ws1, '课次概览');
+
+            if (attendanceRows.length > 0) {
+                const ws2 = XLSX.utils.json_to_sheet(attendanceRows);
+                XLSX.utils.book_append_sheet(workbook, ws2, '学员考勤表');
+            }
+
+            XLSX.writeFile(workbook, `训练课次明细_${team?.name || ''}_${localSession.date}_${localSession.title}.xlsx`);
+        } catch (e) {
+            console.error('Export single session excel failed:', e);
+            alert('导出 Excel 失败');
+        }
+    };
+
+    const handleExportSingleSessionPDF = async () => {
+        setIsExportingSession(true);
+        try {
+            await exportToPDF('single-session-modal-content', `训练课次明细_${team?.name || ''}_${localSession.date}_${localSession.title}`);
+        } catch (e) {
+            console.error('Export single session pdf failed:', e);
+            alert('导出 PDF 失败');
+        } finally {
+            setIsExportingSession(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm">
             <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
@@ -1121,6 +1223,12 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                            {saveStatus === 'saving' && <span className="text-xs text-bvb-yellow flex items-center"><RefreshCw className="w-3 h-3 mr-1 animate-spin"/> 保存中</span>}
                            {saveStatus === 'saved' && <span className="text-xs text-green-400 flex items-center bg-gray-800 px-2 py-0.5 rounded-full"><CheckCircle className="w-3 h-3 mr-1"/> 已保存</span>}
                       </div>
+                      <button onClick={handleExportSingleSessionExcel} className="p-1 hover:text-green-400 text-gray-300 transition-colors" title="导出 Excel 表格">
+                          <FileSpreadsheet className="w-5 h-5 text-green-400" />
+                      </button>
+                      <button onClick={handleExportSingleSessionPDF} disabled={isExportingSession} className="p-1 hover:text-blue-400 text-gray-300 transition-colors" title="导出 PDF 文档">
+                          {isExportingSession ? <Loader2 className="w-5 h-5 animate-spin text-blue-400"/> : <FileText className="w-5 h-5 text-blue-400" />}
+                      </button>
                       <button onClick={() => onDuplicate(localSession)} className="p-1 hover:text-bvb-yellow" title="复制并选择日期">
                           <Copy className="w-5 h-5" />
                       </button>
@@ -1141,7 +1249,28 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                         {isDirector && localSession.submissionStatus === 'Submitted' && <span className="absolute top-2 right-4 w-2.5 h-2.5 bg-blue-500 rounded-full animate-pulse border border-white"></span>}
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6 custom-scrollbar">
+                {/* 操作员（教练员与助教）信息提示条 */}
+                <div className="bg-amber-50/70 border-b border-amber-100/90 px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+                    <div className="flex items-center gap-1.5 font-bold">
+                        <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+                        <span className="text-gray-500">录入日志教练:</span>
+                        <span className="text-gray-900 font-black bg-white px-2 py-0.5 rounded border border-gray-200">
+                            {getLogOperatorName(localSession, users)}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                        <UsersIcon className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-gray-500">打卡助教:</span>
+                        <span className={`font-black px-2 py-0.5 rounded border ${
+                            getCheckInAssistantNames(localSession, users) === '未打卡' 
+                                ? 'bg-gray-100 text-gray-400 border-gray-200 font-normal' 
+                                : 'bg-blue-50 text-blue-700 border-blue-200'
+                        }`}>
+                            {getCheckInAssistantNames(localSession, users)}
+                        </span>
+                    </div>
+                </div>
+                <div id="single-session-modal-content" className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6 custom-scrollbar">
                     {activeTab === 'info' && (
                         <div className="animate-in fade-in duration-200 space-y-6">
                             <div className="space-y-4">
@@ -1957,7 +2086,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, matches = [], onUpdateMatch 
+    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, users = [], onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, matches = [], onUpdateMatch 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -1971,6 +2100,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [editingMatchForModal, setEditingMatchForModal] = useState<Match | null>(null);
@@ -3100,6 +3230,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                             <th className="px-3 md:px-6 py-4 hidden md:table-cell">时长</th>
                             <th className="px-3 md:px-6 py-4 hidden md:table-cell">重点</th>
                             <th className="px-3 md:px-6 py-4 hidden md:table-cell">强度</th>
+                            <th className="px-3 md:px-6 py-4 hidden lg:table-cell">操作员 (教练/助教)</th>
                             <th className="px-3 md:px-6 py-4 text-right">状态</th>
                         </tr>
                     </thead>
@@ -3109,6 +3240,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                 const team = teams.find(t => t.id === s.teamId);
                                 const isUnread = isCoach && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
                                 const isPendingDirector = isDirector && s.submissionStatus === 'Submitted';
+                                const logCoach = getLogOperatorName(s, users);
+                                const assistantCheckIns = getCheckInAssistantNames(s, users);
                                 
                                 return (
                                     <tr 
@@ -3142,6 +3275,19 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             }`}>
                                                 {s.intensity === 'High' ? '高' : s.intensity === 'Medium' ? '中' : '低'}
                                             </span>
+                                        </td>
+                                        <td className="px-3 md:px-6 py-4 hidden lg:table-cell text-xs">
+                                            <div className="space-y-0.5">
+                                                <div className="font-bold text-gray-700 flex items-center gap-1">
+                                                    <span className="text-gray-400 font-normal">教练:</span> {logCoach}
+                                                </div>
+                                                <div className="text-gray-500 flex items-center gap-1">
+                                                    <span className="text-gray-400 font-normal">助教:</span>
+                                                    <span className={assistantCheckIns === '未打卡' ? 'text-gray-400 font-normal' : 'text-blue-600 font-bold'}>
+                                                        {assistantCheckIns}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td className="px-3 md:px-6 py-4 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end">
@@ -3202,6 +3348,108 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             alert('导出失败'); 
         } finally { 
             setIsExporting(false); 
+        }
+    };
+
+  const handleExportExcel = () => {
+        try {
+            if (viewType === 'periodization') {
+                const teamObj = teams.find(t => t.id === statsTeamFilter);
+                const teamName = teamObj ? teamObj.name : '全部梯队';
+                
+                const rows: any[] = [];
+                const targetPlans = statsTeamFilter === 'all' 
+                    ? periodizationPlans 
+                    : periodizationPlans.filter(p => p.teamId === statsTeamFilter);
+
+                targetPlans.forEach(plan => {
+                    const planTeam = teams.find(t => t.id === plan.teamId)?.name || '未知梯队';
+                    (plan.weeks || []).forEach(w => {
+                        rows.push({
+                            '梯队名称': planTeam,
+                            '年份': `${plan.year}年`,
+                            '月份': `${w.month}月`,
+                            '周次': `第${w.weekInMonth}周`,
+                            '训练主题': w.trainingTheme || '未设定',
+                            '核心训练大纲': w.trainingContent || '未设定',
+                            '赛事与假期': w.matchInfo || '-',
+                            '已安排课次': w.sessionCount || 0
+                        });
+                    });
+                });
+
+                if (rows.length === 0) {
+                    alert('暂无周期大纲数据可供导出');
+                    return;
+                }
+
+                const worksheet = XLSX.utils.json_to_sheet(rows);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, '周期训练大纲');
+
+                const colWidths = Object.keys(rows[0] || {}).map(key => ({
+                    wch: Math.max(12, ...rows.map(row => {
+                        const val = row[key]?.toString() || '';
+                        let len = 0;
+                        for (let i = 0; i < val.length; i++) {
+                            len += val.charCodeAt(i) > 127 ? 2 : 1;
+                        }
+                        return len;
+                    }))
+                }));
+                worksheet['!cols'] = colWidths;
+
+                XLSX.writeFile(workbook, `顽石之光_周期训练大纲_${teamName}_${dateLabel}.xlsx`);
+            } else {
+                if (!filteredSessions || filteredSessions.length === 0) {
+                    alert('当前筛选范围内无训练计划数据可供导出');
+                    return;
+                }
+
+                const rows = filteredSessions.map(s => {
+                    const team = teams.find(t => t.id === s.teamId);
+                    const logCoach = getLogOperatorName(s, users);
+                    const assistantCheckIns = getCheckInAssistantNames(s, users);
+                    const intensityCn = s.intensity === 'High' ? '高' : s.intensity === 'Medium' ? '中' : '低';
+                    const statusCn = s.submissionStatus === 'Reviewed' ? '已审核' : s.submissionStatus === 'Submitted' ? '待审核' : '已计划';
+
+                    return {
+                        '训练日期': s.date,
+                        '梯队': team?.name || '未知梯队',
+                        '训练标题': s.title || '-',
+                        '训练主题': s.focus || '-',
+                        '时长(分钟)': s.duration || 0,
+                        '训练强度': intensityCn,
+                        '录入日志教练': logCoach,
+                        '打卡助教': assistantCheckIns,
+                        '审核状态': statusCn,
+                        '重点训练科目/教案': Array.isArray(s.drills) ? s.drills.join('； ') : (s.drills || '-'),
+                        '训练总结与反思': s.planReflection || s.coachFeedback || '-',
+                        '总监批复与建议': s.directorReview || '-'
+                    };
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(rows);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, '训练计划列表');
+
+                const colWidths = Object.keys(rows[0] || {}).map(key => ({
+                    wch: Math.max(12, ...rows.map(row => {
+                        const val = row[key]?.toString() || '';
+                        let len = 0;
+                        for (let i = 0; i < val.length; i++) {
+                            len += val.charCodeAt(i) > 127 ? 2 : 1;
+                        }
+                        return len;
+                    }))
+                }));
+                worksheet['!cols'] = colWidths;
+
+                XLSX.writeFile(workbook, `顽石之光_训练计划明细表_${dateLabel}.xlsx`);
+            }
+        } catch (error) {
+            console.error('Export Excel failed:', error);
+            alert('导出 Excel 失败：' + (error instanceof Error ? error.message : error));
         }
     };
     
@@ -3340,9 +3588,53 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 </div>
 
                 <div className="flex gap-2">
-                    <button onClick={handleExportPDF} disabled={isExporting} className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-600 shadow-sm transition-all" title="导出 (PDF)">
-                        {isExporting ? <Loader2 className="w-5 h-5 animate-spin"/> : <Download className="w-5 h-5"/>}
-                    </button>
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowExportDropdown(prev => !prev)} 
+                            disabled={isExporting} 
+                            className="p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700 shadow-sm transition-all flex items-center justify-center cursor-pointer" 
+                            title="下载训练计划 (Excel / PDF)"
+                        >
+                            {isExporting ? <Loader2 className="w-5 h-5 animate-spin text-bvb-black"/> : <Download className="w-5 h-5 text-gray-700"/>}
+                        </button>
+
+                        {showExportDropdown && (
+                            <>
+                                <div className="fixed inset-0 z-20" onClick={() => setShowExportDropdown(false)} />
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 z-30 animate-in fade-in zoom-in duration-150 space-y-1">
+                                    <div className="px-3 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                                        导出训练计划
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            setShowExportDropdown(false);
+                                            handleExportExcel();
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-green-50 text-green-800 text-xs font-bold transition-all text-left"
+                                    >
+                                        <FileSpreadsheet className="w-4 h-4 text-green-600 shrink-0" />
+                                        <div>
+                                            <div className="font-extrabold text-green-900">导出 Excel (.xlsx)</div>
+                                            <div className="text-[10px] text-gray-400 font-normal">包含明细表格与教练/助教打卡列</div>
+                                        </div>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowExportDropdown(false);
+                                            handleExportPDF();
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl hover:bg-blue-50 text-blue-800 text-xs font-bold transition-all text-left"
+                                    >
+                                        <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                                        <div>
+                                            <div className="font-extrabold text-blue-900">导出 PDF (.pdf)</div>
+                                            <div className="text-[10px] text-gray-400 font-normal">生成高保真图表页面，便于打印</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                     <button 
                         onClick={() => {
                             const initialDate = selectedDate || new Date().toISOString().split('T')[0];
@@ -3369,7 +3661,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         </div>
 
         <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-             <div className="flex-1 p-1">
+             <div id={viewType === 'periodization' ? 'periodization-plan-export' : 'training-plan-list-pdf'} className="flex-1 p-1">
                  {viewType === 'calendar' ? renderCalendarView() : 
                   viewType === 'list' ? renderListView() : 
                   viewType === 'periodization' ? renderPeriodizationView() :
@@ -3389,6 +3681,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                 const team = teams.find(t => t.id === s.teamId);
                                 const isUnread = isCoach && s.submissionStatus === 'Reviewed' && !s.isReviewRead;
                                 const isPendingDirector = isDirector && s.submissionStatus === 'Submitted';
+                                const logCoach = getLogOperatorName(s, users);
+                                const assistantCheckIns = getCheckInAssistantNames(s, users);
 
                                 return (
                                     <div key={s.id} onClick={() => setSelectedSession(s)} className={`p-4 border rounded-2xl cursor-pointer transition-all group relative ${isUnread || isPendingDirector ? 'bg-blue-50/50 border-blue-200 shadow-sm' : 'bg-gray-50 border-gray-100 hover:bg-yellow-50 hover:border-bvb-yellow/30 shadow-none'}`}>
@@ -3406,10 +3700,29 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                                             </div>
                                         </div>
                                         <h5 className={`font-black group-hover:text-bvb-black leading-tight ${isUnread || isPendingDirector ? 'text-blue-900' : 'text-gray-800'}`}>{s.title}</h5>
-                                        <div className="flex items-center gap-3 text-[10px] text-gray-400 font-bold mt-4 uppercase">
+                                        <div className="flex items-center gap-3 text-[10px] text-gray-400 font-bold mt-2 uppercase">
                                             <div className="flex items-center"><Clock className="w-3 h-3 mr-1" /> {s.duration} MIN</div>
-                                            <div className="flex items-center"><Target className="w-3 h-3 mr-1" /> {s.focus}</div>
+                                            <div className="flex items-center truncate"><Target className="w-3 h-3 mr-1 shrink-0" /> {s.focus}</div>
                                         </div>
+
+                                        {/* 操作员信息：教练员与打卡助教 */}
+                                        <div className="mt-2.5 pt-2 border-t border-gray-200/60 text-[10px] space-y-1">
+                                            <div className="flex items-center justify-between text-gray-500">
+                                                <span className="font-bold text-gray-400 flex items-center gap-1">
+                                                    <UserCheck className="w-3 h-3 text-amber-500" /> 教练:
+                                                </span>
+                                                <span className="font-extrabold text-gray-700 truncate max-w-[110px]">{logCoach}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-gray-500">
+                                                <span className="font-bold text-gray-400 flex items-center gap-1">
+                                                    <UsersIcon className="w-3 h-3 text-blue-500" /> 助教:
+                                                </span>
+                                                <span className={`font-extrabold truncate max-w-[110px] ${assistantCheckIns === '未打卡' ? 'text-gray-400 font-normal' : 'text-blue-600'}`}>
+                                                    {assistantCheckIns}
+                                                </span>
+                                            </div>
+                                        </div>
+
                                         <ChevronRight className="absolute right-3 bottom-4 w-4 h-4 text-gray-300 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                                     </div>
                                 )
@@ -3788,7 +4101,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} focusSubjects={focusSubjects} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} currentUser={currentUser} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} focusSubjects={focusSubjects} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} currentUser={currentUser} users={users} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
         )}
         {editingMatchForModal && (
             <MatchEditModal
