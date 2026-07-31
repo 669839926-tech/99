@@ -1039,9 +1039,24 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         if (!copy.performanceRatings) {
             copy.performanceRatings = { technical: 5, application: 5, focus: 5, discipline: 5 };
         }
-        if (currentUser && (currentUser.role === 'coach' || currentUser.role === 'director')) {
-            if (!copy.coachId) copy.coachId = currentUser.id;
-            if (!copy.logCoachName) copy.logCoachName = currentUser.name;
+        const staffList = (users && users.length > 0) ? users : MOCK_USERS;
+        if (!copy.coachId && currentUser) {
+            copy.coachId = currentUser.id;
+        }
+        if (copy.coachId) {
+            const found = staffList.find(u => u.id === copy.coachId);
+            if (found && !copy.logCoachName) {
+                copy.logCoachName = found.name;
+            }
+        }
+        if (!copy.logCoachName && currentUser) {
+            copy.logCoachName = currentUser.name;
+        }
+        if (copy.assistantCheckInIds && copy.assistantCheckInIds.length > 0 && (!copy.assistantCheckInNames || copy.assistantCheckInNames.length === 0)) {
+            copy.assistantCheckInNames = copy.assistantCheckInIds.map((id: string) => {
+                const u = staffList.find(user => user.id === id);
+                return u ? u.name : '助教';
+            });
         }
         return copy;
     });
@@ -1262,8 +1277,10 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                             <select
                                 value={(() => {
                                     const staffList = (users && users.length > 0) ? users : MOCK_USERS;
-                                    const currentStaff = staffList.find(u => u.id === localSession.coachId || u.name === localSession.logCoachName);
-                                    return currentStaff ? currentStaff.id : (localSession.coachId || '');
+                                    const currentStaff = staffList.find(u => u.id === localSession.coachId)
+                                        || staffList.find(u => u.name === localSession.logCoachName)
+                                        || (currentUser ? staffList.find(u => u.id === currentUser.id) : undefined);
+                                    return currentStaff ? currentStaff.id : (localSession.coachId || staffList[0]?.id || '');
                                 })()}
                                 onChange={(e) => {
                                     const selectedId = e.target.value;
@@ -1299,7 +1316,14 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                         <span className="text-gray-500">打卡助教:</span>
                         {isDirector ? (
                             <select
-                                value={localSession.assistantCheckInIds && localSession.assistantCheckInIds.length > 0 ? localSession.assistantCheckInIds[0] : ''}
+                                value={(() => {
+                                    const staffList = (users && users.length > 0) ? users : MOCK_USERS;
+                                    const currentAssistant = staffList.find(u => 
+                                        (localSession.assistantCheckInIds && localSession.assistantCheckInIds.includes(u.id)) ||
+                                        (localSession.assistantCheckInNames && localSession.assistantCheckInNames.includes(u.name))
+                                    );
+                                    return currentAssistant ? currentAssistant.id : (localSession.assistantCheckInIds && localSession.assistantCheckInIds.length > 0 ? localSession.assistantCheckInIds[0] : '');
+                                })()}
                                 onChange={(e) => {
                                     const selectedId = e.target.value;
                                     if (!selectedId) {
