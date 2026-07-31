@@ -2105,10 +2105,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [editingMatchForModal, setEditingMatchForModal] = useState<Match | null>(null);
   
-  const [statsTeamFilter, setStatsTeamFilter] = useState<string>(() => {
-    if (isCoach && currentUser?.teamIds?.length) return currentUser.teamIds[0];
-    return 'all';
-  });
+  const [statsTeamFilter, setStatsTeamFilter] = useState<string>('all');
 
   const [activeWeekPlan, setActiveWeekPlan] = useState<WeeklyPlan | null>(null);
   const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
@@ -2120,12 +2117,12 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [selectedFocusPlayerId, setSelectedFocusPlayerId] = useState<string | null>(null);
 
   const userManagedSessions = useMemo(() => {
-      if (isDirector) return trainings;
+      if (isDirector || !currentUser?.teamIds || currentUser.teamIds.length === 0) return trainings;
       return trainings.filter(t => currentUser?.teamIds?.includes(t.teamId));
   }, [trainings, currentUser, isDirector]);
 
   const availableTeams = useMemo(() => {
-      if (isDirector) return teams;
+      if (isDirector || !currentUser?.teamIds || currentUser.teamIds.length === 0) return teams;
       return teams.filter(t => currentUser?.teamIds?.includes(t.id));
   }, [currentUser, teams, isDirector]);
 
@@ -2482,7 +2479,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   }, [userManagedSessions]);
 
   const monthlyFocusStats = useMemo(() => {
-    const teamPlayers = players.filter(p => statsTeamFilter === 'all' || p.teamId === statsTeamFilter);
+    const teamPlayers = players.filter(p => statsTeamFilter === 'all' ? (isDirector || !currentUser?.teamIds || currentUser.teamIds.length === 0 ? p.teamId !== 'unassigned' : availableTeams.some(at => at.id === p.teamId)) : p.teamId === statsTeamFilter);
     if (teamPlayers.length === 0) return { coverage: 0, focusedCount: 0, totalCount: 0, unfocusedPlayers: [] };
 
     const focusedInMonthForTeam = new Set<string>();
@@ -2504,7 +2501,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       totalCount,
       unfocusedPlayers
     };
-  }, [players, statsTeamFilter, focusSearchTerm, focusedPlayerIdsThisMonth]);
+  }, [players, statsTeamFilter, focusSearchTerm, focusedPlayerIdsThisMonth, availableTeams, currentUser, isDirector]);
 
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
@@ -3574,7 +3571,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         onChange={e => setStatsTeamFilter(e.target.value)}
                         className="bg-transparent text-[11px] md:text-xs font-black uppercase text-gray-700 outline-none focus:ring-0 cursor-pointer min-w-[80px] md:min-w-[120px]"
                     >
-                        {isDirector && <option value="all">全部管理梯队</option>}
+                        <option value="all">全部管理梯队</option>
                         {availableTeams.map(t => (
                             <option key={t.id} value={t.id}>{t.name}</option>
                         ))}

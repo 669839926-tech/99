@@ -27,18 +27,14 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
     players, teams, currentUser, techTests = [], onUpdatePlayer, onUpdateTechTests 
 }) => {
     const isDirector = currentUser?.role === 'director';
-    const isCoach = currentUser?.role === 'coach';
     
     const managedTeams = useMemo(() => {
-        if (isDirector) return teams;
+        if (isDirector || !currentUser?.teamIds || currentUser.teamIds.length === 0) return teams;
         return teams.filter(t => currentUser?.teamIds?.includes(t.id));
     }, [teams, currentUser, isDirector]);
 
     const [activeTab, setActiveTab] = useState<'juggling' | 'home' | 'tests'>('juggling');
-    const [selectedTeamId, setSelectedTeamId] = useState<string>(() => {
-        if (isCoach && managedTeams.length > 0) return managedTeams[0].id;
-        return 'all';
-    });
+    const [selectedTeamId, setSelectedTeamId] = useState<string>('all');
 
     const [isExportingHome, setIsExportingHome] = useState(false);
     const [jugglingPlayerId, setJugglingPlayerId] = useState<string>('');
@@ -292,7 +288,7 @@ const TechnicalGrowth: React.FC<TechnicalGrowthProps> = ({
                         onChange={e => setSelectedTeamId(e.target.value)}
                         className="p-1.5 md:p-2 border rounded-xl text-[11px] md:text-xs font-black bg-white outline-none focus:ring-2 focus:ring-bvb-yellow flex-1 md:flex-none"
                     >
-                        {isDirector && <option value="all">所有梯队</option>}
+                        <option value="all">所有梯队</option>
                         {managedTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                 </div>

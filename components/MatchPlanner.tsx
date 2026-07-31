@@ -386,7 +386,7 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
               <div className="relative group flex-1 md:flex-none">
                   <div className="absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-gray-400"><Filter className="w-3.5 h-3.5 md:w-4 md:h-4" /></div>
                   <select value={filterTeamId} onChange={e => setFilterTeamId(e.target.value)} className="w-full md:w-48 pl-8 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-white border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 outline-none focus:ring-2 focus:ring-bvb-yellow shadow-sm transition-all">
-                      {isDirector && <option value="all">所有梯队</option>}
+                      <option value="all">所有梯队</option>
                       {availableTeams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
               </div>
