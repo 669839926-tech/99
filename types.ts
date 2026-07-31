@@ -577,6 +577,7 @@ export interface MonthlySalaryRecord {
     matchSubsidy?: number;     // 比赛补贴 (可手动输入)
     monthlyExecutionReward?: number; // 月度执行奖 (优秀 200, 良好 100)
     monthlyExecutionLevel?: string;  // 月度执行等级 ("Excellent" | "Good" | "NeedsImprovement")
+    totalDeductions?: number;        // 月/季考核扣罚 (支持手动修改/覆盖)
     totalSalary: number;
     isDisbursed?: boolean;
     disbursedDate?: string;

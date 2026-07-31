@@ -3,7 +3,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import storageHandler from './api/storage.ts';
+import storageHandler from './api/storage';
 
 async function startServer() {
   console.log('[Server] Starting server...');
@@ -15,11 +15,15 @@ async function startServer() {
 
   // CORS Middleware to support sandboxed/null origins and normal cross-origins
   app.use((req, res, next) => {
-    const origin = req.headers.origin || '*';
-    res.setHeader('Access-Control-Allow-Origin', origin);
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
 
     if (req.method === 'OPTIONS') {
       res.sendStatus(200);
@@ -54,7 +58,7 @@ async function startServer() {
     console.log('[Server] Running in production mode');
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
+    app.get('*all', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

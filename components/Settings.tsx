@@ -886,7 +886,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">入职时间</label>
                                 <input type="date" className="w-full p-2.5 border rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow text-sm font-bold bg-white" value={newUser.joiningDate || ''} onChange={e => setNewUser({...newUser, joiningDate: e.target.value})} />
                             </div>
-                            {newUser.role === 'coach' && (
+                            {(newUser.role === 'coach' || newUser.role === 'director') && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:col-span-2 lg:col-span-1">
                                     <div>
                                         <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">教练等级</label>
@@ -912,7 +912,7 @@ const Settings: React.FC<SettingsProps> = ({
                             )}
                         </div>
 
-                        {(newUser.role === 'coach' || newUser.role === 'assistant_coach') && (
+                        {(newUser.role === 'coach' || newUser.role === 'assistant_coach' || newUser.role === 'director') && (
                             <div className="animate-in slide-in-from-top-2 duration-300">
                                 <label className="block text-[10px] font-black text-gray-400 uppercase mb-3 tracking-widest flex items-center gap-2">
                                     <Shirt className="w-3 h-3 text-bvb-yellow" /> 管理范围：请选择该教练负责的梯队
@@ -967,8 +967,8 @@ const Settings: React.FC<SettingsProps> = ({
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-3 mb-1">
                                             <span className="font-black text-gray-800 text-lg leading-none">{u.name}</span>
-                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-tighter ${u.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : u.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : u.role === 'assistant_coach' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-gray-50 text-gray-500'}`}>{u.role === 'coach' ? '主教练' : u.role === 'assistant_coach' ? '助教' : u.role}</span>
-                                            {u.role === 'coach' && (
+                                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border tracking-tighter ${u.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : u.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : u.role === 'assistant_coach' ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-gray-50 text-gray-500'}`}>{u.role === 'coach' ? '主教练' : u.role === 'assistant_coach' ? '助教' : u.role === 'director' ? '青训总监' : u.role}</span>
+                                            {(u.role === 'coach' || u.role === 'director') && (
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="text-[9px] font-black text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                                                         {u.level === 'Apprentice' ? '见习' : u.level === 'Junior' ? '初级' : u.level === 'Intermediate' ? '常驻' : u.level === 'Senior' ? '核心' : u.level || 'Junior'}

@@ -283,7 +283,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
     }, [transactions, selectedYear, selectedMonth, financeCategories, salarySettings.quarterlyRenewalReward.minRechargeAmount]);
 
     const coachSalaries = useMemo(() => {
-        const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach') && (filterCoachId === 'all' || u.id === filterCoachId));
+        const staff = users.filter(u => (u.role === 'coach' || u.role === 'assistant_coach' || u.role === 'director') && (filterCoachId === 'all' || u.id === filterCoachId));
         const isDistributionMonth = [2, 5, 8, 11].includes(selectedMonth);
         const effectiveYear = selectedYear === 'all' ? new Date().getFullYear() : selectedYear;
         const quarterIndex = Math.floor(selectedMonth / 3);
@@ -292,8 +292,37 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         return staff.map(coach => {
             const savedRecord = coach.monthlySalaryRecords?.find(r => r.year === selectedYear && r.month === selectedMonth);
             const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
-            const coachTeams = coach.teamIds || [];
             const isAssistant = coach.role === 'assistant_coach';
+            
+            // 判定训练日志是否由当前教练员实际录入/签到
+            const isRecordedByCoach = (t: TrainingSession) => {
+                const { year: sYear, month: sMonth } = parseDateInfo(t.date);
+                if (sYear !== selectedYear || sMonth !== selectedMonth) return false;
+                
+                if (isAssistant) {
+                    return Boolean(
+                        (t.assistantCheckInIds && t.assistantCheckInIds.includes(coach.id)) ||
+                        (t.assistantCheckInNames && t.assistantCheckInNames.includes(coach.name))
+                    );
+                } else {
+                    // 主教练/教练员：优先按日志记录的 coachId / logCoachName 匹配实际录入人员
+                    if (t.coachId) {
+                        return t.coachId === coach.id;
+                    }
+                    if (t.logCoachName) {
+                        return t.logCoachName === coach.name;
+                    }
+                    // 若无显示录入人记录（兼容历史数据），退回匹配教练负责的梯队
+                    return Boolean(coach.teamIds?.includes(t.teamId));
+                }
+            };
+
+            // 获取该月该教练实际有录入日志的梯队以及默认负责的梯队
+            const recordedTeamIdsInMonth = trainings
+                .filter(isRecordedByCoach)
+                .map(t => t.teamId);
+            const coachTeams = Array.from(new Set([...(coach.teamIds || []), ...recordedTeamIdsInMonth]));
+
             const isPerformanceEnabled = isAssistant ? salarySettings.enableAssistantPerformanceReward : salarySettings.enableCoachPerformanceReward;
             
             const isAttendanceEnabled = isPerformanceEnabled && (isAssistant 
@@ -320,12 +349,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 let sessionFeeFormula = "";
 
                 const monthlySessions = trainings.filter(t => {
-                    const { year, month } = parseDateInfo(t.date);
-                    const isTeamSession = t.teamId === teamId && year === selectedYear && month === selectedMonth;
-                    if (isAssistant) {
-                        return isTeamSession && (t.assistantCheckInIds?.includes(coach.id));
-                    }
-                    return isTeamSession;
+                    return t.teamId === teamId && isRecordedByCoach(t);
                 });
 
                 if (isAssistant) {
@@ -444,7 +468,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                     renewalFormula,
                     sessionFeeFormula
                 };
-            });
+            }).filter(b => b.monthlySessionFee > 0);
 
             calcSessionFees = teamBreakdown.reduce((sum, b) => sum + b.monthlySessionFee, 0);
             calcAttendanceReward = 0; // 季度全勤奖由总监季评，默认0，选择全勤则奖励配置金额
@@ -517,10 +541,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const isLogAuditApplies = rules.directorLogAudit.enabled && 
                 (isAssistant ? rules.directorLogAudit.assessAssistants : rules.directorLogAudit.assessCoaches);
 
-            const coachSessionsInMonth = trainings.filter(t => {
-                const { year: sYear, month: sMonth } = parseDateInfo(t.date);
-                return coachTeams.includes(t.teamId) && sYear === selectedYear && sMonth === selectedMonth;
-            });
+            const coachSessionsInMonth = trainings.filter(t => isRecordedByCoach(t));
             const todayStr = new Date().toISOString().split('T')[0];
 
             coachSessionsInMonth.forEach(s => {
@@ -680,14 +701,19 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 ? savedRecord.monthlyExecutionLevel 
                 : (monthlyExecutionReward === rules.monthlyExecution.amount ? 'Excellent' : monthlyExecutionReward === Math.round(rules.monthlyExecution.amount / 2) ? 'Good' : defaultExecutionLevel);
 
-            const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : Math.max(0, baseSalaryDefault - totalSupervisorDeductions - totalLogAuditDeductions - periodizationDeduction - playerReviewDeduction));
+            const autoDeductions = totalSupervisorDeductions + totalLogAuditDeductions + periodizationDeduction + playerReviewDeduction;
+            const totalDeductions = currentEdit.totalDeductions !== undefined 
+                ? currentEdit.totalDeductions 
+                : (savedRecord && savedRecord.totalDeductions !== undefined ? savedRecord.totalDeductions : autoDeductions);
+
+            const baseSalary = currentEdit.baseSalary !== undefined ? currentEdit.baseSalary : (savedRecord ? savedRecord.baseSalary : baseSalaryDefault);
             const sessionFees = currentEdit.sessionFees !== undefined ? currentEdit.sessionFees : (savedRecord ? savedRecord.sessionFees : calcSessionFees);
             const attendanceReward = currentEdit.attendanceReward !== undefined ? currentEdit.attendanceReward : (savedRecord ? savedRecord.attendanceReward : calcAttendanceReward);
             const renewalReward = currentEdit.renewalReward !== undefined ? currentEdit.renewalReward : (savedRecord ? savedRecord.renewalReward : calcRenewalReward);
             const performanceReward = currentEdit.performanceReward !== undefined ? currentEdit.performanceReward : (savedRecord ? savedRecord.performanceReward : calcPerformanceReward);
             const matchSubsidy = currentEdit.matchSubsidy !== undefined ? currentEdit.matchSubsidy : (savedRecord ? (savedRecord.matchSubsidy || 0) : 0);
             
-            const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward + matchSubsidy + monthlyExecutionReward;
+            const totalSalary = baseSalary + sessionFees + attendanceReward + renewalReward + performanceReward + matchSubsidy + monthlyExecutionReward - totalDeductions;
 
             return {
                 coachId: coach.id,
@@ -702,6 +728,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                 matchSubsidy,
                 monthlyExecutionReward,
                 monthlyExecutionLevel,
+                autoDeductions,
+                totalDeductions,
                 totalSalary,
                 performanceFormula,
                 evaluationScore: evaluation?.score || 0,
@@ -744,7 +772,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             totalRenewalReward += (sal.renewalReward || 0);
             totalExecutionReward += (sal.monthlyExecutionReward || 0);
             totalMatchSubsidy += (sal.matchSubsidy || 0);
-            totalDeductions += (sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction || 0);
+            totalDeductions += (sal.totalDeductions || 0);
             totalPayable += (sal.totalSalary || 0);
         });
 
@@ -799,6 +827,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             matchSubsidy: row.matchSubsidy,
             monthlyExecutionReward: row.monthlyExecutionReward,
             monthlyExecutionLevel: row.monthlyExecutionLevel,
+            totalDeductions: row.totalDeductions,
             totalSalary: row.totalSalary, 
             isDisbursed: row.isDisbursed,
             overriddenTeamSizes: teamOverrides,
@@ -855,7 +884,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
         if (existingIdx >= 0) nextRecords[existingIdx] = newRecord; else nextRecords.push(newRecord);
         onUpdateUser({ ...coach, monthlySalaryRecords: nextRecords });
         const salaryExpenseCategory = financeCategories.find(c => c.label.includes('工资支出') || c.id === 'cat-4');
-        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${yearNum}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
+        onAddTransaction({ id: `disburse-${Date.now()}-${coachId}`, date: new Date().toISOString().split('T')[0], details: `${yearNum}年${selectedMonth + 1}月 ${coach.name} (${coach.role === 'director' ? '青训总监' : coach.role === 'coach' ? '主教练' : '助教'}) 薪资发放入账`, category: salaryExpenseCategory?.id || 'cat-4', income: 0, expense: row.totalSalary, account: '黔农云 (发薪账户)' });
         alert(`发放成功！已为 ${coach.name} 生成一笔 ¥${row.totalSalary} 的薪酬支出记录。`);
     };
 
@@ -957,8 +986,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                             <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
                                 <UserCheck className="w-3.5 h-3.5 text-gray-400" />
                                 <select value={filterCoachId} onChange={e => setFilterCoachId(e.target.value)} className="bg-transparent text-[10px] md:text-xs font-black outline-none focus:ring-0 cursor-pointer">
-                                    <option value="all">全部人员 (主/助教)</option>
-                                    {users.filter(u => u.role === 'coach' || u.role === 'assistant_coach').map(c => <option key={c.id} value={c.id}>{c.name} ({c.role === 'coach' ? '主' : '助'})</option>)}
+                                    <option value="all">全部人员 (主/助/总监)</option>
+                                    {users.filter(u => u.role === 'coach' || u.role === 'assistant_coach' || u.role === 'director').map(c => <option key={c.id} value={c.id}>{c.name} ({c.role === 'coach' ? '主' : c.role === 'director' ? '总监' : '助'})</option>)}
                                 </select>
                             </div>
                             <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1 md:px-3 md:py-1.5 rounded-xl border border-gray-100">
@@ -1030,8 +1059,8 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center gap-1"><span className="font-black text-gray-800 text-[11px] md:text-sm">{sal.coachName}</span>{sal.isDisbursed && <span className="text-[7px] md:text-[8px] bg-green-500 text-white px-1 rounded font-black uppercase">已发</span>}</div>
                                                                                        <div className="flex items-center gap-1.5 mt-0.5">
-                                                             <span className={`text-[8px] font-black uppercase px-1 rounded border leading-tight ${sal.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                                                                 {sal.role === 'coach' ? '主教练' : '助教'}
+                                                             <span className={`text-[8px] font-black uppercase px-1 rounded border leading-tight ${sal.role === 'director' ? 'bg-purple-50 text-purple-600 border-purple-100' : sal.role === 'coach' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
+                                                                 {sal.role === 'director' ? '青训总监' : sal.role === 'coach' ? '主教练' : '助教'}
                                                              </span>
                                                              <span className="text-[8px] md:text-[10px] text-gray-400 font-bold uppercase">
                                                                  {sal.level === 'Apprentice' ? '见习' : sal.level === 'Junior' ? '初级' : sal.level === 'Intermediate' ? '常驻' : sal.level === 'Senior' ? '核心' : sal.level}
@@ -1109,14 +1138,19 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                                                 </td>
                                                 <td className="px-2 py-3 md:px-4 md:py-4 text-right bg-red-50/5">
                                                     <div className="flex flex-col items-end">
-                                                        <span className={`font-black text-[10px] md:text-sm leading-none ${(sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction) > 0 ? 'text-red-600 font-extrabold' : 'text-gray-400'}`}>
-                                                            {(sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction) > 0 
-                                                                ? `-¥${sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction}` 
-                                                                : '¥0'
-                                                            }
-                                                        </span>
-                                                        {(sal.totalSupervisorDeductions + sal.totalLogAuditDeductions + sal.periodizationDeduction + sal.playerReviewDeduction) > 0 && (
-                                                            <span className="text-[7px] md:text-[8px] text-red-500 font-black leading-none mt-1">月/季考核扣罚</span>
+                                                        <div className="flex items-center justify-end gap-0.5">
+                                                            <span className="text-red-500 font-bold text-[10px] md:text-xs">-¥</span>
+                                                            <input 
+                                                                type="number" 
+                                                                className="w-12 md:w-20 p-1 border border-transparent rounded text-right font-black text-[10px] md:text-xs text-red-600 hover:border-red-200 focus:bg-white outline-none" 
+                                                                value={sal.totalDeductions} 
+                                                                onChange={(e) => handleUpdatePayrollField(sal.coachId, 'totalDeductions', e.target.value)} 
+                                                            />
+                                                        </div>
+                                                        {sal.totalDeductions > 0 && (
+                                                            <span className="text-[7px] md:text-[8px] text-red-500 font-black leading-none mt-0.5 whitespace-nowrap">
+                                                                {sal.totalDeductions !== sal.autoDeductions ? '扣罚 (已修改)' : '月/季考核扣罚'}
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </td>

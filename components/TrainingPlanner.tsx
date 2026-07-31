@@ -1039,6 +1039,10 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         if (!copy.performanceRatings) {
             copy.performanceRatings = { technical: 5, application: 5, focus: 5, discipline: 5 };
         }
+        if (currentUser && (currentUser.role === 'coach' || currentUser.role === 'director')) {
+            if (!copy.coachId) copy.coachId = currentUser.id;
+            if (!copy.logCoachName) copy.logCoachName = currentUser.name;
+        }
         return copy;
     });
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
@@ -1254,20 +1258,89 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                     <div className="flex items-center gap-1.5 font-bold">
                         <UserCheck className="w-3.5 h-3.5 text-amber-600" />
                         <span className="text-gray-500">录入日志教练:</span>
-                        <span className="text-gray-900 font-black bg-white px-2 py-0.5 rounded border border-gray-200">
-                            {getLogOperatorName(localSession, users)}
-                        </span>
+                        {isDirector ? (
+                            <select
+                                value={(() => {
+                                    const staffList = (users && users.length > 0) ? users : MOCK_USERS;
+                                    const currentStaff = staffList.find(u => u.id === localSession.coachId || u.name === localSession.logCoachName);
+                                    return currentStaff ? currentStaff.id : (localSession.coachId || '');
+                                })()}
+                                onChange={(e) => {
+                                    const selectedId = e.target.value;
+                                    const staffList = (users && users.length > 0) ? users : MOCK_USERS;
+                                    const selectedUser = staffList.find(u => u.id === selectedId);
+                                    if (selectedUser) {
+                                        setLocalSession(prev => ({
+                                            ...prev,
+                                            coachId: selectedUser.id,
+                                            logCoachName: selectedUser.name
+                                        }));
+                                    }
+                                }}
+                                className="text-gray-900 font-black bg-white px-2 py-0.5 rounded border border-amber-300 focus:outline-none focus:ring-1 focus:ring-amber-500 text-xs cursor-pointer shadow-sm hover:border-amber-400"
+                            >
+                                {((users && users.length > 0) ? users : MOCK_USERS)
+                                    .filter(u => u.role === 'coach' || u.role === 'director' || u.role === 'assistant_coach')
+                                    .map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name} ({u.role === 'director' ? '青训总监' : u.role === 'coach' ? '主教练' : '助教'})
+                                        </option>
+                                    ))
+                                }
+                            </select>
+                        ) : (
+                            <span className="text-gray-900 font-black bg-white px-2 py-0.5 rounded border border-gray-200">
+                                {getLogOperatorName(localSession, users)}
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-1.5 font-bold">
                         <UsersIcon className="w-3.5 h-3.5 text-blue-600" />
                         <span className="text-gray-500">打卡助教:</span>
-                        <span className={`font-black px-2 py-0.5 rounded border ${
-                            getCheckInAssistantNames(localSession, users) === '未打卡' 
-                                ? 'bg-gray-100 text-gray-400 border-gray-200 font-normal' 
-                                : 'bg-blue-50 text-blue-700 border-blue-200'
-                        }`}>
-                            {getCheckInAssistantNames(localSession, users)}
-                        </span>
+                        {isDirector ? (
+                            <select
+                                value={localSession.assistantCheckInIds && localSession.assistantCheckInIds.length > 0 ? localSession.assistantCheckInIds[0] : ''}
+                                onChange={(e) => {
+                                    const selectedId = e.target.value;
+                                    if (!selectedId) {
+                                        setLocalSession(prev => ({
+                                            ...prev,
+                                            assistantCheckInIds: [],
+                                            assistantCheckInNames: []
+                                        }));
+                                    } else {
+                                        const staffList = (users && users.length > 0) ? users : MOCK_USERS;
+                                        const selectedUser = staffList.find(u => u.id === selectedId);
+                                        if (selectedUser) {
+                                            setLocalSession(prev => ({
+                                                ...prev,
+                                                assistantCheckInIds: [selectedUser.id],
+                                                assistantCheckInNames: [selectedUser.name]
+                                            }));
+                                        }
+                                    }
+                                }}
+                                className="text-gray-900 font-black bg-white px-2 py-0.5 rounded border border-blue-300 focus:outline-none focus:ring-1 focus:ring-blue-500 text-xs cursor-pointer shadow-sm hover:border-blue-400"
+                            >
+                                <option value="">未打卡</option>
+                                {((users && users.length > 0) ? users : MOCK_USERS)
+                                    .filter(u => u.role === 'assistant_coach' || u.role === 'coach' || u.role === 'director')
+                                    .map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {u.name} ({u.role === 'assistant_coach' ? '助教' : u.role === 'coach' ? '主教练' : '青训总监'})
+                                        </option>
+                                    ))
+                                }
+                            </select>
+                        ) : (
+                            <span className={`font-black px-2 py-0.5 rounded border ${
+                                getCheckInAssistantNames(localSession, users) === '未打卡' 
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 font-normal' 
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                            }`}>
+                                {getCheckInAssistantNames(localSession, users)}
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div id="single-session-modal-content" className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 pb-24 md:pb-6 custom-scrollbar">

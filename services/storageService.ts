@@ -29,19 +29,6 @@ export interface AppData {
 }
 
 const getApiUrl = (relativePath: string): string => {
-    if (typeof window !== 'undefined' && window.location) {
-        const isHttp = /^https?:/i.test(window.location.protocol);
-        if (isHttp && window.location.host) {
-            return `${window.location.protocol}//${window.location.host}${relativePath}`;
-        }
-        if (window.location.href && /^https?:/i.test(window.location.href)) {
-            try {
-                return new URL(relativePath, window.location.href).href;
-            } catch (e) {
-                console.warn('[Storage Service] failed to parse absolute url:', e);
-            }
-        }
-    }
     return relativePath;
 };
 
