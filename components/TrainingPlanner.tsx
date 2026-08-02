@@ -1029,7 +1029,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, onUpdate, onDuplicate, onDelete, onClose }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, allSessions = [], onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
@@ -1147,13 +1147,45 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         }
     };
 
-    const updateFocusNote = (playerId: string, field: 'technical' | 'mental', value: string) => {
+    const updateFocusNote = (playerId: string, field: 'technical' | 'mental' | 'resolved', value: any) => {
         setLocalSession(prev => {
             const notes = { ...(prev.focusedPlayerNotes || {}) };
-            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '' };
+            if (!notes[playerId]) notes[playerId] = { technical: '', mental: '', resolved: false };
             notes[playerId][field] = value;
             return { ...prev, focusedPlayerNotes: notes };
         });
+    };
+
+    const getLastFocusRecord = (playerId: string) => {
+        if (!allSessions || allSessions.length === 0) return null;
+        const candidates = allSessions.filter((s: TrainingSession) => {
+            if (s.id === localSession.id) return false;
+            if (!s.focusedPlayerIds || !s.focusedPlayerIds.includes(playerId)) return false;
+            const note = s.focusedPlayerNotes?.[playerId];
+            if (!note) return false;
+            return Boolean(
+                (note.technical && note.technical.trim() !== '') || 
+                (note.mental && note.mental.trim() !== '') || 
+                note.resolved !== undefined
+            );
+        });
+
+        if (candidates.length === 0) return null;
+
+        candidates.sort((a: TrainingSession, b: TrainingSession) => {
+            if (a.date !== b.date) {
+                return b.date.localeCompare(a.date);
+            }
+            return b.id.localeCompare(a.id);
+        });
+
+        const targetSession = candidates.find((s: TrainingSession) => s.date <= localSession.date) || candidates[0];
+        if (!targetSession) return null;
+
+        return {
+            session: targetSession,
+            note: targetSession.focusedPlayerNotes?.[playerId] || { technical: '', mental: '', resolved: false }
+        };
     };
 
     const handleRatingChange = (key: string, value: number) => {
@@ -1961,7 +1993,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                 />
                             </section>
 
-                            {/* 三、重点关注球员内容 (保持现状) */}
+                            {/* 三、重点关注球员内容 */}
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-gray-100 pb-3">
                                     <Star className="w-5 h-5 text-bvb-yellow fill-current" />
@@ -1972,38 +2004,142 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                         {localSession.focusedPlayerIds.map(pid => {
                                             const p = players.find(p => p.id === pid);
                                             if (!p) return null;
-                                            const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '' };
+                                            const note = localSession.focusedPlayerNotes?.[pid] || { technical: '', mental: '', resolved: false };
+                                            const lastRecord = getLastFocusRecord(pid);
+
                                             return (
-                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-3xl p-6 shadow-sm space-y-4">
-                                                    <div className="flex items-center gap-3 border-b border-yellow-100 pb-4">
-                                                        <img src={p.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
-                                                        <div>
-                                                            <div className="font-black text-gray-800 text-base">{p.name}</div>
-                                                            <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Focused Player Stats Tracking</div>
+                                                <div key={pid} className="bg-yellow-50/30 border border-yellow-200 rounded-3xl p-6 shadow-sm space-y-5">
+                                                    {/* 球员信息与本次解决状态标示 */}
+                                                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-yellow-100 pb-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <img src={p.image} className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                            <div>
+                                                                <div className="font-black text-gray-800 text-base">{p.name}</div>
+                                                                <div className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">FOCUSED PLAYER STATS TRACKING</div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-2">
+                                                            {note.resolved ? (
+                                                                <span className="flex items-center gap-1 text-xs font-black text-green-700 bg-green-50 px-3 py-1 rounded-full border border-green-200">
+                                                                    <CheckCircle className="w-3.5 h-3.5 text-green-600" /> 已解决
+                                                                </span>
+                                                            ) : (
+                                                                <span className="flex items-center gap-1 text-xs font-black text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-200">
+                                                                    <AlertCircle className="w-3.5 h-3.5 text-red-500" /> 未解决
+                                                                </span>
+                                                            )}
+                                                            {canEdit && localSession.submissionStatus !== 'Reviewed' && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => updateFocusNote(pid, 'resolved', !note.resolved)}
+                                                                    className={`flex items-center gap-1 text-xs font-black px-3 py-1 rounded-xl transition-all shadow-xs cursor-pointer ${
+                                                                        note.resolved
+                                                                            ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                                                                            : 'bg-bvb-yellow text-bvb-black hover:bg-yellow-400 border border-bvb-black/10'
+                                                                    }`}
+                                                                >
+                                                                    {note.resolved ? '撤销已解决' : '标记已解决'}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                                                    {/* 上次录入的该球员关注内容（联动显示） */}
+                                                    {lastRecord ? (
+                                                        <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs space-y-3">
+                                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-xs font-black text-gray-800">
+                                                                        上次关注: {lastRecord.session.title || lastRecord.session.focus}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-gray-400 font-bold">
+                                                                        ({lastRecord.session.date})
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {lastRecord.note.resolved ? (
+                                                                        <span className="flex items-center gap-1 text-[10px] font-black text-green-600 uppercase bg-green-50 px-2 py-0.5 rounded border border-green-200">
+                                                                            <CheckCircle className="w-3 h-3" /> 已解决
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="flex items-center gap-1 text-[10px] font-black text-red-600 uppercase bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                                                                            <AlertCircle className="w-3 h-3" /> 未解决
+                                                                        </span>
+                                                                    )}
+                                                                    {canEdit && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => {
+                                                                                const updatedPrevSession = { ...lastRecord.session };
+                                                                                const updatedNotes = { ...(updatedPrevSession.focusedPlayerNotes || {}) };
+                                                                                const currentNote = updatedNotes[pid] || { technical: '', mental: '', resolved: false };
+                                                                                updatedNotes[pid] = { ...currentNote, resolved: !lastRecord.note.resolved };
+                                                                                updatedPrevSession.focusedPlayerNotes = updatedNotes;
+                                                                                onUpdate(updatedPrevSession, updatedPrevSession.attendance || []);
+                                                                            }}
+                                                                            className={`flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded border transition-colors cursor-pointer ${
+                                                                                lastRecord.note.resolved 
+                                                                                    ? 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                                                                    : 'bg-bvb-yellow text-bvb-black border-bvb-black/10 hover:bg-yellow-400'
+                                                                            }`}
+                                                                        >
+                                                                            {lastRecord.note.resolved ? '撤销已解决' : '标记已解决'}
+                                                                        </button>
+                                                                    )}
+                                                                    <span className="text-[9px] font-black text-gray-400 uppercase bg-gray-50 px-2 py-0.5 rounded border border-gray-100">
+                                                                        TRAINING RECORD
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                                                <div className="bg-gray-50/80 p-3 rounded-xl border border-gray-100 space-y-1">
+                                                                    <div className="text-[10px] font-black text-amber-700 flex items-center gap-1">
+                                                                        <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现评价
+                                                                    </div>
+                                                                    <div className="text-gray-700 italic leading-relaxed">
+                                                                        {lastRecord.note.technical || '暂无评价记录'}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="bg-gray-50/80 p-3 rounded-xl border border-gray-100 space-y-1">
+                                                                    <div className="text-[10px] font-black text-indigo-700 flex items-center gap-1">
+                                                                        <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度评估
+                                                                    </div>
+                                                                    <div className="text-gray-700 italic leading-relaxed">
+                                                                        {lastRecord.note.mental || '暂无评估记录'}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-white/70 border border-dashed border-yellow-200/90 rounded-2xl p-3 text-center text-xs text-gray-400 font-bold">
+                                                            💡 该球员暂无历史关注记录（首次关注）
+                                                        </div>
+                                                    )}
+
+                                                    {/* 本课次反馈输入框 */}
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
                                                         <div className="space-y-1.5">
-                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
                                                                 <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现反馈
                                                             </label>
                                                             <textarea 
                                                                 disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
                                                                 className="w-full h-28 p-4 bg-white border border-yellow-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
                                                                 placeholder="点评该球员的技术执行..."
-                                                                value={note.technical}
+                                                                value={note.technical || ''}
                                                                 onChange={e => updateFocusNote(pid, 'technical', e.target.value)}
                                                             />
                                                         </div>
                                                         <div className="space-y-1.5">
-                                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
                                                                 <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度反馈
                                                             </label>
                                                             <textarea 
                                                                 disabled={!canEdit || localSession.submissionStatus === 'Reviewed'}
                                                                 className="w-full h-28 p-4 bg-white border border-yellow-100 rounded-2xl text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none transition-all placeholder-gray-300"
                                                                 placeholder="评价球员的心理状态、抗压能力和团队融入..."
-                                                                value={note.mental}
+                                                                value={note.mental || ''}
                                                                 onChange={e => updateFocusNote(pid, 'mental', e.target.value)}
                                                             />
                                                         </div>
@@ -4195,7 +4331,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
         )}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} focusSubjects={focusSubjects} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} currentUser={currentUser} users={users} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} focusSubjects={focusSubjects} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} currentUser={currentUser} users={users} allSessions={userManagedSessions} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
         )}
         {editingMatchForModal && (
             <MatchEditModal
