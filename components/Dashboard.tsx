@@ -5,6 +5,7 @@ import { Users as UsersIcon, Trophy, Calendar, Cake, Activity, ChevronDown, Down
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
+import { ParentRenewalCardModal } from './ParentRenewalCardModal';
 
 interface DashboardProps {
   players: Player[];
@@ -108,6 +109,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingCredits, setIsExportingCredits] = useState(false);
+  const [selectedRenewalPlayer, setSelectedRenewalPlayer] = useState<Player | null>(null);
   
   // Birthday Card State
   const [selectedBirthdayPlayer, setSelectedBirthdayPlayer] = useState<any | null>(null);
@@ -1078,8 +1080,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                     return (
                                                         <div 
                                                             key={p.id} 
-                                                            onClick={() => handleLowCreditPlayerClick(p)} 
+                                                            onClick={() => setSelectedRenewalPlayer(p)} 
                                                             className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer hover:scale-[1.02] gap-2 ${p.credits <= 0 ? 'bg-red-50 border-red-200' : 'bg-orange-50/50 border-orange-200'}`}
+                                                            title="点击生成家长续费卡片(图片)"
                                                         >
                                                             <div className="flex flex-col min-w-0 flex-1">
                                                                 <span className="font-bold text-[11px] md:text-xs text-gray-800 truncate" title={p.name}>{p.name}</span>
@@ -1956,6 +1959,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
         </div>
+      )}
+
+      {selectedRenewalPlayer && (
+        <ParentRenewalCardModal
+          player={selectedRenewalPlayer}
+          teams={teams}
+          trainings={trainings}
+          appLogo={appLogo}
+          onClose={() => setSelectedRenewalPlayer(null)}
+          onNavigateToAttendance={handleLowCreditPlayerClick}
+        />
       )}
     </div>
   );

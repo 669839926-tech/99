@@ -58,3 +58,37 @@ export const exportToPDF = async (elementId: string, fileName: string) => {
     throw error;
   }
 };
+
+/**
+ * 将 HTML 元素导出为高清 PNG 图片
+ * @param elementId 目标元素 ID
+ * @param fileName 导出的图片文件名
+ */
+export const exportToImage = async (elementId: string, fileName: string) => {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    console.error(`Element with id ${elementId} not found`);
+    return;
+  }
+
+  try {
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowHeight: element.scrollHeight,
+      scrollY: -window.scrollY
+    });
+
+    const imgData = canvas.toDataURL('image/png', 1.0);
+    const link = document.createElement('a');
+    link.download = `${fileName}.png`;
+    link.href = imgData;
+    link.click();
+  } catch (error) {
+    console.error('Error generating PNG image:', error);
+    throw error;
+  }
+};
+
