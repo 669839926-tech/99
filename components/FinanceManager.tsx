@@ -294,7 +294,7 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
             const levelConfig = salarySettings.levels.find(l => l.level === coach.level) || salarySettings.levels[0];
             const isAssistant = coach.role === 'assistant_coach';
             
-            // 判定训练日志是否由当前教练员实际录入/签到
+            // 判定训练日志是否由当前教练员实际录入/签到（以最终录入训练日志教练为准核算课时费）
             const isRecordedByCoach = (t: TrainingSession) => {
                 const { year: sYear, month: sMonth } = parseDateInfo(t.date);
                 if (sYear !== selectedYear || sMonth !== selectedMonth) return false;
@@ -305,14 +305,32 @@ const FinanceManager: React.FC<FinanceManagerProps> = ({
                         (t.assistantCheckInNames && t.assistantCheckInNames.includes(coach.name))
                     );
                 } else {
-                    // 主教练/教练员：优先按日志记录的 coachId / logCoachName 匹配实际录入人员
-                    if (t.coachId) {
-                        return t.coachId === coach.id;
-                    }
+                    // 主教练/教练员：按最终录入训练日志教练 (logCoachName / coachId) 核算
+                    // 1. 优先匹配明确记入日志的教练姓名 (logCoachName)
                     if (t.logCoachName) {
-                        return t.logCoachName === coach.name;
+                        if (t.logCoachName === coach.name || t.logCoachName.includes(coach.name) || coach.name.includes(t.logCoachName)) {
+                            return true;
+                        }
+                        const logUser = users.find(u => u.name === t.logCoachName);
+                        if (logUser) {
+                            return logUser.id === coach.id;
+                        }
+                        return false;
                     }
-                    // 若无显示录入人记录（兼容历史数据），退回匹配教练负责的梯队
+
+                    // 2. 其次匹配教练 ID (coachId)
+                    if (t.coachId) {
+                        if (t.coachId === coach.id) {
+                            return true;
+                        }
+                        const coachUser = users.find(u => u.id === t.coachId);
+                        if (coachUser) {
+                            return coachUser.id === coach.id || coachUser.name === coach.name;
+                        }
+                        return false;
+                    }
+
+                    // 3. 若无显式日志录入人记录（兼容未记录日志的旧数据），退回匹配教练负责的梯队
                     return Boolean(coach.teamIds?.includes(t.teamId));
                 }
             };

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan, Match } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink, FileSpreadsheet } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink, FileSpreadsheet, UserPlus } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -1031,8 +1031,12 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
 
 const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, allSessions = [], onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
-    const teamPlayers = useMemo(() => players.filter(p => p.teamId === session.teamId), [players, session.teamId]);
-    const team = useMemo(() => teams.find(t => t.id === session.teamId), [teams, session.teamId]);
+    const teamPlayers = useMemo(() => players.filter((p: Player) => p.teamId === session.teamId), [players, session.teamId]);
+    const team = useMemo(() => teams.find((t: Team) => t.id === session.teamId), [teams, session.teamId]);
+
+    const [showGuestPicker, setShowGuestPicker] = useState(false);
+    const [guestSearchTerm, setGuestSearchTerm] = useState('');
+    const [guestTeamFilter, setGuestTeamFilter] = useState<string>('all');
 
     const [localSession, setLocalSession] = useState<TrainingSession>(() => {
         const copy = JSON.parse(JSON.stringify(session));
@@ -1060,6 +1064,89 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         }
         return copy;
     });
+
+    const guestAttendanceRecords = useMemo(() => {
+        const teamPlayerIds = new Set(teamPlayers.map(p => p.id));
+        return (localSession.attendance || []).filter(r => !teamPlayerIds.has(r.playerId));
+    }, [teamPlayers, localSession.attendance]);
+
+    const guestPlayers = useMemo(() => {
+        return guestAttendanceRecords.map(r => players.find((p: Player) => p.id === r.playerId)).filter(Boolean) as Player[];
+    }, [guestAttendanceRecords, players]);
+
+    const candidateGuestPlayers = useMemo(() => {
+        const homePlayerIds = new Set(teamPlayers.map(p => p.id));
+        
+        return players.filter((p: Player) => {
+            if (homePlayerIds.has(p.id)) return false;
+            if (guestTeamFilter !== 'all' && p.teamId !== guestTeamFilter) return false;
+            if (guestSearchTerm.trim()) {
+                const term = guestSearchTerm.trim().toLowerCase();
+                const pTeam = teams.find((t: Team) => t.id === p.teamId);
+                const matchName = p.name.toLowerCase().includes(term);
+                const matchNumber = String(p.number || '').includes(term);
+                const matchTeam = pTeam ? pTeam.name.toLowerCase().includes(term) : false;
+                if (!matchName && !matchNumber && !matchTeam) return false;
+            }
+            return true;
+        });
+    }, [players, teamPlayers, guestTeamFilter, guestSearchTerm, teams]);
+
+    const isAllCandidateSelected = useMemo(() => {
+        if (candidateGuestPlayers.length === 0) return false;
+        return candidateGuestPlayers.every((p: Player) => 
+            localSession.attendance?.some((r: AttendanceRecord) => r.playerId === p.id)
+        );
+    }, [candidateGuestPlayers, localSession.attendance]);
+
+    const selectedCandidateCount = useMemo(() => {
+        const candidateIds = new Set(candidateGuestPlayers.map(p => p.id));
+        return (localSession.attendance || []).filter(r => candidateIds.has(r.playerId)).length;
+    }, [candidateGuestPlayers, localSession.attendance]);
+
+    const handleToggleSelectAllCandidates = () => {
+        if (candidateGuestPlayers.length === 0) return;
+        
+        const existingAttendance = localSession.attendance || [];
+        const candidateIds = new Set(candidateGuestPlayers.map(p => p.id));
+
+        if (isAllCandidateSelected) {
+            setLocalSession(prev => ({
+                ...prev,
+                attendance: (prev.attendance || []).filter(r => !candidateIds.has(r.playerId))
+            }));
+        } else {
+            const currentAttendanceMap = new Map(existingAttendance.map(r => [r.playerId, r]));
+            candidateGuestPlayers.forEach(p => {
+                if (!currentAttendanceMap.has(p.id)) {
+                    currentAttendanceMap.set(p.id, {
+                        playerId: p.id,
+                        status: 'Present',
+                        creditCost: 1
+                    });
+                }
+            });
+            setLocalSession(prev => ({
+                ...prev,
+                attendance: Array.from(currentAttendanceMap.values())
+            }));
+        }
+    };
+
+    const totalPresentCount = useMemo(() => {
+        return localSession.attendance?.filter(r => r.status === 'Present').length || 0;
+    }, [localSession.attendance]);
+
+    const homePresentCount = useMemo(() => {
+        const homeIds = new Set(teamPlayers.map(p => p.id));
+        return localSession.attendance?.filter(r => homeIds.has(r.playerId) && r.status === 'Present').length || 0;
+    }, [teamPlayers, localSession.attendance]);
+
+    const guestPresentCount = useMemo(() => {
+        const homeIds = new Set(teamPlayers.map(p => p.id));
+        return localSession.attendance?.filter(r => !homeIds.has(r.playerId) && r.status === 'Present').length || 0;
+    }, [teamPlayers, localSession.attendance]);
+
     const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
 
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -1122,11 +1209,25 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
     };
 
     const markAllPresent = () => {
-        const allPresent: AttendanceRecord[] = teamPlayers.map(p => ({
-            playerId: p.id,
-            status: 'Present'
-        }));
-        setLocalSession(prev => ({ ...prev, attendance: allPresent }));
+        const existingAttendance = localSession.attendance || [];
+        const teamPlayerIds = new Set(teamPlayers.map(p => p.id));
+        
+        const updatedAttendance: AttendanceRecord[] = [
+            ...teamPlayers.map(p => {
+                const existing = existingAttendance.find(r => r.playerId === p.id);
+                return {
+                    playerId: p.id,
+                    status: 'Present' as AttendanceStatus,
+                    creditCost: existing?.creditCost ?? 1
+                };
+            }),
+            ...existingAttendance.filter(r => !teamPlayerIds.has(r.playerId)).map(r => ({
+                ...r,
+                status: 'Present' as AttendanceStatus
+            }))
+        ];
+
+        setLocalSession(prev => ({ ...prev, attendance: updatedAttendance }));
     };
 
     const addDrill = () => {
@@ -1223,10 +1324,14 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
 
             const attendanceRows = (localSession.attendance || []).map(r => {
                 const player = players.find(p => p.id === r.playerId);
+                const pTeam = teams.find(t => t.id === player?.teamId);
+                const isGuest = player && player.teamId !== session.teamId;
                 const statusCn = r.status === 'Present' ? '出勤' : r.status === 'Leave' ? '请假' : r.status === 'Injury' ? '伤病' : '缺席';
                 return {
                     '球员姓名': player?.name || '未知球员',
                     '球衣号码': player?.number ? `#${player.number}` : '-',
+                    '所属梯队': pTeam?.name || '未知梯队',
+                    '参训类型': isGuest ? '跨梯队加练' : '本梯队参训',
                     '考勤状态': statusCn,
                     '扣除课时': r.creditCost ?? 1,
                     '备注说明': r.notes || '-'
@@ -1821,25 +1926,53 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                           </div>
 
                           <div>
-                              <div className="flex justify-between items-center mb-4">
-                                  <h4 className="font-bold text-gray-800 flex items-center"><UserCheck className="w-4 h-4 mr-2 text-bvb-yellow" /> 考勤列表</h4>
-                                  <div className="text-xs"><span className="font-bold">{localSession.attendance?.filter(r => r.status === 'Present').length || 0}</span> / {teamPlayers.length} 实到<button onClick={markAllPresent} className="ml-3 text-bvb-black underline hover:text-bvb-yellow">全勤</button></div>
+                              <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
+                                  <div className="flex items-center gap-2">
+                                      <h4 className="font-bold text-gray-800 flex items-center">
+                                          <UserCheck className="w-4 h-4 mr-1.5 text-bvb-yellow" /> 考勤列表
+                                      </h4>
+                                      <span className="text-[11px] font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200">
+                                          本梯队实到 <span className="text-green-700 font-black">{homePresentCount}</span> / {teamPlayers.length} 人 (共出勤 {totalPresentCount} 人)
+                                          {guestPlayers.length > 0 && <span className="text-blue-600 ml-1 font-black">• 含 {guestPresentCount}名跨梯队加练</span>}
+                                      </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                      {canEdit && (
+                                          <button
+                                              type="button"
+                                              onClick={() => setShowGuestPicker(true)}
+                                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                                          >
+                                              <UserPlus className="w-3.5 h-3.5" />
+                                              <span>+ 跨梯队加练球员</span>
+                                          </button>
+                                      )}
+                                      <button onClick={markAllPresent} className="text-xs font-bold text-bvb-black underline hover:text-bvb-yellow px-2 py-1">
+                                          全勤
+                                      </button>
+                                  </div>
                               </div>
+
+                              {/* 本梯队学员 Section */}
                               <div className="space-y-3">
+                                  <div className="text-xs font-black text-gray-600 flex items-center gap-1.5 border-b border-gray-100 pb-1">
+                                      <UsersIcon className="w-3.5 h-3.5 text-gray-400" />
+                                      <span>本梯队学员 ({teamPlayers.length}人)</span>
+                                  </div>
                                   {teamPlayers.map(player => {
                                       const status = getStatus(player.id);
                                       const record = localSession.attendance?.find(r => r.playerId === player.id);
                                       const currentCost = record?.creditCost || 1;
                                       const isFocused = localSession.focusedPlayerIds?.includes(player.id);
                                       return (
-                                          <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-sm transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-white border-gray-100'}`}>
+                                          <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-xs transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-white border-gray-100'}`}>
                                               <div className="flex items-center justify-between mb-3">
                                                   <div className="flex items-center">
                                                       <div className="relative">
                                                           <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold mr-3 border-2 ${status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' : status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
                                                               {player.name.charAt(0)}
                                                           </div>
-                                                          {isFocused && <div className="absolute -top-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white shadow-sm"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>}
+                                                          {isFocused && <div className="absolute -top-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white shadow-xs"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>}
                                                       </div>
                                                       <div>
                                                           <div className="flex items-center gap-1.5">
@@ -1850,7 +1983,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                                       </div>
                                                   </div>
                                                   <div className="flex flex-col items-end gap-1">
-                                                      <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
+                                                      <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600 font-black">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
                                                       {status === 'Present' && (
                                                           <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
                                                               <span className="text-[9px] font-black text-gray-500 uppercase">扣课时:</span>
@@ -1866,15 +1999,128 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                                   </div>
                                               </div>
                                               <div className="flex bg-gray-50/50 p-1 rounded-lg gap-1">
-                                                  <button onClick={() => setPlayerStatus(player.id, 'Present', currentCost)} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-sm text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}><CheckCircle className="w-5 h-5" /></button>
-                                                  <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-sm text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}><Clock className="w-5 h-5" /></button>
-                                                  <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-sm text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}><AlertCircle className="w-5 h-5" /></button>
-                                                  <button onClick={() => setPlayerStatus(player.id, 'Absent')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-sm text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-200'}`}><Ban className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Present', currentCost)} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-xs text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-200'}`}><CheckCircle className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-xs text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-200'}`}><Clock className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-xs text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-200'}`}><AlertCircle className="w-5 h-5" /></button>
+                                                  <button onClick={() => setPlayerStatus(player.id, 'Absent')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-xs text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-200'}`}><Ban className="w-5 h-5" /></button>
                                               </div>
                                           </div>
                                       );
                                   })}
                               </div>
+
+                              {/* 跨梯队/跟班加练学员 Section */}
+                              {guestPlayers.length > 0 ? (
+                                  <div className="space-y-3 pt-6">
+                                      <div className="flex flex-wrap items-center justify-between border-b border-blue-100 pb-1.5 gap-2">
+                                          <div className="flex items-center gap-1.5">
+                                              <UserPlus className="w-4 h-4 text-blue-600" />
+                                              <span className="text-xs font-black text-blue-900">跨梯队 / 跟班加练学员 ({guestPlayers.length}人)</span>
+                                              <span className="text-[10px] text-blue-500 font-bold">（正常扣除个人课时并计入出勤）</span>
+                                          </div>
+                                          {canEdit && (
+                                              <button
+                                                  type="button"
+                                                  onClick={() => setShowGuestPicker(true)}
+                                                  className="text-[11px] font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                              >
+                                                  + 继续添加球员
+                                              </button>
+                                          )}
+                                      </div>
+                                      <div className="space-y-3">
+                                          {guestPlayers.map(player => {
+                                              const status = getStatus(player.id);
+                                              const record = localSession.attendance?.find(r => r.playerId === player.id);
+                                              const currentCost = record?.creditCost || 1;
+                                              const homeTeam = teams.find((t: Team) => t.id === player.teamId);
+                                              const isFocused = localSession.focusedPlayerIds?.includes(player.id);
+
+                                              return (
+                                                  <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-xs transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-blue-50/40 border-blue-200'}`}>
+                                                      <div className="flex items-center justify-between mb-3">
+                                                          <div className="flex items-center">
+                                                              <div className="relative">
+                                                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold mr-3 border-2 ${status === 'Present' ? 'bg-green-50 border-green-200 text-green-700' : status === 'Leave' ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : status === 'Injury' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                                                                      {player.name.charAt(0)}
+                                                                  </div>
+                                                                  {isFocused && <div className="absolute -top-1 -right-1 p-1 bg-bvb-yellow rounded-full border border-white shadow-xs"><Star className="w-2.5 h-2.5 text-bvb-black fill-current" /></div>}
+                                                              </div>
+                                                              <div>
+                                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                                      <div className="font-black text-gray-800 text-sm">{player.name}</div>
+                                                                      <span className="text-[9px] font-black text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded-md border border-blue-200">
+                                                                          来自: {homeTeam?.name || '其他梯队'}
+                                                                      </span>
+                                                                      <span className="text-[8px] font-black uppercase text-amber-700 bg-amber-100 px-1 rounded-xs">
+                                                                          跨梯队加练
+                                                                      </span>
+                                                                  </div>
+                                                                  <div className="text-[10px] text-gray-400 font-mono">#{player.number} • {player.position}</div>
+                                                              </div>
+                                                          </div>
+                                                          <div className="flex flex-col items-end gap-1">
+                                                              <div className="flex items-center gap-2">
+                                                                  <div className="text-[10px] font-bold">
+                                                                      {status === 'Present' && <span className="text-green-600 font-black">正常参训</span>}
+                                                                      {status === 'Leave' && <span className="text-yellow-600">请假</span>}
+                                                                      {status === 'Injury' && <span className="text-red-600">伤停</span>}
+                                                                      {(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}
+                                                                  </div>
+                                                                  {canEdit && (
+                                                                      <button
+                                                                          type="button"
+                                                                          title="移除该加练球员"
+                                                                          onClick={() => setLocalSession(prev => ({
+                                                                              ...prev,
+                                                                              attendance: (prev.attendance || []).filter(r => r.playerId !== player.id)
+                                                                          }))}
+                                                                          className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors"
+                                                                      >
+                                                                          移除
+                                                                      </button>
+                                                                  )}
+                                                              </div>
+                                                              {status === 'Present' && (
+                                                                  <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-blue-200 shadow-2xs">
+                                                                      <span className="text-[9px] font-black text-gray-500 uppercase">扣课时:</span>
+                                                                      <select 
+                                                                          className="bg-transparent text-[10px] font-black text-bvb-black outline-none cursor-pointer"
+                                                                          value={currentCost}
+                                                                          onChange={(e) => setPlayerStatus(player.id, 'Present', parseInt(e.target.value))}
+                                                                      >
+                                                                          {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
+                                                                      </select>
+                                                                  </div>
+                                                              )}
+                                                          </div>
+                                                      </div>
+                                                      <div className="flex bg-white/70 p-1 rounded-lg gap-1 border border-blue-100">
+                                                          <button onClick={() => setPlayerStatus(player.id, 'Present', currentCost)} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Present' ? 'bg-white shadow-xs text-green-600 ring-1 ring-green-100' : 'text-gray-400 hover:text-green-600 hover:bg-gray-100'}`}><CheckCircle className="w-5 h-5" /></button>
+                                                          <button onClick={() => setPlayerStatus(player.id, 'Leave')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Leave' ? 'bg-white shadow-xs text-yellow-600 ring-1 ring-yellow-100' : 'text-gray-400 hover:text-yellow-600 hover:bg-gray-100'}`}><Clock className="w-5 h-5" /></button>
+                                                          <button onClick={() => setPlayerStatus(player.id, 'Injury')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Injury' ? 'bg-white shadow-xs text-red-600 ring-1 ring-red-100' : 'text-gray-400 hover:text-red-600 hover:bg-gray-100'}`}><AlertCircle className="w-5 h-5" /></button>
+                                                          <button onClick={() => setPlayerStatus(player.id, 'Absent')} className={`flex-1 py-2 rounded-md transition-all flex items-center justify-center ${status === 'Absent' ? 'bg-white shadow-xs text-gray-600 ring-1 ring-gray-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}><Ban className="w-5 h-5" /></button>
+                                                      </div>
+                                                  </div>
+                                              );
+                                          })}
+                                      </div>
+                                  </div>
+                              ) : (
+                                  canEdit && (
+                                      <div className="mt-5 p-3.5 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 border border-dashed border-blue-200 rounded-xl text-center">
+                                          <p className="text-xs font-medium text-gray-600 mb-2">有其他梯队/跟班球员临时加入本次训练？</p>
+                                          <button
+                                              type="button"
+                                              onClick={() => setShowGuestPicker(true)}
+                                              className="px-4 py-1.5 bg-white border border-blue-300 text-blue-700 hover:bg-blue-50 text-xs font-bold rounded-lg transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                                          >
+                                              <UserPlus className="w-3.5 h-3.5 text-blue-600" />
+                                              <span>选择跨梯队加练球员</span>
+                                          </button>
+                                      </div>
+                                  )
+                              )}
                           </div>
                         </div>
                     )}
@@ -2298,6 +2544,194 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                             {saveStatus === 'saved' ? <CheckCircle className="w-4 h-4 mr-2" /> : <RefreshCw className={`w-4 h-4 mr-2 ${saveStatus === 'saving' ? 'animate-spin' : ''}`} />}
                             立即保存所有更改
                         </button>
+                    </div>
+                )}
+                {showGuestPicker && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+                        <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100">
+                            {/* Modal Header */}
+                            <div className="p-4 bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white flex justify-between items-center shrink-0">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="p-2 bg-blue-500/20 rounded-xl border border-blue-400/30">
+                                        <UserPlus className="w-5 h-5 text-bvb-yellow" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-sm text-white">选择跨梯队/跟班加练球员</h3>
+                                        <p className="text-[10px] text-blue-200 font-medium">选中的球员将临时加入本次训练，扣除课时并记入考勤</p>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setShowGuestPicker(false)}
+                                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            {/* Filter & Search Controls */}
+                            <div className="p-3.5 bg-gray-50 border-b border-gray-100 space-y-2.5 shrink-0">
+                                <div className="flex gap-2">
+                                    <div className="w-2/5">
+                                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">筛选梯队</label>
+                                        <select
+                                            value={guestTeamFilter}
+                                            onChange={(e) => setGuestTeamFilter(e.target.value)}
+                                            className="w-full p-2 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-800 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                        >
+                                            <option value="all">所有其他梯队</option>
+                                            {teams.filter((t: Team) => t.id !== session.teamId).map((t: Team) => (
+                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="flex-1">
+                                        <label className="block text-[10px] font-bold text-gray-500 mb-1 uppercase">搜索姓名/号码</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={guestSearchTerm}
+                                                onChange={(e) => setGuestSearchTerm(e.target.value)}
+                                                placeholder="输入球员名字或号码..."
+                                                className="w-full p-2 pl-8 bg-white border border-gray-200 rounded-lg text-xs font-bold outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                            />
+                                            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Multi-select Toolbar */}
+                                <div className="flex items-center justify-between pt-1 border-t border-gray-200/60">
+                                    <div className="text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
+                                        <span>匹配球员: <strong className="text-gray-900">{candidateGuestPlayers.length}</strong> 人</span>
+                                        <span>•</span>
+                                        <span>已加入考勤: <strong className="text-blue-600">{selectedCandidateCount}</strong> 人</span>
+                                    </div>
+
+                                    {candidateGuestPlayers.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleSelectAllCandidates}
+                                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                                                isAllCandidateSelected 
+                                                    ? 'bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300' 
+                                                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-2xs'
+                                            }`}
+                                        >
+                                            <CheckCircle className="w-3.5 h-3.5" />
+                                            <span>{isAllCandidateSelected ? '取消全选当前' : `全选当前 (${candidateGuestPlayers.length}人)`}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Candidate Players List */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-2 min-h-[250px] max-h-[50vh]">
+                                {candidateGuestPlayers.length === 0 ? (
+                                    <div className="text-center py-12 text-gray-400 text-xs italic">
+                                        未找到符合条件的加练球员
+                                    </div>
+                                ) : (
+                                    candidateGuestPlayers.map((p: Player) => {
+                                        const pTeam = teams.find((t: Team) => t.id === p.teamId);
+                                        const isAlreadyAdded = localSession.attendance?.some((r: AttendanceRecord) => r.playerId === p.id);
+                                        
+                                        const toggleGuest = () => {
+                                            if (isAlreadyAdded) {
+                                                setLocalSession(prev => ({
+                                                    ...prev,
+                                                    attendance: (prev.attendance || []).filter((r: AttendanceRecord) => r.playerId !== p.id)
+                                                }));
+                                            } else {
+                                                setPlayerStatus(p.id, 'Present', 1);
+                                            }
+                                        };
+
+                                        return (
+                                            <div 
+                                                key={p.id} 
+                                                onClick={toggleGuest}
+                                                className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                                                    isAlreadyAdded 
+                                                        ? 'bg-blue-50/80 border-blue-300 ring-2 ring-blue-200/50 shadow-2xs' 
+                                                        : 'bg-white border-gray-100 hover:border-blue-200 hover:shadow-2xs'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    {/* Checkbox indicator for intuitive multi-selection */}
+                                                    <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 ${
+                                                        isAlreadyAdded ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-300 bg-gray-50'
+                                                    }`}>
+                                                        {isAlreadyAdded && <CheckCircle className="w-3.5 h-3.5 stroke-[3]" />}
+                                                    </div>
+
+                                                    <div className="w-9 h-9 rounded-full bg-blue-100/80 border border-blue-200 flex items-center justify-center font-black text-xs text-blue-800">
+                                                        {p.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className="font-black text-sm text-gray-800">{p.name}</span>
+                                                            <span className="text-[10px] font-mono text-gray-400">#{p.number}</span>
+                                                            <span className="text-[9px] font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
+                                                                {pTeam?.name || '未知梯队'}
+                                                            </span>
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-400 mt-0.5">
+                                                            位置: {p.position || '全能'} • 剩余课时: <span className="font-bold text-blue-600">{p.remainingCredits ?? 0}</span> 节
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    {isAlreadyAdded ? (
+                                                        <span className="text-xs font-bold text-blue-700 bg-blue-100/80 px-2.5 py-1 rounded-lg border border-blue-200 flex items-center gap-1">
+                                                            <CheckCircle className="w-3.5 h-3.5 text-blue-600" /> 已勾选
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleGuest();
+                                                            }}
+                                                            className="px-3.5 py-1.5 bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-700 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                                        >
+                                                            <UserPlus className="w-3.5 h-3.5" />
+                                                            <span>勾选</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            {/* Modal Footer */}
+                            <div className="p-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center shrink-0">
+                                <div className="flex items-center gap-2">
+                                    {candidateGuestPlayers.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleSelectAllCandidates}
+                                            className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                                        >
+                                            {isAllCandidateSelected ? '全不选' : '全选列表'}
+                                        </button>
+                                    )}
+                                    <span className="text-xs text-gray-500">
+                                        共计加入 <span className="font-black text-blue-600">{guestPlayers.length}</span> 名加练球员
+                                    </span>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGuestPicker(false)}
+                                    className="px-5 py-1.5 bg-bvb-black text-white font-bold text-xs rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+                                >
+                                    完成选择
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
                 <ThemeSelectorModal
