@@ -629,3 +629,71 @@ export interface User {
   monthlyEvaluations?: MonthlyEvaluation[];
   monthlySalaryRecords?: MonthlySalaryRecord[];
 }
+
+// --- Intramural Tournament (队内赛) Types ---
+export type PitchFormat = '3人制' | '5人制' | '8人制' | '11人制';
+export type TournamentType = 'league' | 'group_knockout'; // 积分循环赛(联赛) | 小组赛+淘汰赛(杯赛)
+
+export interface PlayerCategoryOverride {
+  status: 'participating' | 'opt_out';
+  overrideCategoryId?: string;
+}
+
+export interface TournamentCategory {
+  id: string;
+  name: string; // e.g. "U10 组别"
+  minBirthDate: string; // e.g. "2015-09-01"
+  maxBirthDate: string; // e.g. "2016-08-31"
+  pitchFormat: PitchFormat;
+  tournamentType: TournamentType;
+  legCount?: 1 | 2; // 单循环 / 双循环 (for league)
+  playerOverrides?: Record<string, PlayerCategoryOverride>;
+  playerSkillTiers?: Record<string, number>; // playerId -> tierIndex (0=A档, 1=B档, 2=C档...)
+}
+
+export interface IntramuralTeam {
+  id: string;
+  categoryId: string;
+  name: string; // e.g. "红队", "蓝队", "战狼队"
+  color: string; // hex color or tailwind badge style
+  captainPlayerId?: string;
+  playerIds: string[]; // assigned player IDs
+}
+
+export interface IntramuralMatchGoal {
+  id: string;
+  matchId: string;
+  scorerPlayerId: string;
+  assistantPlayerId?: string;
+  minute?: number;
+  teamId: string;
+}
+
+export interface IntramuralMatch {
+  id: string;
+  categoryId: string;
+  stage: 'group' | 'semi_final' | 'final' | 'third_place' | 'league_round';
+  groupName?: string; // e.g., 'A组', 'B组'
+  roundNumber?: number; // e.g. Round 1, Round 2
+  homeTeamId: string;
+  awayTeamId: string;
+  homeScore?: number;
+  awayScore?: number;
+  status: 'scheduled' | 'live' | 'completed';
+  date?: string;
+  time?: string;
+  field?: string;
+  goals?: IntramuralMatchGoal[];
+  notes?: string;
+}
+
+export interface IntramuralTournament {
+  id: string;
+  title: string; // e.g. "2026年夏季俱乐部队内赛"
+  createdAt: string;
+  status: 'draft' | 'active' | 'completed';
+  categories: TournamentCategory[];
+  teams: IntramuralTeam[];
+  matches: IntramuralMatch[];
+}
+
