@@ -476,7 +476,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
-    const [activeTab, setActiveTab] = useState<'profile' | 'technical' | 'tactical' | 'physical' | 'mental' | 'reviews' | 'records' | 'gallery'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'radar' | 'reviews' | 'records' | 'gallery'>('profile');
+    const [radarSubCategory, setRadarSubCategory] = useState<'all' | AttributeCategory>('all');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -488,6 +489,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [playerSearchTerm, setPlayerSearchTerm] = useState('');
     const [showPlayerDropdown, setShowPlayerDropdown] = useState(false);
+    const [personalityInput, setPersonalityInput] = useState('');
+    const [coachingInput, setCoachingInput] = useState('');
 
     const [selectedStatsYear, setSelectedStatsYear] = useState<number>(new Date().getFullYear());
 
@@ -621,45 +624,86 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
       });
     };
 
-    const renderTagSelector = (label: string, field: keyof Player, configGroup: keyof AttributeConfig) => {
+    const renderManualTagInput = (
+        label: string, 
+        field: 'personalityTraits' | 'coachingReminders', 
+        placeholder: string,
+        inputValue: string,
+        setInputValue: (val: string) => void
+    ) => {
         const selectedTags = (editedPlayer[field] as string[]) || [];
-        const availableTags = (attributeConfig[configGroup] as string[]) || [];
 
-        const toggleTag = (tag: string) => {
-            const next = selectedTags.includes(tag) 
-                ? selectedTags.filter(t => t !== tag) 
-                : [...selectedTags, tag];
+        const addTag = () => {
+            const text = inputValue.trim();
+            if (!text) return;
+            if (!selectedTags.includes(text)) {
+                setEditedPlayer({ ...editedPlayer, [field]: [...selectedTags, text] });
+            }
+            setInputValue('');
+        };
+
+        const removeTag = (tagToRemove: string) => {
+            const next = selectedTags.filter(t => t !== tagToRemove);
             setEditedPlayer({ ...editedPlayer, [field]: next });
         };
 
         return (
-            <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">{label}</label>
-                <div className="flex flex-wrap gap-2">
-                    {isEditing ? (
-                        availableTags.length > 0 ? (
-                            availableTags.map(tag => (
-                                <button
-                                    key={tag}
-                                    onClick={() => toggleTag(tag)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${selectedTags.includes(tag) ? 'bg-bvb-yellow text-bvb-black shadow-md' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+            <div className="space-y-2.5">
+                <label className="text-xs font-black text-gray-700 uppercase tracking-wider block flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-bvb-yellow"></span>
+                    {label}
+                </label>
+                <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 items-center min-h-[32px]">
+                        {selectedTags.length > 0 ? (
+                            selectedTags.map((tag, idx) => (
+                                <span 
+                                    key={idx} 
+                                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 border border-amber-200/80 rounded-xl text-xs font-bold shadow-2xs"
                                 >
-                                    {tag}
-                                </button>
-                            ))
-                        ) : (
-                            <p className="text-[10px] text-gray-400 italic">暂无可选标签，请在设置中添加</p>
-                        )
-                    ) : (
-                        selectedTags.length > 0 ? (
-                            selectedTags.map(tag => (
-                                <span key={tag} className="px-3 py-1.5 bg-yellow-50 text-bvb-black rounded-lg text-xs font-bold border border-yellow-100">
-                                    {tag}
+                                    <span>{tag}</span>
+                                    {isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeTag(tag)}
+                                            className="p-0.5 hover:bg-amber-200/60 rounded-full text-amber-800 hover:text-amber-950 transition-colors cursor-pointer"
+                                            title="删除标签"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    )}
                                 </span>
                             ))
                         ) : (
                             <span className="text-xs text-gray-400 italic">未设置</span>
-                        )
+                        )}
+                    </div>
+
+                    {isEditing && (
+                        <div className="flex gap-2 items-center mt-1">
+                            <input
+                                type="text"
+                                value={inputValue}
+                                onChange={(e) => setInputValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addTag();
+                                    }
+                                }}
+                                placeholder={placeholder}
+                                className="flex-1 px-3 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl font-medium focus:bg-white focus:border-bvb-yellow focus:ring-1 focus:ring-bvb-yellow outline-none transition-all"
+                            />
+                            <button
+                                type="button"
+                                onClick={addTag}
+                                disabled={!inputValue.trim()}
+                                className="px-3.5 py-2 bg-bvb-black text-white text-xs font-black rounded-xl hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-bvb-black flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>添加</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             </div>
@@ -903,45 +947,177 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         );
     };
 
-    const renderCategoryContent = (category: AttributeCategory) => {
+
+
+    const renderRadarIntegratedContent = () => {
       const statsForYear = editedPlayer.yearlyStats?.[selectedStatsYear] || editedPlayer.stats;
-      const radarData = getCategoryRadarData(editedPlayer, category, attributeConfig, statsForYear);
+      const radar4DData = [
+        { subject: '技术能力', A: getCategoryAvg(editedPlayer, 'technical', attributeConfig, statsForYear), fullMark: 10 },
+        { subject: '战术意识', A: getCategoryAvg(editedPlayer, 'tactical', attributeConfig, statsForYear), fullMark: 10 },
+        { subject: '身体素质', A: getCategoryAvg(editedPlayer, 'physical', attributeConfig, statsForYear), fullMark: 10 },
+        { subject: '心理素质', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig, statsForYear), fullMark: 10 },
+      ];
+
+      const overallAvg = (
+        (radar4DData[0].A + radar4DData[1].A + radar4DData[2].A + radar4DData[3].A) / 4
+      ).toFixed(1);
+
+      const categoriesList: { id: 'all' | AttributeCategory; label: string; icon: any }[] = [
+        { id: 'all', label: '4维全景', icon: Target },
+        { id: 'technical', label: '技术能力', icon: Target },
+        { id: 'tactical', label: '战术意识', icon: Brain },
+        { id: 'physical', label: '身体素质', icon: Dumbbell },
+        { id: 'mental', label: '心理素质', icon: CheckSquare },
+      ];
+
+      const isAll = radarSubCategory === 'all';
+      const currentRadarData = isAll
+        ? radar4DData
+        : getCategoryRadarData(editedPlayer, radarSubCategory, attributeConfig, statsForYear);
+      const dataKey = isAll ? 'A' : 'value';
+
       return (
-         <div className="animate-in slide-in-from-right-4 duration-300 flex flex-col md:flex-row h-full gap-4 md:gap-6 overflow-hidden">
-            <div className="w-full md:w-5/12 h-64 md:h-auto relative bg-gray-50/50 rounded-xl p-2 shrink-0 border border-gray-100 flex flex-col justify-center">
-                <div className="absolute top-2 right-3 z-10 flex items-center gap-2 bg-white/80 backdrop-blur-sm px-2 py-1 rounded-lg border border-gray-100 shadow-sm">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">评估年份</span>
-                    <select 
-                        value={selectedStatsYear} 
-                        onChange={(e) => changeStatsYear(parseInt(e.target.value))}
-                        className="bg-transparent text-[11px] font-black text-gray-800 outline-none cursor-pointer"
-                    >
-                        {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年度</option>)}
-                    </select>
-                </div>
-                <div className="absolute top-2 left-3 z-10"><span className="text-xs font-black text-gray-400 uppercase tracking-wider">{categoryLabels[category]}分析</span></div>
-                <div className="h-64 md:h-full w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="55%" outerRadius="70%" data={radarData}>
-                            <PolarGrid stroke="#e5e7eb" />
-                            <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 'bold' }} />
-                            <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
-                            <Radar name={categoryLabels[category]} dataKey="value" stroke="#000" strokeWidth={2} fill="#FDE100" fillOpacity={0.6} />
-                        </RadarChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="absolute bottom-2 right-2 bg-white px-2 py-1 rounded shadow-sm border border-gray-100 text-center">
-                    <div className="text-[10px] text-gray-400 font-bold uppercase">平均分</div>
-                    <div className="text-lg font-black text-bvb-black">{getCategoryAvg(editedPlayer, category, attributeConfig, statsForYear)}</div>
-                </div>
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Top Control Bar */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gray-50/80 p-4 rounded-2xl border border-gray-100 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-bvb-yellow text-bvb-black rounded-xl shadow-xs">
+                <Target className="w-5 h-5 stroke-[2.5]" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
+                  球员雷达综合评估
+                  <span className="text-xs text-gray-400 font-normal">
+                    ({isEditing ? '拖动滑块直接调整 4 维指标' : '点击右上角“编辑”后可调整数值'})
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-500 font-medium mt-0.5">一站式录入与管理技术、战术、身体、心理 4 维度能力指标</p>
+              </div>
             </div>
-            <div className="w-full md:w-7/12 overflow-y-auto custom-scrollbar pb-20 md:pb-0 pr-1">
-                <div className="mb-3 px-1 flex justify-between items-center sticky top-0 bg-white z-10 py-2 border-b border-gray-50">
-                    <span className="text-xs text-gray-400 font-bold flex items-center"><Edit2 className="w-3 h-3 mr-1" />{isEditing ? '拖动滑块调整数值' : '点击右上角“编辑”进行修改'}</span>
-                </div>
-                {renderStatSliders(category)}
+
+            <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
+                <span className="text-xs font-bold text-gray-400">评估年份:</span>
+                <select
+                  value={selectedStatsYear}
+                  onChange={(e) => changeStatsYear(parseInt(e.target.value))}
+                  className="bg-transparent text-xs font-black text-gray-800 outline-none cursor-pointer"
+                >
+                  {[2023, 2024, 2025, 2026].map(y => <option key={y} value={y}>{y}年度</option>)}
+                </select>
+              </div>
             </div>
-         </div>
+          </div>
+
+          {/* Sub Category Selector Navigation */}
+          <div className="flex gap-2 border-b border-gray-100 pb-3 overflow-x-auto no-scrollbar">
+            {categoriesList.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setRadarSubCategory(cat.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all whitespace-nowrap cursor-pointer ${radarSubCategory === cat.id ? 'bg-bvb-black text-bvb-yellow shadow-sm scale-105' : 'bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-800'}`}
+              >
+                <cat.icon className="w-3.5 h-3.5" />
+                <span>{cat.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Overview Chart + Summary Stats Cards */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            {/* Radar Chart Display */}
+            <div className="lg:col-span-5 bg-white border border-gray-100 rounded-2xl p-4 shadow-xs relative flex flex-col items-center justify-center min-h-[280px]">
+              <div className="absolute top-3 left-3 text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-bvb-yellow"></span>
+                {selectedStatsYear} {isAll ? '4维雷达图谱' : `${categoryLabels[radarSubCategory]}雷达图`}
+              </div>
+              <div className="w-full h-56 mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="70%" data={currentRadarData}>
+                    <PolarGrid stroke="#e5e7eb" />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#374151', fontSize: 11, fontWeight: 'bold' }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
+                    <Radar name={isAll ? '能力值' : categoryLabels[radarSubCategory]} dataKey={dataKey} stroke="#000000" strokeWidth={2.5} fill="#FDE100" fillOpacity={0.65} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 4 Dimension Score Cards */}
+            <div className="lg:col-span-7 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-3 content-center">
+              {[
+                { id: 'technical', label: '技术能力', score: radar4DData[0].A, color: 'border-blue-200 bg-blue-50/50 text-blue-900', icon: Target },
+                { id: 'tactical', label: '战术意识', score: radar4DData[1].A, color: 'border-purple-200 bg-purple-50/50 text-purple-900', icon: Brain },
+                { id: 'physical', label: '身体素质', score: radar4DData[2].A, color: 'border-amber-200 bg-amber-50/50 text-amber-900', icon: Dumbbell },
+                { id: 'mental', label: '心理素质', score: radar4DData[3].A, color: 'border-emerald-200 bg-emerald-50/50 text-emerald-900', icon: CheckSquare },
+              ].map(item => (
+                <div 
+                  key={item.id}
+                  onClick={() => setRadarSubCategory(item.id as AttributeCategory)}
+                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer hover:shadow-md flex items-center justify-between ${item.color} ${radarSubCategory === item.id ? 'ring-2 ring-bvb-yellow shadow-sm scale-[1.02]' : ''}`}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold opacity-80">
+                      <item.icon className="w-3.5 h-3.5" />
+                      <span>{item.label}</span>
+                    </div>
+                    <div className="text-2xl font-black font-mono">{item.score}</div>
+                  </div>
+                  <div className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/80 backdrop-blur-2xs shadow-2xs">
+                    维度均分
+                  </div>
+                </div>
+              ))}
+
+              <div className="col-span-2 sm:col-span-4 lg:col-span-2 bg-bvb-black text-white p-3.5 rounded-2xl flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-bvb-yellow" />
+                  <span className="text-xs font-bold">4维综合能力总评价</span>
+                </div>
+                <span className="text-2xl font-black font-mono text-bvb-yellow">{overallAvg} <span className="text-xs text-gray-400 font-normal">/ 10</span></span>
+              </div>
+            </div>
+          </div>
+
+          {/* Detailed Indicators Sliders */}
+          {radarSubCategory === 'all' ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {[
+                  { id: 'technical', label: '技术能力', icon: Target, border: 'border-blue-100', headerBg: 'bg-blue-50/70 text-blue-900' },
+                  { id: 'tactical', label: '战术意识', icon: Brain, border: 'border-purple-100', headerBg: 'bg-purple-50/70 text-purple-900' },
+                  { id: 'physical', label: '身体素质', icon: Dumbbell, border: 'border-amber-100', headerBg: 'bg-amber-50/70 text-amber-900' },
+                  { id: 'mental', label: '心理素质', icon: CheckSquare, border: 'border-emerald-100', headerBg: 'bg-emerald-50/70 text-emerald-900' },
+                ].map(dim => (
+                  <div key={dim.id} className={`bg-white rounded-2xl border ${dim.border} p-4 shadow-2xs space-y-3`}>
+                    <div className={`flex justify-between items-center px-3.5 py-2.5 rounded-xl font-black text-xs ${dim.headerBg}`}>
+                      <div className="flex items-center gap-2">
+                        <dim.icon className="w-4 h-4" />
+                        <span>{dim.label}</span>
+                      </div>
+                      <span className="font-mono text-sm font-black">
+                        {getCategoryAvg(editedPlayer, dim.id as AttributeCategory, attributeConfig, statsForYear)} 分
+                      </span>
+                    </div>
+                    {renderStatSliders(dim.id as AttributeCategory)}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-2xs space-y-3">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                <h4 className="text-sm font-black text-gray-800 flex items-center gap-2">
+                  {categoryLabels[radarSubCategory]}评估明细
+                </h4>
+                <span className="text-xs text-gray-400 font-bold">
+                  当前平均: {getCategoryAvg(editedPlayer, radarSubCategory, attributeConfig, statsForYear)}
+                </span>
+              </div>
+              {renderStatSliders(radarSubCategory)}
+            </div>
+          )}
+        </div>
       );
     };
 
@@ -1695,7 +1871,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                 </button>
              </div>
           </div>
-          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'profile', label: '球员画像', icon: UserIcon }, { id: 'technical', label: '技术', icon: Target }, { id: 'tactical', label: '战术', icon: Brain }, { id: 'physical', label: '身体', icon: Dumbbell }, { id: 'mental', label: '心理', icon: CheckSquare }, { id: 'reviews', label: '球员跟踪', icon: Search }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
+          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'profile', label: '球员画像', icon: UserIcon }, { id: 'radar', label: '球员雷达', icon: Target }, { id: 'reviews', label: '球员跟踪', icon: Search }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
              {activeTab === 'profile' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.gender} onChange={e => setEditedPlayer({...editedPlayer, gender: e.target.value})}><option value="男">男</option><option value="女">女</option></select> : <span className="font-bold">{editedPlayer.gender}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{calculateAge(editedPlayer.birthDate) || editedPlayer.age || 0} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => {
   const bDate = e.target.value;
@@ -1724,13 +1900,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                           <h4 className="text-lg font-black text-gray-800 uppercase tracking-tight">球员画像标签</h4>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {renderTagSelector('球员类型', 'playerType', 'playerTypes')}
-                        {renderTagSelector('技术强项', 'technicalStrengths', 'technicalStrengths')}
-                        {renderTagSelector('性格特点', 'personalityTraits', 'personalityTraits')}
-                        {renderTagSelector('行为特点', 'behavioralTraits', 'behavioralTraits')}
-                        <div className="md:col-span-2">
-                           {renderTagSelector('指导提醒', 'coachingReminders', 'coachingReminders')}
-                        </div>
+                        {renderManualTagInput('性格特点', 'personalityTraits', '输入性格特点标签，按 Enter 或点击添加...', personalityInput, setPersonalityInput)}
+                        {renderManualTagInput('指导提醒', 'coachingReminders', '输入指导提醒，按 Enter 或点击添加...', coachingInput, setCoachingInput)}
                       </div>
 
                       {/* 球员收费/续费等级板块 */}
@@ -1833,10 +2004,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                       )}
                    </div>
                <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2"><h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name="能力" dataKey="A" stroke="#000000" strokeWidth={3} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div></div></div>)}
-             {activeTab === 'technical' && renderCategoryContent('technical')}
-             {activeTab === 'tactical' && renderCategoryContent('tactical')}
-             {activeTab === 'physical' && renderCategoryContent('physical')}
-             {activeTab === 'mental' && renderCategoryContent('mental')}
+             {activeTab === 'radar' && renderRadarIntegratedContent()}
              {activeTab === 'reviews' && renderReviews()}
              {activeTab === 'records' && renderRecords()}
              {activeTab === 'gallery' && renderGallery()}

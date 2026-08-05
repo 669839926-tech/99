@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Player, Team, IntramuralTournament, TournamentCategory, IntramuralTeam, IntramuralMatch, PitchFormat, IntramuralMatchGoal, User } from '../types';
-import { Trophy, Users, Calendar, Shuffle, Dices, CheckCircle2, Award, Flame, RefreshCw, Plus, Edit3, Settings2, BarChart2, Search, Sparkles, Crown, ChevronRight, X, UserPlus, Flag, Shield, Check, UserX, Lock, Eye, RotateCcw } from 'lucide-react';
+import { Trophy, Users, Calendar, Shuffle, Dices, CheckCircle2, Award, Flame, RefreshCw, Plus, Edit3, Settings2, BarChart2, Search, Sparkles, Crown, ChevronRight, X, UserPlus, Flag, Shield, Check, UserX, Lock, Eye, RotateCcw, Trash2 } from 'lucide-react';
 
 interface IntramuralTournamentProps {
   players: Player[];
@@ -102,8 +102,14 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
   const [editingAwayScore, setEditingAwayScore] = useState<number>(0);
   const [editingGoals, setEditingGoals] = useState<IntramuralMatchGoal[]>([]);
 
-  // Category Edit Modal
+  // Category Edit & New Modal State
   const [editingCategory, setEditingCategory] = useState<TournamentCategory | null>(null);
+  const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryPitchFormat, setNewCategoryPitchFormat] = useState<PitchFormat>('5人制');
+  const [newCategoryMinBirthDate, setNewCategoryMinBirthDate] = useState('2015-01-01');
+  const [newCategoryMaxBirthDate, setNewCategoryMaxBirthDate] = useState('2016-12-31');
+
   const [showNewTournamentModal, setShowNewTournamentModal] = useState(false);
   const [newTournamentTitle, setNewTournamentTitle] = useState('');
 
@@ -623,6 +629,61 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
     }, 90);
   };
 
+  // Delete Category (删除组别)
+  const handleDeleteCategory = (categoryId: string, categoryName: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!currentTournament) return;
+    if (currentTournament.categories.length <= 1) {
+      alert('赛事至少需要保留一个比赛组别！');
+      return;
+    }
+    if (!window.confirm(`确定要删除【${categoryName}】组别吗？\n删除后该组别下的球队分组与比赛对阵数据都将被清理。`)) {
+      return;
+    }
+
+    const updatedCategories = currentTournament.categories.filter(c => c.id !== categoryId);
+    const updatedTeams = currentTournament.teams.filter(t => t.categoryId !== categoryId);
+    const updatedMatches = currentTournament.matches.filter(m => m.categoryId !== categoryId);
+
+    updateCurrentTournament(t => ({
+      ...t,
+      categories: updatedCategories,
+      teams: updatedTeams,
+      matches: updatedMatches
+    }));
+
+    if (activeCategoryId === categoryId) {
+      setActiveCategoryId(updatedCategories[0]?.id || '');
+    }
+  };
+
+  // Create New Category (新增组别)
+  const handleCreateCategory = () => {
+    if (!currentTournament) return;
+    if (!newCategoryName.trim()) {
+      alert('请输入组别名称！');
+      return;
+    }
+
+    const newCat: TournamentCategory = {
+      id: `cat_${currentTournament.id}_${Date.now()}`,
+      name: newCategoryName.trim(),
+      minBirthDate: newCategoryMinBirthDate,
+      maxBirthDate: newCategoryMaxBirthDate,
+      pitchFormat: newCategoryPitchFormat,
+      tournamentType: 'group_knockout'
+    };
+
+    updateCurrentTournament(t => ({
+      ...t,
+      categories: [...t.categories, newCat]
+    }));
+
+    setActiveCategoryId(newCat.id);
+    setShowNewCategoryModal(false);
+    setNewCategoryName('');
+  };
+
   // Reset Draft / Redraw (一键重置，重新抽签)
   const handleResetDraft = () => {
     if (!activeCategory || categoryTeams.length === 0) return;
@@ -1086,46 +1147,64 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
           {currentTournament?.categories.map(cat => {
             const isActive = cat.id === activeCategoryId;
             return (
-              <button
+              <div
                 key={cat.id}
-                onClick={() => setActiveCategoryId(cat.id)}
-                className={`px-3.5 py-1.5 rounded-xl font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`group relative rounded-xl font-black text-xs transition-all flex items-center gap-1.5 ${
                   isActive
-                    ? 'bg-bvb-yellow text-bvb-black shadow-lg scale-105'
-                    : 'bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white'
+                    ? 'bg-bvb-yellow text-bvb-black shadow-lg scale-105 px-3 py-1.5'
+                    : 'bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white px-3 py-1.5'
                 }`}
               >
-                <span>{cat.name}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                  isActive ? 'bg-black/20 text-bvb-black' : 'bg-black/30 text-amber-200'
-                }`}>
-                  {cat.pitchFormat}
-                </span>
-              </button>
+                <button
+                  onClick={() => setActiveCategoryId(cat.id)}
+                  className="flex items-center gap-1.5 cursor-pointer outline-none"
+                >
+                  <span>{cat.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                    isActive ? 'bg-black/20 text-bvb-black' : 'bg-black/30 text-amber-200'
+                  }`}>
+                    {cat.pitchFormat}
+                  </span>
+                </button>
+
+                {/* Edit & Delete Action Buttons */}
+                <div className="flex items-center gap-1 ml-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingCategory(cat);
+                    }}
+                    title="编辑组别设置"
+                    className={`p-0.5 rounded hover:bg-black/20 transition-colors cursor-pointer ${
+                      isActive ? 'text-bvb-black hover:text-black' : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+
+                  <button
+                    onClick={(e) => handleDeleteCategory(cat.id, cat.name, e)}
+                    title="删除组别"
+                    className={`p-0.5 rounded transition-colors cursor-pointer ${
+                      isActive ? 'text-rose-900 hover:bg-rose-500 hover:text-white' : 'text-gray-400 hover:bg-rose-600 hover:text-white'
+                    }`}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
             );
           })}
 
           <button
             onClick={() => {
-              if (!currentTournament) return;
-              const newCatName = prompt('请输入新组别名称（例：U13 组别 / 女足组）:', 'U13 组别');
-              if (newCatName) {
-                const newCat: TournamentCategory = {
-                  id: `cat_${currentTournament.id}_${Date.now()}`,
-                  name: newCatName,
-                  minBirthDate: '2012-09-01',
-                  maxBirthDate: '2013-08-31',
-                  pitchFormat: '8人制',
-                  tournamentType: 'group_knockout'
-                };
-                updateCurrentTournament(t => ({ ...t, categories: [...t.categories, newCat] }));
-                setActiveCategoryId(newCat.id);
-              }
+              setNewCategoryName(`U${(currentTournament?.categories.length || 0) + 12} 组别`);
+              setShowNewCategoryModal(true);
             }}
-            className="px-2.5 py-1.5 bg-white/5 hover:bg-white/15 border border-dashed border-white/30 text-gray-300 hover:text-white font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+            className="px-3 py-1.5 bg-bvb-yellow/20 hover:bg-bvb-yellow hover:text-bvb-black border border-dashed border-bvb-yellow/50 text-amber-300 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>自定义组别</span>
+            <span>新增比赛组别</span>
           </button>
         </div>
       </div>
@@ -2380,6 +2459,20 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1">赛制 / 人数限制</label>
+                <select
+                  value={editingCategory.pitchFormat}
+                  onChange={(e) => setEditingCategory({ ...editingCategory, pitchFormat: e.target.value as PitchFormat })}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none"
+                >
+                  <option value="3人制">3人制 (小场地无门将)</option>
+                  <option value="5人制">5人制 (标准半场/室内)</option>
+                  <option value="8人制">8人制 (中型场地)</option>
+                  <option value="11人制">11人制 (全场标准)</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1">出生起始日期</label>
@@ -2402,16 +2495,105 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-              <button onClick={() => setEditingCategory(null)} className="px-4 py-2 bg-gray-100 font-bold text-xs rounded-xl cursor-pointer">取消</button>
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
               <button
                 onClick={() => {
-                  updateActiveCategory(() => editingCategory);
+                  const catToDelete = editingCategory;
                   setEditingCategory(null);
+                  handleDeleteCategory(catToDelete.id, catToDelete.name);
                 }}
+                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>删除此组别</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button onClick={() => setEditingCategory(null)} className="px-4 py-2 bg-gray-100 font-bold text-xs rounded-xl cursor-pointer">取消</button>
+                <button
+                  onClick={() => {
+                    updateActiveCategory(() => editingCategory);
+                    setEditingCategory(null);
+                  }}
+                  className="px-5 py-2 bg-bvb-black text-white font-black text-xs rounded-xl hover:bg-gray-800 cursor-pointer"
+                >
+                  保存设置
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Category Modal */}
+      {showNewCategoryModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-gray-100">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+              <h3 className="font-black text-lg text-gray-900 flex items-center gap-2">
+                <Plus className="w-5 h-5 text-bvb-yellow" />
+                <span>新增比赛组别</span>
+              </h3>
+              <button onClick={() => setShowNewCategoryModal(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1">组别名称</label>
+                <input
+                  type="text"
+                  placeholder="例如: U13 组别 / 女足组"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-bvb-yellow"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1">赛制 / 人数限制</label>
+                <select
+                  value={newCategoryPitchFormat}
+                  onChange={(e) => setNewCategoryPitchFormat(e.target.value as PitchFormat)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none"
+                >
+                  <option value="3人制">3人制 (小场地无门将)</option>
+                  <option value="5人制">5人制 (标准半场/室内)</option>
+                  <option value="8人制">8人制 (中型场地)</option>
+                  <option value="11人制">11人制 (全场标准)</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1">出生起始日期</label>
+                  <input
+                    type="date"
+                    value={newCategoryMinBirthDate}
+                    onChange={(e) => setNewCategoryMinBirthDate(e.target.value)}
+                    className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-700 uppercase tracking-wider mb-1">出生截止日期</label>
+                  <input
+                    type="date"
+                    value={newCategoryMaxBirthDate}
+                    onChange={(e) => setNewCategoryMaxBirthDate(e.target.value)}
+                    className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <button onClick={() => setShowNewCategoryModal(false)} className="px-4 py-2 bg-gray-100 font-bold text-xs rounded-xl cursor-pointer">取消</button>
+              <button
+                onClick={handleCreateCategory}
                 className="px-5 py-2 bg-bvb-black text-white font-black text-xs rounded-xl hover:bg-gray-800 cursor-pointer"
               >
-                保存设置
+                确认创建组别
               </button>
             </div>
           </div>

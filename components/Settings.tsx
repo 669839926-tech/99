@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AttributeConfig, AttributeCategory, User, Team, RolePermissions, ModuleId, PermissionLevel, UserRole, FinanceCategoryDefinition, SalarySettings, CoachLevel } from '../types';
-import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, Zap, TrendingUp, Calculator, Star, Shirt, Square, Wallet, Cloud, Database, RefreshCw, FileJson, AlertTriangle, History, ArrowRight, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Trash2, Save, Book, Target, CheckSquare, Users as UsersIcon, RotateCcw, Lock, KeyRound, Image as ImageIcon, Upload, CheckCircle, Edit2, X, ShieldAlert, Eye, TrendingUp, Calculator, Star, Shirt, Square, Wallet, Cloud, Database, RefreshCw, FileJson, AlertTriangle, History, ArrowRight, Calendar as CalendarIcon } from 'lucide-react';
 import { getCoachingTenure } from './utils';
 
 interface SettingsProps {
@@ -131,9 +131,8 @@ const Settings: React.FC<SettingsProps> = ({
     return raw;
   });
   
-  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'profile_tags' | 'drills' | 'branding' | 'cloud'>('account');
+  const [activeTab, setActiveTab] = useState<'account' | 'permissions' | 'users' | 'salary' | 'finance_cats' | 'attributes' | 'drills' | 'branding' | 'cloud'>('account');
   const [activeCategory, setActiveCategory] = useState<AttributeCategory>('technical');
-  const [activeTagGroup, setActiveTagGroup] = useState<'playerTypes' | 'technicalStrengths' | 'personalityTraits' | 'behavioralTraits' | 'coachingReminders'>('playerTypes');
   const [newItemName, setNewItemName] = useState('');
 
   const [newUser, setNewUser] = useState<Partial<User>>({ username: '', name: '', role: 'coach', teamIds: [], level: 'Junior', isTrial: false, joiningDate: '' });
@@ -268,24 +267,6 @@ const Settings: React.FC<SettingsProps> = ({
       }
   };
 
-  const handleAddProfileTag = () => {
-    if (!newItemName.trim()) return;
-    setLocalConfig(prev => ({
-      ...prev,
-      [activeTagGroup]: [...(prev[activeTagGroup] || []), newItemName.trim()]
-    }));
-    setNewItemName('');
-  };
-
-  const handleDeleteProfileTag = (group: keyof AttributeConfig, tagToDelete: string) => {
-    if (confirm('确定要删除这个标签吗？')) {
-      setLocalConfig(prev => ({
-        ...prev,
-        [group]: (prev[group] as string[] || []).filter(tag => tag !== tagToDelete)
-      }));
-    }
-  };
-
   const handleChangeOwnPassword = (e: React.FormEvent) => {
       e.preventDefault();
       if (passwordForm.new !== passwordForm.confirm) { alert('两次输入的新密码不一致'); return; }
@@ -348,7 +329,6 @@ const Settings: React.FC<SettingsProps> = ({
                 <button onClick={() => setActiveTab('salary')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'salary' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Calculator className="w-4 h-4 mr-2" /> 薪酬规则配置</button>
                 <button onClick={() => setActiveTab('finance_cats')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'finance_cats' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Wallet className="w-4 h-4 mr-2" /> 财务科目管理</button>
                 <button onClick={() => setActiveTab('attributes')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attributes' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Target className="w-4 h-4 mr-2" /> 球员能力模型</button>
-                <button onClick={() => setActiveTab('profile_tags')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'profile_tags' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Zap className="w-4 h-4 mr-2" /> 球员画像标签</button>
                 <button onClick={() => setActiveTab('drills')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'drills' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Book className="w-4 h-4 mr-2" /> 训练内容库</button>
                 <button onClick={() => setActiveTab('branding')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'branding' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><ImageIcon className="w-4 h-4 mr-2" /> 品牌外观</button>
                 <button onClick={() => setActiveTab('cloud')} className={`px-4 py-2 font-bold text-sm flex items-center border-b-2 transition-colors whitespace-nowrap ${activeTab === 'cloud' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-500'}`}><Cloud className="w-4 h-4 mr-2" /> 云端备份与数据恢复</button>
@@ -1063,71 +1043,6 @@ const Settings: React.FC<SettingsProps> = ({
                             </button>
                         </div>
                     ))}
-                </div>
-            </div>
-        )}
-
-        {activeTab === 'profile_tags' && isDirector && (
-            <div className="flex-1 p-6 space-y-8">
-                <div>
-                    <h3 className="text-xl font-bold text-gray-800 flex items-center"><Zap className="w-5 h-5 mr-2 text-bvb-yellow" /> 球员画像标签设置</h3>
-                    <p className="text-sm text-gray-500 mt-1">配置球员档案中“球员画像”所使用的可选标签。</p>
-                </div>
-
-                <div className="flex gap-2 p-1 bg-gray-100 rounded-xl w-fit overflow-x-auto no-scrollbar">
-                    {[
-                        { id: 'playerTypes', label: '球员类型' },
-                        { id: 'technicalStrengths', label: '技术强项' },
-                        { id: 'personalityTraits', label: '性格特点' },
-                        { id: 'behavioralTraits', label: '行为特点' },
-                        { id: 'coachingReminders', label: '指导提醒' },
-                    ].map(group => (
-                        <button 
-                            key={group.id} 
-                            onClick={() => setActiveTagGroup(group.id as any)}
-                            className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all whitespace-nowrap ${activeTagGroup === group.id ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                        >
-                            {group.label}
-                        </button>
-                    ))}
-                </div>
-
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <label className="block text-sm font-bold text-gray-600 mb-2">
-                        新增{[
-                            { id: 'playerTypes', label: '球员类型' },
-                            { id: 'technicalStrengths', label: '技术强项' },
-                            { id: 'personalityTraits', label: '性格特点' },
-                            { id: 'behavioralTraits', label: '行为特点' },
-                            { id: 'coachingReminders', label: '指导提醒' },
-                        ].find(g => g.id === activeTagGroup)?.label}标签
-                    </label>
-                    <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            placeholder="输入标签名称..." 
-                            className="flex-1 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-bvb-yellow font-bold" 
-                            value={newItemName} 
-                            onChange={(e) => setNewItemName(e.target.value)} 
-                        />
-                        <button onClick={handleAddProfileTag} className="px-6 py-2 bg-bvb-black text-white text-xs font-black rounded-lg flex items-center gap-2">
-                            <Plus className="w-4 h-4" /> 添加标签
-                        </button>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {((localConfig[activeTagGroup as keyof AttributeConfig] as string[]) || []).map(tag => (
-                        <div key={tag} className="flex justify-between items-center p-4 bg-white border border-gray-100 rounded-xl shadow-sm group hover:border-bvb-yellow transition-all">
-                            <span className="font-bold text-gray-700">{tag}</span>
-                            <button onClick={() => handleDeleteProfileTag(activeTagGroup, tag)} className="text-gray-200 hover:text-red-500 transition-colors">
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ))}
-                    {(!localConfig[activeTagGroup as keyof AttributeConfig] || (localConfig[activeTagGroup as keyof AttributeConfig] as string[]).length === 0) && (
-                        <p className="col-span-full text-center py-8 text-gray-400 font-bold italic">暂无标签项，请点击上方按钮添加。</p>
-                    )}
                 </div>
             </div>
         )}
