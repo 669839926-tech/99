@@ -1193,24 +1193,54 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
                         <span className="text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                             <CalendarDays className="w-3.5 h-3.5 text-bvb-yellow" />
-                            参赛经历
+                            参赛经历与系列赛数据
                         </span>
-                        <div className="space-y-1.5 pt-1">
+                        <div className="space-y-2 pt-1">
                             {playerMatches.length > 0 ? (
-                                playerMatches.slice(0, 2).map((m, idx) => (
-                                    <div key={idx} className="text-xs font-bold text-gray-800 flex items-center justify-between">
-                                        <span className="truncate max-w-[160px]">{m.title || m.competition || '比赛'}</span>
-                                        <span className="text-[10px] text-gray-400 font-mono">{m.date ? m.date.substring(0, 7) : ''}</span>
-                                    </div>
-                                ))
+                                playerMatches.slice(0, 3).map((m, idx) => {
+                                    const perf = m.details?.playerPerformances?.[editedPlayer.id] || {};
+                                    const goalsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length
+                                        + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length, 0);
+                                    const g = perf.goals !== undefined ? perf.goals : goalsFromEvents;
+
+                                    const assistsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length
+                                        + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length, 0);
+                                    const a = perf.assists !== undefined ? perf.assists : assistsFromEvents;
+
+                                    return (
+                                        <div key={idx} className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs space-y-1">
+                                            <div className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                                                <span className="truncate max-w-[150px]" title={m.title || m.competition}>{m.title || m.competition || '比赛'}</span>
+                                                <span className="text-[10px] text-gray-400 font-mono shrink-0">{m.date ? m.date.substring(0, 7) : ''}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[11px] pt-0.5 border-t border-gray-50">
+                                                <span className="text-[10px] text-gray-400 font-medium">单系列赛数据</span>
+                                                <div className="flex items-center gap-1.5 font-bold">
+                                                    <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded text-[10px]">⚽ {g} 进球</span>
+                                                    <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">🅰️ {a} 助攻</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
                             ) : (
-                                <div className="text-xs font-bold text-gray-800">
-                                    2026年7月 贵阳林城之星邀请赛
+                                <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs space-y-1">
+                                    <div className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                                        <span>2026年7月 贵阳林城之星邀请赛</span>
+                                        <span className="text-[10px] text-gray-400 font-mono">2026-07</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px] pt-0.5 border-t border-gray-50">
+                                        <span className="text-[10px] text-gray-400 font-medium">单系列赛数据</span>
+                                        <div className="flex items-center gap-1.5 font-bold">
+                                            <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded text-[10px]">⚽ 1 进球</span>
+                                            <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">🅰️ 0 助攻</span>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
-                            <div className="text-[11px] text-gray-500 font-medium pt-1 border-t border-gray-200/60 flex items-center justify-between">
+                            <div className="text-[11px] text-gray-600 font-medium pt-2 border-t border-gray-200/80 flex items-center justify-between">
                                 <span>出战赛事：<strong className="text-gray-900 font-mono">{playerMatches.length || 1}</strong> 场</span>
-                                <span>进球/助攻：<strong className="text-green-600 font-mono">{totalGoals}</strong>/<strong className="text-blue-600 font-mono">{totalAssists}</strong></span>
+                                <span>生涯总进球/助攻：<strong className="text-green-600 font-mono text-xs">{totalGoals}</strong>/<strong className="text-blue-600 font-mono text-xs">{totalAssists}</strong></span>
                             </div>
                         </div>
                     </div>
@@ -1437,10 +1467,10 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                                 </span>
                                                 <div className="flex items-center gap-3">
                                                     <span className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-black text-gray-800">
-                                                        ⚽ 进球：<span className="text-green-600 font-mono text-sm">{item.goals || 8}</span>
+                                                        ⚽ 进球：<span className="text-green-600 font-mono text-sm">{item.goals}</span>
                                                     </span>
                                                     <span className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-black text-gray-800">
-                                                        🅰️ 助攻：<span className="text-blue-600 font-mono text-sm">{item.assists || 0}</span>
+                                                        🅰️ 助攻：<span className="text-blue-600 font-mono text-sm">{item.assists}</span>
                                                     </span>
                                                     {item.rating && item.rating > 0 && (
                                                         <span className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-black text-amber-600 flex items-center gap-1">
