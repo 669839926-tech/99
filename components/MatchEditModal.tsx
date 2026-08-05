@@ -1073,6 +1073,125 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                                         }}
                                                     />
                                                 </div>
+
+                                                {/* 个人数据 & 个人荣誉 */}
+                                                {(() => {
+                                                    const goalsFromEvents = (editingMatch.details?.events || [])
+                                                        .filter(e => e.playerId === pid && e.type === 'Goal').length;
+                                                    const assistsFromEvents = (editingMatch.details?.events || [])
+                                                        .filter(e => e.playerId === pid && e.type === 'Assist').length;
+
+                                                    const goals = currentPerf.goals !== undefined ? currentPerf.goals : goalsFromEvents;
+                                                    const assists = currentPerf.assists !== undefined ? currentPerf.assists : assistsFromEvents;
+                                                    const honors = currentPerf.honors || [];
+                                                    const honorPresets = ['最佳射手', 'MVP 最佳球员', '最佳守门员', '拼搏奖', '优秀球员', '金靴奖', '最佳后卫'];
+
+                                                    return (
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-gray-50/70 p-3 rounded-xl border border-gray-100 mt-2">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[11px] font-black text-gray-700 flex items-center gap-1.5">
+                                                                    <Target className="w-3.5 h-3.5 text-bvb-yellow" />
+                                                                    个人数据 (进球 / 助攻)
+                                                                </label>
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                                                                        <span className="text-[10px] font-bold text-gray-400">进球:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            className="w-10 text-xs font-black text-gray-900 outline-none font-mono"
+                                                                            value={goals}
+                                                                            onChange={e => {
+                                                                                const val = parseInt(e.target.value) || 0;
+                                                                                const current = ensureDetails(editingMatch);
+                                                                                const performances = { ...(current.details?.playerPerformances || {}) };
+                                                                                performances[pid] = {
+                                                                                    ...(performances[pid] || {}),
+                                                                                    goals: val
+                                                                                };
+                                                                                setEditingMatch({
+                                                                                    ...current,
+                                                                                    details: {
+                                                                                        ...current.details!,
+                                                                                        playerPerformances: performances
+                                                                                    }
+                                                                                });
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-gray-200">
+                                                                        <span className="text-[10px] font-bold text-gray-400">助攻:</span>
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            className="w-10 text-xs font-black text-gray-900 outline-none font-mono"
+                                                                            value={assists}
+                                                                            onChange={e => {
+                                                                                const val = parseInt(e.target.value) || 0;
+                                                                                const current = ensureDetails(editingMatch);
+                                                                                const performances = { ...(current.details?.playerPerformances || {}) };
+                                                                                performances[pid] = {
+                                                                                    ...(performances[pid] || {}),
+                                                                                    assists: val
+                                                                                };
+                                                                                setEditingMatch({
+                                                                                    ...current,
+                                                                                    details: {
+                                                                                        ...current.details!,
+                                                                                        playerPerformances: performances
+                                                                                    }
+                                                                                });
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-1">
+                                                                <label className="text-[11px] font-black text-gray-700 flex items-center gap-1.5">
+                                                                    <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                                                                    个人荣誉
+                                                                </label>
+                                                                <div className="flex flex-wrap gap-1 items-center">
+                                                                    {honorPresets.map(preset => {
+                                                                        const isSelected = honors.includes(preset);
+                                                                        return (
+                                                                            <button
+                                                                                key={preset}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const nextHonors = isSelected
+                                                                                        ? honors.filter(h => h !== preset)
+                                                                                        : [...honors, preset];
+                                                                                    const current = ensureDetails(editingMatch);
+                                                                                    const performances = { ...(current.details?.playerPerformances || {}) };
+                                                                                    performances[pid] = {
+                                                                                        ...(performances[pid] || {}),
+                                                                                        honors: nextHonors
+                                                                                    };
+                                                                                    setEditingMatch({
+                                                                                        ...current,
+                                                                                        details: {
+                                                                                            ...current.details!,
+                                                                                            playerPerformances: performances
+                                                                                        }
+                                                                                    });
+                                                                                }}
+                                                                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all border cursor-pointer ${
+                                                                                    isSelected
+                                                                                        ? 'bg-amber-400 text-bvb-black border-amber-500 font-black'
+                                                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-amber-300'
+                                                                                }`}
+                                                                            >
+                                                                                {preset}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         );
                                     })

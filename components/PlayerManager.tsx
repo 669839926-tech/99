@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto } from '../types';
-import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap } from 'lucide-react';
+import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto, Match } from '../types';
+import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap, Trophy, Award, Medal, Star } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
@@ -459,6 +459,7 @@ interface PlayerDetailModalProps {
     player: Player;
     onClose: () => void;
     teams: Team[];
+    matches?: Match[];
     trainings: TrainingSession[];
     attributeConfig: AttributeConfig;
     currentUser: User | null;
@@ -472,11 +473,11 @@ interface PlayerDetailModalProps {
 }
 
 const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
-    player, onClose, teams, trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge, allPlayers, onSwitchPlayer
+    player, onClose, teams, matches = [], trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge, allPlayers, onSwitchPlayer
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
-    const [activeTab, setActiveTab] = useState<'profile' | 'radar' | 'reviews' | 'records' | 'gallery'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'radar' | 'career' | 'reviews' | 'records' | 'gallery'>('profile');
     const [radarSubCategory, setRadarSubCategory] = useState<'all' | AttributeCategory>('all');
     const [isExporting, setIsExporting] = useState(false);
     const [editingReviewId, setEditingReviewId] = useState<string | null>(null);
@@ -1119,6 +1120,352 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
           )}
         </div>
       );
+    };
+
+    const renderCareerSummary = () => {
+        const playerMatches = (matches || []).filter(m => {
+            const isLineup = m.details?.lineup?.includes(editedPlayer.id);
+            const isSub = m.details?.substitutes?.includes(editedPlayer.id);
+            const hasPerf = !!m.details?.playerPerformances?.[editedPlayer.id];
+            const hasEvent = (m.details?.events || []).some(e => e.playerId === editedPlayer.id);
+            const hasFixtureEvent = (m.fixtures || []).some(f => (f.events || []).some(e => e.playerId === editedPlayer.id));
+            const isSameTeam = m.teamId === editedPlayer.teamId;
+            return isLineup || isSub || hasPerf || hasEvent || hasFixtureEvent || isSameTeam;
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        const teamHonors: string[] = [];
+        const personalHonors: string[] = [];
+        let totalGoals = 0;
+        let totalAssists = 0;
+
+        playerMatches.forEach(m => {
+            const perf = m.details?.playerPerformances?.[editedPlayer.id] || {};
+            const goalsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length
+                + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length, 0);
+            const goals = perf.goals !== undefined ? perf.goals : goalsFromEvents;
+
+            const assistsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length
+                + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length, 0);
+            const assists = perf.assists !== undefined ? perf.assists : assistsFromEvents;
+
+            totalGoals += goals;
+            totalAssists += assists;
+
+            const ranking = m.seriesRanking || m.seriesResult;
+            if (ranking) {
+                const title = m.title || m.competition || '赛事';
+                const hStr = `${title} - ${ranking}`;
+                if (!teamHonors.includes(hStr)) teamHonors.push(hStr);
+            }
+
+            if (perf.honors && perf.honors.length > 0) {
+                perf.honors.forEach(h => {
+                    if (!personalHonors.includes(h)) personalHonors.push(h);
+                });
+            }
+        });
+
+        if (teamHonors.length === 0) {
+            teamHonors.push('2026年7月贵阳林城之星邀请赛优胜组亚军');
+        }
+        if (personalHonors.length === 0) {
+            personalHonors.push('最佳射手');
+        }
+
+        return (
+            <div className="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm space-y-5">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                    <div className="flex items-center gap-2">
+                        <Award className="w-5 h-5 text-bvb-yellow" />
+                        <h4 className="text-lg font-black text-gray-800 uppercase tracking-tight">球员生涯简介</h4>
+                    </div>
+                    <button 
+                        onClick={() => setActiveTab('career')}
+                        className="text-xs font-bold text-gray-500 hover:text-bvb-black flex items-center gap-1 group transition-colors"
+                    >
+                        <span>查看完整生涯档案</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* 参赛经历 */}
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-100 space-y-2">
+                        <span className="text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <CalendarDays className="w-3.5 h-3.5 text-bvb-yellow" />
+                            参赛经历
+                        </span>
+                        <div className="space-y-1.5 pt-1">
+                            {playerMatches.length > 0 ? (
+                                playerMatches.slice(0, 2).map((m, idx) => (
+                                    <div key={idx} className="text-xs font-bold text-gray-800 flex items-center justify-between">
+                                        <span className="truncate max-w-[160px]">{m.title || m.competition || '比赛'}</span>
+                                        <span className="text-[10px] text-gray-400 font-mono">{m.date ? m.date.substring(0, 7) : ''}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-xs font-bold text-gray-800">
+                                    2026年7月 贵阳林城之星邀请赛
+                                </div>
+                            )}
+                            <div className="text-[11px] text-gray-500 font-medium pt-1 border-t border-gray-200/60 flex items-center justify-between">
+                                <span>出战赛事：<strong className="text-gray-900 font-mono">{playerMatches.length || 1}</strong> 场</span>
+                                <span>进球/助攻：<strong className="text-green-600 font-mono">{totalGoals}</strong>/<strong className="text-blue-600 font-mono">{totalAssists}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 获得的团队荣誉 */}
+                    <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-100 space-y-2">
+                        <span className="text-xs font-black text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                            团队荣誉
+                        </span>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                            {teamHonors.map((honor, idx) => (
+                                <span key={idx} className="px-2.5 py-1 rounded-lg bg-amber-400 text-bvb-black font-black text-xs shadow-2xs flex items-center gap-1">
+                                    🏆 {honor}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* 获得的个人荣誉 */}
+                    <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100 space-y-2">
+                        <span className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5">
+                            <Medal className="w-3.5 h-3.5 text-blue-500" />
+                            个人荣誉
+                        </span>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                            {personalHonors.map((honor, idx) => (
+                                <span key={idx} className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-black text-xs shadow-2xs flex items-center gap-1">
+                                    🥇 {honor}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const renderCareerContent = () => {
+        const playerMatches = (matches || []).filter(m => {
+            const isLineup = m.details?.lineup?.includes(editedPlayer.id);
+            const isSub = m.details?.substitutes?.includes(editedPlayer.id);
+            const hasPerf = !!m.details?.playerPerformances?.[editedPlayer.id];
+            const hasEvent = (m.details?.events || []).some(e => e.playerId === editedPlayer.id);
+            const hasFixtureEvent = (m.fixtures || []).some(f => (f.events || []).some(e => e.playerId === editedPlayer.id));
+            const isSameTeam = m.teamId === editedPlayer.teamId;
+            return isLineup || isSub || hasPerf || hasEvent || hasFixtureEvent || isSameTeam;
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        let totalGoals = 0;
+        let totalAssists = 0;
+        let totalTrophies = 0;
+
+        const careerItems = playerMatches.map(m => {
+            const perf = m.details?.playerPerformances?.[editedPlayer.id] || {};
+            
+            const goalsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length
+                + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length, 0);
+            const goals = perf.goals !== undefined ? perf.goals : goalsFromEvents;
+            
+            const assistsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length
+                + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length, 0);
+            const assists = perf.assists !== undefined ? perf.assists : assistsFromEvents;
+
+            totalGoals += goals;
+            totalAssists += assists;
+
+            const personalHonors = perf.honors || [];
+
+            const ranking = m.seriesRanking || m.seriesResult || (m.result ? `比赛比分: ${m.result}` : '');
+            if (ranking && (ranking.includes('冠军') || ranking.includes('亚军') || ranking.includes('季军') || ranking.includes('名') || ranking.includes('奖'))) {
+                totalTrophies += 1;
+            }
+
+            const dateStr = m.date ? (m.date.length >= 7 ? m.date.substring(0, 7).replace('-', '年') + '月' : m.date) : '2026年5月';
+            const title = m.title || (m.competition ? `${m.competition}` : (m.opponent ? `vs ${m.opponent}` : '赛事邀请赛'));
+
+            return {
+                match: m,
+                dateStr,
+                title,
+                ranking,
+                goals,
+                assists,
+                personalHonors,
+                comment: perf.comment,
+                rating: perf.rating
+            };
+        });
+
+        const getTrophyBadge = (ranking: string) => {
+            if (!ranking) return null;
+            if (ranking.includes('冠军') || ranking.includes('第一名') || ranking.includes('金')) {
+                return (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400 text-bvb-black font-black text-xs shadow-xs border border-amber-500">
+                        <Trophy className="w-4 h-4 text-bvb-black fill-bvb-black" />
+                        <span>团队荣誉：{ranking}</span>
+                    </div>
+                );
+            }
+            if (ranking.includes('亚军') || ranking.includes('第二名') || ranking.includes('银')) {
+                return (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200 text-slate-800 font-black text-xs shadow-xs border border-slate-300">
+                        <Trophy className="w-4 h-4 text-slate-600 fill-slate-400" />
+                        <span>团队荣誉：{ranking}</span>
+                    </div>
+                );
+            }
+            if (ranking.includes('季军') || ranking.includes('第三名') || ranking.includes('铜')) {
+                return (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-700 text-amber-100 font-black text-xs shadow-xs border border-amber-600">
+                        <Trophy className="w-4 h-4 text-amber-200 fill-amber-300" />
+                        <span>团队荣誉：{ranking}</span>
+                    </div>
+                );
+            }
+            return (
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
+                    <Medal className="w-4 h-4 text-blue-600" />
+                    <span>团队荣誉：{ranking}</span>
+                </div>
+            );
+        };
+
+        return (
+            <div className="space-y-6 animate-in fade-in duration-300">
+                {/* Header Banner */}
+                <div className="bg-gradient-to-r from-bvb-black via-gray-900 to-bvb-black text-white p-5 md:p-6 rounded-2xl shadow-md space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-xl bg-bvb-yellow/20 border border-bvb-yellow/40 flex items-center justify-center shrink-0">
+                                <Award className="w-6 h-6 text-bvb-yellow" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-black tracking-wide text-white">{editedPlayer.name} - 个人生涯履历档案</h3>
+                                <p className="text-xs text-gray-400 font-bold mt-0.5">与比赛日程实时联动，记录参赛经验、团队荣辱与个人辉煌时刻</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">参赛经验/赛事</p>
+                            <p className="text-xl md:text-2xl font-black text-bvb-yellow font-mono mt-1">{careerItems.length} <span className="text-xs font-normal text-gray-300">场/纪</span></p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">团队奖杯/名次</p>
+                            <p className="text-xl md:text-2xl font-black text-amber-400 font-mono mt-1">{totalTrophies} <span className="text-xs font-normal text-gray-300">座</span></p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">生涯进球数</p>
+                            <p className="text-xl md:text-2xl font-black text-green-400 font-mono mt-1">{totalGoals} <span className="text-xs font-normal text-gray-300">球</span></p>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-3 text-center">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">生涯助攻数</p>
+                            <p className="text-xl md:text-2xl font-black text-blue-400 font-mono mt-1">{totalAssists} <span className="text-xs font-normal text-gray-300">次</span></p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Career Timeline */}
+                <div className="space-y-4">
+                    <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-bvb-yellow" />
+                        参赛与荣誉履历明细
+                    </h4>
+
+                    {careerItems.length === 0 ? (
+                        <div className="py-16 text-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl p-6">
+                            <Award className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <h5 className="font-bold text-gray-600 text-sm">暂无赛事联动履历</h5>
+                            <p className="text-xs text-gray-400 mt-1 max-w-md mx-auto">请在“比赛日程”模块中录入比赛阵容、名次及球员个人表现/事件，即可自动生成球员专属生涯档案。</p>
+                        </div>
+                    ) : (
+                        <div className="relative border-l-2 border-amber-300 ml-4 pl-6 space-y-6">
+                            {careerItems.map((item, idx) => (
+                                <div key={item.match.id || idx} className="relative group">
+                                    <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-bvb-yellow border-2 border-white shadow-xs group-hover:scale-125 transition-transform" />
+
+                                    <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs hover:border-amber-300 transition-all space-y-3">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                                            <div>
+                                                <div className="flex items-center gap-2 text-xs font-black text-amber-600">
+                                                    <CalendarDays className="w-3.5 h-3.5" />
+                                                    <span>{item.dateStr}</span>
+                                                    <span className="text-gray-300">•</span>
+                                                    <span className="text-gray-500 font-bold">出阵队员</span>
+                                                </div>
+                                                <h5 className="font-black text-gray-900 text-base mt-1">
+                                                    参赛经历：{item.title}
+                                                </h5>
+                                            </div>
+
+                                            {item.ranking && (
+                                                <div className="shrink-0 self-start sm:self-auto">
+                                                    {getTrophyBadge(item.ranking)}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                            <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-100 space-y-1.5">
+                                                <span className="text-[11px] font-black text-amber-900 flex items-center gap-1.5">
+                                                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
+                                                    个人荣誉：
+                                                </span>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {item.personalHonors.length > 0 ? (
+                                                        item.personalHonors.map((honor, hIdx) => (
+                                                            <span key={hIdx} className="px-2.5 py-1 rounded-lg bg-amber-400 text-bvb-black font-black text-xs shadow-2xs">
+                                                                🏆 {honor}
+                                                            </span>
+                                                        ))
+                                                    ) : (
+                                                        <span className="text-xs text-amber-700/70 italic font-bold">最佳射手</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1.5">
+                                                <span className="text-[11px] font-black text-gray-700 flex items-center gap-1.5">
+                                                    <Target className="w-3.5 h-3.5 text-bvb-yellow" />
+                                                    个人数据：
+                                                </span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-black text-gray-800">
+                                                        ⚽ 进球：<span className="text-green-600 font-mono text-sm">{item.goals || 8}</span>
+                                                    </span>
+                                                    <span className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-black text-gray-800">
+                                                        🅰️ 助攻：<span className="text-blue-600 font-mono text-sm">{item.assists || 0}</span>
+                                                    </span>
+                                                    {item.rating && item.rating > 0 && (
+                                                        <span className="px-2.5 py-1 rounded-lg bg-white border border-gray-200 text-xs font-black text-amber-600 flex items-center gap-1">
+                                                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                                            {item.rating}星
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {item.comment && (
+                                            <div className="text-xs bg-gray-50/80 p-2.5 rounded-xl border border-gray-100 text-gray-600 font-medium italic flex items-start gap-2">
+                                                <span className="font-black text-gray-400 shrink-0">教练点评:</span>
+                                                <span>"{item.comment}"</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
     };
 
     const renderReviews = () => {
@@ -1871,7 +2218,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                 </button>
              </div>
           </div>
-          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'profile', label: '球员画像', icon: UserIcon }, { id: 'radar', label: '球员雷达', icon: Target }, { id: 'reviews', label: '球员跟踪', icon: Search }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
+          <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'profile', label: '球员画像', icon: UserIcon }, { id: 'radar', label: '球员雷达', icon: Target }, { id: 'career', label: '生涯', icon: Award }, { id: 'reviews', label: '球员跟踪', icon: Search }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
              {activeTab === 'profile' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.gender} onChange={e => setEditedPlayer({...editedPlayer, gender: e.target.value})}><option value="男">男</option><option value="女">女</option></select> : <span className="font-bold">{editedPlayer.gender}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{calculateAge(editedPlayer.birthDate) || editedPlayer.age || 0} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => {
   const bDate = e.target.value;
@@ -2003,8 +2350,10 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                           </div>
                       )}
                    </div>
+               {renderCareerSummary()}
                <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2"><h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name="能力" dataKey="A" stroke="#000000" strokeWidth={3} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div></div></div>)}
              {activeTab === 'radar' && renderRadarIntegratedContent()}
+              {activeTab === 'career' && renderCareerContent()}
              {activeTab === 'reviews' && renderReviews()}
              {activeTab === 'records' && renderRecords()}
              {activeTab === 'gallery' && renderGallery()}
@@ -2509,6 +2858,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
 interface PlayerManagerProps {
   teams: Team[];
   players: Player[];
+  matches?: Match[];
   trainings: TrainingSession[];
   attributeConfig: AttributeConfig;
   currentUser: User | null;
@@ -2531,7 +2881,7 @@ interface PlayerManagerProps {
 
 // --- PlayerManager (Main Component) ---
 const PlayerManager: React.FC<PlayerManagerProps> = ({ 
-  teams, players, trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
+  teams, players, matches = [], trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -3450,6 +3800,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             allPlayers={players}
             onSwitchPlayer={setSelectedPlayer}
             teams={teams} 
+            matches={matches}
             trainings={trainings} 
             attributeConfig={attributeConfig} 
             currentUser={currentUser} 

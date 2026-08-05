@@ -316,6 +316,9 @@ export interface SeriesFixture {
 export interface PlayerPerformanceEvaluation {
     rating?: number;  // 1-5 颗星
     comment?: string; // 个人点评
+    goals?: number;   // 个人进球数
+    assists?: number; // 个人助攻数
+    honors?: string[]; // 个人荣誉 (如 ['最佳射手', 'MVP'])
 }
 
 export interface MatchDetails {
