@@ -4,7 +4,7 @@ import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory
 import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap, Trophy, Award, Medal, Star } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
-import { exportToPDF } from '../services/pdfService';
+import { exportToPDF, exportToImage } from '../services/pdfService';
 import html2canvas from 'html2canvas';
 
 // --- Shared Helper Functions ---
@@ -583,13 +583,58 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
       { subject: '心理', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig, currentYearStats), fullMark: 10 },
     ];
 
-    const exportYearStats = editedPlayer?.yearlyStats?.[exportYear] || editedPlayer?.stats;
-    const exportRadarData = [
-      { subject: '技术', A: getCategoryAvg(editedPlayer, 'technical', attributeConfig, exportYearStats), fullMark: 10 },
-      { subject: '战术', A: getCategoryAvg(editedPlayer, 'tactical', attributeConfig, exportYearStats), fullMark: 10 },
-      { subject: '身体', A: getCategoryAvg(editedPlayer, 'physical', attributeConfig, exportYearStats), fullMark: 10 },
-      { subject: '心理', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig, exportYearStats), fullMark: 10 },
+    const exportYearStats = editedPlayer?.yearlyStats?.[exportYear] || editedPlayer?.stats || generateDefaultStats(attributeConfig);
+    const exportOverviewRadarData = [
+      { subject: '技术能力', A: getCategoryAvg(editedPlayer, 'technical', attributeConfig, exportYearStats) },
+      { subject: '战术意识', A: getCategoryAvg(editedPlayer, 'tactical', attributeConfig, exportYearStats) },
+      { subject: '身体素质', A: getCategoryAvg(editedPlayer, 'physical', attributeConfig, exportYearStats) },
+      { subject: '心理素质', A: getCategoryAvg(editedPlayer, 'mental', attributeConfig, exportYearStats) },
     ];
+
+    const exportMatches = (matches || []).filter(m => {
+      const isLineup = (m.details?.lineup || []).some(p => p.id === editedPlayer.id);
+      const isSub = (m.details?.substitutes || []).some(p => p.id === editedPlayer.id);
+      const hasPerf = !!m.details?.playerPerformances?.[editedPlayer.id];
+      const hasEvent = (m.details?.events || []).some(e => e.playerId === editedPlayer.id);
+      const yearMatch = !exportYear || m.date?.startsWith(String(exportYear));
+      return yearMatch && (isLineup || isSub || hasPerf || hasEvent);
+    }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    let exportTotalGoals = 0;
+    let exportTotalAssists = 0;
+    let exportRatingSum = 0;
+    let exportRatingCount = 0;
+    exportMatches.forEach(m => {
+      const perf = m.details?.playerPerformances?.[editedPlayer.id] || {};
+      const g = perf.goals !== undefined ? perf.goals : (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length;
+      const a = perf.assists !== undefined ? perf.assists : (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length;
+      exportTotalGoals += g;
+      exportTotalAssists += a;
+      if (perf.rating) {
+        exportRatingSum += perf.rating;
+        exportRatingCount++;
+      }
+    });
+    const exportAvgRating = exportRatingCount > 0 ? parseFloat((exportRatingSum / exportRatingCount).toFixed(1)) : 0;
+
+    const exportTeamHonors: string[] = [];
+    const exportPersonalHonors: string[] = [];
+    (matches || []).forEach(m => {
+      const perf = m.details?.playerPerformances?.[editedPlayer.id];
+      if (perf?.honors && Array.isArray(perf.honors)) {
+        perf.honors.forEach((h: string) => {
+          if (h.includes('冠军') || h.includes('亚军') || h.includes('季军') || h.includes('组')) {
+            if (!exportTeamHonors.includes(h)) exportTeamHonors.push(h);
+          } else {
+            if (!exportPersonalHonors.includes(h)) exportPersonalHonors.push(h);
+          }
+        });
+      }
+    });
+
+    const exportQuarterlyReviews = (editedPlayer.reviews || [])
+      .filter(r => r.year === exportYear)
+      .sort((a, b) => a.quarter.localeCompare(b.quarter));
 
     const handleSave = () => {
       if (!editedPlayer) return;
@@ -605,6 +650,17 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const handleDeleteRechargeAction = (rechargeId: string) => {
          onDeleteRecharge(player.id, rechargeId);
          setEditedPlayer(prev => ({ ...prev, rechargeHistory: prev.rechargeHistory?.filter(r => r.id !== rechargeId) || [] }));
+    };
+    const handleExportImage = async () => { 
+      setIsExporting(true); 
+      try { 
+        await exportToImage('player-profile-export', `${player.name}_${exportYear}_年度档案`); 
+      } catch (err) { 
+        console.error(err);
+        alert('导出图片失败，请重试'); 
+      } finally { 
+        setIsExporting(false); 
+      } 
     };
     const handleExportPDF = async () => { setIsExporting(true); try { await exportToPDF('player-profile-export', `${player.name}_${exportYear}_年度档案`); } catch { alert('导出失败，请重试'); } finally { setIsExporting(false); } };
     const changeStatsYear = (year: number) => {
@@ -1129,8 +1185,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             const hasPerf = !!m.details?.playerPerformances?.[editedPlayer.id];
             const hasEvent = (m.details?.events || []).some(e => e.playerId === editedPlayer.id);
             const hasFixtureEvent = (m.fixtures || []).some(f => (f.events || []).some(e => e.playerId === editedPlayer.id));
-            const isSameTeam = m.teamId === editedPlayer.teamId;
-            return isLineup || isSub || hasPerf || hasEvent || hasFixtureEvent || isSameTeam;
+            return isLineup || isSub || hasPerf || hasEvent || hasFixtureEvent;
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const teamHonors: string[] = [];
@@ -1164,13 +1219,6 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                 });
             }
         });
-
-        if (teamHonors.length === 0) {
-            teamHonors.push('2026年7月贵阳林城之星邀请赛优胜组亚军');
-        }
-        if (personalHonors.length === 0) {
-            personalHonors.push('最佳射手');
-        }
 
         return (
             <div className="bg-white border-2 border-gray-100 rounded-2xl p-6 shadow-sm space-y-5">
@@ -1206,6 +1254,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                     const assistsFromEvents = (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length
                                         + (m.fixtures || []).reduce((acc, f) => acc + (f.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length, 0);
                                     const a = perf.assists !== undefined ? perf.assists : assistsFromEvents;
+                                    const rating = perf.rating || 0;
 
                                     return (
                                         <div key={idx} className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs space-y-1">
@@ -1218,28 +1267,23 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                                 <div className="flex items-center gap-1.5 font-bold">
                                                     <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded text-[10px]">⚽ {g} 进球</span>
                                                     <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">🅰️ {a} 助攻</span>
+                                                    {rating > 0 && (
+                                                        <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[10px] flex items-center gap-0.5">
+                                                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {rating}星
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
                                     );
                                 })
                             ) : (
-                                <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-2xs space-y-1">
-                                    <div className="text-xs font-bold text-gray-800 flex items-center justify-between">
-                                        <span>2026年7月 贵阳林城之星邀请赛</span>
-                                        <span className="text-[10px] text-gray-400 font-mono">2026-07</span>
-                                    </div>
-                                    <div className="flex items-center justify-between text-[11px] pt-0.5 border-t border-gray-50">
-                                        <span className="text-[10px] text-gray-400 font-medium">单系列赛数据</span>
-                                        <div className="flex items-center gap-1.5 font-bold">
-                                            <span className="text-green-700 bg-green-50 px-1.5 py-0.5 rounded text-[10px]">⚽ 1 进球</span>
-                                            <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">🅰️ 0 助攻</span>
-                                        </div>
-                                    </div>
+                                <div className="bg-white p-3 rounded-lg border border-gray-100 text-center py-4">
+                                    <span className="text-xs text-gray-400 font-medium">暂无参赛比赛记录</span>
                                 </div>
                             )}
                             <div className="text-[11px] text-gray-600 font-medium pt-2 border-t border-gray-200/80 flex items-center justify-between">
-                                <span>出战赛事：<strong className="text-gray-900 font-mono">{playerMatches.length || 1}</strong> 场</span>
+                                <span>出战赛事：<strong className="text-gray-900 font-mono">{playerMatches.length}</strong> 场</span>
                                 <span>生涯总进球/助攻：<strong className="text-green-600 font-mono text-xs">{totalGoals}</strong>/<strong className="text-blue-600 font-mono text-xs">{totalAssists}</strong></span>
                             </div>
                         </div>
@@ -1252,11 +1296,15 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             团队荣誉
                         </span>
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                            {teamHonors.map((honor, idx) => (
-                                <span key={idx} className="px-2.5 py-1 rounded-lg bg-amber-400 text-bvb-black font-black text-xs shadow-2xs flex items-center gap-1">
-                                    🏆 {honor}
-                                </span>
-                            ))}
+                            {teamHonors.length > 0 ? (
+                                teamHonors.map((honor, idx) => (
+                                    <span key={idx} className="px-2.5 py-1 rounded-lg bg-amber-400 text-bvb-black font-black text-xs shadow-2xs flex items-center gap-1">
+                                        🏆 {honor}
+                                    </span>
+                                ))
+                            ) : (
+                                <span className="text-xs text-amber-800/60 font-medium italic">暂无团队荣誉</span>
+                            )}
                         </div>
                     </div>
 
@@ -1267,11 +1315,15 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                             个人荣誉
                         </span>
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                            {personalHonors.map((honor, idx) => (
-                                <span key={idx} className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-black text-xs shadow-2xs flex items-center gap-1">
-                                    🥇 {honor}
-                                </span>
-                            ))}
+                            {personalHonors.length > 0 ? (
+                                personalHonors.map((honor, idx) => (
+                                    <span key={idx} className="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-black text-xs shadow-2xs flex items-center gap-1">
+                                        🥇 {honor}
+                                    </span>
+                                ))
+                            ) : (
+                                <span className="text-xs text-blue-800/60 font-medium italic">暂无个人荣誉</span>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -1286,8 +1338,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
             const hasPerf = !!m.details?.playerPerformances?.[editedPlayer.id];
             const hasEvent = (m.details?.events || []).some(e => e.playerId === editedPlayer.id);
             const hasFixtureEvent = (m.fixtures || []).some(f => (f.events || []).some(e => e.playerId === editedPlayer.id));
-            const isSameTeam = m.teamId === editedPlayer.teamId;
-            return isLineup || isSub || hasPerf || hasEvent || hasFixtureEvent || isSameTeam;
+            return isLineup || isSub || hasPerf || hasEvent || hasFixtureEvent;
         }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         let totalGoals = 0;
@@ -1455,7 +1506,7 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                                                             </span>
                                                         ))
                                                     ) : (
-                                                        <span className="text-xs text-amber-700/70 italic font-bold">最佳射手</span>
+                                                        <span className="text-xs text-amber-800/60 font-medium italic">暂无个人荣誉</span>
                                                     )}
                                                 </div>
                                             </div>
@@ -2224,8 +2275,13 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
 
-                <button onClick={handleExportPDF} disabled={isExporting} className="hidden md:flex p-2 bg-gray-800 rounded hover:bg-gray-700 text-bvb-yellow items-center" title="导出PDF档案">
-                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                <button onClick={handleExportImage} disabled={isExporting} className="hidden md:flex px-2.5 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-bvb-black font-extrabold text-xs rounded items-center gap-1.5 shadow-sm transition-all" title="下载球员年度档案 (A4图片)">
+                    {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                    <span>下载A4图片档案</span>
+                </button>
+
+                <button onClick={handleExportPDF} disabled={isExporting} className="hidden md:flex p-2 bg-gray-800 rounded hover:bg-gray-700 text-gray-300 hover:text-white items-center" title="导出PDF档案">
+                    {isExporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
                 </button>
                 
                 {isEditing ? (
@@ -2388,131 +2444,234 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
              {activeTab === 'records' && renderRecords()}
              {activeTab === 'gallery' && renderGallery()}
           </div>
-            {/* HIDDEN PDF TEMPLATE - UPDATED TO MATCH IMAGE LAYOUT */}
+            {/* HIDDEN PDF/IMAGE TEMPLATE - ANNUAL PLAYER PROFILE A4 ARCHIVE */}
             <div id="player-profile-export" className="absolute left-[-9999px] top-0 w-[210mm] bg-white text-black p-0 z-[-1000] font-sans">
-              <div className="w-full h-[297mm] p-[10mm] flex flex-col relative overflow-hidden bg-white">
+              <div className="w-full p-[8mm] flex flex-col relative overflow-hidden bg-white text-gray-900 border-8 border-gray-900">
                 {/* Header */}
-                <div className="flex justify-between items-start mb-6">
-                  <h1 className="text-3xl font-bold text-gray-800 tracking-tight">个人报告</h1>
-                  <div className="flex items-center gap-2">
-                    <div className="text-right">
-                      <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">WSZG FOOTBALL CLUB</div>
-                      <div className="text-sm font-black text-gray-800 uppercase italic">顽石之光足球俱乐部</div>
+                <div className="flex justify-between items-center border-b-4 border-bvb-yellow pb-3 mb-4 bg-gray-900 text-white p-4 -mx-[8mm] -mt-[8mm]">
+                  <div className="flex items-center gap-3">
+                    <img src={appLogo} alt="Club Logo" className="w-14 h-14 object-contain bg-white rounded-full p-1" />
+                    <div>
+                      <h1 className="text-2xl font-black uppercase tracking-tight text-bvb-yellow">顽石之光足球俱乐部</h1>
+                      <p className="text-xs font-bold text-gray-300 tracking-widest uppercase">青少年球员年度发展档案 (A4图像级报告)</p>
                     </div>
-                    <img src={appLogo} alt="Club Logo" className="w-12 h-12 object-contain" />
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-black text-bvb-yellow">{exportYear}</div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Annual Player Profile</div>
                   </div>
                 </div>
 
-                {/* Basic Info Section */}
-                <div className="border-2 border-gray-800 rounded-sm overflow-hidden flex mb-6 h-48">
-                  {/* Photo */}
-                  <div className="w-40 h-full border-r-2 border-gray-800 bg-gray-50 flex items-center justify-center overflow-hidden">
-                    <img src={editedPlayer.image} alt={editedPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                {/* Section 1: 基础信息 */}
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 border-l-4 border-bvb-yellow pl-2 mb-2">
+                    <h2 className="text-sm font-black uppercase tracking-wide text-gray-800">一、 球员基础信息档案</h2>
                   </div>
-                  {/* Info Grid */}
-                  <div className="flex-1 grid grid-cols-2 border-r-2 border-gray-800">
-                    {[
-                      { label: '姓名', value: editedPlayer.name },
-                      { label: '出生日期', value: editedPlayer.birthDate },
-                      { label: '年级', value: editedPlayer.school || '二年级' },
-                      { label: '民族', value: '汉' },
-                      { label: '球衣号码', value: editedPlayer.number },
-                      { label: '球员类型', value: '全能型前锋' },
-                      { label: '惯用脚', value: `${editedPlayer.preferredFoot} 5/左 2` },
-                      { label: '比赛位置', value: editedPlayer.position }
-                    ].map((item, idx) => (
-                      <div key={idx} className={`flex items-center border-b border-gray-300 last:border-b-0 ${idx % 2 === 0 ? 'border-r border-gray-300' : ''}`}>
-                        <div className="w-20 px-3 py-2 text-xs font-bold text-gray-500 border-r border-gray-300 h-full flex items-center">{item.label}:</div>
-                        <div className="flex-1 px-3 py-2 text-sm font-bold text-gray-800">{item.value}</div>
+                  <div className="border-2 border-gray-800 rounded-lg overflow-hidden flex bg-gray-50/50">
+                    {/* Avatar Photo */}
+                    <div className="w-32 h-36 border-r-2 border-gray-800 bg-gray-100 flex items-center justify-center overflow-hidden shrink-0 relative">
+                      <img src={editedPlayer.image} alt={editedPlayer.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                      <div className="absolute bottom-1 right-1 bg-black text-bvb-yellow text-[10px] font-black px-1.5 py-0.5 rounded border border-bvb-yellow">
+                        #{editedPlayer.number}
                       </div>
-                    ))}
-                  </div>
-                  {/* Pitch Diagram */}
-                  <div className="w-48 h-full p-2 flex items-center justify-center bg-gray-50">
-                    <div className="w-full h-full border-2 border-gray-400 rounded-sm relative overflow-hidden">
-                      {/* Pitch Lines */}
-                      <div className="absolute inset-0 border-b-2 border-gray-400 top-1/2 -translate-y-1/2"></div>
-                      <div className="absolute w-12 h-12 border-2 border-gray-400 rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"></div>
-                      <div className="absolute w-16 h-8 border-2 border-gray-400 border-t-0 top-0 left-1/2 -translate-x-1/2"></div>
-                      <div className="absolute w-16 h-8 border-2 border-gray-400 border-b-0 bottom-0 left-1/2 -translate-x-1/2"></div>
-                      <div className="absolute w-8 h-4 border-2 border-gray-400 border-t-0 top-0 left-1/2 -translate-x-1/2"></div>
-                      <div className="absolute w-8 h-4 border-2 border-gray-400 border-b-0 bottom-0 left-1/2 -translate-x-1/2"></div>
-                      {/* Player Marker */}
-                      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 bg-red-500 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm">10</div>
-                      <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-red-400 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white opacity-60">6</div>
-                      <div className="absolute top-1/2 right-1/4 translate-x-1/2 -translate-y-1/2 w-5 h-5 bg-gray-400 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white opacity-40">7</div>
+                    </div>
+                    {/* Info Grid (11 Required Fields) */}
+                    <div className="flex-1 grid grid-cols-3 divide-x divide-y divide-gray-300 text-xs">
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">姓名</span><span className="font-extrabold text-gray-900">{editedPlayer.name}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">性别</span><span className="font-bold text-gray-800">{editedPlayer.gender || '男'}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">出生年月</span><span className="font-bold font-mono text-gray-800">{editedPlayer.birthDate || '未录入'}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">年龄</span><span className="font-bold text-gray-800">{calculateAge(editedPlayer.birthDate) || editedPlayer.age || 0} 岁</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">惯用脚</span><span className="font-bold text-gray-800">{editedPlayer.preferredFoot || '右'}脚</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">所属球队</span><span className="font-bold text-gray-800">{teams.find(t => t.id === editedPlayer.teamId)?.name || '未分配'}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">球员位置</span><span className="font-bold text-gray-800">{editedPlayer.position}{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== '待定' ? ` / ${editedPlayer.secondaryPosition}` : ''}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">入队时间</span><span className="font-bold font-mono text-gray-800">{editedPlayer.joinDate || '-'}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">球龄</span><span className="font-bold text-gray-800">{calculateTenure(editedPlayer.joinDate) || '-'}</span></div>
+                      <div className="p-2 col-span-2"><span className="text-gray-400 font-bold block text-[10px]">就读学校</span><span className="font-bold text-gray-800 truncate">{editedPlayer.school || '-'}</span></div>
+                      <div className="p-2"><span className="text-gray-400 font-bold block text-[10px]">家长联系人</span><span className="font-bold text-gray-800">{editedPlayer.parentName ? `${editedPlayer.parentName} (${editedPlayer.parentPhone || ''})` : '-'}</span></div>
                     </div>
                   </div>
                 </div>
 
-                {/* Skills Grid */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  {/* Technical & Match Ability */}
-                  {[
-                    { title: '技术能力', category: 'technical', color: 'bg-[#E8F1F8]' },
-                    { title: '比赛能力', category: 'tactical', color: 'bg-[#E8F1F8]' },
-                    { title: '身体能力', category: 'physical', color: 'bg-[#FDF2E9]' },
-                    { title: '心理', category: 'mental', color: 'bg-[#FDF2E9]' }
-                  ].map((section, sIdx) => (
-                    <div key={sIdx} className="border-2 border-gray-800 rounded-sm overflow-hidden">
-                      <div className={`${section.color} border-b-2 border-gray-800 px-4 py-2 text-center font-bold text-sm tracking-widest`}>
-                        {section.title}
+                {/* Section 2: 球员雷达图 (5维全景雷达图) */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between border-l-4 border-bvb-yellow pl-2 mb-2">
+                    <h2 className="text-sm font-black uppercase tracking-wide text-gray-800">二、 球员雷达图 (4维全景+4个专项，共5图)</h2>
+                    <span className="text-[10px] font-bold text-gray-500 font-mono">{exportYear} 赛季测评维度</span>
+                  </div>
+                  <div className="border-2 border-gray-800 rounded-lg p-3 bg-white">
+                    <div className="grid grid-cols-5 gap-2">
+                      {/* Main 4D Overview Radar */}
+                      <div className="col-span-1 border border-gray-200 rounded-md p-1 bg-gray-50 flex flex-col items-center justify-center">
+                        <span className="text-[10px] font-black text-gray-800 uppercase tracking-tighter mb-1 text-center">4维全景雷达</span>
+                        <div className="w-full h-32">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart cx="50%" cy="50%" outerRadius="68%" data={exportOverviewRadarData}>
+                              <PolarGrid stroke="#d1d5db" />
+                              <PolarAngleAxis dataKey="subject" tick={{ fill: '#111827', fontSize: 8, fontWeight: 'bold' }} />
+                              <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
+                              <Radar name="综合" dataKey="A" stroke="#000" strokeWidth={1.5} fill="#FDE100" fillOpacity={0.7} isAnimationActive={false} />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <table className="w-full text-xs">
-                        <tbody>
-                          {attributeConfig[section.category as AttributeCategory].map((attr, aIdx) => {
-                            const val = exportYearStats[section.category as AttributeCategory][attr.key] || 5;
-                            const scaledVal = Math.min(4, Math.max(1, Math.ceil(val / 2.5)));
-                            return (
-                              <tr key={aIdx} className="border-b border-gray-300 last:border-b-0">
-                                <td className="px-3 py-2 font-bold text-gray-600 border-r border-gray-300 w-1/2">{attr.label}</td>
-                                <td className="px-1 py-1">
-                                  <div className="flex justify-around items-center h-full">
-                                    {[1, 2, 3, 4].map(num => (
-                                      <div key={num} className={`w-6 h-6 flex items-center justify-center rounded-sm border border-gray-300 text-[10px] font-bold ${scaledVal === num ? 'bg-[#F9D5D3] text-red-700 border-red-300' : 'text-gray-400'}`}>
-                                        {num}
-                                      </div>
-                                    ))}
+
+                      {/* 4 Sub-Radars */}
+                      {[
+                        { key: 'technical', title: '技术能力', color: '#2563eb' },
+                        { key: 'tactical', title: '战术意识', color: '#059669' },
+                        { key: 'physical', title: '身体素质', color: '#d97706' },
+                        { key: 'mental', title: '心理素质', color: '#7c3aed' }
+                      ].map(dim => {
+                        const chartData = getCategoryRadarData(editedPlayer, dim.key as AttributeCategory, attributeConfig, exportYearStats);
+                        const avgVal = getCategoryAvg(editedPlayer, dim.key as AttributeCategory, attributeConfig, exportYearStats);
+                        return (
+                          <div key={dim.key} className="col-span-1 border border-gray-200 rounded-md p-1 bg-gray-50 flex flex-col items-center">
+                            <div className="flex justify-between items-center w-full px-1 border-b border-gray-200 pb-0.5">
+                              <span className="text-[9px] font-black text-gray-800">{dim.title}</span>
+                              <span className="text-[9px] font-black px-1 rounded bg-black text-bvb-yellow">{avgVal}</span>
+                            </div>
+                            <div className="w-full h-32">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart cx="50%" cy="55%" outerRadius="65%" data={chartData}>
+                                  <PolarGrid stroke="#e5e7eb" />
+                                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontSize: 7, fontWeight: 'bold' }} />
+                                  <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
+                                  <Radar name={dim.title} dataKey="value" stroke={dim.color} strokeWidth={1.5} fill={dim.color} fillOpacity={0.35} isAnimationActive={false} />
+                                </RadarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 3: 生涯 */}
+                <div className="mb-4">
+                  <div className="flex items-center border-l-4 border-bvb-yellow pl-2 mb-2">
+                    <h2 className="text-sm font-black uppercase tracking-wide text-gray-800">三、 球员生涯履历与荣誉数据</h2>
+                  </div>
+                  <div className="border-2 border-gray-800 rounded-lg p-3 bg-white space-y-3">
+                    {/* Stats summary banner */}
+                    <div className="grid grid-cols-4 gap-2 text-center bg-gray-900 text-white rounded-md p-2">
+                      <div><span className="text-[10px] text-gray-400 block font-bold">出战赛事</span><span className="text-base font-black text-bvb-yellow font-mono">{exportMatches.length} 场</span></div>
+                      <div><span className="text-[10px] text-gray-400 block font-bold">总进球</span><span className="text-base font-black text-green-400 font-mono">{exportTotalGoals} 个</span></div>
+                      <div><span className="text-[10px] text-gray-400 block font-bold">总助攻</span><span className="text-base font-black text-blue-400 font-mono">{exportTotalAssists} 次</span></div>
+                      <div>
+                        <span className="text-[10px] text-gray-400 block font-bold">比赛综合星级</span>
+                        <span className="text-xs font-black text-amber-400 flex items-center justify-center gap-0.5 mt-0.5">
+                          {exportAvgRating > 0 ? (
+                            <>
+                              {[1, 2, 3, 4, 5].map(st => (
+                                <span key={st} className={st <= Math.round(exportAvgRating) ? 'text-amber-400' : 'text-gray-600'}>★</span>
+                              ))}
+                              <span className="ml-1 text-[10px] text-white font-mono">{exportAvgRating}星</span>
+                            </>
+                          ) : '暂无星级'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 参赛经历与荣誉 */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="border border-gray-200 rounded p-2 bg-gray-50">
+                        <span className="font-black text-gray-800 block border-b border-gray-200 pb-1 mb-1 text-[11px] flex justify-between">
+                          <span>⚽ 参赛经历明细</span>
+                          <span className="text-gray-400 text-[10px] font-normal">{exportYear}年度记录</span>
+                        </span>
+                        <div className="space-y-1">
+                          {exportMatches.length > 0 ? (
+                            exportMatches.slice(0, 3).map((m, idx) => {
+                              const perf = m.details?.playerPerformances?.[editedPlayer.id] || {};
+                              const g = perf.goals !== undefined ? perf.goals : (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Goal').length;
+                              const a = perf.assists !== undefined ? perf.assists : (m.details?.events || []).filter(e => e.playerId === editedPlayer.id && e.type === 'Assist').length;
+                              const rating = perf.rating || 0;
+                              return (
+                                <div key={idx} className="flex justify-between items-center bg-white p-1.5 rounded border border-gray-200 text-[11px]">
+                                  <span className="font-bold truncate max-w-[150px]">{m.title || m.competition}</span>
+                                  <div className="flex items-center gap-1 font-bold shrink-0">
+                                    <span className="text-green-700 bg-green-50 px-1 rounded text-[10px]">⚽{g}</span>
+                                    <span className="text-blue-700 bg-blue-50 px-1 rounded text-[10px]">🅰️{a}</span>
+                                    {rating > 0 && <span className="text-amber-600 bg-amber-50 px-1 rounded text-[10px]">★{rating}星</span>}
                                   </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ))}
-                </div>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p className="text-gray-400 italic text-center py-2 text-[10px]">本年度暂无赛事履历</p>
+                          )}
+                        </div>
+                      </div>
 
-                {/* Bottom Section */}
-                <div className="flex-1 border-2 border-gray-800 rounded-sm overflow-hidden flex">
-                  {/* Evaluation suggestions */}
-                  <div className="flex-1 p-4 border-r-2 border-gray-800 flex flex-col">
-                    <h3 className="text-lg font-bold text-gray-800 mb-3">评价建议</h3>
-                    <div className="flex-1 text-sm text-gray-700 leading-relaxed overflow-hidden">
-                      {editedPlayer.reviews?.filter(r => r.year === exportYear).sort((a,b) => b.date.localeCompare(a.date))[0]?.summary || 
-                       "该球员表现稳定，在训练中展现出良好的学习态度和竞技状态。技术动作规范，团队配合意识强。建议在接下来的训练中重点加强身体对抗能力和比赛中的决策果断性。"}
+                      {/* 团队荣誉 & 个人荣誉 & 教练点评 */}
+                      <div className="border border-gray-200 rounded p-2 bg-gray-50 space-y-2">
+                        <div>
+                          <span className="font-black text-gray-800 block border-b border-gray-200 pb-1 mb-1 text-[11px]">🏆 团队荣誉</span>
+                          <div className="flex flex-wrap gap-1">
+                            {exportTeamHonors.length > 0 ? (
+                              exportTeamHonors.map((h, idx) => (
+                                <span key={idx} className="bg-amber-400 text-black px-1.5 py-0.5 rounded text-[10px] font-black">🏆 {h}</span>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-[10px] italic">暂无团队荣誉</span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="font-black text-gray-800 block border-b border-gray-200 pb-1 mb-1 text-[11px]">🥇 个人荣誉与星级</span>
+                          <div className="flex flex-wrap gap-1">
+                            {exportPersonalHonors.length > 0 ? (
+                              exportPersonalHonors.map((h, idx) => (
+                                <span key={idx} className="bg-blue-600 text-white px-1.5 py-0.5 rounded text-[10px] font-black">🥇 {h}</span>
+                              ))
+                            ) : (
+                              <span className="text-gray-400 text-[10px] italic">暂无个人荣誉</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  {/* Radar Chart */}
-                  <div className="w-72 h-full p-4 flex flex-col items-center justify-center bg-gray-50">
-                    <div className="w-full h-full">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={exportRadarData}>
-                          <PolarGrid stroke="#e5e7eb" />
-                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#6b7280', fontSize: 10, fontWeight: 'bold' }} />
-                          <PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} />
-                          <Radar name="能力值" dataKey="A" stroke="#000" strokeWidth={1} fill="#000" fillOpacity={0.05} isAnimationActive={false} />
-                        </RadarChart>
-                      </ResponsiveContainer>
-                    </div>
+                </div>
+
+                {/* Section 4: 球员跟踪 (本年度教练员季度点评) */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between border-l-4 border-bvb-yellow pl-2 mb-2">
+                    <h2 className="text-sm font-black uppercase tracking-wide text-gray-800">四、 球员跟踪 (本年度教练员季度点评)</h2>
+                    <span className="text-[10px] font-bold text-gray-500">{exportYear} 年度季度复盘</span>
+                  </div>
+                  <div className="border-2 border-gray-800 rounded-lg p-3 bg-gray-50">
+                    {exportQuarterlyReviews.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        {exportQuarterlyReviews.map(r => (
+                          <div key={r.id} className="bg-white p-2.5 rounded border border-gray-200 shadow-2xs space-y-1">
+                            <div className="flex justify-between items-center border-b border-gray-100 pb-1">
+                              <span className="bg-bvb-yellow text-bvb-black font-black px-1.5 py-0.5 rounded text-[10px]">
+                                {r.year} {r.quarter} 季度点评
+                              </span>
+                              <span className="text-[9px] text-gray-400 font-mono">{r.date}</span>
+                            </div>
+                            <div className="space-y-0.5 text-[11px]">
+                              <div><strong className="text-gray-600 font-bold">重点目标/技战术: </strong><span className="text-gray-800">{r.technicalTacticalImprovement || '规范技术动作，提升配合'}</span></div>
+                              <div><strong className="text-gray-600 font-bold">心理/完成情况: </strong><span className="text-gray-800">{r.mentalDevelopment || '态度积极，专注度显著提升'}</span></div>
+                              <div className="pt-1 border-t border-gray-50 text-gray-700 italic">"{r.summary || '表现优异，各维度均有所突破。'}"</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-white p-3 rounded text-center border border-dashed border-gray-300 text-gray-400 text-xs italic">
+                        {exportYear}年度暂无教练员季度考评跟踪记录
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="mt-4 flex justify-between items-center text-[10px] text-gray-400 font-mono uppercase tracking-widest">
-                  <span>WSZG CLUB • INDIVIDUAL REPORT</span>
-                  <span>GENERATED ON {new Date().toLocaleDateString()}</span>
+                <div className="mt-auto pt-3 border-t-2 border-gray-900 flex justify-between items-center text-[10px] text-gray-500 font-mono uppercase">
+                  <div>WSZG FOOTBALL CLUB • OFFICIAL PLAYER PROFILE</div>
+                  <div>生成日期: {new Date().toISOString().split('T')[0]} • 审核部门: 顽石之光青训发展部</div>
                 </div>
               </div>
             </div>
