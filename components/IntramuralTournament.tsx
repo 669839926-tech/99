@@ -96,7 +96,6 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
   // Search & Filter within active category
   const [playerSearch, setPlayerSearch] = useState('');
-  const [playerFilterStatus, setPlayerFilterStatus] = useState<'all' | 'participating' | 'opt_out'>('all');
 
   // Draft Lottery State
   const [isLotteryAnimating, setIsLotteryAnimating] = useState(false);
@@ -2409,15 +2408,9 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                 />
               </div>
 
-              <select
-                value={playerFilterStatus}
-                onChange={(e) => setPlayerFilterStatus(e.target.value as any)}
-                className="bg-gray-50 border border-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 outline-none cursor-pointer"
-              >
-                <option value="all">显示全部状态</option>
-                <option value="participating">仅显示确认参赛</option>
-                <option value="opt_out">仅显示不参加</option>
-              </select>
+              <div className="text-xs text-gray-400 font-bold hidden sm:block">
+                仅显示确认参赛学员
+              </div>
             </div>
 
             <button
@@ -2435,69 +2428,91 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
           </div>
 
           {/* Player Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {categoryPlayersInfo.all
-              .filter(item => {
-                if (playerFilterStatus === 'participating' && item.status !== 'participating') return false;
-                if (playerFilterStatus === 'opt_out' && item.status !== 'opt_out') return false;
-                if (playerSearch) {
-                  const query = playerSearch.toLowerCase();
-                  return item.player.name.toLowerCase().includes(query) || item.player.number.toString().includes(query);
-                }
-                return true;
-              })
-              .map(item => {
-                const p = item.player;
-                const isParticipating = item.status === 'participating';
-                const originalTeam = teams.find(t => t.id === p.teamId);
+          {(() => {
+            const filteredList = categoryPlayersInfo.participating.filter(item => {
+              if (playerSearch) {
+                const query = playerSearch.toLowerCase();
+                return item.player.name.toLowerCase().includes(query) || item.player.number.toString().includes(query);
+              }
+              return true;
+            });
 
-                return (
-                  <div
-                    key={p.id}
-                    className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-2 ${
-                      isParticipating
-                        ? 'bg-white border-gray-100 hover:border-amber-300 shadow-2xs'
-                        : 'bg-gray-50 border-gray-200 opacity-60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs border overflow-hidden shrink-0 ${
-                        isParticipating ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-gray-200 text-gray-500 border-gray-300'
-                      }`}>
-                        {p.image ? (
-                          <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
-                        ) : (
-                          p.name.charAt(0)
-                        )}
+            if (filteredList.length === 0) {
+              return (
+                <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400 text-xs font-bold">
+                  {categoryPlayersInfo.participating.length === 0
+                    ? '【' + activeCategory.name + '】暂无确认参赛的球员'
+                    : '没有符合搜索条件的参赛球员'}
+                </div>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {filteredList.map(item => {
+                  const p = item.player;
+                  const originalTeam = teams.find(t => t.id === p.teamId);
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="bg-white p-3.5 rounded-2xl border border-gray-200 hover:border-amber-400 shadow-2xs transition-all flex flex-col justify-between gap-3"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-xs flex items-center justify-center overflow-hidden shrink-0">
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                            ) : (
+                              p.name.charAt(0)
+                            )}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-black text-gray-900 text-sm">{p.name}</span>
+                              <span className="text-[10px] font-mono text-gray-400">#{p.number}</span>
+                              {item.isCrossCategory && (
+                                <span className="text-[8px] font-black bg-blue-100 text-blue-800 px-1 py-0.2 rounded">跨组/补强</span>
+                              )}
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-0.5">
+                              原梯队: {originalTeam?.name || '未指定'} • 生日: {p.birthDate || '未知'}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-black text-gray-900 text-sm">{p.name}</span>
-                          <span className="text-[10px] font-mono text-gray-400">#{p.number}</span>
-                          {item.isCrossCategory && (
-                            <span className="text-[8px] font-black bg-blue-100 text-blue-800 px-1 py-0.2 rounded">跨组</span>
-                          )}
+
+                      <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                        {/* Competition Category Dropdown Selector */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-500 font-bold">参赛组别:</span>
+                          <select
+                            value={activeCategory.id}
+                            onChange={(e) => handleMovePlayerToCategoryGlobal(p.id, activeCategory.id, e.target.value)}
+                            className="bg-amber-50 border border-amber-200 text-[11px] font-black text-amber-900 rounded-lg px-2 py-1 outline-none cursor-pointer focus:bg-white focus:border-amber-500"
+                          >
+                            {currentTournament.categories.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
                         </div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">
-                          原梯队: {originalTeam?.name || '未指定'} • 生日: {p.birthDate || '未知'}
-                        </div>
+
+                        {/* Toggle to Non-Participating */}
+                        <button
+                          onClick={() => handleTogglePlayerStatusGlobal(p.id, activeCategory.id)}
+                          className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                          title="选择不参加比赛，将移出组别名单"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>设为非参赛</span>
+                        </button>
                       </div>
                     </div>
-
-                    <button
-                      onClick={() => handleTogglePlayerStatus(p.id)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        isParticipating
-                          ? 'bg-emerald-100 text-emerald-800 hover:bg-rose-100 hover:text-rose-800'
-                          : 'bg-gray-200 text-gray-600 hover:bg-emerald-100 hover:text-emerald-800'
-                      }`}
-                    >
-                      {isParticipating ? '参训中' : '已选择不参加'}
-                    </button>
-                  </div>
-                );
-              })}
-          </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
 
