@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Player, Team, IntramuralTournament, TournamentCategory, IntramuralTeam, IntramuralMatch, PitchFormat, IntramuralMatchGoal, User } from '../types';
-import { Trophy, Users, Calendar, Shuffle, Dices, CheckCircle2, Award, Flame, RefreshCw, Plus, Edit3, Settings2, BarChart2, Search, Sparkles, Crown, ChevronRight, X, UserPlus, Flag, Shield, Check, UserX, Lock, Eye, RotateCcw, Trash2 } from 'lucide-react';
+import { Trophy, Users, Calendar, Shuffle, Dices, CheckCircle2, Award, Flame, RefreshCw, Plus, Edit3, Settings2, BarChart2, Search, Sparkles, Crown, ChevronRight, X, UserPlus, Flag, Shield, Check, UserX, Lock, Eye, RotateCcw, Trash2, Download, FileSpreadsheet, UserCheck } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface IntramuralTournamentProps {
   players: Player[];
@@ -84,7 +85,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
   const [activeTournamentId, setActiveTournamentId] = useState<string>(tournaments[0]?.id || '');
   const [activeCategoryId, setActiveCategoryId] = useState<string>('');
-  const [activeStep, setActiveStep] = useState<'roster' | 'format' | 'draft' | 'schedule' | 'standings'>('roster');
+  const [activeStep, setActiveStep] = useState<'overview' | 'roster' | 'format' | 'draft' | 'schedule' | 'standings'>('overview');
+
+  // Overview Search & Filters
+  const [overviewSearch, setOverviewSearch] = useState('');
+  const [overviewCategoryFilter, setOverviewCategoryFilter] = useState<string>('all');
+  const [overviewStatusFilter, setOverviewStatusFilter] = useState<'all' | 'participating' | 'opt_out'>('all');
 
   // Search & Filter within active category
   const [playerSearch, setPlayerSearch] = useState('');
@@ -247,6 +253,242 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       crossCategory
     };
   }, [players, activeCategory, currentTournament, playerCategoryMap]);
+
+  // Calculate Player Enrollment for ANY Category based on Birth Date Range & Overrides
+  const getCategoryPlayersInfo = useCallback((catId: string) => {
+    if (!currentTournament) {
+      return { category: null, all: [], participating: [], optOut: [], crossCategory: [] };
+    }
+
+    const cat = currentTournament.categories.find(c => c.id === catId);
+    if (!cat) return { category: null, all: [], participating: [], optOut: [], crossCategory: [] };
+
+    const minDate = cat.minBirthDate;
+    const maxDate = cat.maxBirthDate;
+
+    const list: {
+      player: Player;
+      isAutoEligible: boolean;
+      status: 'participating' | 'opt_out';
+      isCrossCategory: boolean;
+      categoryId: string;
+      categoryName: string;
+    }[] = [];
+
+    players.forEach(p => {
+      if (isUnassignedTeamPlayer(p, teams)) {
+        return;
+      }
+      const assignment = playerCategoryMap[p.id];
+      if (assignment && assignment.categoryId === cat.id) {
+        const inAgeRange = Boolean(p.birthDate && p.birthDate >= minDate && p.birthDate <= maxDate);
+        const override = cat.playerOverrides?.[p.id];
+        const isCross = !inAgeRange || Boolean(override && override.overrideCategoryId === cat.id);
+
+        list.push({
+          player: p,
+          isAutoEligible: inAgeRange,
+          status: assignment.status,
+          isCrossCategory: isCross,
+          categoryId: cat.id,
+          categoryName: cat.name
+        });
+      }
+    });
+
+    const participating = list.filter(item => item.status === 'participating');
+    const optOut = list.filter(item => item.status === 'opt_out');
+    const crossCategory = list.filter(item => item.isCrossCategory && item.status === 'participating');
+
+    return {
+      category: cat,
+      all: list,
+      participating,
+      optOut,
+      crossCategory
+    };
+  }, [currentTournament, players, teams, playerCategoryMap]);
+
+  // Global handler: Toggle Player Status in ANY Category
+  const handleTogglePlayerStatusGlobal = (playerId: string, categoryId: string) => {
+    if (!currentTournament) return;
+    const cat = currentTournament.categories.find(c => c.id === categoryId);
+    if (!cat) return;
+
+    const overrides = { ...(cat.playerOverrides || {}) };
+    const current = overrides[playerId];
+
+    if (!current) {
+      overrides[playerId] = { status: 'opt_out' };
+    } else if (current.status === 'participating') {
+      overrides[playerId] = { ...current, status: 'opt_out' };
+    } else {
+      overrides[playerId] = { ...current, status: 'participating' };
+    }
+
+    const updatedCategories = currentTournament.categories.map(c =>
+      c.id === categoryId ? { ...c, playerOverrides: overrides } : c
+    );
+
+    updateCurrentTournament(t => ({
+      ...t,
+      categories: updatedCategories
+    }));
+  };
+
+  // Global handler: Move Player to another Category
+  const handleMovePlayerToCategoryGlobal = (playerId: string, oldCategoryId: string, newCategoryId: string) => {
+    if (!currentTournament || oldCategoryId === newCategoryId) return;
+
+    const updatedCategories = currentTournament.categories.map(cat => {
+      const catOverrides = { ...(cat.playerOverrides || {}) };
+
+      if (cat.id === newCategoryId) {
+        // Set new category override as participating
+        catOverrides[playerId] = { status: 'participating', overrideCategoryId: newCategoryId };
+        return { ...cat, playerOverrides: catOverrides };
+      } else {
+        // Remove override from old and other categories
+        if (catOverrides[playerId]) {
+          delete catOverrides[playerId];
+          return { ...cat, playerOverrides: catOverrides };
+        }
+        return cat;
+      }
+    });
+
+    // Remove player from teams in old category to prevent orphaned players
+    const updatedTeams = currentTournament.teams.map(t => {
+      if (t.categoryId === oldCategoryId && t.playerIds.includes(playerId)) {
+        return { ...t, playerIds: t.playerIds.filter(id => id !== playerId) };
+      }
+      return t;
+    });
+
+    updateCurrentTournament(t => ({
+      ...t,
+      categories: updatedCategories,
+      teams: updatedTeams
+    }));
+  };
+
+  // Export Roster Overview to Excel (.xlsx)
+  const handleExportExcel = () => {
+    if (!currentTournament) return;
+
+    const participatingRows: any[] = [];
+    let partIdx = 1;
+
+    const optOutRows: any[] = [];
+    let optIdx = 1;
+
+    const statsRows: any[] = [];
+
+    currentTournament.categories.forEach((cat, cIdx) => {
+      const info = getCategoryPlayersInfo(cat.id);
+      const catTeams = currentTournament.teams.filter(t => t.categoryId === cat.id);
+
+      info.participating.forEach(item => {
+        const p = item.player;
+        const origTeam = teams.find(t => t.id === p.teamId);
+        participatingRows.push({
+          '序号': partIdx++,
+          '参赛组别': cat.name,
+          '学员姓名': p.name,
+          '球衣号码': p.number || '无',
+          '性别': p.gender || '男',
+          '出生日期': p.birthDate || '未填写',
+          '原所属梯队': origTeam?.name || '未指定',
+          '场上位置': p.position || '未定',
+          '脚法': p.preferredFoot || '右脚',
+          '属性标注': item.isCrossCategory ? '跨组/补强' : '标准适龄',
+          '状态': '确认参赛'
+        });
+      });
+
+      info.optOut.forEach(item => {
+        const p = item.player;
+        const origTeam = teams.find(t => t.id === p.teamId);
+        optOutRows.push({
+          '序号': optIdx++,
+          '原适用组别': cat.name,
+          '学员姓名': p.name,
+          '球衣号码': p.number || '无',
+          '性别': p.gender || '男',
+          '出生日期': p.birthDate || '未填写',
+          '原所属梯队': origTeam?.name || '未指定',
+          '状态说明': '选择不参加 / 伤病请假'
+        });
+      });
+
+      const totalEligible = info.all.length;
+      const partCount = info.participating.length;
+      const optCount = info.optOut.length;
+      const rate = totalEligible > 0 ? Math.round((partCount / totalEligible) * 100) : 0;
+
+      statsRows.push({
+        '序号': cIdx + 1,
+        '组别名称': cat.name,
+        '赛制规格': cat.pitchFormat,
+        '适龄区间': `${cat.minBirthDate} 至 ${cat.maxBirthDate}`,
+        '适龄总人数': totalEligible,
+        '实际参赛人数': partCount,
+        '非参赛人数': optCount,
+        '已建队伍数': catTeams.length,
+        '参训率': `${rate}%`
+      });
+    });
+
+    const wb = XLSX.utils.book_new();
+
+    const wsParticipating = XLSX.utils.json_to_sheet(participatingRows);
+    const wsOptOut = XLSX.utils.json_to_sheet(optOutRows);
+    const wsStats = XLSX.utils.json_to_sheet(statsRows);
+
+    wsParticipating['!cols'] = [
+      { wch: 8 },  // 序号
+      { wch: 14 }, // 参赛组别
+      { wch: 14 }, // 学员姓名
+      { wch: 10 }, // 球衣号码
+      { wch: 8 },  // 性别
+      { wch: 14 }, // 出生日期
+      { wch: 16 }, // 原所属梯队
+      { wch: 12 }, // 场上位置
+      { wch: 10 }, // 脚法
+      { wch: 14 }, // 属性标注
+      { wch: 12 }, // 状态
+    ];
+
+    wsOptOut['!cols'] = [
+      { wch: 8 },  // 序号
+      { wch: 14 }, // 原适用组别
+      { wch: 14 }, // 学员姓名
+      { wch: 10 }, // 球衣号码
+      { wch: 8 },  // 性别
+      { wch: 14 }, // 出生日期
+      { wch: 16 }, // 原所属梯队
+      { wch: 22 }, // 状态说明
+    ];
+
+    wsStats['!cols'] = [
+      { wch: 8 },  // 序号
+      { wch: 16 }, // 组别名称
+      { wch: 12 }, // 赛制规格
+      { wch: 26 }, // 适龄区间
+      { wch: 12 }, // 适龄总人数
+      { wch: 14 }, // 实际参赛人数
+      { wch: 12 }, // 非参赛人数
+      { wch: 14 }, // 已建队伍数
+      { wch: 12 }, // 参训率
+    ];
+
+    XLSX.utils.book_append_sheet(wb, wsParticipating, '参赛球员名单');
+    XLSX.utils.book_append_sheet(wb, wsOptOut, '非参赛球员名单');
+    XLSX.utils.book_append_sheet(wb, wsStats, '组别人数统计概况');
+
+    const fileName = `顽石之光队内赛_球员名单总览_${currentTournament.title}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
 
   // Teams in current category
   const categoryTeams = useMemo(() => {
@@ -1210,9 +1452,26 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       </div>
 
       {/* Main Workflow Tabs */}
-      {activeCategory && (
+      {currentTournament && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1">
+            <button
+              onClick={() => setActiveStep('overview')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                activeStep === 'overview'
+                  ? 'bg-bvb-black text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+              <span>0. 全员名单总览与Excel导出</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 font-mono">
+                {currentTournament.categories.reduce((acc, cat) => acc + getCategoryPlayersInfo(cat.id).participating.length, 0)}人参赛
+              </span>
+            </button>
+
+            <ChevronRight className="w-4 h-4 text-gray-300 hidden sm:block" />
+
             <button
               onClick={() => setActiveStep('roster')}
               className={`px-4 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
@@ -1222,10 +1481,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
               }`}
             >
               <Users className="w-4 h-4 text-bvb-yellow" />
-              <span>1. 年龄限制与人员名单</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-800 font-mono">
-                {categoryPlayersInfo.participating.length}人
-              </span>
+              <span>1. 年龄限制与组别名单</span>
+              {activeCategory && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-800 font-mono">
+                  {categoryPlayersInfo.participating.length}人
+                </span>
+              )}
             </button>
 
             <ChevronRight className="w-4 h-4 text-gray-300 hidden sm:block" />
@@ -1301,6 +1562,368 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
             <Edit3 className="w-3.5 h-3.5 text-gray-500" />
             <span>设置组别参数</span>
           </button>
+        </div>
+      )}
+
+      {/* STEP 0: OVERVIEW & ROSTER ADJUSTMENT */}
+      {activeStep === 'overview' && currentTournament && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Banner & Excel Export */}
+          <div className="bg-white p-5 md:p-6 rounded-3xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="bg-amber-100 text-amber-900 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  ROSTER OVERVIEW & EXCEL EXPORT
+                </span>
+                <span className="text-xs text-gray-500 font-bold">按组别集中管控 & 一键导出 Excel</span>
+              </div>
+              <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+                <span>全员参赛名单总览、跨组调整与报表统计</span>
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                按参赛组别查看学员名单，支持实时勾选“参赛 / 非参赛”、跨组别调配学员。调整将直接更新赛事组别人员构成，并可一键导出 Excel 完整表单。
+              </p>
+            </div>
+
+            <button
+              onClick={handleExportExcel}
+              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center gap-2 cursor-pointer active:scale-95 shrink-0"
+            >
+              <Download className="w-4 h-4 text-emerald-200" />
+              <span>导出所有参赛及非参赛球员名单 (Excel)</span>
+            </button>
+          </div>
+
+          {/* Tournament Overview Stats Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-2xs">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                <Users className="w-3.5 h-3.5 text-gray-400" /> 赛事适龄覆盖人数
+              </span>
+              <div className="text-2xl font-black text-gray-900 mt-1">
+                {currentTournament.categories.reduce((acc, cat) => acc + getCategoryPlayersInfo(cat.id).all.length, 0)} 人
+              </div>
+            </div>
+
+            <div className="bg-emerald-50/70 p-4.5 rounded-2xl border border-emerald-100 shadow-2xs">
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> 确认参赛总人数
+              </span>
+              <div className="text-2xl font-black text-emerald-700 mt-1">
+                {currentTournament.categories.reduce((acc, cat) => acc + getCategoryPlayersInfo(cat.id).participating.length, 0)} 人
+              </div>
+            </div>
+
+            <div className="bg-rose-50/70 p-4.5 rounded-2xl border border-rose-100 shadow-2xs">
+              <span className="text-[10px] font-black text-rose-700 uppercase tracking-wider flex items-center gap-1">
+                <UserX className="w-3.5 h-3.5 text-rose-600" /> 选择非参赛人数
+              </span>
+              <div className="text-2xl font-black text-rose-700 mt-1">
+                {currentTournament.categories.reduce((acc, cat) => acc + getCategoryPlayersInfo(cat.id).optOut.length, 0)} 人
+              </div>
+            </div>
+
+            <div className="bg-amber-50/70 p-4.5 rounded-2xl border border-amber-100 shadow-2xs">
+              <span className="text-[10px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1">
+                <Flag className="w-3.5 h-3.5 text-amber-600" /> 整体参训率
+              </span>
+              <div className="text-2xl font-black text-amber-800 mt-1">
+                {(() => {
+                  const total = currentTournament.categories.reduce((acc, cat) => acc + getCategoryPlayersInfo(cat.id).all.length, 0);
+                  const part = currentTournament.categories.reduce((acc, cat) => acc + getCategoryPlayersInfo(cat.id).participating.length, 0);
+                  return total > 0 ? `${Math.round((part / total) * 100)}%` : '0%';
+                })()}
+              </div>
+            </div>
+          </div>
+
+          {/* Search & Filter Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1 min-w-[260px]">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="全局搜索学员姓名 / 球衣号码..."
+                  value={overviewSearch}
+                  onChange={(e) => setOverviewSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:ring-1 focus:ring-bvb-yellow"
+                />
+              </div>
+
+              <select
+                value={overviewCategoryFilter}
+                onChange={(e) => setOverviewCategoryFilter(e.target.value)}
+                className="bg-gray-50 border border-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 outline-none cursor-pointer"
+              >
+                <option value="all">显示全部组别</option>
+                {currentTournament.categories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              <select
+                value={overviewStatusFilter}
+                onChange={(e) => setOverviewStatusFilter(e.target.value as any)}
+                className="bg-gray-50 border border-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 outline-none cursor-pointer"
+              >
+                <option value="all">全部参赛状态</option>
+                <option value="participating">仅显示确认参赛</option>
+                <option value="opt_out">仅显示非参赛</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Categories Overview List */}
+          <div className="space-y-6">
+            {currentTournament.categories
+              .filter(cat => overviewCategoryFilter === 'all' || overviewCategoryFilter === cat.id)
+              .map(cat => {
+                const info = getCategoryPlayersInfo(cat.id);
+                const filteredParticipating = info.participating.filter(item => {
+                  if (overviewStatusFilter === 'opt_out') return false;
+                  if (overviewSearch) {
+                    const q = overviewSearch.toLowerCase();
+                    return item.player.name.toLowerCase().includes(q) || item.player.number.toString().includes(q);
+                  }
+                  return true;
+                });
+
+                return (
+                  <div key={cat.id} className="bg-white rounded-3xl border border-gray-200/80 shadow-xs overflow-hidden">
+                    {/* Category Header */}
+                    <div className="bg-gradient-to-r from-gray-900 via-slate-800 to-gray-900 p-4 md:p-5 text-white flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-bvb-yellow text-bvb-black flex items-center justify-center font-black text-sm shadow-md">
+                          {cat.name.substring(0, 3)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-black text-lg text-white">{cat.name}</h4>
+                            <span className="bg-white/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-md">
+                              {cat.pitchFormat}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-gray-300 mt-0.5 font-mono">
+                            生日限制: {cat.minBirthDate} ~ {cat.maxBirthDate}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Headcount Statistics Pills */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/15 text-xs">
+                          <span className="text-gray-300 text-[10px]">适龄人员: </span>
+                          <span className="font-black text-white">{info.all.length} 人</span>
+                        </div>
+                        <div className="bg-emerald-500/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-400/30 text-xs">
+                          <span className="text-emerald-300 text-[10px]">参赛人员: </span>
+                          <span className="font-black text-emerald-200">{info.participating.length} 人</span>
+                        </div>
+                        <div className="bg-rose-500/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-rose-400/30 text-xs">
+                          <span className="text-rose-300 text-[10px]">非参赛: </span>
+                          <span className="font-black text-rose-200">{info.optOut.length} 人</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Participating Roster Content */}
+                    <div className="p-4 md:p-5">
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                          <UserCheck className="w-4 h-4 text-emerald-600" />
+                          <span>【{cat.name}】确认参赛球员名单 ({filteredParticipating.length} 人)</span>
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          提示: 可直接下拉调整所属组别或点击“设为非参赛”移动至非参赛名单
+                        </span>
+                      </div>
+
+                      {filteredParticipating.length === 0 ? (
+                        <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400 text-xs">
+                          {info.participating.length === 0
+                            ? '暂无确认参赛的球员'
+                            : '没有符合搜索条件的参赛球员'}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {filteredParticipating.map(item => {
+                            const p = item.player;
+                            const origTeam = teams.find(t => t.id === p.teamId);
+
+                            return (
+                              <div
+                                key={p.id}
+                                className="bg-white p-3.5 rounded-2xl border border-gray-200 hover:border-amber-400 shadow-2xs transition-all flex flex-col justify-between gap-3"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-amber-100 border border-amber-300 text-amber-900 font-black text-xs flex items-center justify-center overflow-hidden shrink-0">
+                                      {p.image ? (
+                                        <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                                      ) : (
+                                        p.name.charAt(0)
+                                      )}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-black text-gray-900 text-sm">{p.name}</span>
+                                        <span className="text-[10px] font-mono text-gray-400">#{p.number}</span>
+                                        {item.isCrossCategory && (
+                                          <span className="text-[8px] font-black bg-blue-100 text-blue-800 px-1 py-0.2 rounded">跨组补强</span>
+                                        )}
+                                      </div>
+                                      <div className="text-[10px] text-gray-400 mt-0.5">
+                                        梯队: {origTeam?.name || '未指定'} • 生日: {p.birthDate || '未知'}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                                  {/* Category Change Selector */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-[10px] text-gray-400 font-bold">组别:</span>
+                                    <select
+                                      value={cat.id}
+                                      onChange={(e) => handleMovePlayerToCategoryGlobal(p.id, cat.id, e.target.value)}
+                                      className="bg-gray-50 border border-gray-200 text-[11px] font-black text-gray-800 rounded-lg px-2 py-1 outline-none cursor-pointer focus:bg-white focus:border-amber-400"
+                                    >
+                                      {currentTournament.categories.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* Participation Toggle */}
+                                  <button
+                                    onClick={() => handleTogglePlayerStatusGlobal(p.id, cat.id)}
+                                    className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                                  >
+                                    <UserX className="w-3.5 h-3.5" />
+                                    <span>设为非参赛</span>
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* NON-PARTICIPATING PLAYERS SECTION */}
+          {(() => {
+            const allOptOut = currentTournament.categories.flatMap(cat => {
+              const info = getCategoryPlayersInfo(cat.id);
+              return info.optOut.map(item => ({
+                ...item,
+                categoryId: cat.id,
+                categoryName: cat.name
+              }));
+            }).filter(item => {
+              if (overviewCategoryFilter !== 'all' && item.categoryId !== overviewCategoryFilter) return false;
+              if (overviewStatusFilter === 'participating') return false;
+              if (overviewSearch) {
+                const q = overviewSearch.toLowerCase();
+                return item.player.name.toLowerCase().includes(q) || item.player.number.toString().includes(q);
+              }
+              return true;
+            });
+
+            return (
+              <div className="bg-rose-50/40 rounded-3xl border border-rose-200/80 p-5 md:p-6 space-y-4">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black">
+                      <UserX className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-gray-900 text-base">非参赛球员名单汇总专区</h4>
+                      <p className="text-xs text-gray-500">
+                        在此可集中查看未参加本次比赛的学员，点击“恢复参赛”可将其直接恢复加入指定组别。
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="bg-rose-100 text-rose-800 text-xs font-black px-3 py-1 rounded-full border border-rose-200">
+                    共 {allOptOut.length} 人非参赛
+                  </span>
+                </div>
+
+                {allOptOut.length === 0 ? (
+                  <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-rose-200 text-gray-400 text-xs">
+                    暂无非参赛球员记录
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {allOptOut.map(item => {
+                      const p = item.player;
+                      const origTeam = teams.find(t => t.id === p.teamId);
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="bg-white p-3.5 rounded-2xl border border-rose-100 shadow-2xs flex flex-col justify-between gap-3 opacity-90 hover:opacity-100 transition-opacity"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-100 border border-gray-300 text-gray-500 font-black text-xs flex items-center justify-center overflow-hidden shrink-0">
+                              {p.image ? (
+                                <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                              ) : (
+                                p.name.charAt(0)
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-black text-gray-900 text-sm">{p.name}</span>
+                                <span className="text-[10px] font-mono text-gray-400">#{p.number}</span>
+                                <span className="text-[9px] bg-rose-100 text-rose-800 px-1.5 py-0.2 rounded font-bold">
+                                  原适用: {item.categoryName}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-gray-400 mt-0.5">
+                                原梯队: {origTeam?.name || '未指定'} • 生日: {p.birthDate || '未知'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="pt-2 border-t border-gray-100 flex items-center justify-between gap-2">
+                            {/* Reassign target category dropdown */}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] text-gray-400 font-bold">恢复到:</span>
+                              <select
+                                value={item.categoryId}
+                                onChange={(e) => handleMovePlayerToCategoryGlobal(p.id, item.categoryId, e.target.value)}
+                                className="bg-gray-50 border border-gray-200 text-[11px] font-black text-gray-800 rounded-lg px-2 py-1 outline-none cursor-pointer focus:bg-white focus:border-amber-400"
+                              >
+                                {currentTournament.categories.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Restore Participation Button */}
+                            <button
+                              onClick={() => handleTogglePlayerStatusGlobal(p.id, item.categoryId)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>恢复参赛</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
