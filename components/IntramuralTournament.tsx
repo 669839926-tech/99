@@ -7,6 +7,8 @@ interface IntramuralTournamentProps {
   players: Player[];
   teams: Team[];
   currentUser?: User | null;
+  intramuralTournaments?: IntramuralTournament[];
+  onUpdateTournaments?: (tournaments: IntramuralTournament[]) => void;
 }
 
 // Default Category Configuration
@@ -55,9 +57,17 @@ const isUnassignedTeamPlayer = (p: Player, teams: Team[] = []): boolean => {
   return false;
 };
 
-export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = ({ players, teams }) => {
+export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = ({ 
+  players, 
+  teams, 
+  intramuralTournaments,
+  onUpdateTournaments 
+}) => {
   // Main state - tournaments list
   const [tournaments, setTournaments] = useState<IntramuralTournament[]>(() => {
+    if (intramuralTournaments && intramuralTournaments.length > 0) {
+      return intramuralTournaments;
+    }
     const saved = localStorage.getItem('club_intramural_tournaments_v1');
     if (saved) {
       try {
@@ -82,6 +92,25 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       matches: []
     }];
   });
+
+  // Sync state if parent props update from cloud
+  useEffect(() => {
+    if (intramuralTournaments && intramuralTournaments.length > 0) {
+      setTournaments(intramuralTournaments);
+    }
+  }, [intramuralTournaments]);
+
+  const handleUpdateTournaments = useCallback((updater: IntramuralTournament[] | ((prev: IntramuralTournament[]) => IntramuralTournament[])) => {
+    setTournaments(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (onUpdateTournaments) {
+        queueMicrotask(() => {
+          onUpdateTournaments(next);
+        });
+      }
+      return next;
+    });
+  }, [onUpdateTournaments]);
 
   const [activeTournamentId, setActiveTournamentId] = useState<string>(tournaments[0]?.id || '');
   const [activeCategoryId, setActiveCategoryId] = useState<string>('');
@@ -152,7 +181,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
   // Helper to update active tournament
   const updateCurrentTournament = (updater: (t: IntramuralTournament) => IntramuralTournament) => {
-    setTournaments(prev => prev.map(t => t.id === currentTournament.id ? updater(t) : t));
+    handleUpdateTournaments(prev => prev.map(t => t.id === currentTournament.id ? updater(t) : t));
   };
 
   // Helper to update active category
@@ -1428,7 +1457,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       matches: []
     };
 
-    setTournaments(prev => [newTour, ...prev]);
+    handleUpdateTournaments(prev => [newTour, ...prev]);
     setActiveTournamentId(newId);
     setNewTournamentTitle('');
     setShowNewTournamentModal(false);

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Match, Player, Team, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic } from '../types';
+import { Match, Player, Team, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic, IntramuralTournament } from '../types';
 // Comment: Added 'Star', 'Target', 'Download' to lucide-react imports
 import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, ClipboardList, PenTool, Coins, TrendingDown, ListPlus, Cloud, Star, Target, Printer, Download } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -30,6 +30,8 @@ interface MatchPlannerProps {
   appLogo?: string;
   tactics: Tactic[];
   onUpdateTactics: (tactics: Tactic[]) => void;
+  intramuralTournaments?: IntramuralTournament[];
+  onUpdateIntramuralTournaments?: (tournaments: IntramuralTournament[]) => void;
 }
 
 type ViewMode = 'matches' | 'intramural' | 'points' | 'tactics';
@@ -52,7 +54,9 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   travelingPlayerIds,
   onUpdateTravelingPlayers,
   tactics,
-  onUpdateTactics
+  onUpdateTactics,
+  intramuralTournaments,
+  onUpdateIntramuralTournaments
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
@@ -493,6 +497,8 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
             players={players}
             teams={teams}
             currentUser={currentUser}
+            intramuralTournaments={intramuralTournaments}
+            onUpdateTournaments={onUpdateIntramuralTournaments}
         />
       ) : viewMode === 'points' ? (
         <MatchPointManager 

@@ -26,6 +26,7 @@ export interface AppData {
     basicTechThemes?: any[];
     scenarioThemes?: any[];
     philosophyOverview?: any;
+    intramuralTournaments?: any[];
 }
 
 const getApiUrl = (relativePath: string): string => {

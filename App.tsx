@@ -14,7 +14,7 @@ import TechnicalGrowth from './components/TechnicalGrowth';
 import PhilosophyLibrary from './components/PhilosophyLibrary';
 import { MATCH_PRINCIPLES, PHILOSOPHY_OVERVIEW, BASIC_TECH_THEMES, SCENARIO_THEMES, MatchPrinciple, BasicTechItem, ScenarioTheme } from './src/philosophyData';
 import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord, PhilosophyDocument } from './types';
+import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord, PhilosophyDocument, IntramuralTournament, Tactic, PointItemDefinition, PlayerPointRecord } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -50,6 +50,7 @@ function App() {
   const [basicTechThemes, setBasicTechThemes] = useState<BasicTechItem[]>(BASIC_TECH_THEMES);
   const [scenarioThemes, setScenarioThemes] = useState<ScenarioTheme[]>(SCENARIO_THEMES);
   const [philosophyOverview, setPhilosophyOverview] = useState<any>(PHILOSOPHY_OVERVIEW);
+  const [intramuralTournaments, setIntramuralTournaments] = useState<IntramuralTournament[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -200,6 +201,21 @@ function App() {
         if (data.basicTechThemes) setBasicTechThemes(data.basicTechThemes);
         if (data.scenarioThemes) setScenarioThemes(data.scenarioThemes);
         if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
+        if (data.intramuralTournaments && Array.isArray(data.intramuralTournaments) && data.intramuralTournaments.length > 0) {
+            setIntramuralTournaments(data.intramuralTournaments);
+        } else {
+            const savedLocalTournaments = localStorage.getItem('club_intramural_tournaments_v1');
+            if (savedLocalTournaments) {
+                try {
+                    const parsed = JSON.parse(savedLocalTournaments);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setIntramuralTournaments(parsed);
+                    }
+                } catch {
+                    // Ignore parse error
+                }
+            }
+        }
     };
 
     try {
@@ -287,7 +303,8 @@ function App() {
             matchPrinciples,
             basicTechThemes,
             scenarioThemes,
-            philosophyOverview
+            philosophyOverview,
+            intramuralTournaments
         };
 
         // Mirror in local browser storage synchronously first
@@ -316,7 +333,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, intramuralTournaments, isInitializing]);
 
   const handleRestoreSystem = (data: any) => {
     if (!data) return;
@@ -367,6 +384,7 @@ function App() {
     if (Array.isArray(data.basicTechThemes)) setBasicTechThemes(data.basicTechThemes);
     if (Array.isArray(data.scenarioThemes)) setScenarioThemes(data.scenarioThemes);
     if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
+    if (Array.isArray(data.intramuralTournaments)) setIntramuralTournaments(data.intramuralTournaments);
 
     setTimeout(() => {
         setIsInitializing(false);
@@ -406,7 +424,8 @@ function App() {
         matchPrinciples,
         basicTechThemes,
         scenarioThemes,
-        philosophyOverview
+        philosophyOverview,
+        intramuralTournaments
     };
 
     // Mirror in local browser storage synchronously first
@@ -612,6 +631,8 @@ function App() {
           onUpdateTravelingPlayers={handleUpdateTravelingPlayers}
           tactics={tactics}
           onUpdateTactics={setTactics}
+          intramuralTournaments={intramuralTournaments}
+          onUpdateIntramuralTournaments={setIntramuralTournaments}
         />;
       case 'philosophy':
         return (
