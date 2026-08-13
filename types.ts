@@ -652,6 +652,7 @@ export interface TournamentCategory {
   legCount?: 1 | 2; // 单循环 / 双循环 (for league)
   playerOverrides?: Record<string, PlayerCategoryOverride>;
   playerSkillTiers?: Record<string, number>; // playerId -> tierIndex (0=A档, 1=B档, 2=C档...)
+  specifiedCaptainTierIndex?: number; // 指定队长档位: undefined/-1 代表随机抽取档位，0=A档, 1=B档, 2=C档...
 }
 
 export interface IntramuralTeam {

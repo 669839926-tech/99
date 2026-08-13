@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import confetti from 'canvas-confetti';
 import { Player, Team, IntramuralTournament, TournamentCategory, IntramuralTeam, IntramuralMatch, PitchFormat, IntramuralMatchGoal, User } from '../types';
 import { Trophy, Users, Calendar, Shuffle, Dices, CheckCircle2, Award, Flame, RefreshCw, Plus, Edit3, Settings2, BarChart2, Search, Sparkles, Crown, ChevronRight, X, UserPlus, Flag, Shield, Check, UserX, Lock, Eye, RotateCcw, Trash2, Download, FileSpreadsheet, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -812,7 +813,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
   };
 
   // 3. Online Draft / Lottery System (线上抽签)
-  // Step A: Draw Captains Randomly from Tiers
+  // Step A: Draw Captains Randomly or from Specified Tier
   const handleRunCaptainLottery = () => {
     if (participatingList.length < teamCount) {
       alert(`参赛球员人数 (${participatingList.length}人) 少于队伍数量 (${teamCount}队)，无法抽取队长！`);
@@ -820,38 +821,47 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
     }
 
     setIsLotteryAnimating(true);
-    setLotteryMessage('🎲 正在从5个盲盒能力档位中滚签抽选【队长档位】...');
+    const specifiedTier = activeCategory?.specifiedCaptainTierIndex;
+    const isSpecified = specifiedTier !== undefined && specifiedTier >= 0 && specifiedTier < calculatedTierCount;
+
+    setLotteryMessage('🎲 正在从盲盒选中滚签抽选【队长】...');
 
     let counter = 0;
     const interval = setInterval(() => {
-      const randomTierIdx = Math.floor(Math.random() * calculatedTierCount);
-      const tierConfig = TIER_CONFIGS[randomTierIdx % TIER_CONFIGS.length];
+      const randomTierIdx = isSpecified ? specifiedTier : Math.floor(Math.random() * calculatedTierCount);
       const playersInTier = participatingList.filter(p => (playerSkillTiers[p.id] ?? 0) === randomTierIdx);
       if (playersInTier.length > 0) {
         const sample = playersInTier[Math.floor(Math.random() * playersInTier.length)];
         setLotteryHighlightedPlayer(sample);
       }
-      setLotteryMessage(`🎲 正在滚签盲盒档位: 【${tierConfig.name}】...`);
+      setLotteryMessage('🎲 正在滚签盲盒抽选各队队长...');
       counter++;
 
       if (counter > 25) {
         clearInterval(interval);
 
-        const validTierIndices: number[] = [];
-        for (let i = 0; i < calculatedTierCount; i++) {
-          const count = participatingList.filter(p => (playerSkillTiers[p.id] ?? 0) === i).length;
-          if (count > 0) validTierIndices.push(i);
+        let chosenTierIdx = 0;
+        if (isSpecified) {
+          chosenTierIdx = specifiedTier;
+        } else {
+          const validTierIndices: number[] = [];
+          for (let i = 0; i < calculatedTierCount; i++) {
+            const count = participatingList.filter(p => (playerSkillTiers[p.id] ?? 0) === i).length;
+            if (count > 0) validTierIndices.push(i);
+          }
+          chosenTierIdx = validTierIndices.length > 0
+            ? validTierIndices[Math.floor(Math.random() * validTierIndices.length)]
+            : 0;
         }
-        const chosenTierIdx = validTierIndices.length > 0
-          ? validTierIndices[Math.floor(Math.random() * validTierIndices.length)]
-          : 0;
 
-        const chosenTierConfig = TIER_CONFIGS[chosenTierIdx % TIER_CONFIGS.length];
         const tierCaptains = participatingList.filter(p => (playerSkillTiers[p.id] ?? 0) === chosenTierIdx);
+        // Fallback: in case specified tier has fewer players than teamCount, backfill with other available players
+        const otherPlayers = participatingList.filter(p => (playerSkillTiers[p.id] ?? 0) !== chosenTierIdx);
+        const captainPool = [...tierCaptains, ...otherPlayers.sort(() => 0.5 - Math.random())];
         const shuffledCaptains = [...tierCaptains].sort(() => 0.5 - Math.random());
 
         const updatedCategoryTeams = categoryTeams.map((team, idx) => {
-          const captain = shuffledCaptains[idx % shuffledCaptains.length] || participatingList[idx];
+          const captain = shuffledCaptains[idx] || captainPool[idx] || participatingList[idx];
           const existingPlayers = team.playerIds.filter(pid => pid !== captain.id);
           return {
             ...team,
@@ -867,7 +877,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
         }));
 
         setIsLotteryAnimating(false);
-        setLotteryMessage(`👑 随机盲盒抽中【${chosenTierConfig.name}】学员担任各队队长！已生成 ${categoryTeams.length} 支球队队长。`);
+        setLotteryMessage(`👑 盲盒抽选队长完成！已成功为各队配对产生 ${categoryTeams.length} 支球队队长。`);
+        try {
+          confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
+        } catch {
+          // ignore if canvas not supported
+        }
       }
     }, 100);
   };
@@ -877,7 +892,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
     if (categoryTeams.length === 0 || participatingList.length === 0) return;
 
     setIsLotteryAnimating(true);
-    setLotteryMessage('⚡ 正在按 A/B/C/D/E 技战术能力档位全自动盲盒配对，生成绝对均衡阵容...');
+    setLotteryMessage('⚡ 正在进行一键全自动盲盒对等配对，生成绝对均衡阵容...');
 
     let counter = 0;
     const interval = setInterval(() => {
@@ -904,6 +919,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
         if (existingCaptains.length === categoryTeams.length) {
           const cap0Tier = playerSkillTiers[existingCaptains[0]];
           if (cap0Tier !== undefined) captainTierIdx = cap0Tier;
+        } else if (
+          activeCategory?.specifiedCaptainTierIndex !== undefined &&
+          activeCategory.specifiedCaptainTierIndex >= 0 &&
+          activeCategory.specifiedCaptainTierIndex < calculatedTierCount
+        ) {
+          captainTierIdx = activeCategory.specifiedCaptainTierIndex;
         } else {
           captainTierIdx = Math.floor(Math.random() * calculatedTierCount);
         }
@@ -917,15 +938,18 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
         // 1. Assign Captains from captainTierIdx
         const captainPool = [...(tierBuckets[captainTierIdx] || [])].sort(() => 0.5 - Math.random());
-        categoryTeams.forEach((team, idx) => {
-          const captain = captainPool[idx % captainPool.length] || participatingList[idx];
-          if (captain) {
-            newCaptains[team.id] = captain.id;
-            newTeamPlayerMap[team.id].push(captain.id);
+        const availableCaptains = [...participatingList].sort(() => 0.5 - Math.random());
+        categoryTeams.forEach((team) => {
+          const chosenCaptain = captainPool.find(c => !Object.values(newCaptains).includes(c.id))
+            || availableCaptains.find(c => !Object.values(newCaptains).includes(c.id));
+          if (chosenCaptain) {
+            newCaptains[team.id] = chosenCaptain.id;
+            newTeamPlayerMap[team.id].push(chosenCaptain.id);
           }
         });
 
-        // 2. Assign remaining players tier by tier
+        // 2. Assign remaining players tier by tier with continuous team pointer
+        let teamPointer = 0;
         for (let tIdx = 0; tIdx < calculatedTierCount; tIdx++) {
           let playersInTier = [...(tierBuckets[tIdx] || [])];
           if (tIdx === captainTierIdx) {
@@ -934,13 +958,24 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
           }
 
           const shuffledTierPlayers = playersInTier.sort(() => 0.5 - Math.random());
-          shuffledTierPlayers.forEach((player, pIdx) => {
-            const targetTeam = categoryTeams[pIdx % categoryTeams.length];
+          shuffledTierPlayers.forEach((player) => {
+            const targetTeam = categoryTeams[teamPointer % categoryTeams.length];
             if (!newTeamPlayerMap[targetTeam.id].includes(player.id)) {
               newTeamPlayerMap[targetTeam.id].push(player.id);
             }
+            teamPointer++;
           });
         }
+
+        // 3. Fallback: ensure EVERY participating player is assigned sequentially to Teams A, B, C...
+        const assignedIds = new Set(Object.values(newTeamPlayerMap).flat());
+        const remainingUnassigned = participatingList.filter(p => !assignedIds.has(p.id));
+        remainingUnassigned.forEach((player, idx) => {
+          const targetTeam = categoryTeams[idx % categoryTeams.length];
+          if (targetTeam && !newTeamPlayerMap[targetTeam.id].includes(player.id)) {
+            newTeamPlayerMap[targetTeam.id].push(player.id);
+          }
+        });
 
         const updatedTeams = categoryTeams.map(t => ({
           ...t,
@@ -955,7 +990,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
         }));
 
         setIsLotteryAnimating(false);
-        setLotteryMessage('🎉 全盲盒档位分配完成！各队均均衡包含 A/B/C/D/E 档位选手，阵容水平绝对均衡！');
+        setLotteryMessage('🎉 智能盲盒配对完成！各队伍对等均衡，已全员对齐落位！');
+        try {
+          confetti({ particleCount: 120, spread: 90, origin: { y: 0.6 } });
+        } catch {
+          // ignore
+        }
       }
     }, 90);
   };
@@ -966,7 +1006,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
     const unassigned = participatingList.filter(p => !assignedPlayerIds.has(p.id));
 
     if (unassigned.length === 0) {
-      alert('所有盲盒档位学员均已配对完毕！');
+      alert('所有盲盒学员均已配对完毕！');
       return;
     }
 
@@ -979,11 +1019,11 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       }
     }
 
-    const targetTierConfig = TIER_CONFIGS[targetTierIdx % TIER_CONFIGS.length];
     const unassignedInTier = unassigned.filter(p => (playerSkillTiers[p.id] ?? 0) === targetTierIdx);
+    const roundName = `第 ${targetTierIdx + 1} 轮`;
 
     setIsLotteryAnimating(true);
-    setLotteryMessage(`📦 各队队长正在轮流抽取【${targetTierConfig.name}】盲盒 (${unassignedInTier.length}人待抽取)...`);
+    setLotteryMessage(`📦 各队队长正在轮流开启【${roundName}盲盒】(${unassignedInTier.length}人待抽取)...`);
 
     let counter = 0;
     const interval = setInterval(() => {
@@ -1020,7 +1060,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
         }));
 
         setIsLotteryAnimating(false);
-        setLotteryMessage(`🎁【${targetTierConfig.name}】盲盒抽取完成！成功为各队配对落位 ${poolIdx} 名学员！`);
+        setLotteryMessage(`🎁【${roundName}盲盒】开启完成！成功为各队配对落位 ${poolIdx} 名学员！`);
+        try {
+          confetti({ particleCount: 90, spread: 75, origin: { y: 0.6 } });
+        } catch {
+          // ignore
+        }
       }
     }, 90);
   };
@@ -1116,6 +1161,69 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       ...tournament,
       teams: [...otherTeams, ...updatedTeams]
     }));
+  };
+
+  // Auto sequential assignment for remaining unassigned players (e.g. 3 players remaining for 4 teams -> assigned sequentially to A, B, C)
+  const handleAutoAssignUnassigned = () => {
+    if (categoryTeams.length === 0) {
+      alert('请先创建队伍！');
+      return;
+    }
+    const assignedPlayerIds = new Set(categoryTeams.flatMap(t => t.playerIds));
+    const unassigned = categoryPlayersInfo.participating
+      .map(item => item.player)
+      .filter(p => !assignedPlayerIds.has(p.id));
+
+    if (unassigned.length === 0) {
+      alert('目前所有参训学员均已分配至队伍！');
+      return;
+    }
+
+    setIsLotteryAnimating(true);
+    setLotteryMessage(`✨ 正在自动将剩余 ${unassigned.length} 名学员均衡配对分配至各队...`);
+
+    let counter = 0;
+    const interval = setInterval(() => {
+      const randomIdx = Math.floor(Math.random() * unassigned.length);
+      setLotteryHighlightedPlayer(unassigned[randomIdx]);
+      counter++;
+
+      if (counter > 15) {
+        clearInterval(interval);
+
+        const newTeamPlayerMap: Record<string, string[]> = {};
+        categoryTeams.forEach(t => {
+          newTeamPlayerMap[t.id] = [...t.playerIds];
+        });
+
+        // Assign remaining players sequentially to Teams A, B, C...
+        unassigned.forEach((player, idx) => {
+          const targetTeam = categoryTeams[idx % categoryTeams.length];
+          if (targetTeam && !newTeamPlayerMap[targetTeam.id].includes(player.id)) {
+            newTeamPlayerMap[targetTeam.id].push(player.id);
+          }
+        });
+
+        const updatedTeams = categoryTeams.map(t => ({
+          ...t,
+          playerIds: newTeamPlayerMap[t.id]
+        }));
+
+        const otherTeams = currentTournament.teams.filter(t => t.categoryId !== activeCategory.id);
+        updateCurrentTournament(t => ({
+          ...t,
+          teams: [...otherTeams, ...updatedTeams]
+        }));
+
+        setIsLotteryAnimating(false);
+        setLotteryMessage(`✅ 自动分配完成！已成功将剩余 ${unassigned.length} 名学员按顺序分配至各队。`);
+        try {
+          confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+        } catch {
+          // ignore
+        }
+      }
+    }, 80);
   };
 
   // 4. Generate Fixtures & Schedule
@@ -2711,40 +2819,6 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                   </button>
                 ))}
               </div>
-
-              {/* Draft Buttons */}
-              <button
-                onClick={handleRunCaptainLottery}
-                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Crown className="w-4 h-4 text-yellow-200" />
-                <span>1. 抽选队长 (Captain Lottery)</span>
-              </button>
-
-              <button
-                onClick={handleRunRoundLottery}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Shuffle className="w-4 h-4 text-purple-200" />
-                <span>2. 队长轮流抽盲盒</span>
-              </button>
-
-              <button
-                onClick={handleRunInstantFairDraft}
-                className="px-4 py-2 bg-bvb-black hover:bg-gray-800 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-              >
-                <Sparkles className="w-4 h-4 text-bvb-yellow" />
-                <span>一键全自动抽签</span>
-              </button>
-
-              <button
-                onClick={handleResetDraft}
-                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                title="重置当前组别的球队分组与队长"
-              >
-                <RotateCcw className="w-4 h-4 text-rose-600" />
-                <span>一键重置抽签</span>
-              </button>
             </div>
           </div>
 
@@ -2756,14 +2830,14 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                   <Lock className="w-4 h-4" />
                 </div>
                 <div>
-                  <h4 className="font-black text-xs text-gray-900 flex items-center gap-2">
-                    <span>教练员盲盒能力档位已设定（保护学员自尊，已隐去具体档位标签）</span>
+                  <h4 className="font-black text-xs text-gray-900 flex flex-wrap items-center gap-2">
+                    <span>教练员盲盒能力档位已设定</span>
                     <span className="bg-amber-200 text-amber-900 px-2 py-0.5 rounded-md text-[10px] font-bold">
                       已划分 {calculatedTierCount} 档位
                     </span>
                   </h4>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    盲盒抽签算法正在按设置的 A/B/C/D 档位进行等量对等抽取，球队名册中不会向球员显示档位称号。
+                    盲盒抽签算法正在按设置的均衡实力进行配对抽取，球队名册中不会向球员显示任何档位称号。
                   </p>
                 </div>
               </div>
@@ -2785,7 +2859,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                     <span>教练员盲盒档位分配设置 (技战术能力划分)</span>
                   </h4>
                   <p className="text-xs text-gray-600 mt-1">
-                    抽签前教练员将参赛学员划分为 {calculatedTierCount} 个档位（A/B/C/D/E...），盲盒抽签时随机抽取1个档位作为队长，队长再轮流抽取其余档位盲盒，确保队间实力平衡。
+                    抽签前教练员将参赛学员划分为 {calculatedTierCount} 个盲盒组，可指定某组学员担任队长，也可随机抽选队长。
                   </p>
                 </div>
 
@@ -2822,6 +2896,30 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                 <span className="bg-purple-100 text-purple-900 px-2.5 py-1 rounded-xl">
                   📦 划分盲盒档数: <strong className="font-black text-purple-900">{calculatedTierCount}</strong> 档
                 </span>
+
+                {/* Specified Captain Tier Selector Dropdown */}
+                <div className="sm:ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-300 px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs">
+                  <Crown className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-amber-950 font-black whitespace-nowrap">指定队长档位:</span>
+                  <select
+                    value={activeCategory.specifiedCaptainTierIndex ?? -1}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      updateActiveCategory(c => ({
+                        ...c,
+                        specifiedCaptainTierIndex: val < 0 ? undefined : val
+                      }));
+                    }}
+                    className="bg-white text-amber-900 font-black px-2 py-0.5 rounded-lg border border-amber-200 outline-none cursor-pointer hover:bg-amber-50"
+                  >
+                    <option value={-1}>🎲 随机抽取盲盒档位</option>
+                    {Array.from({ length: calculatedTierCount }).map((_, tIdx) => (
+                      <option key={tIdx} value={tIdx}>
+                        👑 {TIER_CONFIGS[tIdx % TIER_CONFIGS.length].name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Tier Grid */}
@@ -2833,13 +2931,33 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                   return (
                     <div key={tierIdx} className={`p-3 rounded-2xl border ${config.border} ${config.lightBg} space-y-2 flex flex-col justify-between`}>
                       <div>
-                        <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-gray-200/60">
-                          <span className={`text-xs font-black px-2 py-0.5 rounded-lg shadow-xs ${config.badge}`}>
-                            {config.label}
-                          </span>
-                          <span className="text-[10px] font-mono font-bold text-gray-500">
-                            {tierPlayers.length}人
-                          </span>
+                        <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-gray-200/60 gap-1">
+                          <div className="flex items-center gap-1 truncate">
+                            <span className={`text-xs font-black px-2 py-0.5 rounded-lg shadow-xs ${config.badge}`}>
+                              {config.label}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                const nextVal = activeCategory.specifiedCaptainTierIndex === tierIdx ? undefined : tierIdx;
+                                updateActiveCategory(c => ({ ...c, specifiedCaptainTierIndex: nextVal }));
+                              }}
+                              className={`text-[10px] font-black px-1.5 py-0.5 rounded-lg transition-all cursor-pointer flex items-center gap-0.5 ${
+                                activeCategory.specifiedCaptainTierIndex === tierIdx
+                                  ? 'bg-amber-500 text-white shadow-xs'
+                                  : 'bg-white/80 text-gray-500 border border-gray-200 hover:text-amber-600 hover:bg-amber-50'
+                              }`}
+                              title={activeCategory.specifiedCaptainTierIndex === tierIdx ? "取消指定队长档位" : "指定该档位球员当队长"}
+                            >
+                              <Crown className={`w-3 h-3 ${activeCategory.specifiedCaptainTierIndex === tierIdx ? 'text-yellow-200' : 'text-gray-400'}`} />
+                              <span>{activeCategory.specifiedCaptainTierIndex === tierIdx ? '队长档' : '设为队长'}</span>
+                            </button>
+                            <span className="text-[10px] font-mono font-bold text-gray-500">
+                              {tierPlayers.length}人
+                            </span>
+                          </div>
                         </div>
 
                         {/* Tier Players List */}
@@ -2881,18 +2999,118 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
             </div>
           )}
 
-          {/* Lottery Animation Notice Banner */}
+          {/* Lottery Action Buttons Panel (Right below Coach Tier Setup for easy player operation) */}
+          <div className="bg-white p-4 rounded-3xl border border-amber-200/60 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-2xl bg-amber-500 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+                <Dices className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-black text-xs text-gray-900">球队抽签与配对控制台</h4>
+                <p className="text-[11px] text-gray-500 mt-0.5">请按步骤抽取队长或使用一键智能分队</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={handleRunCaptainLottery}
+                className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Crown className="w-4 h-4 text-yellow-200" />
+                <span>1. 抽选队长</span>
+              </button>
+
+              <button
+                onClick={handleRunRoundLottery}
+                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Shuffle className="w-4 h-4 text-purple-200" />
+                <span>2. 队长轮流抽盲盒</span>
+              </button>
+
+              <button
+                onClick={handleRunInstantFairDraft}
+                className="px-4 py-2 bg-bvb-black hover:bg-gray-800 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-bvb-yellow" />
+                <span>一键全自动抽签</span>
+              </button>
+
+              <button
+                onClick={handleAutoAssignUnassigned}
+                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="将剩余待分配的学员按顺序依次分配至 A、B、C... 队"
+              >
+                <Sparkles className="w-4 h-4 text-amber-100" />
+                <span>自动分配剩余学员</span>
+              </button>
+
+              <button
+                onClick={handleResetDraft}
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title="重置当前组别的球队分组与队长"
+              >
+                <RotateCcw className="w-4 h-4 text-rose-600" />
+                <span>一键重置抽签</span>
+              </button>
+            </div>
+          </div>
+
+          {/* High-Tech Blind Box Lottery Live Stage */}
           {lotteryMessage && (
-            <div className={`p-4 rounded-2xl border text-center transition-all ${
-              isLotteryAnimating ? 'bg-amber-100 border-amber-300 text-amber-900 animate-pulse' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-            }`}>
-              <div className="flex items-center justify-center gap-3">
-                <Dices className={`w-6 h-6 ${isLotteryAnimating ? 'animate-spin text-amber-600' : 'text-emerald-600'}`} />
-                <span className="font-black text-sm">{lotteryMessage}</span>
-                {lotteryHighlightedPlayer && isLotteryAnimating && (
-                  <span className="bg-amber-500 text-white font-black px-3 py-1 rounded-xl text-xs shadow-xs animate-bounce">
-                    🎯 候选: {lotteryHighlightedPlayer.name} (#{lotteryHighlightedPlayer.number})
-                  </span>
+            <div className="relative overflow-hidden rounded-3xl bg-slate-900 border-2 border-amber-400/80 shadow-2xl p-6 text-white text-center transition-all animate-in fade-in zoom-in-95 duration-300">
+              {/* Background Glows & Particle Effects */}
+              <div className="absolute -top-24 -left-24 w-60 h-60 bg-amber-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
+              <div className="absolute -bottom-24 -right-24 w-60 h-60 bg-purple-500/20 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+              <div className="relative z-10 flex flex-col items-center justify-center space-y-4">
+                {/* Stage Header Badge */}
+                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-black uppercase tracking-wider shadow-inner">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-spin" />
+                  <span>【{activeCategory?.name}】盲盒抽签大舞台</span>
+                </div>
+
+                {/* Main Status Text */}
+                <h3 className="text-base sm:text-lg font-black text-amber-200 tracking-wide drop-shadow-md flex items-center justify-center gap-2">
+                  <Dices className={`w-5 h-5 ${isLotteryAnimating ? 'animate-spin text-amber-400' : 'text-emerald-400'}`} />
+                  <span>{lotteryMessage}</span>
+                </h3>
+
+                {/* Cool Rolling Slot Machine Card (Active during animating) */}
+                {isLotteryAnimating && lotteryHighlightedPlayer && (
+                  <div className="my-2 p-4 bg-slate-800/90 border-2 border-amber-400 rounded-2xl shadow-xl flex items-center justify-center gap-4 max-w-md w-full animate-pulse transform scale-105 transition-transform">
+                    <div className="relative w-14 h-14 rounded-2xl bg-amber-500 border-2 border-yellow-300 flex items-center justify-center font-black text-2xl text-slate-950 shadow-lg overflow-hidden shrink-0">
+                      {lotteryHighlightedPlayer.image ? (
+                        <img src={lotteryHighlightedPlayer.image} alt={lotteryHighlightedPlayer.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>{lotteryHighlightedPlayer.name.charAt(0)}</span>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                    </div>
+
+                    <div className="text-left overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-black text-white truncate drop-shadow-sm">
+                          {lotteryHighlightedPlayer.name}
+                        </span>
+                        <span className="bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-lg text-xs shadow-xs">
+                          #{lotteryHighlightedPlayer.number}
+                        </span>
+                      </div>
+                      <p className="text-xs text-amber-300/80 font-mono mt-0.5 flex items-center gap-1">
+                        <Dices className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                        <span>盲盒卡牌高速旋转抽选配对中...</span>
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Result Finished Celebratory Banner */}
+                {!isLotteryAnimating && (
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 font-black text-xs">
+                    <Trophy className="w-4 h-4 text-yellow-300 animate-bounce" />
+                    <span>盲盒配对结果已即时打入各参赛球队阵容名册！</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -2995,12 +3213,25 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                 {/* Unassigned Participating Players */}
                 <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <h4 className="font-black text-xs text-gray-800 uppercase tracking-wider flex items-center gap-2">
-                      <Users className="w-4 h-4 text-amber-500" />
-                      <span>待分配参训学员 ({unassignedPlayers.length} 人)</span>
-                    </h4>
-                    <span className="text-[10px] text-gray-400">参训但尚未加入队伍</span>
+                  <div className="flex flex-wrap items-center justify-between border-b border-gray-100 pb-2 gap-2">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-black text-xs text-gray-800 uppercase tracking-wider flex items-center gap-2">
+                        <Users className="w-4 h-4 text-amber-500" />
+                        <span>待分配参训学员 ({unassignedPlayers.length} 人)</span>
+                      </h4>
+                      <span className="text-[10px] text-gray-400 hidden sm:inline">参训但尚未加入队伍</span>
+                    </div>
+
+                    {unassignedPlayers.length > 0 && categoryTeams.length > 0 && (
+                      <button
+                        onClick={handleAutoAssignUnassigned}
+                        className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-[11px] rounded-xl shadow-xs transition-all flex items-center gap-1 cursor-pointer active:scale-95 shrink-0"
+                        title="将剩余待分配学员依次按顺序分配至 A、B、C... 各队伍"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-200" />
+                        <span>一键按顺序自动分配 ({unassignedPlayers.length}人)</span>
+                      </button>
+                    )}
                   </div>
 
                   {unassignedPlayers.length === 0 ? (
