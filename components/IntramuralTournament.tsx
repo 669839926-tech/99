@@ -23,15 +23,39 @@ const DEFAULT_CATEGORIES: Omit<TournamentCategory, 'id'>[] = [
 ];
 
 const TEAM_PRESET_COLORS = [
-  { name: '红队', bg: 'bg-red-500', text: 'text-red-500', border: 'border-red-500', hex: '#ef4444', badge: 'bg-red-100 text-red-800 border-red-200' },
-  { name: '蓝队', bg: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500', hex: '#3b82f6', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
-  { name: '黄队', bg: 'bg-amber-400', text: 'text-amber-500', border: 'border-amber-400', hex: '#f59e0b', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
-  { name: '绿队', bg: 'bg-emerald-500', text: 'text-emerald-500', border: 'border-emerald-500', hex: '#10b981', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  { name: '橙队', bg: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500', hex: '#f97316', badge: 'bg-orange-100 text-orange-800 border-orange-200' },
-  { name: '紫队', bg: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-500', hex: '#a855f7', badge: 'bg-purple-100 text-purple-800 border-purple-200' },
-  { name: '青队', bg: 'bg-cyan-500', text: 'text-cyan-500', border: 'border-cyan-500', hex: '#06b6d4', badge: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
-  { name: '黑队', bg: 'bg-gray-800', text: 'text-gray-800', border: 'border-gray-800', hex: '#1f2937', badge: 'bg-gray-200 text-gray-900 border-gray-300' },
+  { name: 'A队', bg: 'bg-red-500', text: 'text-red-500', border: 'border-red-500', hex: '#ef4444', badge: 'bg-red-100 text-red-800 border-red-200' },
+  { name: 'B队', bg: 'bg-blue-500', text: 'text-blue-500', border: 'border-blue-500', hex: '#3b82f6', badge: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { name: 'C队', bg: 'bg-amber-400', text: 'text-amber-500', border: 'border-amber-400', hex: '#f59e0b', badge: 'bg-amber-100 text-amber-800 border-amber-200' },
+  { name: 'D队', bg: 'bg-emerald-500', text: 'text-emerald-500', border: 'border-emerald-500', hex: '#10b981', badge: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { name: 'E队', bg: 'bg-orange-500', text: 'text-orange-500', border: 'border-orange-500', hex: '#f97316', badge: 'bg-orange-100 text-orange-800 border-orange-200' },
+  { name: 'F队', bg: 'bg-purple-500', text: 'text-purple-500', border: 'border-purple-500', hex: '#a855f7', badge: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { name: 'G队', bg: 'bg-cyan-500', text: 'text-cyan-500', border: 'border-cyan-500', hex: '#06b6d4', badge: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+  { name: 'H队', bg: 'bg-gray-800', text: 'text-gray-800', border: 'border-gray-800', hex: '#1f2937', badge: 'bg-gray-200 text-gray-900 border-gray-300' },
 ];
+
+const normalizeTeamName = (name: string): string => {
+  const map: Record<string, string> = {
+    '红队': 'A队',
+    '蓝队': 'B队',
+    '黄队': 'C队',
+    '绿队': 'D队',
+    '橙队': 'E队',
+    '紫队': 'F队',
+    '青队': 'G队',
+    '黑队': 'H队',
+  };
+  return map[name] || name;
+};
+
+const normalizeTournaments = (tList: IntramuralTournament[]): IntramuralTournament[] => {
+  return tList.map(t => ({
+    ...t,
+    teams: (t.teams || []).map(team => ({
+      ...team,
+      name: normalizeTeamName(team.name)
+    }))
+  }));
+};
 
 const TIER_CONFIGS = [
   { name: 'A档', label: 'A档 (种子/顶尖)', badge: 'bg-amber-500 text-white', border: 'border-amber-400', lightBg: 'bg-amber-50/80', textColor: 'text-amber-900' },
@@ -67,12 +91,12 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
   // Main state - tournaments list
   const [tournaments, setTournaments] = useState<IntramuralTournament[]>(() => {
     if (intramuralTournaments && intramuralTournaments.length > 0) {
-      return intramuralTournaments;
+      return normalizeTournaments(intramuralTournaments);
     }
     const saved = localStorage.getItem('club_intramural_tournaments_v1');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        return normalizeTournaments(JSON.parse(saved));
       } catch (e) {
         console.error('Failed to parse tournaments', e);
       }
@@ -97,7 +121,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
   // Sync state if parent props update from cloud
   useEffect(() => {
     if (intramuralTournaments && intramuralTournaments.length > 0) {
-      setTournaments(intramuralTournaments);
+      setTournaments(normalizeTournaments(intramuralTournaments));
     }
   }, [intramuralTournaments]);
 
@@ -132,6 +156,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
   const [lotteryHighlightedPlayer, setLotteryHighlightedPlayer] = useState<Player | null>(null);
   const [lotteryMessage, setLotteryMessage] = useState<string>('');
   const [isTierSetupCollapsed, setIsTierSetupCollapsed] = useState<boolean>(false);
+  const [selectedDesignatedPlayerId, setSelectedDesignatedPlayerId] = useState<string>('');
 
   // Match Result Modal State
   const [editingMatch, setEditingMatch] = useState<IntramuralMatch | null>(null);
@@ -731,6 +756,23 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
     }));
   };
 
+  // Assign specific player to a designated Team / Group (指定某球员分配在某个小组/队伍)
+  const handleSetPlayerSpecifiedTeam = (playerId: string, targetTeamId: string) => {
+    if (!activeCategory || !currentTournament) return;
+    const current = activeCategory.specifiedPlayerTeamAssignments || {};
+    const updatedAssignments = { ...current };
+    if (!targetTeamId) {
+      delete updatedAssignments[playerId];
+    } else {
+      updatedAssignments[playerId] = targetTeamId;
+    }
+
+    updateActiveCategory(c => ({
+      ...c,
+      specifiedPlayerTeamAssignments: updatedAssignments
+    }));
+  };
+
   // Toggle player participation status
   const handleTogglePlayerStatus = (playerId: string) => {
     if (!activeCategory) return;
@@ -862,11 +904,10 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
         const updatedCategoryTeams = categoryTeams.map((team, idx) => {
           const captain = shuffledCaptains[idx] || captainPool[idx] || participatingList[idx];
-          const existingPlayers = team.playerIds.filter(pid => pid !== captain.id);
           return {
             ...team,
             captainPlayerId: captain.id,
-            playerIds: [captain.id, ...existingPlayers]
+            playerIds: [captain.id]
           };
         });
 
@@ -903,14 +944,34 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       if (counter > 20) {
         clearInterval(interval);
 
+        const specifiedAssignments = activeCategory?.specifiedPlayerTeamAssignments || {};
+
+        // Initialize team buckets
+        const newTeamPlayerMap: Record<string, string[]> = {};
+        categoryTeams.forEach(t => {
+          newTeamPlayerMap[t.id] = [];
+        });
+
+        // 1. Place pre-assigned / specified players into designated teams first
+        participatingList.forEach(p => {
+          const targetTeamId = specifiedAssignments[p.id];
+          if (targetTeamId && newTeamPlayerMap[targetTeamId] && !newTeamPlayerMap[targetTeamId].includes(p.id)) {
+            newTeamPlayerMap[targetTeamId].push(p.id);
+          }
+        });
+
+        // 2. Build tier buckets for players not yet assigned
         const tierBuckets: Record<number, Player[]> = {};
         for (let i = 0; i < calculatedTierCount; i++) {
           tierBuckets[i] = [];
         }
         participatingList.forEach(p => {
-          const tIdx = playerSkillTiers[p.id] ?? 0;
-          if (!tierBuckets[tIdx]) tierBuckets[tIdx] = [];
-          tierBuckets[tIdx].push(p);
+          const targetTeamId = specifiedAssignments[p.id];
+          if (!targetTeamId || !categoryTeams.some(t => t.id === targetTeamId)) {
+            const tIdx = playerSkillTiers[p.id] ?? 0;
+            if (!tierBuckets[tIdx]) tierBuckets[tIdx] = [];
+            tierBuckets[tIdx].push(p);
+          }
         });
 
         let captainTierIdx = 0;
@@ -929,49 +990,57 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
           captainTierIdx = Math.floor(Math.random() * calculatedTierCount);
         }
 
-        const newTeamPlayerMap: Record<string, string[]> = {};
-        categoryTeams.forEach(t => {
-          newTeamPlayerMap[t.id] = [];
-        });
-
         const newCaptains: Record<string, string> = {};
 
-        // 1. Assign Captains from captainTierIdx
-        const captainPool = [...(tierBuckets[captainTierIdx] || [])].sort(() => 0.5 - Math.random());
-        const availableCaptains = [...participatingList].sort(() => 0.5 - Math.random());
-        categoryTeams.forEach((team) => {
-          const chosenCaptain = captainPool.find(c => !Object.values(newCaptains).includes(c.id))
-            || availableCaptains.find(c => !Object.values(newCaptains).includes(c.id));
-          if (chosenCaptain) {
-            newCaptains[team.id] = chosenCaptain.id;
-            newTeamPlayerMap[team.id].push(chosenCaptain.id);
+        // Check if any team already has a designated captain candidate
+        categoryTeams.forEach(team => {
+          const teamAssigned = newTeamPlayerMap[team.id];
+          const capMatch = teamAssigned.find(pid => (playerSkillTiers[pid] ?? 0) === captainTierIdx) || teamAssigned[0];
+          if (capMatch) {
+            newCaptains[team.id] = capMatch;
           }
         });
 
-        // 2. Assign remaining players tier by tier with continuous team pointer
-        let teamPointer = 0;
+        // 3. Assign Captains for teams still missing one
+        const captainPool = [...(tierBuckets[captainTierIdx] || [])].sort(() => 0.5 - Math.random());
+        const remainingUnassignedOverall = participatingList
+          .filter(p => !Object.values(newTeamPlayerMap).flat().includes(p.id))
+          .sort(() => 0.5 - Math.random());
+
+        categoryTeams.forEach((team) => {
+          if (!newCaptains[team.id]) {
+            const chosenCaptain = captainPool.find(c => !Object.values(newCaptains).includes(c.id) && !Object.values(newTeamPlayerMap).flat().includes(c.id))
+              || remainingUnassignedOverall.find(c => !Object.values(newCaptains).includes(c.id) && !Object.values(newTeamPlayerMap).flat().includes(c.id));
+            if (chosenCaptain) {
+              newCaptains[team.id] = chosenCaptain.id;
+              newTeamPlayerMap[team.id].push(chosenCaptain.id);
+              tierBuckets[captainTierIdx] = (tierBuckets[captainTierIdx] || []).filter(p => p.id !== chosenCaptain.id);
+            }
+          }
+        });
+
+        // 4. Assign remaining players tier by tier, prioritizing teams with fewer players
         for (let tIdx = 0; tIdx < calculatedTierCount; tIdx++) {
           let playersInTier = [...(tierBuckets[tIdx] || [])];
-          if (tIdx === captainTierIdx) {
-            const capIds = new Set(Object.values(newCaptains));
-            playersInTier = playersInTier.filter(p => !capIds.has(p.id));
-          }
+          const capIds = new Set(Object.values(newCaptains));
+          playersInTier = playersInTier.filter(p => !capIds.has(p.id) && !Object.values(newTeamPlayerMap).flat().includes(p.id));
 
           const shuffledTierPlayers = playersInTier.sort(() => 0.5 - Math.random());
           shuffledTierPlayers.forEach((player) => {
-            const targetTeam = categoryTeams[teamPointer % categoryTeams.length];
-            if (!newTeamPlayerMap[targetTeam.id].includes(player.id)) {
+            const sortedTeams = [...categoryTeams].sort((a, b) => newTeamPlayerMap[a.id].length - newTeamPlayerMap[b.id].length);
+            const targetTeam = sortedTeams[0];
+            if (targetTeam && !newTeamPlayerMap[targetTeam.id].includes(player.id)) {
               newTeamPlayerMap[targetTeam.id].push(player.id);
             }
-            teamPointer++;
           });
         }
 
-        // 3. Fallback: ensure EVERY participating player is assigned sequentially to Teams A, B, C...
+        // 5. Fallback: ensure EVERY participating player is assigned
         const assignedIds = new Set(Object.values(newTeamPlayerMap).flat());
         const remainingUnassigned = participatingList.filter(p => !assignedIds.has(p.id));
-        remainingUnassigned.forEach((player, idx) => {
-          const targetTeam = categoryTeams[idx % categoryTeams.length];
+        remainingUnassigned.forEach((player) => {
+          const sortedTeams = [...categoryTeams].sort((a, b) => newTeamPlayerMap[a.id].length - newTeamPlayerMap[b.id].length);
+          const targetTeam = sortedTeams[0];
           if (targetTeam && !newTeamPlayerMap[targetTeam.id].includes(player.id)) {
             newTeamPlayerMap[targetTeam.id].push(player.id);
           }
@@ -979,7 +1048,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
         const updatedTeams = categoryTeams.map(t => ({
           ...t,
-          captainPlayerId: newCaptains[t.id] || t.captainPlayerId,
+          captainPlayerId: newCaptains[t.id] || t.captainPlayerId || t.playerIds[0],
           playerIds: newTeamPlayerMap[t.id] || []
         }));
 
@@ -1002,6 +1071,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
 
   // Step C: Sequential Round-by-Round Lottery Pick (队长轮流开启盲盒)
   const handleRunRoundLottery = () => {
+    const specifiedAssignments = activeCategory?.specifiedPlayerTeamAssignments || {};
     const assignedPlayerIds = new Set(categoryTeams.flatMap(t => t.playerIds));
     const unassigned = participatingList.filter(p => !assignedPlayerIds.has(p.id));
 
@@ -1034,17 +1104,29 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       if (counter > 20) {
         clearInterval(interval);
 
-        const shuffledUnassigned = [...unassignedInTier].sort(() => 0.5 - Math.random());
         const newTeamPlayerMap: Record<string, string[]> = {};
         categoryTeams.forEach(t => {
           newTeamPlayerMap[t.id] = [...t.playerIds];
         });
 
-        let poolIdx = 0;
-        categoryTeams.forEach(t => {
-          if (poolIdx < shuffledUnassigned.length) {
-            newTeamPlayerMap[t.id].push(shuffledUnassigned[poolIdx].id);
-            poolIdx++;
+        // 1. Specified players in this tier are placed directly into designated teams
+        const specifiedInTier = unassignedInTier.filter(p => specifiedAssignments[p.id] && categoryTeams.some(t => t.id === specifiedAssignments[p.id]));
+        specifiedInTier.forEach(p => {
+          const targetTeamId = specifiedAssignments[p.id];
+          if (targetTeamId && !newTeamPlayerMap[targetTeamId].includes(p.id)) {
+            newTeamPlayerMap[targetTeamId].push(p.id);
+          }
+        });
+
+        // 2. Randomly assign remaining players in this tier to teams with fewer players
+        const nonSpecifiedInTier = unassignedInTier.filter(p => !specifiedInTier.includes(p));
+        const shuffled = [...nonSpecifiedInTier].sort(() => 0.5 - Math.random());
+        
+        shuffled.forEach(player => {
+          const sortedTeams = [...categoryTeams].sort((a, b) => newTeamPlayerMap[a.id].length - newTeamPlayerMap[b.id].length);
+          const targetTeam = sortedTeams[0];
+          if (targetTeam && !newTeamPlayerMap[targetTeam.id].includes(player.id)) {
+            newTeamPlayerMap[targetTeam.id].push(player.id);
           }
         });
 
@@ -1060,7 +1142,7 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
         }));
 
         setIsLotteryAnimating(false);
-        setLotteryMessage(`🎁【${roundName}盲盒】开启完成！成功为各队配对落位 ${poolIdx} 名学员！`);
+        setLotteryMessage(`🎁【${roundName}盲盒】开启完成！成功为各队配对落位 ${unassignedInTier.length} 名学员！`);
         try {
           confetti({ particleCount: 90, spread: 75, origin: { y: 0.6 } });
         } catch {
@@ -1191,14 +1273,26 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
       if (counter > 15) {
         clearInterval(interval);
 
+        const specifiedAssignments = activeCategory?.specifiedPlayerTeamAssignments || {};
         const newTeamPlayerMap: Record<string, string[]> = {};
         categoryTeams.forEach(t => {
           newTeamPlayerMap[t.id] = [...t.playerIds];
         });
 
-        // Assign remaining players sequentially to Teams A, B, C...
-        unassigned.forEach((player, idx) => {
-          const targetTeam = categoryTeams[idx % categoryTeams.length];
+        // 1. Assign players with specified team first
+        const specifiedUnassigned = unassigned.filter(p => specifiedAssignments[p.id] && categoryTeams.some(t => t.id === specifiedAssignments[p.id]));
+        specifiedUnassigned.forEach(p => {
+          const targetTeamId = specifiedAssignments[p.id];
+          if (targetTeamId && !newTeamPlayerMap[targetTeamId].includes(p.id)) {
+            newTeamPlayerMap[targetTeamId].push(p.id);
+          }
+        });
+
+        // 2. Assign remaining players sequentially to balance team counts
+        const restUnassigned = unassigned.filter(p => !specifiedUnassigned.includes(p));
+        restUnassigned.forEach((player) => {
+          const sortedTeams = [...categoryTeams].sort((a, b) => newTeamPlayerMap[a.id].length - newTeamPlayerMap[b.id].length);
+          const targetTeam = sortedTeams[0];
           if (targetTeam && !newTeamPlayerMap[targetTeam.id].includes(player.id)) {
             newTeamPlayerMap[targetTeam.id].push(player.id);
           }
@@ -2897,28 +2991,94 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                   📦 划分盲盒档数: <strong className="font-black text-purple-900">{calculatedTierCount}</strong> 档
                 </span>
 
-                {/* Specified Captain Tier Selector Dropdown */}
-                <div className="sm:ml-auto flex items-center gap-1.5 bg-amber-500/10 border border-amber-300 px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs">
-                  <Crown className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span className="text-amber-950 font-black whitespace-nowrap">指定队长档位:</span>
-                  <select
-                    value={activeCategory.specifiedCaptainTierIndex ?? -1}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      updateActiveCategory(c => ({
-                        ...c,
-                        specifiedCaptainTierIndex: val < 0 ? undefined : val
-                      }));
-                    }}
-                    className="bg-white text-amber-900 font-black px-2 py-0.5 rounded-lg border border-amber-200 outline-none cursor-pointer hover:bg-amber-50"
-                  >
-                    <option value={-1}>🎲 随机抽取盲盒档位</option>
-                    {Array.from({ length: calculatedTierCount }).map((_, tIdx) => (
-                      <option key={tIdx} value={tIdx}>
-                        👑 {TIER_CONFIGS[tIdx % TIER_CONFIGS.length].name}
-                      </option>
-                    ))}
-                  </select>
+                {/* Right controls area: Specified Player Assignment & Specified Captain Tier */}
+                <div className="sm:ml-auto flex flex-wrap items-center gap-2">
+                  {/* Designate a specific player to a specific group/team */}
+                  <div className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-300 px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs">
+                    <Shield className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="text-blue-950 font-black whitespace-nowrap">指定球员分组:</span>
+                    
+                    {/* Player selector */}
+                    <select
+                      value={selectedDesignatedPlayerId}
+                      onChange={(e) => setSelectedDesignatedPlayerId(e.target.value)}
+                      className="bg-white text-blue-900 font-black px-2 py-0.5 rounded-lg border border-blue-200 outline-none cursor-pointer hover:bg-blue-50 text-[11px] max-w-[130px]"
+                    >
+                      <option value="">选择学员...</option>
+                      {participatingList.map(p => {
+                        const assignedTeamId = activeCategory.specifiedPlayerTeamAssignments?.[p.id];
+                        const assignedTeam = categoryTeams.find(t => t.id === assignedTeamId);
+                        return (
+                          <option key={p.id} value={p.id}>
+                            {p.name} #{p.number} {assignedTeam ? `(👉${assignedTeam.name})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    <span className="text-blue-400 font-bold">👉</span>
+
+                    {/* Team selector */}
+                    <select
+                      value={selectedDesignatedPlayerId ? (activeCategory.specifiedPlayerTeamAssignments?.[selectedDesignatedPlayerId] || '') : ''}
+                      onChange={(e) => {
+                        if (!selectedDesignatedPlayerId) {
+                          alert('请先选择要指定分组的学员！');
+                          return;
+                        }
+                        handleSetPlayerSpecifiedTeam(selectedDesignatedPlayerId, e.target.value);
+                      }}
+                      className="bg-white text-blue-900 font-black px-2 py-0.5 rounded-lg border border-blue-200 outline-none cursor-pointer hover:bg-blue-50 text-[11px]"
+                    >
+                      <option value="">🎲 自动分配 (轮流抽取)</option>
+                      {categoryTeams.map(t => (
+                        <option key={t.id} value={t.id}>
+                          🛡️ {t.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Show count of already assigned players or clear all */}
+                    {Object.keys(activeCategory.specifiedPlayerTeamAssignments || {}).length > 0 && (
+                      <button
+                        onClick={() => {
+                          updateActiveCategory(c => ({
+                            ...c,
+                            specifiedPlayerTeamAssignments: {}
+                          }));
+                          setSelectedDesignatedPlayerId('');
+                        }}
+                        className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-1.5 py-0.5 rounded border border-red-200 font-black cursor-pointer ml-1"
+                        title="清空所有指定分组"
+                      >
+                        清空({Object.keys(activeCategory.specifiedPlayerTeamAssignments || {}).length})
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Specified Captain Tier Selector Dropdown */}
+                  <div className="flex items-center gap-1.5 bg-amber-500/10 border border-amber-300 px-2.5 py-1 rounded-xl text-xs font-bold shadow-2xs">
+                    <Crown className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="text-amber-950 font-black whitespace-nowrap">指定队长档位:</span>
+                    <select
+                      value={activeCategory.specifiedCaptainTierIndex ?? -1}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        updateActiveCategory(c => ({
+                          ...c,
+                          specifiedCaptainTierIndex: val < 0 ? undefined : val
+                        }));
+                      }}
+                      className="bg-white text-amber-900 font-black px-2 py-0.5 rounded-lg border border-amber-200 outline-none cursor-pointer hover:bg-amber-50"
+                    >
+                      <option value={-1}>🎲 随机抽取盲盒档位</option>
+                      {Array.from({ length: calculatedTierCount }).map((_, tIdx) => (
+                        <option key={tIdx} value={tIdx}>
+                          👑 {TIER_CONFIGS[tIdx % TIER_CONFIGS.length].name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
@@ -2965,30 +3125,42 @@ export const IntramuralTournamentModule: React.FC<IntramuralTournamentProps> = (
                           {tierPlayers.length === 0 ? (
                             <div className="text-[11px] text-gray-400 italic text-center py-2">暂无队员</div>
                           ) : (
-                            tierPlayers.map(p => (
-                              <div key={p.id} className="bg-white/90 p-1.5 rounded-xl border border-gray-100 flex items-center justify-between text-xs font-bold text-gray-800">
-                                <div className="flex items-center gap-1.5 truncate">
-                                  <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center font-black text-[9px] overflow-hidden shrink-0">
-                                    {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : p.name.charAt(0)}
-                                  </div>
-                                  <span className="truncate">{p.name}</span>
-                                  <span className="text-[9px] text-gray-400 font-mono shrink-0">#{p.number}</span>
-                                </div>
+                            tierPlayers.map(p => {
+                              const specifiedTeamId = activeCategory.specifiedPlayerTeamAssignments?.[p.id];
+                              const specifiedTeam = categoryTeams.find(t => t.id === specifiedTeamId);
 
-                                {/* Dropdown to adjust Tier */}
-                                <select
-                                  value={tierIdx}
-                                  onChange={(e) => handleSetPlayerTier(p.id, parseInt(e.target.value))}
-                                  className="text-[9px] font-black bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-gray-700 outline-none cursor-pointer hover:bg-white"
-                                >
-                                  {Array.from({ length: calculatedTierCount }).map((_, tIndex) => (
-                                    <option key={tIndex} value={tIndex}>
-                                      {TIER_CONFIGS[tIndex % TIER_CONFIGS.length].name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            ))
+                              return (
+                                <div key={p.id} className="bg-white/90 p-1.5 rounded-xl border border-gray-100 flex items-center justify-between text-xs font-bold text-gray-800 gap-1">
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center font-black text-[9px] overflow-hidden shrink-0">
+                                      {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : p.name.charAt(0)}
+                                    </div>
+                                    <span className="truncate">{p.name}</span>
+                                    <span className="text-[9px] text-gray-400 font-mono shrink-0">#{p.number}</span>
+                                    {specifiedTeam && (
+                                      <span className="bg-blue-100 text-blue-800 text-[8px] font-black px-1 py-0.2 rounded border border-blue-200 shrink-0">
+                                        👉 {specifiedTeam.name}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {/* Dropdown to adjust Tier */}
+                                    <select
+                                      value={tierIdx}
+                                      onChange={(e) => handleSetPlayerTier(p.id, parseInt(e.target.value))}
+                                      className="text-[9px] font-black bg-gray-50 border border-gray-200 rounded px-1 py-0.5 text-gray-700 outline-none cursor-pointer hover:bg-white"
+                                    >
+                                      {Array.from({ length: calculatedTierCount }).map((_, tIndex) => (
+                                        <option key={tIndex} value={tIndex}>
+                                          {TIER_CONFIGS[tIndex % TIER_CONFIGS.length].name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              );
+                            })
                           )}
                         </div>
                       </div>

@@ -653,6 +653,7 @@ export interface TournamentCategory {
   playerOverrides?: Record<string, PlayerCategoryOverride>;
   playerSkillTiers?: Record<string, number>; // playerId -> tierIndex (0=A档, 1=B档, 2=C档...)
   specifiedCaptainTierIndex?: number; // 指定队长档位: undefined/-1 代表随机抽取档位，0=A档, 1=B档, 2=C档...
+  specifiedPlayerTeamAssignments?: Record<string, string>; // playerId -> teamId (指定球员分配在某个小组/队伍)
 }
 
 export interface IntramuralTeam {
