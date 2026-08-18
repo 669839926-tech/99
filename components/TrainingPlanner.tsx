@@ -588,7 +588,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
                                 <ClipboardCopy className="w-4 h-4" />
                             </button>
                         )}
-                        <button onClick={onClose}><X className="w-6 h-6" /></button>
+                        <button onClick={() => { onUpdate(localSession, localSession.attendance || []); onClose(); }}><X className="w-6 h-6" /></button>
                     </div>
                 </div>
                 <div className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
@@ -1037,6 +1037,9 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
     const [showGuestPicker, setShowGuestPicker] = useState(false);
     const [guestSearchTerm, setGuestSearchTerm] = useState('');
     const [guestTeamFilter, setGuestTeamFilter] = useState<string>('all');
+    const [guestDefaultCost, setGuestDefaultCost] = useState<number>(1);
+    const [guestCustomBatchCost, setGuestCustomBatchCost] = useState<string>('');
+    const [teamCustomBatchCost, setTeamCustomBatchCost] = useState<string>('');
 
     const [localSession, setLocalSession] = useState<TrainingSession>(() => {
         const copy = JSON.parse(JSON.stringify(session));
@@ -1122,7 +1125,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                     currentAttendanceMap.set(p.id, {
                         playerId: p.id,
                         status: 'Present',
-                        creditCost: 1
+                        creditCost: Number(guestDefaultCost) >= 0 ? Number(guestDefaultCost) : 1
                     });
                 }
             });
@@ -1199,11 +1202,55 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         return record ? record.status : 'Absent';
     };
 
+    const setPlayerCreditCost = (playerId: string, cost: number) => {
+        const validCost = isNaN(cost) || cost < 0 ? 0 : Number(cost);
+        setLocalSession(prev => {
+            const currentAttendance = prev.attendance || [];
+            const existingRecord = currentAttendance.find(r => r.playerId === playerId);
+            let updatedAttendance: AttendanceRecord[];
+            if (!existingRecord) {
+                updatedAttendance = [...currentAttendance, { playerId, status: 'Present', creditCost: validCost }];
+            } else {
+                updatedAttendance = currentAttendance.map(r => 
+                    r.playerId === playerId ? { ...r, creditCost: validCost } : r
+                );
+            }
+            onUpdate({ ...prev, attendance: updatedAttendance }, updatedAttendance);
+            return { ...prev, attendance: updatedAttendance };
+        });
+    };
+
+    const batchSetCreditCost = (playerIds: string[], cost: number) => {
+        const validCost = isNaN(cost) || cost < 0 ? 0 : Number(cost);
+        setLocalSession(prev => {
+            const currentAttendance = prev.attendance || [];
+            const existingMap = new Map(currentAttendance.map(r => [r.playerId, r]));
+            playerIds.forEach(pid => {
+                const existing = existingMap.get(pid);
+                if (existing) {
+                    existingMap.set(pid, { ...existing, creditCost: validCost });
+                } else {
+                    existingMap.set(pid, { playerId: pid, status: 'Present', creditCost: validCost });
+                }
+            });
+            const updatedAttendance = Array.from(existingMap.values());
+            onUpdate({ ...prev, attendance: updatedAttendance }, updatedAttendance);
+            return { ...prev, attendance: updatedAttendance };
+        });
+    };
+
     const setPlayerStatus = (playerId: string, status: AttendanceStatus, creditCost?: number) => {
         setLocalSession(prev => {
             const currentAttendance = prev.attendance || [];
+            const existingRecord = currentAttendance.find(r => r.playerId === playerId);
+            const resolvedCost = creditCost !== undefined 
+                ? creditCost 
+                : (existingRecord?.creditCost !== undefined ? existingRecord.creditCost : 1);
             const others = currentAttendance.filter(r => r.playerId !== playerId);
-            const nextAttendance = status === 'Absent' ? others : [...others, { playerId, status, creditCost }];
+            const nextAttendance = status === 'Absent' 
+                ? others 
+                : [...others, { ...(existingRecord || {}), playerId, status, creditCost: resolvedCost }];
+            onUpdate({ ...prev, attendance: nextAttendance }, nextAttendance);
             return { ...prev, attendance: nextAttendance };
         });
     };
@@ -1218,12 +1265,13 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                 return {
                     playerId: p.id,
                     status: 'Present' as AttendanceStatus,
-                    creditCost: existing?.creditCost ?? 1
+                    creditCost: existing?.creditCost !== undefined ? existing.creditCost : 1
                 };
             }),
             ...existingAttendance.filter(r => !teamPlayerIds.has(r.playerId)).map(r => ({
                 ...r,
-                status: 'Present' as AttendanceStatus
+                status: 'Present' as AttendanceStatus,
+                creditCost: r.creditCost !== undefined ? r.creditCost : 1
             }))
         ];
 
@@ -1955,14 +2003,56 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
 
                               {/* 本梯队学员 Section */}
                               <div className="space-y-3">
-                                  <div className="text-xs font-black text-gray-600 flex items-center gap-1.5 border-b border-gray-100 pb-1">
-                                      <UsersIcon className="w-3.5 h-3.5 text-gray-400" />
-                                      <span>本梯队学员 ({teamPlayers.length}人)</span>
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-1.5">
+                                      <div className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                                          <UsersIcon className="w-3.5 h-3.5 text-gray-500" />
+                                          <span>本梯队学员 ({teamPlayers.length}人)</span>
+                                      </div>
+                                      {canEdit && teamPlayers.length > 0 && (
+                                          <div className="flex flex-wrap items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-lg border border-gray-200 text-[11px]">
+                                              <span className="text-[10px] font-bold text-gray-500">批量设本队扣课时:</span>
+                                              {[0, 1, 2, 3, 4, 5, 6].map(val => (
+                                                  <button
+                                                      key={val}
+                                                      type="button"
+                                                      onClick={() => batchSetCreditCost(teamPlayers.map(p => p.id), val)}
+                                                      className="px-1.5 py-0.5 bg-white hover:bg-yellow-50 hover:text-yellow-800 border border-gray-300 rounded text-[10px] font-black text-gray-700 transition-colors cursor-pointer shadow-2xs"
+                                                      title={`将所有本队学员扣除课时设为 ${val}`}
+                                                  >
+                                                      {val === 0 ? '0(免扣)' : `${val}课时`}
+                                                  </button>
+                                              ))}
+                                              <div className="flex items-center gap-1 ml-0.5">
+                                                  <input
+                                                      type="number"
+                                                      min="0"
+                                                      step="0.5"
+                                                      placeholder="自定义"
+                                                      value={teamCustomBatchCost}
+                                                      onChange={(e) => setTeamCustomBatchCost(e.target.value)}
+                                                      className="w-14 px-1 py-0.5 bg-white border border-gray-300 rounded text-[10px] font-bold outline-none text-center"
+                                                  />
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                          const cost = parseFloat(teamCustomBatchCost);
+                                                          if (!isNaN(cost) && cost >= 0) {
+                                                              batchSetCreditCost(teamPlayers.map(p => p.id), cost);
+                                                              setTeamCustomBatchCost('');
+                                                          }
+                                                      }}
+                                                      className="px-1.5 py-0.5 bg-bvb-yellow hover:bg-yellow-400 text-bvb-black font-black text-[10px] rounded cursor-pointer transition-colors shadow-2xs"
+                                                  >
+                                                      应用
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      )}
                                   </div>
                                   {teamPlayers.map(player => {
                                       const status = getStatus(player.id);
                                       const record = localSession.attendance?.find(r => r.playerId === player.id);
-                                      const currentCost = record?.creditCost || 1;
+                                      const currentCost = record?.creditCost !== undefined ? record.creditCost : 1;
                                       const isFocused = localSession.focusedPlayerIds?.includes(player.id);
                                       return (
                                           <div key={player.id} className={`flex flex-col p-3 border rounded-xl shadow-xs transition-all ${isFocused ? 'bg-yellow-50/50 border-yellow-200 ring-2 ring-yellow-100' : 'bg-white border-gray-100'}`}>
@@ -1984,18 +2074,56 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                                   </div>
                                                   <div className="flex flex-col items-end gap-1">
                                                       <div className="text-[10px] font-bold">{status === 'Present' && <span className="text-green-600 font-black">正常参训</span>}{status === 'Leave' && <span className="text-yellow-600">请假</span>}{status === 'Injury' && <span className="text-red-600">伤停</span>}{(status === 'Absent' || !status) && <span className="text-gray-400">未出席</span>}</div>
-                                                      {status === 'Present' && (
-                                                          <div className="flex items-center gap-1 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200">
-                                                              <span className="text-[9px] font-black text-gray-500 uppercase">扣课时:</span>
-                                                              <select 
-                                                                  className="bg-transparent text-[10px] font-black text-bvb-black outline-none cursor-pointer"
-                                                                  value={currentCost}
-                                                                  onChange={(e) => setPlayerStatus(player.id, 'Present', parseInt(e.target.value))}
-                                                              >
-                                                                  {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
-                                                              </select>
-                                                          </div>
-                                                      )}
+                                                      
+                                                      {/* Flexible Stepper and Credit Cost Selector */}
+                                                      <div className="flex items-center gap-1 bg-gray-100/90 px-1.5 py-0.5 rounded-lg border border-gray-200 shadow-2xs">
+                                                          <span className="text-[9px] font-black text-gray-500 uppercase">扣课时:</span>
+                                                          <button
+                                                              type="button"
+                                                              disabled={!canEdit || currentCost <= 0}
+                                                              onClick={() => setPlayerCreditCost(player.id, Math.max(0, currentCost - (currentCost > 1 && currentCost % 1 !== 0 ? 0.5 : 1)))}
+                                                              className="w-4 h-4 rounded bg-white hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center text-xs font-black text-gray-700 transition-colors shadow-2xs cursor-pointer"
+                                                              title="减少扣除课时"
+                                                          >
+                                                              -
+                                                          </button>
+                                                          <select 
+                                                              disabled={!canEdit}
+                                                              className="bg-transparent text-[11px] font-black text-gray-900 outline-none cursor-pointer text-center px-0.5"
+                                                              value={currentCost}
+                                                              onChange={(e) => setPlayerCreditCost(player.id, parseFloat(e.target.value))}
+                                                          >
+                                                              <option value={0}>0 (免扣)</option>
+                                                              <option value={1}>1 课时</option>
+                                                              <option value={2}>2 课时</option>
+                                                              <option value={3}>3 课时</option>
+                                                              <option value={4}>4 课时</option>
+                                                              <option value={5}>5 课时</option>
+                                                              <option value={6}>6 课时</option>
+                                                              <option value={7}>7 课时</option>
+                                                              <option value={8}>8 课时</option>
+                                                              <option value={9}>9 课时</option>
+                                                              <option value={10}>10 课时</option>
+                                                              <option value={0.5}>0.5 课时</option>
+                                                              <option value={1.5}>1.5 课时</option>
+                                                              <option value={2.5}>2.5 课时</option>
+                                                              <option value={3.5}>3.5 课时</option>
+                                                              <option value={4.5}>4.5 课时</option>
+                                                              <option value={5.5}>5.5 课时</option>
+                                                              {![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5].includes(currentCost) && (
+                                                                  <option value={currentCost}>{currentCost} 课时</option>
+                                                              )}
+                                                          </select>
+                                                          <button
+                                                              type="button"
+                                                              disabled={!canEdit}
+                                                              onClick={() => setPlayerCreditCost(player.id, currentCost + 1)}
+                                                              className="w-4 h-4 rounded bg-white hover:bg-gray-200 disabled:opacity-30 flex items-center justify-center text-xs font-black text-gray-700 transition-colors shadow-2xs cursor-pointer"
+                                                              title="增加扣除课时"
+                                                          >
+                                                              +
+                                                          </button>
+                                                      </div>
                                                   </div>
                                               </div>
                                               <div className="flex bg-gray-50/50 p-1 rounded-lg gap-1">
@@ -2028,11 +2156,56 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                               </button>
                                           )}
                                       </div>
+
+                                      {/* Batch Credit Deduction Bar for Guest Players */}
+                                      {canEdit && (
+                                          <div className="flex flex-wrap items-center justify-between gap-2 bg-blue-50/70 p-2 rounded-xl border border-blue-200 text-[11px]">
+                                              <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-blue-950">
+                                                  <span className="text-[10px] font-bold text-blue-700">⚡ 批量设置加练扣课时:</span>
+                                                  {[0, 1, 2, 3, 4, 5, 6].map(val => (
+                                                      <button
+                                                          key={val}
+                                                          type="button"
+                                                          onClick={() => batchSetCreditCost(guestPlayers.map(p => p.id), val)}
+                                                          className="px-2 py-0.5 bg-white hover:bg-blue-100 border border-blue-300 rounded text-[10px] font-black text-blue-900 transition-colors cursor-pointer shadow-2xs"
+                                                          title={`将所有加练球员扣除课时设为 ${val}`}
+                                                      >
+                                                          {val === 0 ? '0(免扣)' : `${val}课时`}
+                                                      </button>
+                                                  ))}
+                                              </div>
+                                              <div className="flex items-center gap-1">
+                                                  <input
+                                                      type="number"
+                                                      min="0"
+                                                      step="0.5"
+                                                      placeholder="自定义"
+                                                      value={guestCustomBatchCost}
+                                                      onChange={(e) => setGuestCustomBatchCost(e.target.value)}
+                                                      className="w-16 px-1.5 py-0.5 bg-white border border-blue-300 rounded text-[10px] font-bold outline-none text-center"
+                                                  />
+                                                  <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                          const cost = parseFloat(guestCustomBatchCost);
+                                                          if (!isNaN(cost) && cost >= 0) {
+                                                              batchSetCreditCost(guestPlayers.map(p => p.id), cost);
+                                                              setGuestCustomBatchCost('');
+                                                          }
+                                                      }}
+                                                      className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] rounded cursor-pointer transition-colors shadow-2xs"
+                                                  >
+                                                      应用
+                                                  </button>
+                                              </div>
+                                          </div>
+                                      )}
+
                                       <div className="space-y-3">
                                           {guestPlayers.map(player => {
                                               const status = getStatus(player.id);
                                               const record = localSession.attendance?.find(r => r.playerId === player.id);
-                                              const currentCost = record?.creditCost || 1;
+                                              const currentCost = record?.creditCost !== undefined ? record.creditCost : 1;
                                               const homeTeam = teams.find((t: Team) => t.id === player.teamId);
                                               const isFocused = localSession.focusedPlayerIds?.includes(player.id);
 
@@ -2075,24 +2248,62 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                                                               ...prev,
                                                                               attendance: (prev.attendance || []).filter(r => r.playerId !== player.id)
                                                                           }))}
-                                                                          className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors"
+                                                                          className="text-[10px] font-bold text-red-500 hover:text-red-700 hover:bg-red-50 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
                                                                       >
                                                                           移除
                                                                       </button>
                                                                   )}
                                                               </div>
-                                                              {status === 'Present' && (
-                                                                  <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-blue-200 shadow-2xs">
-                                                                      <span className="text-[9px] font-black text-gray-500 uppercase">扣课时:</span>
-                                                                      <select 
-                                                                          className="bg-transparent text-[10px] font-black text-bvb-black outline-none cursor-pointer"
-                                                                          value={currentCost}
-                                                                          onChange={(e) => setPlayerStatus(player.id, 'Present', parseInt(e.target.value))}
-                                                                      >
-                                                                          {[1, 2, 3, 4, 5].map(v => <option key={v} value={v}>{v}</option>)}
-                                                                      </select>
-                                                                  </div>
-                                                              )}
+
+                                                              {/* Guest Player Stepper and Credit Cost Selector */}
+                                                              <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded-lg border border-blue-200 shadow-2xs">
+                                                                  <span className="text-[9px] font-black text-blue-600 uppercase">扣课时:</span>
+                                                                  <button
+                                                                      type="button"
+                                                                      disabled={!canEdit || currentCost <= 0}
+                                                                      onClick={() => setPlayerCreditCost(player.id, Math.max(0, currentCost - (currentCost > 1 && currentCost % 1 !== 0 ? 0.5 : 1)))}
+                                                                      className="w-4 h-4 rounded bg-blue-50 hover:bg-blue-200 disabled:opacity-30 flex items-center justify-center text-xs font-black text-blue-800 transition-colors shadow-2xs cursor-pointer"
+                                                                      title="减少扣除课时"
+                                                                  >
+                                                                      -
+                                                                  </button>
+                                                                  <select 
+                                                                      disabled={!canEdit}
+                                                                      className="bg-transparent text-[11px] font-black text-bvb-black outline-none cursor-pointer text-center px-0.5"
+                                                                      value={currentCost}
+                                                                      onChange={(e) => setPlayerCreditCost(player.id, parseFloat(e.target.value))}
+                                                                  >
+                                                                      <option value={0}>0 (免扣)</option>
+                                                              <option value={1}>1 课时</option>
+                                                              <option value={2}>2 课时</option>
+                                                              <option value={3}>3 课时</option>
+                                                              <option value={4}>4 课时</option>
+                                                              <option value={5}>5 课时</option>
+                                                              <option value={6}>6 课时</option>
+                                                              <option value={7}>7 课时</option>
+                                                              <option value={8}>8 课时</option>
+                                                              <option value={9}>9 课时</option>
+                                                              <option value={10}>10 课时</option>
+                                                              <option value={0.5}>0.5 课时</option>
+                                                              <option value={1.5}>1.5 课时</option>
+                                                              <option value={2.5}>2.5 课时</option>
+                                                              <option value={3.5}>3.5 课时</option>
+                                                              <option value={4.5}>4.5 课时</option>
+                                                              <option value={5.5}>5.5 课时</option>
+                                                                      {![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0.5, 1.5, 2.5, 3.5, 4.5, 5.5].includes(currentCost) && (
+                                                                          <option value={currentCost}>{currentCost} 课时</option>
+                                                                      )}
+                                                                  </select>
+                                                                  <button
+                                                                      type="button"
+                                                                      disabled={!canEdit}
+                                                                      onClick={() => setPlayerCreditCost(player.id, currentCost + 1)}
+                                                                      className="w-4 h-4 rounded bg-blue-50 hover:bg-blue-200 disabled:opacity-30 flex items-center justify-center text-xs font-black text-blue-800 transition-colors shadow-2xs cursor-pointer"
+                                                                      title="增加扣除课时"
+                                                                  >
+                                                                      +
+                                                                  </button>
+                                                              </div>
                                                           </div>
                                                       </div>
                                                       <div className="flex bg-white/70 p-1 rounded-lg gap-1 border border-blue-100">
@@ -2601,11 +2812,36 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                 </div>
 
                                 {/* Multi-select Toolbar */}
-                                <div className="flex items-center justify-between pt-1 border-t border-gray-200/60">
-                                    <div className="text-[11px] font-bold text-gray-600 flex items-center gap-1.5">
-                                        <span>匹配球员: <strong className="text-gray-900">{candidateGuestPlayers.length}</strong> 人</span>
+                                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-gray-200/60">
+                                    <div className="text-[11px] font-bold text-gray-600 flex items-center gap-1.5 flex-wrap">
+                                        <span>匹配: <strong className="text-gray-900">{candidateGuestPlayers.length}</strong>人</span>
                                         <span>•</span>
-                                        <span>已加入考勤: <strong className="text-blue-600">{selectedCandidateCount}</strong> 人</span>
+                                        <span>已加考勤: <strong className="text-blue-600">{selectedCandidateCount}</strong>人</span>
+                                        <span className="hidden sm:inline">•</span>
+                                        <div className="flex items-center gap-1 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                            <span className="text-[10px] font-bold text-blue-900">加入时默认扣:</span>
+                                            <select
+                                                value={guestDefaultCost}
+                                                onChange={(e) => setGuestDefaultCost(parseFloat(e.target.value))}
+                                                className="bg-white text-blue-950 font-black text-[10px] rounded px-1.5 py-0.5 border border-blue-300 outline-none cursor-pointer"
+                                            >
+                                                <option value={0}>0 (免扣/试训)</option>
+                                                <option value={1}>1 课时 (标准)</option>
+                                                <option value={2}>2 课时 (2倍/双节)</option>
+                                                <option value={3}>3 课时</option>
+                                                <option value={4}>4 课时</option>
+                                                <option value={5}>5 课时</option>
+                                                <option value={6}>6 课时</option>
+                                                <option value={7}>7 课时</option>
+                                                <option value={8}>8 课时</option>
+                                                <option value={9}>9 课时</option>
+                                                <option value={10}>10 课时</option>
+                                                <option value={0.5}>0.5 课时</option>
+                                                <option value={1.5}>1.5 课时</option>
+                                                <option value={2.5}>2.5 课时</option>
+                                                <option value={3.5}>3.5 课时</option>
+                                            </select>
+                                        </div>
                                     </div>
 
                                     {candidateGuestPlayers.length > 0 && (
@@ -2643,7 +2879,7 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                                     attendance: (prev.attendance || []).filter((r: AttendanceRecord) => r.playerId !== p.id)
                                                 }));
                                             } else {
-                                                setPlayerStatus(p.id, 'Present', 1);
+                                                setPlayerStatus(p.id, 'Present', Number(guestDefaultCost) >= 0 ? Number(guestDefaultCost) : 1);
                                             }
                                         };
 
