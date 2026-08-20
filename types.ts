@@ -356,6 +356,36 @@ export interface Match {
   details?: MatchDetails;
   isSeries?: boolean;
   fixtures?: SeriesFixture[];
+  tournamentId?: string;
+  tournamentTier?: TournamentTier;
+  tournamentCategory?: TournamentCategory;
+}
+
+export type TournamentTier = 'S' | 'A' | 'B' | 'C';
+export type TournamentCategory = '官方赛事' | '品牌赛事' | '商业赛事' | '地方赛事' | '交流赛' | string;
+
+export interface TournamentItem {
+    id: string;
+    name: string;                         // 赛事名称
+    tier: TournamentTier;                 // 赛事等级: S / A / B / C（手动录入）
+    category: TournamentCategory;         // 赛事类型: 官方赛事 / 品牌赛事 / 商业赛事 / 地方赛事 / 交流赛（手动录入）
+    standardRating?: number;              // 赛事水准评分：例如4.3★（结合比赛日志1-3项目均星为准）
+    experienceRating?: number;            // 赛事体验评分：例如3.6★（结合比赛日志4-5项目均星为准）
+    recommendParticipation?: '是' | '否' | boolean; // 是否推荐再次参赛（与图2录入一致）
+    orgRating?: OrgRating;                // 5项指标具体星级
+    province?: string;                    // 省
+    city?: string;                        // 市
+    district?: string;                    // 区/县
+    locationName?: string;                // 举办场地/基地
+    targetAgeGroup?: string;              // 适龄梯队/组别 (如: U8-U12, 2015/2016挑战队)
+    seasonMonth?: string;                 // 举办时间/周期 (如: 每年五一 / 每年暑期7-8月 / 冬假)
+    matchFormat?: string;                 // 赛制 (如: 8人制, 11人制, 5人制)
+    organizer?: string;                   // 主办方/承办单位
+    notes?: string;                       // 赛事特色、往届备忘与经验总结
+    isPotential?: boolean;                // 是否为潜在待参赛赛事
+    historyMatchIds?: string[];           // 关联的历史比赛ID
+    createdAt: string;
+    updatedAt: string;
 }
 
 export interface TrainingSession {
@@ -700,5 +730,48 @@ export interface IntramuralTournament {
   categories: TournamentCategory[];
   teams: IntramuralTeam[];
   matches: IntramuralMatch[];
+}
+
+// ==========================================
+// 球员品质 (Player Character / Qualities)
+// ==========================================
+export type CharacterDimensionKey = 'confidence' | 'resilience' | 'courage' | 'creativity' | 'cooperation';
+
+export type CheckpointScore = 0 | 1 | 2 | null; // null represents "—" (场景不足无法判断，不按0分处理)
+
+export type CharacterBadgeLevel = 'none' | 'observing' | 'standard' | 'outstanding';
+
+export interface CharacterDimensionAssessment {
+  checkpoint1: CheckpointScore; // 观察点1得分 0, 1, 2, or null
+  checkpoint2: CheckpointScore; // 观察点2得分 0, 1, 2, or null
+  totalScore: number | null; // 单项品质总分 (满分4分)
+  badgeLevel: CharacterBadgeLevel;
+  highlightMoment?: string; // 精彩闪光瞬间
+}
+
+export interface PlayerCharacterAssessment {
+  id: string;
+  playerId: string;
+  matchId: string;
+  matchType: 'regular' | 'intramural';
+  matchTitle: string;
+  matchDate: string;
+  teamId?: string;
+  opponentOrTeams?: string; // e.g. "vs 恒大足校" or "A队 vs B队"
+  evaluatorId?: string;
+  evaluatorName?: string;
+  dimensions: {
+    confidence: CharacterDimensionAssessment; // 自信
+    resilience: CharacterDimensionAssessment; // 坚韧
+    courage: CharacterDimensionAssessment; // 勇气
+    creativity: CharacterDimensionAssessment; // 创造
+    cooperation: CharacterDimensionAssessment; // 合作
+  };
+  totalValidScore: number; // 有效总得分 (满分20分)
+  standardBadgesCount: number; // 达到3分的品质勋章数
+  outstandingBadgesCount: number; // 达到4分的卓越勋章数
+  coachSummary?: string; // 教练综合寄语
+  createdAt: string;
+  updatedAt: string;
 }
 

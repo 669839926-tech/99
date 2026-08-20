@@ -1,5 +1,8 @@
 {
   "name": "顽石之光足球俱乐部青训管理系统",
-  "description": "一款专业的足球俱乐部青训管理应用，具有球员追踪、比赛日程安排、AI 辅助训练计划生成以及专业战术板功能。",
-  "requestFramePermissions": []
+  "description": "一款专业的足球俱乐部青训管理应用，具有球员追踪、比赛日程安排、队内锦标赛、赛事库、球员品质五维行为评定与勋章体系、AI 辅助战术生成以及专业战术板功能。",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

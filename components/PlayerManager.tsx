@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto, Match } from '../types';
+import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto, Match, PlayerCharacterAssessment } from '../types';
 import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap, Trophy, Award, Medal, Star } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
+import { PlayerCharacterMedalsCard } from './PlayerCharacterMedalsCard';
 
 // --- Shared Helper Functions ---
 
@@ -470,10 +471,11 @@ interface PlayerDetailModalProps {
     onDeleteRecharge: (playerId: string, rechargeId: string) => void;
     allPlayers: Player[];
     onSwitchPlayer: (player: Player) => void;
+    characterAssessments?: PlayerCharacterAssessment[];
 }
 
 const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({ 
-    player, onClose, teams, matches = [], trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge, allPlayers, onSwitchPlayer
+    player, onClose, teams, matches = [], trainings, attributeConfig, currentUser, onUpdatePlayer, onDeletePlayer, initialFilter, appLogo, onDeleteRecharge, allPlayers, onSwitchPlayer, characterAssessments = []
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedPlayer, setEditedPlayer] = useState<Player>(JSON.parse(JSON.stringify(player)));
@@ -2375,6 +2377,8 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                           </div>
                       )}
                    </div>
+               {/* 顽石之光 · 球员品质勋章展示区 (与比赛实战评定联动) */}
+               <PlayerCharacterMedalsCard player={editedPlayer} characterAssessments={characterAssessments} />
                {renderCareerSummary()}
                <div className="flex-1 bg-white border border-gray-100 rounded-xl shadow-sm relative min-h-[300px] p-2"><h4 className="absolute top-2 left-2 font-bold text-gray-400 uppercase text-xs">综合能力图谱 (当前编辑预览)</h4><ResponsiveContainer width="100%" height="100%"><RadarChart cx="50%" cy="50%" outerRadius="70%" data={overviewRadarData}><PolarGrid stroke="#e5e7eb" /><PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontWeight: 'bold' }} /><PolarRadiusAxis angle={30} domain={[0, 10]} tick={false} axisLine={false} /><Radar name="能力" dataKey="A" stroke="#000000" strokeWidth={3} fill="#FDE100" fillOpacity={0.6} /></RadarChart></ResponsiveContainer></div></div></div>)}
              {activeTab === 'radar' && renderRadarIntegratedContent()}
@@ -2902,11 +2906,12 @@ interface PlayerManagerProps {
   onDeleteRecharge: (playerId: string, rechargeId: string) => void;
   initialFilter?: string;
   appLogo?: string;
+  characterAssessments?: PlayerCharacterAssessment[];
 }
 
 // --- PlayerManager (Main Component) ---
 const PlayerManager: React.FC<PlayerManagerProps> = ({ 
-  teams, players, matches = [], trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo
+  teams, players, matches = [], trainings = [], attributeConfig, currentUser, onAddPlayer, onBulkAddPlayers, onAddTeam, onUpdateTeam, onDeleteTeam, onUpdatePlayer, onDeletePlayer, onBulkDeletePlayers, onTransferPlayers, onRechargePlayer, onBulkRechargePlayers, onDeleteRecharge, initialFilter, appLogo, characterAssessments = []
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
@@ -3834,6 +3839,7 @@ const PlayerManager: React.FC<PlayerManagerProps> = ({
             onDeleteRecharge={onDeleteRecharge} 
             initialFilter={initialFilter} 
             appLogo={appLogo} 
+            characterAssessments={characterAssessments}
             onClose={() => setSelectedPlayer(null)}
         />
       )}

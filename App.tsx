@@ -13,8 +13,14 @@ import FinanceManager from './components/FinanceManager';
 import TechnicalGrowth from './components/TechnicalGrowth';
 import PhilosophyLibrary from './components/PhilosophyLibrary';
 import { MATCH_PRINCIPLES, PHILOSOPHY_OVERVIEW, BASIC_TECH_THEMES, SCENARIO_THEMES, MatchPrinciple, BasicTechItem, ScenarioTheme } from './src/philosophyData';
-import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS } from './constants';
-import { Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, PeriodizationPlan, AccountingRecord, PhilosophyDocument, IntramuralTournament, Tactic, PointItemDefinition, PlayerPointRecord } from './types';
+import { MOCK_PLAYERS, MOCK_MATCHES, MOCK_TRAINING, MOCK_TEAMS, DEFAULT_ATTRIBUTE_CONFIG, MOCK_USERS, MOCK_ANNOUNCEMENTS, APP_LOGO, DEFAULT_PERMISSIONS, DEFAULT_FINANCE_CATEGORIES, DEFAULT_SALARY_SETTINGS, MOCK_TOURNAMENTS } from './constants';
+import { 
+  Player, TrainingSession, Team, AttributeConfig, PlayerReview, AttendanceRecord, 
+  RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, 
+  RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, 
+  PeriodizationPlan, AccountingRecord, PhilosophyDocument, IntramuralTournament, 
+  Tactic, PointItemDefinition, PlayerPointRecord, TournamentItem, PlayerCharacterAssessment 
+} from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { Loader2 } from 'lucide-react';
 
@@ -51,6 +57,8 @@ function App() {
   const [scenarioThemes, setScenarioThemes] = useState<ScenarioTheme[]>(SCENARIO_THEMES);
   const [philosophyOverview, setPhilosophyOverview] = useState<any>(PHILOSOPHY_OVERVIEW);
   const [intramuralTournaments, setIntramuralTournaments] = useState<IntramuralTournament[]>([]);
+  const [tournaments, setTournaments] = useState<TournamentItem[]>(MOCK_TOURNAMENTS);
+  const [characterAssessments, setCharacterAssessments] = useState<PlayerCharacterAssessment[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -216,6 +224,36 @@ function App() {
                 }
             }
         }
+        if (data.tournaments && Array.isArray(data.tournaments) && data.tournaments.length > 0) {
+            setTournaments(data.tournaments);
+        } else {
+            const savedLocalTournaments = localStorage.getItem('club_tournament_library_v1');
+            if (savedLocalTournaments) {
+                try {
+                    const parsed = JSON.parse(savedLocalTournaments);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setTournaments(parsed);
+                    }
+                } catch {
+                    // Ignore parse error
+                }
+            }
+        }
+        if (data.characterAssessments && Array.isArray(data.characterAssessments) && data.characterAssessments.length > 0) {
+            setCharacterAssessments(data.characterAssessments);
+        } else {
+            const savedLocalAssessments = localStorage.getItem('club_character_assessments_v1');
+            if (savedLocalAssessments) {
+                try {
+                    const parsed = JSON.parse(savedLocalAssessments);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setCharacterAssessments(parsed);
+                    }
+                } catch {
+                    // Ignore parse error
+                }
+            }
+        }
     };
 
     try {
@@ -304,12 +342,16 @@ function App() {
             basicTechThemes,
             scenarioThemes,
             philosophyOverview,
-            intramuralTournaments
+            intramuralTournaments,
+            tournaments,
+            characterAssessments
         };
 
         // Mirror in local browser storage synchronously first
         try {
             localStorage.setItem('football_manager_local_cache', JSON.stringify(dataPayload));
+            localStorage.setItem('club_tournament_library_v1', JSON.stringify(tournaments));
+            localStorage.setItem('club_character_assessments_v1', JSON.stringify(characterAssessments));
         } catch (e) {
             console.warn('Failed to cache data in browser storage:', e);
         }
@@ -333,7 +375,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, intramuralTournaments, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, intramuralTournaments, tournaments, characterAssessments, isInitializing]);
 
   const handleRestoreSystem = (data: any) => {
     if (!data) return;
@@ -601,7 +643,7 @@ function App() {
       case 'dashboard':
         return <Dashboard players={derivedPlayers} matches={matches} trainings={trainings} teams={teams} transactions={transactions} announcements={announcements} currentUser={currentUser} onNavigate={handleNavigate} onAddAnnouncement={handleAddAnnouncement} onDeleteAnnouncement={handleDeleteAnnouncement} onUpdateAnnouncement={handleUpdateAnnouncement} appLogo={appLogo} tactics={tactics} salarySettings={salarySettings} />;
       case 'players':
-        return <PlayerManager teams={teams} players={derivedPlayers} matches={matches} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} />;
+        return <PlayerManager teams={teams} players={derivedPlayers} matches={matches} trainings={trainings} attributeConfig={attributeConfig} currentUser={currentUser} onAddPlayer={handleAddPlayer} onBulkAddPlayers={handleBulkAddPlayers} onAddTeam={handleAddTeam} onUpdateTeam={handleUpdateTeam} onDeleteTeam={id => setTeams(prev => prev.filter(t => t.id !== id))} onUpdatePlayer={handleUpdatePlayer} onDeletePlayer={handleDeletePlayer} onBulkDeletePlayers={handleBulkDeletePlayers} onTransferPlayers={handleTransferPlayers} onAddPlayerReview={handleAddPlayerReview} onRechargePlayer={handleRechargePlayer} onBulkRechargePlayers={handleBulkRechargePlayers} onDeleteRecharge={handleDeleteRecharge} initialFilter={navigationParams.filter} appLogo={appLogo} characterAssessments={characterAssessments} />;
       case 'growth':
         return <TechnicalGrowth players={derivedPlayers} teams={teams} currentUser={currentUser} techTests={techTests} onUpdatePlayer={handleUpdatePlayer} onUpdateTechTests={setTechTests} />;
       case 'finance':
@@ -633,6 +675,10 @@ function App() {
           onUpdateTactics={setTactics}
           intramuralTournaments={intramuralTournaments}
           onUpdateIntramuralTournaments={setIntramuralTournaments}
+          tournaments={tournaments}
+          onUpdateTournaments={setTournaments}
+          characterAssessments={characterAssessments}
+          onUpdateCharacterAssessments={setCharacterAssessments}
         />;
       case 'philosophy':
         return (

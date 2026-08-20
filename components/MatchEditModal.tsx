@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, User, SeriesFixture, OrgRating } from '../types';
-import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, FileText, TrendingUp, AlertCircle, Target, Flag, UserMinus, PenTool, Trophy, Shield, Cloud } from 'lucide-react';
+import { Match, Player, Team, MatchDetails, PointItemDefinition, PlayerPointRecord, MatchEvent, MatchEventType, User, SeriesFixture, OrgRating, TournamentItem, TournamentTier } from '../types';
+import { X, Save, CheckCircle, RefreshCw, ChevronLeft, Minimize2, Maximize2, Info, Activity, Users as UsersIcon, Star, Tag, ClipboardList, Plus, Trash2, FileText, TrendingUp, AlertCircle, Target, Flag, UserMinus, PenTool, Trophy, Shield, Cloud, BookmarkPlus } from 'lucide-react';
+import { TIER_CONFIG } from '../constants';
 
 interface MatchEditModalProps {
     match: Match;
@@ -14,6 +15,8 @@ interface MatchEditModalProps {
     onAddPointRecord?: (record: PlayerPointRecord) => void;
     onBulkAddPointRecords?: (records: PlayerPointRecord[]) => void;
     onDeletePointRecord?: (id: string) => void;
+    tournaments?: TournamentItem[];
+    onUpdateTournamentLibrary?: (tournaments: TournamentItem[]) => void;
 }
 
 type TabType = 'info' | 'fixtures' | 'lineup' | 'objectives' | 'events' | 'report';
@@ -120,8 +123,11 @@ const ensureDetails = (match: Match): Match => {
 export const MatchEditModal: React.FC<MatchEditModalProps> = ({
     match,
     players,
+    teams,
     onUpdateMatch,
-    onClose
+    onClose,
+    tournaments = [],
+    onUpdateTournamentLibrary
 }) => {
     const [editingMatch, setEditingMatch] = useState<Match>(() => ensureDetails(match));
     const [activeTab, setActiveTab] = useState<TabType>('info');
@@ -525,12 +531,71 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                             </div>
                                         )}
 
-                                        {/* 比赛性质 (Match Nature / Competition) */}
-                                        <div className="space-y-2 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
-                                            <label className="text-[10px] md:text-xs font-black text-gray-800 uppercase flex items-center gap-1.5">
-                                                <Trophy className="w-3.5 h-3.5 text-bvb-yellow" /> 比赛性质 / 赛事类型
-                                            </label>
-                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                        {/* 比赛性质与赛事库关联 (Match Nature / Tournament Library Integration) */}
+                                        <div className="space-y-3 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                                            <div className="flex items-center justify-between">
+                                                <label className="text-[10px] md:text-xs font-black text-gray-800 uppercase flex items-center gap-1.5">
+                                                    <Trophy className="w-3.5 h-3.5 text-bvb-yellow" /> 比赛性质 / 赛事库档案
+                                                </label>
+                                                {editingMatch.tournamentTier && (
+                                                    <span className={`text-[10px] px-2 py-0.5 rounded-lg ${TIER_CONFIG[editingMatch.tournamentTier]?.badge || 'bg-gray-800 text-white font-bold'}`}>
+                                                        {TIER_CONFIG[editingMatch.tournamentTier]?.icon} {TIER_CONFIG[editingMatch.tournamentTier]?.label || editingMatch.tournamentTier}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* 从俱乐部赛事库快速选用 */}
+                                            {tournaments.length > 0 && (
+                                                <div>
+                                                    <div className="flex items-center justify-between text-[10px] font-bold text-gray-500 mb-1">
+                                                        <span>快捷关联已有赛事档案:</span>
+                                                        {editingMatch.tournamentId && (
+                                                            <span className="text-emerald-600 font-bold flex items-center gap-1">
+                                                                <CheckCircle className="w-3 h-3" /> 已关联赛事库
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <select
+                                                        value={editingMatch.tournamentId || ''}
+                                                        onChange={(e) => {
+                                                            const selectedId = e.target.value;
+                                                            if (!selectedId) {
+                                                                setEditingMatch({
+                                                                    ...editingMatch,
+                                                                    tournamentId: undefined,
+                                                                    tournamentTier: undefined,
+                                                                    tournamentCategory: undefined
+                                                                });
+                                                                return;
+                                                            }
+                                                            const found = tournaments.find(t => t.id === selectedId);
+                                                            if (found) {
+                                                                setEditingMatch({
+                                                                    ...editingMatch,
+                                                                    tournamentId: found.id,
+                                                                    tournamentTier: found.tier,
+                                                                    tournamentCategory: found.category,
+                                                                    competition: found.name,
+                                                                    province: editingMatch.province || found.province,
+                                                                    city: editingMatch.city || found.city,
+                                                                    district: editingMatch.district || found.district
+                                                                });
+                                                            }
+                                                        }}
+                                                        className="w-full p-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-bvb-yellow"
+                                                    >
+                                                        <option value="">-- 手动输入 / 未关联赛事库 --</option>
+                                                        {tournaments.map(t => (
+                                                            <option key={t.id} value={t.id}>
+                                                                [{t.tier}级·{t.category}] {t.name} ({t.city || '全国'})
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
+
+                                            {/* 常用分类快捷按钮 */}
+                                            <div className="flex flex-wrap gap-1.5">
                                                 {competitionPresets.map(preset => (
                                                     <button
                                                         key={preset}
@@ -546,12 +611,66 @@ export const MatchEditModal: React.FC<MatchEditModalProps> = ({
                                                     </button>
                                                 ))}
                                             </div>
+
                                             <input 
                                                 className="w-full p-2.5 border rounded-xl font-bold text-xs md:text-sm bg-white focus:ring-2 focus:ring-bvb-yellow outline-none transition-all" 
                                                 placeholder="自由录入赛事名称/性质 (如: 2026贵阳林城之星邀请赛)" 
                                                 value={editingMatch.competition || ''} 
                                                 onChange={e => setEditingMatch({...editingMatch, competition: e.target.value})} 
                                             />
+
+                                            {/* 赛事等级快速评定与入库 */}
+                                            <div className="pt-2 border-t border-gray-200/70 flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[10px] font-black text-gray-500 uppercase">赛事等级:</span>
+                                                    {(['S', 'A', 'B', 'C'] as TournamentTier[]).map(tierKey => (
+                                                        <button
+                                                            key={tierKey}
+                                                            type="button"
+                                                            onClick={() => setEditingMatch({ ...editingMatch, tournamentTier: tierKey })}
+                                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all border ${
+                                                                editingMatch.tournamentTier === tierKey
+                                                                    ? TIER_CONFIG[tierKey].badge
+                                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                                                            }`}
+                                                        >
+                                                            {tierKey} 级
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {editingMatch.competition && !tournaments.some(t => t.name.trim() === editingMatch.competition?.trim()) && onUpdateTournamentLibrary && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const newTour: TournamentItem = {
+                                                                id: 'tour-' + Date.now(),
+                                                                name: editingMatch.competition!.trim(),
+                                                                tier: editingMatch.tournamentTier || 'A',
+                                                                category: editingMatch.tournamentCategory || '品牌赛事',
+                                                                province: editingMatch.province,
+                                                                city: editingMatch.city,
+                                                                district: editingMatch.district,
+                                                                targetAgeGroup: teams?.find(t => t.id === editingMatch.teamId)?.name || '青训梯队',
+                                                                seasonMonth: editingMatch.date ? `${new Date(editingMatch.date).getMonth() + 1}月份` : '常规赛季',
+                                                                isPotential: false,
+                                                                createdAt: new Date().toISOString(),
+                                                                updatedAt: new Date().toISOString()
+                                                            };
+                                                            onUpdateTournamentLibrary([...tournaments, newTour]);
+                                                            setEditingMatch({
+                                                                ...editingMatch,
+                                                                tournamentId: newTour.id,
+                                                                tournamentTier: newTour.tier,
+                                                                tournamentCategory: newTour.category
+                                                            });
+                                                        }}
+                                                        className="text-[10px] font-black text-bvb-black bg-bvb-yellow px-2 py-1 rounded-lg hover:brightness-105 flex items-center gap-1 shadow-2xs"
+                                                    >
+                                                        <BookmarkPlus className="w-3 h-3" /> 保存为此赛事档案
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {/* 场地 (Pitch) */}

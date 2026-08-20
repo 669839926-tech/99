@@ -1,14 +1,19 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Match, Player, Team, User, MatchDetails, PointItemDefinition, PlayerPointRecord, PointChangeType, Tactic, IntramuralTournament } from '../types';
-// Comment: Added 'Star', 'Target', 'Download' to lucide-react imports
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, ClipboardList, PenTool, Coins, TrendingDown, ListPlus, Cloud, Star, Target, Printer, Download } from 'lucide-react';
+import { 
+  Match, Player, Team, User, PointItemDefinition, PlayerPointRecord, 
+  Tactic, IntramuralTournament, TournamentItem, PlayerCharacterAssessment 
+} from '../types';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, PenTool, Star, Printer, Download, Target } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import html2canvas from 'html2canvas';
 import { generateMatchStrategy } from '../services/geminiService';
 import TacticsModule from './TacticsModule';
 import MatchEditModal from './MatchEditModal';
 import IntramuralTournamentModule from './IntramuralTournament';
+import TournamentLibrary from './TournamentLibrary';
+import PlayerCharacterModule from './PlayerCharacterModule';
+import { TIER_CONFIG } from '../constants';
 
 interface MatchPlannerProps {
   matches: Match[];
@@ -32,9 +37,13 @@ interface MatchPlannerProps {
   onUpdateTactics: (tactics: Tactic[]) => void;
   intramuralTournaments?: IntramuralTournament[];
   onUpdateIntramuralTournaments?: (tournaments: IntramuralTournament[]) => void;
+  tournaments?: TournamentItem[];
+  onUpdateTournaments?: (tournaments: TournamentItem[]) => void;
+  characterAssessments?: PlayerCharacterAssessment[];
+  onUpdateCharacterAssessments?: (assessments: PlayerCharacterAssessment[]) => void;
 }
 
-type ViewMode = 'matches' | 'intramural' | 'points' | 'tactics';
+type ViewMode = 'matches' | 'intramural' | 'tournamentLibrary' | 'character' | 'points' | 'tactics';
 
 const MatchPlanner: React.FC<MatchPlannerProps> = ({ 
   matches, 
@@ -56,7 +65,12 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
   tactics,
   onUpdateTactics,
   intramuralTournaments,
-  onUpdateIntramuralTournaments
+  onUpdateIntramuralTournaments,
+  tournaments = [],
+  onUpdateTournaments,
+  characterAssessments = [],
+  onUpdateCharacterAssessments = () => {},
+  appLogo
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('matches');
   const [selectedMatchForAi, setSelectedMatchForAi] = useState<Match | null>(null);
@@ -379,6 +393,24 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
                     🏆 队内赛 (Intramural)
                 </button>
                 <button 
+                    onClick={() => setViewMode('tournamentLibrary')}
+                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 flex items-center gap-1.5 ${viewMode === 'tournamentLibrary' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                    <span>🏛️ 赛事库</span>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded-full font-black">
+                        {tournaments?.length || 0}
+                    </span>
+                </button>
+                <button 
+                    onClick={() => setViewMode('character')}
+                    className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 flex items-center gap-1.5 ${viewMode === 'character' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                    <span>⭐ 球员品质</span>
+                    <span className="text-[10px] bg-amber-400 text-bvb-black px-1.5 py-0.5 rounded-full font-black">
+                        {characterAssessments?.length || 0}
+                    </span>
+                </button>
+                <button 
                     onClick={() => setViewMode('points')}
                     className={`text-[10px] md:text-xs font-black uppercase tracking-widest pb-1 transition-all border-b-2 ${viewMode === 'points' ? 'border-bvb-yellow text-bvb-black' : 'border-transparent text-gray-400'}`}
                 >
@@ -515,6 +547,44 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
             onDeletePointRecord={onDeletePointRecord}
             travelingPlayerIds={travelingPlayerIds}
             onUpdateTravelingPlayers={onUpdateTravelingPlayers}
+        />
+      ) : viewMode === 'tournamentLibrary' ? (
+        <TournamentLibrary
+            tournaments={tournaments}
+            matches={matches}
+            teams={teams}
+            currentUser={currentUser}
+            onUpdateTournaments={onUpdateTournaments || (() => {})}
+            onAddMatchFromTournament={(t) => {
+                const targetTeam = teams.find(tm => tm.name.includes(t.targetAgeGroup || '')) || availableTeams[0];
+                setNewMatchForm({
+                    teamId: targetTeam?.id || '',
+                    opponent: t.name,
+                    title: t.name,
+                    date: new Date().toISOString().split('T')[0],
+                    endDate: new Date().toISOString().split('T')[0],
+                    time: '09:00',
+                    location: 'Away',
+                    competition: t.name,
+                    status: 'Upcoming',
+                    isSeries: true,
+                    pitch: '天然草',
+                    weather: '晴朗'
+                });
+                setViewMode('matches');
+                setShowAddModal(true);
+            }}
+        />
+      ) : viewMode === 'character' ? (
+        <PlayerCharacterModule
+            players={players}
+            teams={teams}
+            matches={matches}
+            intramuralTournaments={intramuralTournaments}
+            currentUser={currentUser}
+            appLogo={appLogo}
+            characterAssessments={characterAssessments}
+            onUpdateCharacterAssessments={onUpdateCharacterAssessments}
         />
       ) : (
         <TacticsModule 
@@ -669,6 +739,8 @@ const MatchPlanner: React.FC<MatchPlannerProps> = ({
           currentUser={currentUser}
           onUpdateMatch={onUpdateMatch}
           onClose={() => setEditingMatch(null)}
+          tournaments={tournaments}
+          onUpdateTournamentLibrary={onUpdateTournaments}
         />
       )}
 
@@ -1203,6 +1275,11 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, teams, onDeleteMatch, star
                     {match.date} {match.isSeries && match.endDate ? `～ ${match.endDate}` : `• ${match.time}`}
                 </span>
                 <div className="flex items-center gap-1.5 md:gap-2 pr-10 md:pr-0">
+                    {match.tournamentTier && TIER_CONFIG[match.tournamentTier] && (
+                        <span className={`text-[8px] md:text-[9px] px-1.5 py-0.5 rounded font-black ${TIER_CONFIG[match.tournamentTier].badge}`}>
+                            {TIER_CONFIG[match.tournamentTier].icon} {match.tournamentTier}级
+                        </span>
+                    )}
                     {match.isSeries && (
                         <span className="text-[8px] md:text-[10px] bg-bvb-black text-bvb-yellow font-black px-2 py-0.5 rounded italic">SERIES</span>
                     )}
