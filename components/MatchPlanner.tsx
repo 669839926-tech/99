@@ -4,7 +4,7 @@ import {
   Match, Player, Team, User, PointItemDefinition, PlayerPointRecord, 
   Tactic, IntramuralTournament, TournamentItem, PlayerCharacterAssessment 
 } from '../types';
-import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, PenTool, Star, Printer, Download, Target } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Shield, Bot, X, Plus, Trash2, Edit2, FileText, CheckCircle, Save, Users as UsersIcon, Activity, Loader2, RefreshCw, TrendingUp, AlertCircle, Filter, PenTool, Star, Printer, Download, Target, Cloud, ClipboardList } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import html2canvas from 'html2canvas';
 import { generateMatchStrategy } from '../services/geminiService';

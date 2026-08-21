@@ -7,8 +7,9 @@ import {
   Sparkles, Shield, Flame, Lightbulb, Users, Trophy, Award, Crown, 
   Search, CheckCircle2, ChevronRight, Download, 
   X, Save, Star,
-  HelpCircle, Calendar, ArrowRight
+  HelpCircle, Calendar, ArrowRight, FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import html2canvas from 'html2canvas';
 import { 
   CHARACTER_DIMENSIONS, CHARACTER_SCORING_OPTIONS, CHARACTER_BADGE_LEVELS,
@@ -513,6 +514,286 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
     }
   };
 
+  // Export Current Match Evaluation Results to Excel
+  const handleExportMatchExcel = () => {
+    if (!activeMatch) return;
+
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: 本场品质评定明细表
+    const detailRows = matchPlayers.map((player, index) => {
+      const assessment = playerAssessmentMap.get(player.id);
+      const isEvaluated = !!assessment && assessment.totalValidScore > 0;
+      const team = teams.find(t => t.id === player.teamId);
+
+      const getDimData = (key: CharacterDimensionKey) => {
+        if (!assessment) return { cp1: '', cp2: '', score: '', badge: '待评定', note: '' };
+        const dim = assessment.dimensions[key];
+        if (!dim || dim.totalScore === null) return { cp1: '', cp2: '', score: '', badge: '待评定', note: '' };
+        const badgeLabel = dim.badgeLevel === 'outstanding' 
+          ? '👑 卓越勋章 (4分)' 
+          : (dim.badgeLevel === 'standard' 
+              ? '🎖️ 达标勋章 (3分)' 
+              : (dim.badgeLevel === 'observing' ? '🔍 重点观察 (1-2分)' : '待达标 (0分)'));
+        return {
+          cp1: dim.checkpoint1 !== null && dim.checkpoint1 !== undefined ? `${dim.checkpoint1}分` : '',
+          cp2: dim.checkpoint2 !== null && dim.checkpoint2 !== undefined ? `${dim.checkpoint2}分` : '',
+          score: dim.totalScore !== null && dim.totalScore !== undefined ? `${dim.totalScore}分` : '',
+          badge: badgeLabel,
+          note: dim.coachNote || ''
+        };
+      };
+
+      const conf = getDimData('confidence');
+      const resi = getDimData('resilience');
+      const cour = getDimData('courage');
+      const crea = getDimData('creativity');
+      const coop = getDimData('cooperation');
+
+      return {
+        '序号': index + 1,
+        '球员姓名': player.name,
+        '球衣号码': player.number ? `#${player.number}` : '',
+        '场上位置': player.position || '队员',
+        '所属梯队': team?.name || activeMatch.teamName || '青训梯队',
+        '评定状态': isEvaluated ? '已评定' : '待评定',
+        '本场总分(满分20)': isEvaluated ? assessment.totalValidScore : '',
+        '获得勋章总数': isEvaluated ? (assessment.standardBadgesCount + assessment.outstandingBadgesCount) : 0,
+        '卓越勋章数(4分)': isEvaluated ? assessment.outstandingBadgesCount : 0,
+        '达标勋章数(3分)': isEvaluated ? assessment.standardBadgesCount : 0,
+        '自信-观察点1(主动要球/敢于做动作)': conf.cp1,
+        '自信-观察点2(主导战术/坚决执行)': conf.cp2,
+        '自信-合计得分': conf.score,
+        '自信-勋章等级': conf.badge,
+        '自信-教练评语': conf.note,
+        '坚韧-观察点1(失误丢球后立刻就地反抢)': resi.cp1,
+        '坚韧-观察点2(比分落后/体能临界全力拼抢)': resi.cp2,
+        '坚韧-合计得分': resi.score,
+        '坚韧-勋章等级': resi.badge,
+        '坚韧-教练评语': resi.note,
+        '勇气-观察点1(1v1攻防坚决对抗突破)': cour.cp1,
+        '勇气-观察点2(关键球敢于承担责任)': cour.cp2,
+        '勇气-合计得分': cour.score,
+        '勇气-勋章等级': cour.badge,
+        '勇气-教练评语': cour.note,
+        '创造-观察点1(非常规路线传球/破局解法)': crea.cp1,
+        '创造-观察点2(空间阅读与意图隐蔽性)': crea.cp2,
+        '创造-合计得分': crea.score,
+        '创造-勋章等级': crea.badge,
+        '创造-教练评语': crea.note,
+        '合作-观察点1(无球穿插与策应补位)': coop.cp1,
+        '合作-观察点2(场上呼应与激励队友)': coop.cp2,
+        '合作-合计得分': coop.score,
+        '合作-勋章等级': coop.badge,
+        '合作-教练评语': coop.note,
+        '教练综合评语与寄语': assessment?.overallFeedback || '',
+        '评定教练': assessment?.evaluatorName || currentUser?.name || '主教练',
+        '评定日期': assessment?.evaluationDate || activeMatch.date,
+        '比赛名称': activeMatch.title,
+        '赛事类型': activeMatch.type === 'regular' ? '常规比赛日程' : '队内锦标赛'
+      };
+    });
+
+    const wsDetail = XLSX.utils.json_to_sheet(detailRows);
+    XLSX.utils.book_append_sheet(wb, wsDetail, '本场品质评定明细');
+
+    // Sheet 2: 勋章授予荣誉名单
+    const awardRows: any[] = [];
+    let awardIndex = 1;
+    matchPlayers.forEach(player => {
+      const assessment = playerAssessmentMap.get(player.id);
+      if (!assessment) return;
+      const team = teams.find(t => t.id === player.teamId);
+
+      CHARACTER_DIMENSIONS.forEach(dim => {
+        const dimEval = assessment.dimensions[dim.key];
+        if (dimEval && (dimEval.badgeLevel === 'outstanding' || dimEval.badgeLevel === 'standard')) {
+          awardRows.push({
+            '序号': awardIndex++,
+            '球员姓名': player.name,
+            '球衣号码': player.number ? `#${player.number}` : '',
+            '场上位置': player.position || '队员',
+            '所属梯队': team?.name || activeMatch.teamName || '青训梯队',
+            '获得品质勋章': `${dim.name}品质勋章`,
+            '勋章级别': dimEval.badgeLevel === 'outstanding' ? '👑 卓越勋章 (4分)' : '🎖️ 达标勋章 (3分)',
+            '维度得分': `${dimEval.totalScore}分`,
+            '品质核心定义': dim.coreMeaning,
+            '实战行为观察与评语': dimEval.coachNote || '达到实战行为观察卓越/达标授予标准',
+            '评定教练': assessment.evaluatorName || currentUser?.name || '主教练',
+            '比赛名称': activeMatch.title,
+            '比赛日期': activeMatch.date
+          });
+        }
+      });
+    });
+
+    if (awardRows.length === 0) {
+      awardRows.push({
+        '提示': '本场比赛暂无球员达到3分及以上勋章授予标准，请继续加油！'
+      });
+    }
+
+    const wsAwards = XLSX.utils.json_to_sheet(awardRows);
+    XLSX.utils.book_append_sheet(wb, wsAwards, '勋章授予荣誉名单');
+
+    // Sheet 3: 赛事评定概况统计
+    const summaryRows = [
+      {
+        '比赛名称': activeMatch.title,
+        '赛事副标题': activeMatch.subTitle,
+        '比赛日期': activeMatch.date,
+        '赛事类型': activeMatch.type === 'regular' ? '常规比赛' : '队内锦标赛',
+        '参战球员总数': matchCharacterStats.totalCount,
+        '已完成评定人数': matchCharacterStats.evaluatedCount,
+        '待评定人数': matchCharacterStats.pendingCount,
+        '授予勋章总数': matchCharacterStats.totalBadgesSum,
+        '全队平均得分(满分20)': matchCharacterStats.averageTotal,
+        '导出时间': new Date().toLocaleString()
+      }
+    ];
+    const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    XLSX.utils.book_append_sheet(wb, wsSummary, '比赛基本概况');
+
+    const cleanTitle = activeMatch.title.replace(/[\\/:*?"<>|]/g, '_');
+    XLSX.writeFile(wb, `顽石之光_品质评定表_${cleanTitle}_${activeMatch.date}.xlsx`);
+  };
+
+  // Export Overall Character Badges Leaderboard & Club History to Excel
+  const handleExportOverallLeaderboardExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: 全员品质勋章总榜
+    const leaderboardRows = badgeWallData.map((item, index) => {
+      const team = teams.find(t => t.id === item.player.teamId);
+      let honorTitle = '积极参评球员';
+      if (item.outstandingBadges >= 3) {
+        honorTitle = '👑 顽石品质领袖';
+      } else if (item.totalBadges >= 3) {
+        honorTitle = '🎖️ 顽石品质标兵';
+      } else if (item.totalBadges > 0) {
+        honorTitle = '⭐ 顽石品质新星';
+      }
+
+      return {
+        '排名': index + 1,
+        '球员姓名': item.player.name,
+        '球衣号码': item.player.number ? `#${item.player.number}` : '',
+        '场上位置': item.player.position || '队员',
+        '所属梯队': team?.name || '青训梯队',
+        '荣誉称号': honorTitle,
+        '参评比赛场次': item.totalAssessments,
+        '累计获授勋章总数': item.totalBadges,
+        '👑卓越勋章数(4分)': item.outstandingBadges,
+        '🎖️达标勋章数(3分)': item.standardBadges,
+        '综合平均得分(满分20)': item.avgScore,
+        '自信品质勋章(枚)': item.dimBadges.confidence.outstanding + item.dimBadges.confidence.standard,
+        '自信-卓越数': item.dimBadges.confidence.outstanding,
+        '坚韧品质勋章(枚)': item.dimBadges.resilience.outstanding + item.dimBadges.resilience.standard,
+        '坚韧-卓越数': item.dimBadges.resilience.outstanding,
+        '勇气品质勋章(枚)': item.dimBadges.courage.outstanding + item.dimBadges.courage.standard,
+        '勇气-卓越数': item.dimBadges.courage.outstanding,
+        '创造品质勋章(枚)': item.dimBadges.creativity.outstanding + item.dimBadges.creativity.standard,
+        '创造-卓越数': item.dimBadges.creativity.outstanding,
+        '合作品质勋章(枚)': item.dimBadges.cooperation.outstanding + item.dimBadges.cooperation.standard,
+        '合作-卓越数': item.dimBadges.cooperation.outstanding
+      };
+    });
+
+    const wsLeaderboard = XLSX.utils.json_to_sheet(leaderboardRows);
+    XLSX.utils.book_append_sheet(wb, wsLeaderboard, '全员品质勋章总榜');
+
+    // Sheet 2: 全部历史比赛评定明细流水
+    const allHistoryRows = characterAssessments
+      .filter(a => a.totalValidScore > 0)
+      .map((a, index) => {
+        const player = players.find(p => p.id === a.playerId);
+        const team = teams.find(t => t.id === player?.teamId);
+
+        const getDimScoreAndBadge = (key: CharacterDimensionKey) => {
+          const dim = a.dimensions[key];
+          if (!dim || dim.totalScore === null) return { score: '', badge: '未评' };
+          const badgeLabel = dim.badgeLevel === 'outstanding' 
+            ? '👑 卓越(4分)' 
+            : (dim.badgeLevel === 'standard' ? '🎖️ 达标(3分)' : (dim.badgeLevel === 'observing' ? '重点观察' : '待达标'));
+          return {
+            score: `${dim.totalScore}分`,
+            badge: badgeLabel
+          };
+        };
+
+        const conf = getDimScoreAndBadge('confidence');
+        const resi = getDimScoreAndBadge('resilience');
+        const cour = getDimScoreAndBadge('courage');
+        const crea = getDimScoreAndBadge('creativity');
+        const coop = getDimScoreAndBadge('cooperation');
+
+        return {
+          '流水号': index + 1,
+          '比赛日期': a.evaluationDate,
+          '比赛名称': a.matchTitle,
+          '赛事类型': a.matchType === 'regular' ? '常规比赛' : '队内锦标赛',
+          '球员姓名': player?.name || '未知球员',
+          '球衣号码': player?.number ? `#${player.number}` : '',
+          '所属梯队': team?.name || '青训梯队',
+          '本场总分(满分20)': a.totalValidScore,
+          '本场获勋总数': a.standardBadgesCount + a.outstandingBadgesCount,
+          '卓越勋章数': a.outstandingBadgesCount,
+          '达标勋章数': a.standardBadgesCount,
+          '自信得分': conf.score,
+          '自信勋章': conf.badge,
+          '坚韧得分': resi.score,
+          '坚韧勋章': resi.badge,
+          '勇气得分': cour.score,
+          '勇气勋章': cour.badge,
+          '创造得分': crea.score,
+          '创造勋章': crea.badge,
+          '合作得分': coop.score,
+          '合作勋章': coop.badge,
+          '教练综合评语': a.overallFeedback || '',
+          '评定教练': a.evaluatorName || '主教练'
+        };
+      });
+
+    if (allHistoryRows.length > 0) {
+      const wsHistory = XLSX.utils.json_to_sheet(allHistoryRows);
+      XLSX.utils.book_append_sheet(wb, wsHistory, '全部赛事评定明细流水');
+    }
+
+    // Sheet 3: 五大品质维度全队汇总
+    const dimSummaryRows = CHARACTER_DIMENSIONS.map(dim => {
+      let totalAwarded = 0;
+      let totalOutstanding = 0;
+      let totalStandard = 0;
+
+      characterAssessments.forEach(a => {
+        const d = a.dimensions[dim.key];
+        if (d?.badgeLevel === 'outstanding') {
+          totalAwarded++;
+          totalOutstanding++;
+        } else if (d?.badgeLevel === 'standard') {
+          totalAwarded++;
+          totalStandard++;
+        }
+      });
+
+      return {
+        '品质维度': `${dim.name}品质`,
+        '核心定义': dim.coreMeaning,
+        '全队累计授予勋章数': totalAwarded,
+        '👑 卓越勋章数(4分)': totalOutstanding,
+        '🎖️ 达标品质勋章数(3分)': totalStandard,
+        '行为观察要点1': dim.checkpoint1.title,
+        '行为观察要点2': dim.checkpoint2.title
+      };
+    });
+
+    const wsDimSummary = XLSX.utils.json_to_sheet(dimSummaryRows);
+    XLSX.utils.book_append_sheet(wb, wsDimSummary, '5大品质维度荣誉汇总');
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `顽石之光_全员球员品质勋章总榜_${todayStr}.xlsx`);
+  };
+
   // Overall Club Character Leaderboard / Badge Wall
   const badgeWallData = useMemo(() => {
     const playerStatsMap = new Map<string, {
@@ -617,6 +898,14 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
               <span>评定标准说明</span>
             </button>
             <button
+              onClick={handleExportOverallLeaderboardExcel}
+              title="导出全队品质勋章排行榜及全部评定明细流水至Excel"
+              className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-emerald-900/20"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+              <span>导出勋章总榜Excel</span>
+            </button>
+            <button
               onClick={() => setActiveTab(activeTab === 'badgeWall' ? 'assess' : 'badgeWall')}
               className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
                 activeTab === 'badgeWall'
@@ -657,7 +946,7 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
       {activeTab === 'badgeWall' ? (
         /* Club Character Badge Wall & Statistics */
         <div className="space-y-6">
-          <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 md:p-5 rounded-2xl border border-gray-200 shadow-sm">
             <div>
               <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-amber-500" />
@@ -665,13 +954,22 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
               </h3>
               <p className="text-xs text-gray-500 mt-0.5">累计记录了各梯队球员在常规赛与队内赛中获得的品质勋章</p>
             </div>
-            <button
-              onClick={() => setActiveTab('assess')}
-              className="px-4 py-2 bg-bvb-black text-bvb-yellow rounded-xl text-xs font-black hover:bg-gray-800 transition-all flex items-center gap-1.5"
-            >
-              <span>进入比赛打分</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={handleExportOverallLeaderboardExcel}
+                className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>导出全队勋章总榜(Excel)</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('assess')}
+                className="flex-1 sm:flex-none px-4 py-2 bg-bvb-black text-bvb-yellow rounded-xl text-xs font-black hover:bg-gray-800 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <span>进入比赛打分</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -998,15 +1296,25 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
                     </button>
                   </div>
 
-                  <div className="relative w-full sm:w-56">
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      value={searchPlayerTerm}
-                      onChange={(e) => setSearchPlayerTerm(e.target.value)}
-                      placeholder="搜索本场参战球员..."
-                      className="w-full pl-8 pr-3 py-1 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
-                    />
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-52">
+                      <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={searchPlayerTerm}
+                        onChange={(e) => setSearchPlayerTerm(e.target.value)}
+                        placeholder="搜索本场参战球员..."
+                        className="w-full pl-8 pr-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-bvb-yellow"
+                      />
+                    </div>
+                    <button
+                      onClick={handleExportMatchExcel}
+                      title="导出本场比赛全体参战球员的品质评定明细与勋章授予名单至Excel"
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>导出本场评定(Excel)</span>
+                    </button>
                   </div>
                 </div>
               </div>

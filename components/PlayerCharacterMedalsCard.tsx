@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { Player, PlayerCharacterAssessment, CharacterDimensionKey, CharacterBadgeLevel } from '../types';
 import { CHARACTER_DIMENSIONS, CHARACTER_BADGE_LEVELS, DIMENSION_MEDAL_CONFIG } from '../constants';
 import { CharacterMedalBadge } from './CharacterMedalBadges';
-import { Award, Trophy, Crown, Sparkles, CheckCircle2, ChevronRight, X, Calendar, UserCheck, ShieldCheck, Flame, Lightbulb, Users, Shield } from 'lucide-react';
+import { Award, Trophy, Crown, Sparkles, CheckCircle2, ChevronRight, X, Calendar, UserCheck, ShieldCheck, Flame, Lightbulb, Users, Shield, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface PlayerCharacterMedalsCardProps {
   player: Player;
@@ -152,6 +153,107 @@ export const PlayerCharacterMedalsCard: React.FC<PlayerCharacterMedalsCardProps>
     };
   }, [dimensionStats, playerAssessments]);
 
+  // 导出个人品质勋章档案与评定明细 Excel
+  const handleExportPersonalMedalsExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: 球员品质勋章档案概览
+    const profileSummaryRows = [
+      {
+        '球员姓名': player.name,
+        '球衣号码': player.number ? `#${player.number}` : '',
+        '场上位置': player.position || '',
+        '已点亮品质数量': `${overallStats.litCount} / 5`,
+        '累计获授勋章总数': overallStats.totalMedals,
+        '👑 卓越勋章数 (4分)': overallStats.outstandingCount,
+        '🎖️ 达标品质勋章数 (3分)': overallStats.standardCount,
+        '参评比赛总场次': playerAssessments.length,
+        '自信最高荣誉': dimensionStats.confidence.bestLevel === 'outstanding' ? '👑 卓越勋章' : (dimensionStats.confidence.bestLevel === 'standard' ? '🎖️ 达标勋章' : (dimensionStats.confidence.bestLevel === 'observing' ? '重点观察' : '未点亮')),
+        '自信获勋次数': dimensionStats.confidence.earnedCount,
+        '坚韧最高荣誉': dimensionStats.resilience.bestLevel === 'outstanding' ? '👑 卓越勋章' : (dimensionStats.resilience.bestLevel === 'standard' ? '🎖️ 达标勋章' : (dimensionStats.resilience.bestLevel === 'observing' ? '重点观察' : '未点亮')),
+        '坚韧获勋次数': dimensionStats.resilience.earnedCount,
+        '勇气最高荣誉': dimensionStats.courage.bestLevel === 'outstanding' ? '👑 卓越勋章' : (dimensionStats.courage.bestLevel === 'standard' ? '🎖️ 达标勋章' : (dimensionStats.courage.bestLevel === 'observing' ? '重点观察' : '未点亮')),
+        '勇气获勋次数': dimensionStats.courage.earnedCount,
+        '创造最高荣誉': dimensionStats.creativity.bestLevel === 'outstanding' ? '👑 卓越勋章' : (dimensionStats.creativity.bestLevel === 'standard' ? '🎖️ 达标勋章' : (dimensionStats.creativity.bestLevel === 'observing' ? '重点观察' : '未点亮')),
+        '创造获勋次数': dimensionStats.creativity.earnedCount,
+        '合作最高荣誉': dimensionStats.cooperation.bestLevel === 'outstanding' ? '👑 卓越勋章' : (dimensionStats.cooperation.bestLevel === 'standard' ? '🎖️ 达标勋章' : (dimensionStats.cooperation.bestLevel === 'observing' ? '重点观察' : '未点亮')),
+        '合作获勋次数': dimensionStats.cooperation.earnedCount,
+        '档案导出时间': new Date().toLocaleString()
+      }
+    ];
+    const wsProfile = XLSX.utils.json_to_sheet(profileSummaryRows);
+    XLSX.utils.book_append_sheet(wb, wsProfile, '球员品质勋章档案');
+
+    // Sheet 2: 比赛实战评定历程
+    const historyRows = playerAssessments.map((ass, idx) => {
+      const getDimInfo = (k: CharacterDimensionKey) => {
+        const d = ass.dimensions?.[k];
+        if (!d || d.totalScore === null) return { score: '—', badge: '未评定', cp1: '', cp2: '', note: '' };
+        const badgeLabel = d.badgeLevel === 'outstanding' ? '👑 卓越勋章 (4分)' : (d.badgeLevel === 'standard' ? '🎖️ 达标勋章 (3分)' : (d.badgeLevel === 'observing' ? '🔍 重点观察' : '待达标 (0分)'));
+        return {
+          score: `${d.totalScore}分`,
+          badge: badgeLabel,
+          cp1: d.checkpoint1 !== null && d.checkpoint1 !== undefined ? `${d.checkpoint1}分` : '',
+          cp2: d.checkpoint2 !== null && d.checkpoint2 !== undefined ? `${d.checkpoint2}分` : '',
+          note: d.coachNote || ''
+        };
+      };
+
+      const conf = getDimInfo('confidence');
+      const resi = getDimInfo('resilience');
+      const cour = getDimInfo('courage');
+      const crea = getDimInfo('creativity');
+      const coop = getDimInfo('cooperation');
+
+      return {
+        '序号': idx + 1,
+        '比赛日期': ass.matchDate || ass.evaluationDate,
+        '比赛名称': ass.matchTitle,
+        '赛事类型': ass.matchType === 'intramural' ? '队内锦标赛' : '常规赛事',
+        '对阵对手/组别': ass.opponentOrTeams || '',
+        '本场总分(满分20)': ass.totalValidScore,
+        '本场获勋总数': ass.standardBadgesCount + ass.outstandingBadgesCount,
+        '卓越勋章数': ass.outstandingBadgesCount,
+        '达标勋章数': ass.standardBadgesCount,
+        '自信得分': conf.score,
+        '自信勋章等级': conf.badge,
+        '自信观察1': conf.cp1,
+        '自信观察2': conf.cp2,
+        '自信评语': conf.note,
+        '坚韧得分': resi.score,
+        '坚韧勋章等级': resi.badge,
+        '坚韧观察1': resi.cp1,
+        '坚韧观察2': resi.cp2,
+        '坚韧评语': resi.note,
+        '勇气得分': cour.score,
+        '勇气勋章等级': cour.badge,
+        '勇气观察1': cour.cp1,
+        '勇气观察2': cour.cp2,
+        '勇气评语': cour.note,
+        '创造得分': crea.score,
+        '创造勋章等级': crea.badge,
+        '创造观察1': crea.cp1,
+        '创造观察2': crea.cp2,
+        '创造评语': crea.note,
+        '合作得分': coop.score,
+        '合作勋章等级': coop.badge,
+        '合作观察1': coop.cp1,
+        '合作观察2': coop.cp2,
+        '合作评语': coop.note,
+        '教练综合评语': ass.overallFeedback || ass.generalNotes || '',
+        '评定教练': ass.evaluatorName || '青训教练组'
+      };
+    });
+
+    if (historyRows.length > 0) {
+      const wsHistory = XLSX.utils.json_to_sheet(historyRows);
+      XLSX.utils.book_append_sheet(wb, wsHistory, '比赛实战评定历程');
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `品质勋章档案_${player.name}_${todayStr}.xlsx`);
+  };
+
   const selectedDimStat = selectedDimensionKey ? dimensionStats[selectedDimensionKey] : null;
   const selectedDimConfig = selectedDimensionKey ? CHARACTER_DIMENSIONS.find(d => d.key === selectedDimensionKey) : null;
 
@@ -200,13 +302,23 @@ export const PlayerCharacterMedalsCard: React.FC<PlayerCharacterMedalsCardProps>
           )}
 
           {playerAssessments.length > 0 && (
-            <button
-              onClick={() => setShowHistoryModal(true)}
-              className="text-xs text-gray-500 hover:text-bvb-black bg-gray-50 hover:bg-gray-100 px-2 py-1 rounded-lg border border-gray-200 transition-colors font-bold flex items-center gap-0.5"
-            >
-              评定历程 ({playerAssessments.length})
-              <ChevronRight className="w-3 h-3" />
-            </button>
+            <>
+              <button
+                onClick={handleExportPersonalMedalsExcel}
+                title="导出该球员品质勋章档案与评定历程至Excel"
+                className="text-xs text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors font-bold flex items-center gap-1 shadow-sm"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>导出Excel</span>
+              </button>
+              <button
+                onClick={() => setShowHistoryModal(true)}
+                className="text-xs text-gray-600 hover:text-bvb-black bg-gray-50 hover:bg-gray-100 px-2 py-1 rounded-lg border border-gray-200 transition-colors font-bold flex items-center gap-0.5"
+              >
+                评定历程 ({playerAssessments.length})
+                <ChevronRight className="w-3 h-3" />
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -577,7 +689,14 @@ export const PlayerCharacterMedalsCard: React.FC<PlayerCharacterMedalsCardProps>
               )}
             </div>
 
-            <div className="p-3 bg-gray-50 border-t border-gray-200 flex justify-end shrink-0">
+            <div className="p-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
+              <button
+                onClick={handleExportPersonalMedalsExcel}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition-colors flex items-center gap-1.5 shadow-sm"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>导出此球员评定档案(Excel)</span>
+              </button>
               <button
                 onClick={() => setShowHistoryModal(false)}
                 className="px-4 py-1.5 bg-bvb-black text-bvb-yellow font-black text-xs rounded-xl hover:bg-gray-800 transition-colors"

@@ -479,18 +479,24 @@ export interface FinanceTransaction {
     attachment?: string; // Base64 Image
 }
 
-export type PitchType = 'Full' | 'Half' | 'Box' | 'Portrait' | 'Midfield' | 'DefensiveThird' | 'AttackingThird';
-export type PitchTheme = 'Grass' | 'Blue' | 'Grey' | 'White' | 'Black';
+export type PitchType = 
+  | 'Full' | 'Half' | 'Box' | 'Portrait' | 'Midfield' | 'DefensiveThird' | 'AttackingThird'
+  | 'HalfDefend' | 'HalfAttack' | 'Futsal' | 'FutsalVertical' | 'SquareBox' | 'RectangleBox' 
+  | 'AdvRectangle' | 'DualRectangle' | 'TwoThirdsDefend' | 'TwoThirdsAttack' | 'TwoThirdsHorizontal'
+  | 'Triangle' | 'Diamond' | 'Trapezoid' | 'GridType1' | 'GridType2' | 'GridType3' | 'GridType4' | 'GridType5';
+
+export type PitchTheme = 'Grass' | 'Blue' | 'Grey' | 'White' | 'Black' | 'VibrantGreen';
 
 export type ElementType = 
-  | 'PlayerCircle' | 'PlayerPin' | 'GK' | 'Coach' | 'Referee'
+  | 'PlayerCircle' | 'PlayerPin' | 'GK' | 'Coach' | 'Referee' | 'Defender'
   | 'Ball' 
   | 'Cone' | 'Marker' | 'Pole' 
   | 'AgilityRing' | 'Ladder' | 'Hurdle' | 'Mannequin' | 'Rebounder' 
   | 'Goal' | 'MiniGoal' 
-  | 'Text';
+  | 'Text' | 'AreaSquare' | 'AreaRect' | 'AreaCircle' | 'AreaTriangle' | 'AreaDiamond'
+  | 'BadgeNumber' | 'DistanceMeter' | 'Vest' | 'Chute';
 
-export type LineType = 'Pass' | 'Run' | 'Dribble' | 'Boundary';
+export type LineType = 'Pass' | 'Run' | 'Dribble' | 'DribbleWave2' | 'Boundary' | 'CurvePass' | 'Shot';
 
 export interface DesignElement {
     id: string;
@@ -501,6 +507,10 @@ export interface DesignElement {
     scale?: number;
     color?: string;
     label?: string;
+    secondaryColor?: string;
+    shapeWidth?: number;
+    shapeHeight?: number;
+    opacity?: number;
 }
 
 export interface DesignLine {
@@ -511,20 +521,77 @@ export interface DesignLine {
     endX: number;
     endY: number;
     color: string;
+    controlX?: number;
+    controlY?: number;
+    label?: string;
+}
+
+export interface DiagramKeyframe {
+    id: string;
+    name: string;
+    elements: DesignElement[];
+    lines: DesignLine[];
+    duration?: number;
+}
+
+export interface SessionPlanStage {
+    id: string;
+    name: string;
+    duration?: number;
+    focus?: string;
+    drillIds: string[];
+    drills?: DrillDesign[];
+    coachNotes?: string;
 }
 
 export interface DrillDesign {
     id: string;
     title: string;
-    category: 'Drill' | 'Tactic' | 'SetPiece' | 'Other';
+    category: 'Drill' | 'Tactic' | 'SetPiece' | 'Other' | 'diagram' | 'drill_item' | 'session_plan';
+    contentType?: 'diagram' | 'drill' | 'session_plan' | 'other';
     pitchType: PitchType;
     pitchTheme: PitchTheme;
     elements: DesignElement[];
     lines: DesignLine[];
+    keyframes?: DiagramKeyframe[];
+    previewImage?: string;
     description: string;
     keyPoints: string[];
     createdAt: string;
+    updatedAt?: string;
     authorId?: string;
+    authorName?: string;
+    isPrivate?: boolean;
+    folderId?: string;
+    isFavorite?: boolean;
+    isDraft?: boolean;
+    tags?: string[];
+    
+    // Drill Item specific
+    ageGroups?: string[];
+    topic?: string;
+    drillStage?: 'warmup' | 'technical' | 'skill' | 'opposed' | 'scrimmage' | string;
+    durationMinutes?: number;
+    fieldLength?: number;
+    fieldWidth?: number;
+    playerCount?: number;
+    ballCount?: number;
+    coneCount?: number;
+    equipmentNotes?: string;
+    organization?: string;
+    coachingPoints?: string;
+    progressions?: string;
+    diagramId?: string;
+    diagramImage?: string;
+    
+    // Session Plan specific
+    sessionStages?: SessionPlanStage[];
+    totalDuration?: number;
+    targetAge?: string;
+    coverImage?: string;
+    
+    // Other Content (articles/notes)
+    articleContent?: string;
 }
 
 export interface Announcement {
