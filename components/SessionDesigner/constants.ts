@@ -64,36 +64,45 @@ export const PITCH_THEMES: PitchThemeConfig[] = [
 export interface PitchLayoutConfig {
   id: PitchType;
   name: string;
-  category: 'standard' | 'box' | 'half' | 'special';
-  badge?: string;
-  aspectRatio: string; // e.g. '16/10', '1/1', '4/3'
+  category: 'standard' | 'box' | 'half' | 'special' | 'tactical';
+  isVip?: boolean;
+  aspectRatio: string; // e.g. '16/10', '1/1', '10/16'
 }
 
 export const PITCH_LAYOUTS: PitchLayoutConfig[] = [
+  // Page 1 (Image 1)
   { id: 'Midfield', name: '中场', category: 'standard', aspectRatio: '16/10' },
   { id: 'DefensiveThird', name: '防守三区', category: 'standard', aspectRatio: '16/10' },
   { id: 'AttackingThird', name: '进攻三区', category: 'standard', aspectRatio: '16/10' },
   { id: 'Full', name: '完整球场', category: 'standard', aspectRatio: '16/10' },
-  { id: 'HalfDefend', name: '半场 (防守)', category: 'half', aspectRatio: '16/10' },
-  { id: 'HalfAttack', name: '半场 (进攻)', category: 'half', aspectRatio: '16/10' },
+  { id: 'HalfDefend', name: '半场（防守）', category: 'half', aspectRatio: '1/1' },
+  { id: 'HalfAttack', name: '半场（进攻）', category: 'half', aspectRatio: '1/1' },
   { id: 'Futsal', name: '五人制球场', category: 'standard', aspectRatio: '16/10' },
   { id: 'SquareBox', name: '空白正方形', category: 'box', aspectRatio: '1/1' },
+
+  // Page 2 (Image 2)
   { id: 'RectangleBox', name: '空白长方形', category: 'box', aspectRatio: '16/10' },
-  { id: 'AdvRectangle', name: '空白长方形 (进阶)', category: 'box', aspectRatio: '16/10' },
-  { id: 'DualRectangle', name: '双长方形 (进阶)', category: 'box', aspectRatio: '16/10' },
-  { id: 'Portrait', name: '完整球场 (纵向)', category: 'standard', aspectRatio: '10/16' },
-  { id: 'TwoThirdsDefend', name: '三分之二场 (防守)', category: 'half', aspectRatio: '16/10' },
-  { id: 'TwoThirdsAttack', name: '三分之二场 (进攻)', category: 'half', aspectRatio: '16/10' },
-  { id: 'TwoThirdsHorizontal', name: '三分之二场 (横向)', category: 'half', aspectRatio: '16/10' },
-  { id: 'FutsalVertical', name: '五人制球场 (纵向)', category: 'standard', aspectRatio: '10/16' },
-  { id: 'Triangle', name: '三角形', category: 'special', aspectRatio: '1/1' },
-  { id: 'Diamond', name: '菱形', category: 'special', aspectRatio: '1/1' },
-  { id: 'Trapezoid', name: '梯形', category: 'special', aspectRatio: '16/10' },
-  { id: 'GridType1', name: '类型一', category: 'special', aspectRatio: '16/10' },
-  { id: 'GridType2', name: '类型二', category: 'special', aspectRatio: '16/10' },
-  { id: 'GridType3', name: '类型三', category: 'special', aspectRatio: '16/10' },
-  { id: 'GridType4', name: '类型四', category: 'special', aspectRatio: '16/10' },
-  { id: 'GridType5', name: '类型五', category: 'special', aspectRatio: '16/10' }
+  { id: 'RectangleVertical', name: '空白长方形（竖版）', category: 'box', isVip: true, aspectRatio: '10/16' },
+  { id: 'DualRectangleVertical', name: '双长方形（竖版）', category: 'box', isVip: true, aspectRatio: '16/10' },
+  { id: 'Portrait', name: '完整球场（纵向）', category: 'standard', isVip: true, aspectRatio: '10/16' },
+  { id: 'TwoThirdsDefend', name: '三分之二场（防守）', category: 'half', isVip: true, aspectRatio: '10/13' },
+  { id: 'TwoThirdsAttack', name: '三分之二场（进攻）', category: 'half', isVip: true, aspectRatio: '10/13' },
+  { id: 'TwoThirdsHorizontal', name: '三分之二场（横向）', category: 'half', isVip: true, aspectRatio: '16/10' },
+  { id: 'FutsalVertical', name: '五人制球场（纵向）', category: 'standard', isVip: true, aspectRatio: '10/16' },
+
+  // Page 3 (Image 3)
+  { id: 'Triangle', name: '三角形', category: 'special', isVip: true, aspectRatio: '16/10' },
+  { id: 'Circle', name: '圆形', category: 'special', isVip: true, aspectRatio: '16/10' },
+  { id: 'FourGrids', name: '田字形', category: 'special', isVip: true, aspectRatio: '1/1' },
+  { id: 'TacticalZone1', name: '类型一', category: 'tactical', isVip: true, aspectRatio: '16/10' },
+
+  // Page 4 (Image 4)
+  { id: 'TacticalZone2', name: '类型二', category: 'tactical', isVip: true, aspectRatio: '16/10' },
+  { id: 'TacticalZone3', name: '类型三', category: 'tactical', isVip: true, aspectRatio: '16/10' },
+  { id: 'TacticalZone4', name: '类型四', category: 'tactical', isVip: true, aspectRatio: '16/10' },
+  { id: 'TacticalZone5', name: '类型五', category: 'tactical', isVip: true, aspectRatio: '16/10' },
+  { id: 'TacticalZone6', name: '类型六', category: 'tactical', isVip: true, aspectRatio: '16/10' },
+  { id: 'TacticalZone7', name: '类型七', category: 'tactical', isVip: true, aspectRatio: '16/10' }
 ];
 
 export const DRILL_STAGES = [

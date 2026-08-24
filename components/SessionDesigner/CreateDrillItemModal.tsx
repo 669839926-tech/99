@@ -122,338 +122,406 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-white rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl border border-gray-100 flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
-        
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 via-white to-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-bvb-black flex items-center justify-center text-bvb-yellow shadow-md">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-                <span>{initialDrill ? '编辑训练项' : '创建训练项'}</span>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                  单项训练设计
-                </span>
-              </h2>
-              <p className="text-xs text-gray-500 font-medium">设定示意图、年龄段、技战术主题、参数及教学组织步骤</p>
-            </div>
-          </div>
-
+    <div className="fixed inset-0 z-50 bg-gray-950 text-gray-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
+      
+      {/* Top Fullscreen Header Navigation */}
+      <div className="px-6 py-3 bg-gray-900 border-b border-gray-800 flex items-center justify-between shrink-0 select-none">
+        <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 flex items-center justify-center transition-colors"
+            className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
+            <span>返回/退出</span>
           </button>
+          
+          <div className="h-5 w-px bg-gray-800" />
+
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-bvb-yellow text-black flex items-center justify-center font-black text-xs shadow-sm">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-black text-white flex items-center gap-2">
+                <span>{initialDrill ? '编辑训练项' : '创建训练项（全屏模式）'}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  球场视窗已开启
+                </span>
+              </h2>
+            </div>
+          </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+        {/* Header Right Actions */}
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsPrivate(!isPrivate)}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
+              isPrivate
+                ? 'bg-gray-800 border-gray-700 text-gray-400'
+                : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+            }`}
+          >
+            {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span>{isPrivate ? '仅自己可见' : '公开至教案库'}</span>
+          </button>
+
+          <button
+            onClick={() => handleSave(false)}
+            className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs rounded-xl border border-gray-700 transition-colors shadow-sm flex items-center gap-1.5"
+          >
+            <Save className="w-3.5 h-3.5" />
+            <span>保存草稿</span>
+          </button>
+
+          <button
+            onClick={() => handleSave(true)}
+            className="px-4 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-black font-black text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-1.5"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>立即发布训练项</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Fullscreen Split Workspace */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        
+        {/* Left/Center Area: Tactical Football Pitch Canvas Display (Image 2 style) */}
+        <div className="flex-1 bg-gray-900 flex flex-col relative overflow-hidden">
           
-          {/* Section 1: Title & Description */}
-          <div className="space-y-3">
-            <div>
-              <label className="block text-xs font-black text-gray-700 mb-1">
-                训练项标题 <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="例如: 技能: 1v1+1 (回避防守人) 运球变向加速突破训练U8+"
-                className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold text-gray-900 focus:bg-white focus:border-bvb-black focus:ring-2 focus:ring-yellow-400/20 focus:outline-none transition-all"
-              />
+          {/* Canvas Top Bar */}
+          <div className="p-3 px-6 bg-gray-950/90 border-b border-gray-800/80 flex items-center justify-between flex-wrap gap-2 z-20">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-gray-200 flex items-center gap-1.5">
+                <ImageIcon className="w-4 h-4 text-emerald-400" />
+                <span>关联战术示意图 / 动态场地</span>
+              </span>
+              {selectedDiagram && (
+                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-md border border-emerald-800/60">
+                  {selectedDiagram.title}
+                </span>
+              )}
             </div>
 
-            <div>
-              <label className="block text-xs font-black text-gray-700 mb-1">训练项简介</label>
-              <textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="简述该训练项的目标与针对的核心痛点..."
-                rows={2}
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-800 focus:bg-white focus:border-bvb-black focus:outline-none transition-all resize-none"
-              />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowDiagramPicker(!showDiagramPicker)}
+                className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl border border-gray-700 transition-colors shadow-sm"
+              >
+                {showDiagramPicker ? '收起图库' : '从我的示意图库选择'}
+              </button>
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenPitchSelector();
+                }}
+                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>新建示意图</span>
+              </button>
             </div>
           </div>
 
-          {/* Section 2: Diagram Attachment (Video 3) */}
-          <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-black text-gray-800 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-emerald-600" />
-                <span>示意图 / 战术画板关联</span>
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowDiagramPicker(!showDiagramPicker)}
-                  className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors shadow-sm"
-                >
-                  {showDiagramPicker ? '收起画板列表' : '从我的示意图库选择'}
-                </button>
-                <button
+          {/* Expandable Diagram Picker Drawer */}
+          {showDiagramPicker && (
+            <div className="p-4 bg-gray-950 border-b border-gray-800 z-30 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-48 overflow-y-auto">
+              {existingDiagrams.map(d => (
+                <div
+                  key={d.id}
                   onClick={() => {
-                    onOpenPitchSelector();
+                    setSelectedDiagramId(d.id);
+                    setShowDiagramPicker(false);
                   }}
-                  className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1"
+                  className={`p-2 rounded-xl border cursor-pointer transition-all ${
+                    selectedDiagramId === d.id
+                      ? 'border-emerald-500 bg-emerald-950/50 ring-2 ring-emerald-500/30'
+                      : 'border-gray-800 bg-gray-900 hover:border-gray-700'
+                  }`}
                 >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>新建示意图</span>
-                </button>
+                  <div className="aspect-[16/10] bg-gray-950 rounded-lg overflow-hidden mb-1 flex items-center justify-center">
+                    {d.previewImage ? (
+                      <img src={d.previewImage} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <PitchSvgRenderer pitchType={d.pitchType} pitchTheme={d.pitchTheme} className="w-full h-full" />
+                    )}
+                  </div>
+                  <span className="text-[11px] font-bold text-gray-300 block truncate">{d.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pitch Display Viewport */}
+          <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
+            
+            {/* Top-Left pitch overlay badge */}
+            <div className="absolute top-4 left-6 z-10 flex items-center gap-2">
+              <span className="px-2.5 py-1 bg-gray-950/80 border border-gray-800 rounded-lg text-xs font-bold text-gray-300 backdrop-blur-sm">
+                📐 场地规格: {fieldLength}米 × {fieldWidth}米
+              </span>
+              <span className="px-2.5 py-1 bg-gray-950/80 border border-gray-800 rounded-lg text-xs font-bold text-gray-300 backdrop-blur-sm">
+                👥 人数: {playerCount}人
+              </span>
+            </div>
+
+            {/* Tactical Pitch Box */}
+            <div className="w-[720px] h-[480px] sm:w-[780px] sm:h-[520px] relative rounded-2xl overflow-hidden shadow-2xl border-4 border-gray-800 bg-gray-950 shrink-0">
+              <PitchSvgRenderer
+                pitchType={selectedDiagram?.pitchType || 'Midfield'}
+                pitchTheme={selectedDiagram?.pitchTheme || 'Grass'}
+                showGrid={true}
+                className="w-full h-full"
+              />
+
+              {/* Associated Diagram Elements Preview */}
+              {selectedDiagram && selectedDiagram.elements && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {selectedDiagram.elements.map(el => (
+                    <div
+                      key={el.id}
+                      className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
+                      style={{
+                        left: `${el.x}%`,
+                        top: `${el.y}%`,
+                        transform: `translate(-50%, -50%) rotate(${el.rotation || 0}deg) scale(${el.scale || 1})`
+                      }}
+                    >
+                      <div
+                        className="w-7 h-7 rounded-full border-2 border-white shadow-md flex items-center justify-center font-black text-[11px] text-white"
+                        style={{ backgroundColor: el.color || '#eab308' }}
+                      >
+                        {el.label || ''}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom floating pitch info */}
+            <div className="absolute bottom-4 left-6 z-10 flex items-center gap-2 text-xs font-bold text-gray-400 bg-gray-950/80 px-3 py-1.5 rounded-xl border border-gray-800">
+              <span>⚽ 足球: {ballCount}个</span>
+              <span>·</span>
+              <span>🔶 标志盘: {coneCount}个</span>
+              <span>·</span>
+              <span>⏱️ 预计时长: {durationMinutes}分钟</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar Area: Structured Drill Parameters & Teaching Steps */}
+        <div className="w-full lg:w-[480px] bg-gray-950 border-l border-gray-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
+          
+          <div className="p-5 space-y-5">
+            
+            {/* Title & Description */}
+            <div className="space-y-2.5">
+              <div>
+                <label className="block text-xs font-black text-gray-300 mb-1">
+                  训练项标题 <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder="例如: 技能: 1v1+1 (回避防守人) 运球变向加速突破训练"
+                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-bold text-white focus:border-emerald-500 focus:outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-gray-300 mb-1">训练项简介</label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="简述该训练项的目标与针对的核心痛点..."
+                  rows={2}
+                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all resize-none"
+                />
               </div>
             </div>
 
-            {/* Selected Diagram Thumbnail Preview */}
-            {selectedDiagram ? (
-              <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-emerald-300 shadow-sm">
-                <div className="w-28 h-20 bg-gray-900 rounded-xl overflow-hidden shadow-inner flex items-center justify-center shrink-0">
-                  {selectedDiagram.previewImage ? (
-                    <img src={selectedDiagram.previewImage} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <PitchSvgRenderer
-                      pitchType={selectedDiagram.pitchType}
-                      pitchTheme={selectedDiagram.pitchTheme}
-                      className="w-full h-full"
-                    />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="text-xs font-black text-gray-900 truncate">{selectedDiagram.title}</h4>
-                  <p className="text-[11px] text-gray-500 font-mono mt-0.5">
-                    {selectedDiagram.elements.length} 个元素 · {selectedDiagram.lines.length} 条战术线条
-                  </p>
-                  <div className="flex items-center gap-2 mt-1.5">
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      已绑定
-                    </span>
-                    <button
-                      onClick={() => setSelectedDiagramId(null)}
-                      className="text-[11px] text-red-500 hover:underline font-bold"
-                    >
-                      解除绑定
-                    </button>
-                  </div>
+            {/* Age & Topic & Stage */}
+            <div className="space-y-3 bg-gray-900/60 p-3.5 rounded-2xl border border-gray-800">
+              {/* Age selector */}
+              <div>
+                <span className="block text-[11px] font-bold text-gray-400 mb-1.5">适用年龄段 (岁)</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {AGE_GROUPS.map(age => {
+                    const isSelected = selectedAges.includes(age);
+                    return (
+                      <button
+                        key={age}
+                        onClick={() => toggleAge(age)}
+                        className={`w-7 h-7 rounded-lg font-black text-xs transition-all ${
+                          isSelected
+                            ? 'bg-bvb-yellow text-black shadow-md scale-105'
+                            : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                        }`}
+                      >
+                        {age}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            ) : (
-              <div className="p-4 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center">
-                <p className="text-xs text-gray-400 font-bold">暂未关联示意图，可点击右上角选择或新建</p>
-              </div>
-            )}
 
-            {/* Expandable Diagram Picker */}
-            {showDiagramPicker && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 max-h-48 overflow-y-auto">
-                {existingDiagrams.map(d => (
-                  <div
-                    key={d.id}
-                    onClick={() => {
-                      setSelectedDiagramId(d.id);
-                      setShowDiagramPicker(false);
-                    }}
-                    className={`p-2 rounded-xl border cursor-pointer transition-all ${
-                      selectedDiagramId === d.id
-                        ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-500/20'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+              {/* Topic selector */}
+              <div>
+                <span className="block text-[11px] font-bold text-gray-400 mb-1.5">训练主题</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {TRAINING_TOPICS.map(topic => {
+                    const isSelected = selectedTopic === topic;
+                    return (
+                      <button
+                        key={topic}
+                        onClick={() => setSelectedTopic(topic)}
+                        className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                        }`}
+                      >
+                        {topic}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Training Stage */}
+              <div>
+                <span className="block text-[11px] font-bold text-gray-400 mb-1.5">训练环节</span>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                  {DRILL_STAGES.map(stage => {
+                    const isSelected = selectedStage === stage.id;
+                    return (
+                      <button
+                        key={stage.id}
+                        onClick={() => setSelectedStage(stage.id)}
+                        className={`py-1.5 px-2 rounded-xl border text-[11px] font-black transition-all flex items-center justify-center gap-1 ${
+                          isSelected
+                            ? `${stage.color} ring-2 ring-emerald-500/30 text-white`
+                            : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
+                        }`}
+                      >
+                        <span>{stage.name}</span>
+                        {isSelected && <Check className="w-3 h-3" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Basic Numeric Parameters */}
+            <div className="bg-gray-900/60 p-3.5 rounded-2xl border border-gray-800 space-y-2.5">
+              <span className="text-[11px] font-bold text-gray-400 block">基础参数设置</span>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">时长(分)</label>
+                  <input
+                    type="number"
+                    value={durationMinutes}
+                    onChange={e => setDurationMinutes(parseInt(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">场地长(米)</label>
+                  <input
+                    type="number"
+                    value={fieldLength}
+                    onChange={e => setFieldLength(parseInt(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">场地宽(米)</label>
+                  <input
+                    type="number"
+                    value={fieldWidth}
+                    onChange={e => setFieldWidth(parseInt(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">队员数(人)</label>
+                  <input
+                    type="number"
+                    value={playerCount}
+                    onChange={e => setPlayerCount(parseInt(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">足球数(个)</label>
+                  <input
+                    type="number"
+                    value={ballCount}
+                    onChange={e => setBallCount(parseInt(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-400 block mb-1">标志盘(个)</label>
+                  <input
+                    type="number"
+                    value={coneCount}
+                    onChange={e => setConeCount(parseInt(e.target.value) || 0)}
+                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-gray-400 block mb-1">所需器材及背心备注</label>
+                <input
+                  type="text"
+                  value={equipmentNotes}
+                  onChange={e => setEquipmentNotes(e.target.value)}
+                  placeholder="例如: 标志盘8个、足球6个、分队背心2色"
+                  className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-medium text-gray-200 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Teaching Steps: 组织方法, 指导要点, 变化与进阶 */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                <span className="text-xs font-black text-gray-200 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-emerald-400" />
+                  <span>教案要点结构</span>
+                </span>
+                <div className="flex items-center gap-1 bg-gray-900 p-0.5 rounded-lg text-xs font-bold">
+                  <button
+                    onClick={() => setActiveTemplateTab('template')}
+                    className={`px-2.5 py-0.5 rounded-md transition-colors ${
+                      activeTemplateTab === 'template' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400'
                     }`}
                   >
-                    <div className="aspect-[16/10] bg-gray-900 rounded-lg overflow-hidden mb-1.5 flex items-center justify-center">
-                      {d.previewImage ? (
-                        <img src={d.previewImage} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <PitchSvgRenderer pitchType={d.pitchType} pitchTheme={d.pitchTheme} className="w-full h-full" />
-                      )}
-                    </div>
-                    <span className="text-[11px] font-bold text-gray-800 block truncate">{d.title}</span>
-                  </div>
-                ))}
+                    标准教案
+                  </button>
+                  <button
+                    onClick={() => {
+                      setActiveTemplateTab('blank');
+                      setOrganization('');
+                      setCoachingPoints('');
+                      setProgressions('');
+                    }}
+                    className={`px-2.5 py-0.5 rounded-md transition-colors ${
+                      activeTemplateTab === 'blank' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400'
+                    }`}
+                  >
+                    空白模板
+                  </button>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Section 3: Ages, Topics & Stage Selectors */}
-          <div className="space-y-4">
-            {/* Age selector */}
-            <div>
-              <span className="block text-xs font-black text-gray-700 mb-1.5">适用年龄段 (岁)</span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {AGE_GROUPS.map(age => {
-                  const isSelected = selectedAges.includes(age);
-                  return (
-                    <button
-                      key={age}
-                      onClick={() => toggleAge(age)}
-                      className={`w-9 h-8 rounded-xl font-black text-xs transition-all ${
-                        isSelected
-                          ? 'bg-bvb-black text-bvb-yellow shadow-md scale-105 ring-2 ring-yellow-400/20'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {age}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Training Topics */}
-            <div>
-              <span className="block text-xs font-black text-gray-700 mb-1.5">训练主题</span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {TRAINING_TOPICS.map(topic => {
-                  const isSelected = selectedTopic === topic;
-                  return (
-                    <button
-                      key={topic}
-                      onClick={() => setSelectedTopic(topic)}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
-                        isSelected
-                          ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-400/20'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-                      }`}
-                    >
-                      {topic}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Training Stage */}
-            <div>
-              <span className="block text-xs font-black text-gray-700 mb-1.5">训练环节</span>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {DRILL_STAGES.map(stage => {
-                  const isSelected = selectedStage === stage.id;
-                  return (
-                    <button
-                      key={stage.id}
-                      onClick={() => setSelectedStage(stage.id)}
-                      className={`py-2 px-3 rounded-2xl border text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
-                        isSelected
-                          ? `${stage.color} ring-2 ring-emerald-500/20 font-black shadow-sm`
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-white'
-                      }`}
-                    >
-                      <span>{stage.name}</span>
-                      {isSelected && <Check className="w-3.5 h-3.5" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* Section 4: Basic Numeric Parameters */}
-          <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 space-y-3">
-            <span className="text-xs font-black text-gray-800">训练基础参数设置</span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
               <div>
-                <label className="text-[11px] font-bold text-gray-500 block mb-1">训练时长 (分)</label>
-                <input
-                  type="number"
-                  value={durationMinutes}
-                  onChange={e => setDurationMinutes(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 block mb-1">场地长 (米)</label>
-                <input
-                  type="number"
-                  value={fieldLength}
-                  onChange={e => setFieldLength(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 block mb-1">场地宽 (米)</label>
-                <input
-                  type="number"
-                  value={fieldWidth}
-                  onChange={e => setFieldWidth(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 block mb-1">队员数 (人)</label>
-                <input
-                  type="number"
-                  value={playerCount}
-                  onChange={e => setPlayerCount(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 block mb-1">足球数 (个)</label>
-                <input
-                  type="number"
-                  value={ballCount}
-                  onChange={e => setBallCount(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-bold text-gray-500 block mb-1">标志盘 (个)</label>
-                <input
-                  type="number"
-                  value={coneCount}
-                  onChange={e => setConeCount(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-gray-500 block mb-1">器材备注</label>
-              <input
-                type="text"
-                value={equipmentNotes}
-                onChange={e => setEquipmentNotes(e.target.value)}
-                placeholder="例如: 标志盘8个、足球6个、分队背心2色、迷你球门2座"
-                className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs text-gray-900 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Section 5: Structured Coaching Content (组织方法, 指导要点, 变化与进阶) */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-              <span className="text-xs font-black text-gray-900 flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-bvb-black" />
-                <span>教案要点结构</span>
-              </span>
-              <div className="flex items-center gap-1 bg-gray-100 p-0.5 rounded-xl text-xs font-bold">
-                <button
-                  onClick={() => setActiveTemplateTab('template')}
-                  className={`px-3 py-1 rounded-lg transition-colors ${
-                    activeTemplateTab === 'template' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  标准教案模板
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTemplateTab('blank');
-                    setOrganization('');
-                    setCoachingPoints('');
-                    setProgressions('');
-                  }}
-                  className={`px-3 py-1 rounded-lg transition-colors ${
-                    activeTemplateTab === 'blank' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                  }`}
-                >
-                  空白模板
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-black text-gray-700 mb-1">
+                <label className="block text-xs font-black text-gray-300 mb-1">
                   1. 组织方法 (场地布置与步骤流程)
                 </label>
                 <textarea
@@ -461,12 +529,12 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                   onChange={e => setOrganization(e.target.value)}
                   rows={3}
                   placeholder="详细列出每一步训练的站位与跑动组织流程..."
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-800 focus:bg-white focus:border-bvb-black focus:outline-none transition-all leading-relaxed"
+                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-black text-gray-700 mb-1">
+                <label className="block text-xs font-black text-gray-300 mb-1">
                   2. 指导要点 (技术关键与心理意识)
                 </label>
                 <textarea
@@ -474,12 +542,12 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                   onChange={e => setCoachingPoints(e.target.value)}
                   rows={3}
                   placeholder="教练员指导口令与关键技术纠错要点..."
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-800 focus:bg-white focus:border-bvb-black focus:outline-none transition-all leading-relaxed"
+                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-black text-gray-700 mb-1">
+                <label className="block text-xs font-black text-gray-300 mb-1">
                   3. 变化与进阶 (升降级与防守强度调整)
                 </label>
                 <textarea
@@ -487,47 +555,14 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                   onChange={e => setProgressions(e.target.value)}
                   rows={2}
                   placeholder="进阶规则（如触球次数限制、增加防守人、弱侧跑位）..."
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs text-gray-800 focus:bg-white focus:border-bvb-black focus:outline-none transition-all leading-relaxed"
+                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed"
                 />
               </div>
             </div>
+
           </div>
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsPrivate(!isPrivate)}
-              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                isPrivate
-                  ? 'bg-gray-200 border-gray-300 text-gray-700'
-                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-              }`}
-            >
-              {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              <span>{isPrivate ? '仅自己可见' : '公开至教案库'}</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => handleSave(false)}
-              className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 font-black text-xs rounded-xl border border-gray-200 transition-colors shadow-sm flex items-center gap-1.5"
-            >
-              <Save className="w-3.5 h-3.5" />
-              <span>保存为草稿</span>
-            </button>
-
-            <button
-              onClick={() => handleSave(true)}
-              className="px-5 py-2 bg-bvb-black hover:bg-black text-bvb-yellow font-black text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-1.5"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>立即发布训练项</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -15,17 +15,36 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
   showGrid = false,
   className = 'w-full h-full'
 }) => {
-  const theme = PITCH_THEMES.find(t => t.id === pitchTheme) || PITCH_THEMES[3]; // default Grass
-  const isVertical = pitchType === 'Portrait' || pitchType === 'FutsalVertical';
-  const viewBox = isVertical ? '0 0 600 900' : '0 0 900 600';
-  const width = isVertical ? 600 : 900;
-  const height = isVertical ? 900 : 600;
+  const theme = PITCH_THEMES.find(t => t.id === pitchTheme) || PITCH_THEMES[0]; // default Classic White or theme
+  
+  // Orientation & Dimensions
+  const isVertical = pitchType === 'Portrait' || pitchType === 'FutsalVertical' || pitchType === 'RectangleVertical';
+  const isSquare = pitchType === 'SquareBox' || pitchType === 'FourGrids' || pitchType === 'HalfDefend' || pitchType === 'HalfAttack';
+  const isTwoThirdsVertical = pitchType === 'TwoThirdsDefend' || pitchType === 'TwoThirdsAttack';
+
+  let width = 900;
+  let height = 600;
+  let viewBox = '0 0 900 600';
+
+  if (isVertical) {
+    width = 600;
+    height = 900;
+    viewBox = '0 0 600 900';
+  } else if (isSquare) {
+    width = 600;
+    height = 600;
+    viewBox = '0 0 600 600';
+  } else if (isTwoThirdsVertical) {
+    width = 600;
+    height = 780;
+    viewBox = '0 0 600 780';
+  }
 
   // Background pattern with grass stripes if applicable
   const renderBackground = () => {
     if (theme.isStripe && theme.stripeColor) {
       const stripesCount = 10;
-      const stripeSize = isVertical ? height / stripesCount : width / stripesCount;
+      const stripeSize = isVertical || isSquare || isTwoThirdsVertical ? height / stripesCount : width / stripesCount;
       return (
         <g>
           <rect width={width} height={height} fill={theme.bgColor} />
@@ -33,10 +52,10 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
             i % 2 === 1 ? (
               <rect
                 key={i}
-                x={isVertical ? 0 : i * stripeSize}
-                y={isVertical ? i * stripeSize : 0}
-                width={isVertical ? width : stripeSize}
-                height={isVertical ? stripeSize : height}
+                x={isVertical || isSquare || isTwoThirdsVertical ? 0 : i * stripeSize}
+                y={isVertical || isSquare || isTwoThirdsVertical ? i * stripeSize : 0}
+                width={isVertical || isSquare || isTwoThirdsVertical ? width : stripeSize}
+                height={isVertical || isSquare || isTwoThirdsVertical ? stripeSize : height}
                 fill={theme.stripeColor}
                 opacity={0.35}
               />
@@ -49,12 +68,12 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
   };
 
   const lc = theme.lineColor;
-  const lw = 3;
+  const lw = 2.8;
 
-  // Grid lines
+  // Grid lines helper
   const renderGrid = () => {
     if (!showGrid) return null;
-    const gridSpacing = 45;
+    const gridSpacing = 40;
     const gridCols = Math.floor(width / gridSpacing);
     const gridRows = Math.floor(height / gridSpacing);
     return (
@@ -69,209 +88,399 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
     );
   };
 
+  // Helper to render standard horizontal full pitch
+  const renderFullPitchMarkings = (extraOverlay?: React.ReactNode) => {
+    const pad = 36;
+    const innerW = width - pad * 2;
+    const innerH = height - pad * 2;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    return (
+      <g stroke={lc} strokeWidth={lw} fill="none">
+        {/* Outer boundary */}
+        <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+        {/* Center line & circle */}
+        <line x1={cx} y1={pad} x2={cx} y2={height - pad} />
+        <circle cx={cx} cy={cy} r={75} />
+        <circle cx={cx} cy={cy} r={3.2} fill={lc} />
+
+        {/* Left Goal Area */}
+        <rect x={pad} y={cy - 120} width={130} height={240} />
+        <rect x={pad} y={cy - 55} width={48} height={110} />
+        <circle cx={pad + 85} cy={cy} r={3.2} fill={lc} />
+        <path d={`M ${pad + 130} ${cy - 50} A 55 55 0 0 1 ${pad + 130} ${cy + 50}`} />
+
+        {/* Right Goal Area */}
+        <rect x={width - pad - 130} y={cy - 120} width={130} height={240} />
+        <rect x={width - pad - 48} y={cy - 55} width={48} height={110} />
+        <circle cx={width - pad - 85} cy={cy} r={3.2} fill={lc} />
+        <path d={`M ${width - pad - 130} ${cy - 50} A 55 55 0 0 0 ${width - pad - 130} ${cy + 50}`} />
+
+        {/* Corner Arcs */}
+        <path d={`M ${pad} ${pad + 14} A 14 14 0 0 0 ${pad + 14} ${pad}`} />
+        <path d={`M ${pad} ${height - pad - 14} A 14 14 0 0 1 ${pad + 14} ${height - pad}`} />
+        <path d={`M ${width - pad} ${pad + 14} A 14 14 0 0 1 ${width - pad - 14} ${pad}`} />
+        <path d={`M ${width - pad} ${height - pad - 14} A 14 14 0 0 0 ${width - pad - 14} ${height - pad}`} />
+
+        {/* Optional Tactical Overlay */}
+        {extraOverlay}
+      </g>
+    );
+  };
+
   // Specific field line markings
   const renderMarkings = () => {
-    const pad = 40;
+    const pad = 36;
     const innerW = width - pad * 2;
     const innerH = height - pad * 2;
     const cx = width / 2;
     const cy = height / 2;
 
     switch (pitchType) {
-      case 'Full':
-      case 'Futsal':
-        return (
-          <g stroke={lc} strokeWidth={lw} fill="none">
-            {/* Outer border */}
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
-            {/* Center line & circle */}
-            <line x1={cx} y1={pad} x2={cx} y2={height - pad} />
-            <circle cx={cx} cy={cy} r={75} />
-            <circle cx={cx} cy={cy} r={3} fill={lc} />
-            {/* Left Penalty Area */}
-            <rect x={pad} y={cy - 120} width={130} height={240} />
-            <rect x={pad} y={cy - 60} width={50} height={120} />
-            <circle cx={pad + 80} cy={cy} r={3} fill={lc} />
-            <path d={`M ${pad + 130} ${cy - 50} A 60 60 0 0 1 ${pad + 130} ${cy + 50}`} />
-            {/* Right Penalty Area */}
-            <rect x={width - pad - 130} y={cy - 120} width={130} height={240} />
-            <rect x={width - pad - 50} y={cy - 60} width={50} height={120} />
-            <circle cx={width - pad - 80} cy={cy} r={3} fill={lc} />
-            <path d={`M ${width - pad - 130} ${cy - 50} A 60 60 0 0 0 ${width - pad - 130} ${cy + 50}`} />
-            {/* Corners */}
-            <path d={`M ${pad} ${pad + 15} A 15 15 0 0 0 ${pad + 15} ${pad}`} />
-            <path d={`M ${pad} ${height - pad - 15} A 15 15 0 0 1 ${pad + 15} ${height - pad}`} />
-            <path d={`M ${width - pad} ${pad + 15} A 15 15 0 0 1 ${width - pad - 15} ${pad}`} />
-            <path d={`M ${width - pad} ${height - pad - 15} A 15 15 0 0 0 ${width - pad - 15} ${height - pad}`} />
-          </g>
-        );
-
-      case 'Portrait':
-      case 'FutsalVertical':
-        return (
-          <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
-            <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
-            <circle cx={cx} cy={cy} r={75} />
-            <circle cx={cx} cy={cy} r={3} fill={lc} />
-            {/* Top Penalty Area */}
-            <rect x={cx - 120} y={pad} width={240} height={130} />
-            <rect x={cx - 60} y={pad} width={120} height={50} />
-            <circle cx={cx} cy={pad + 80} r={3} fill={lc} />
-            {/* Bottom Penalty Area */}
-            <rect x={cx - 120} y={height - pad - 130} width={240} height={130} />
-            <rect x={cx - 60} y={height - pad - 50} width={120} height={50} />
-            <circle cx={cx} cy={height - pad - 80} r={3} fill={lc} />
-          </g>
-        );
-
+      // 1. 中场 (Image 1, Item 1)
       case 'Midfield':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
             <line x1={cx} y1={pad} x2={cx} y2={height - pad} />
-            <circle cx={cx} cy={cy} r={110} />
-            <circle cx={cx} cy={cy} r={4} fill={lc} />
-            {/* Dotted zone guides */}
-            <line x1={pad + innerW * 0.25} y1={pad} x2={pad + innerW * 0.25} y2={height - pad} strokeDasharray="6,6" opacity={0.6} />
-            <line x1={pad + innerW * 0.75} y1={pad} x2={pad + innerW * 0.75} y2={height - pad} strokeDasharray="6,6" opacity={0.6} />
+            <circle cx={cx} cy={cy} r={85} />
+            <circle cx={cx} cy={cy} r={3.2} fill={lc} />
           </g>
         );
 
-      case 'AttackingThird':
-      case 'HalfAttack':
-      case 'TwoThirdsAttack':
-        return (
-          <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
-            {/* Center line boundary on left */}
-            <line x1={pad} y1={pad} x2={pad} y2={height - pad} strokeWidth={lw * 1.5} />
-            {/* Right Goal Area */}
-            <rect x={width - pad - 180} y={cy - 160} width={180} height={320} />
-            <rect x={width - pad - 70} y={cy - 80} width={70} height={160} />
-            <circle cx={width - pad - 110} cy={cy} r={4} fill={lc} />
-            <path d={`M ${width - pad - 180} ${cy - 70} A 80 80 0 0 0 ${width - pad - 180} ${cy + 70}`} />
-            {/* Wing Channels */}
-            <line x1={pad} y1={pad + innerH * 0.22} x2={width - pad} y2={pad + innerH * 0.22} strokeDasharray="6,6" opacity={0.5} />
-            <line x1={pad} y1={height - pad - innerH * 0.22} x2={width - pad} y2={height - pad - innerH * 0.22} strokeDasharray="6,6" opacity={0.5} />
-          </g>
-        );
-
+      // 2. 防守三区 (Image 1, Item 2)
       case 'DefensiveThird':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <rect x={cx - 180} y={height - pad - 160} width={360} height={160} />
+            <rect x={cx - 80} y={height - pad - 60} width={160} height={60} />
+            <circle cx={cx} cy={height - pad - 110} r={3.5} fill={lc} />
+            <path d={`M ${cx - 70} ${height - pad - 160} A 75 75 0 0 1 ${cx + 70} ${height - pad - 160}`} />
+          </g>
+        );
+
+      // 3. 进攻三区 (Image 1, Item 3)
+      case 'AttackingThird':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <rect x={cx - 180} y={pad} width={360} height={160} />
+            <rect x={cx - 80} y={pad} width={160} height={60} />
+            <circle cx={cx} cy={pad + 110} r={3.5} fill={lc} />
+            <path d={`M ${cx - 70} ${pad + 160} A 75 75 0 0 0 ${cx + 70} ${pad + 160}`} />
+          </g>
+        );
+
+      // 4. 完整球场 (Image 1, Item 4)
+      case 'Full':
+        return renderFullPitchMarkings();
+
+      // 5. 半场 (防守) (Image 1, Item 5)
       case 'HalfDefend':
-      case 'TwoThirdsDefend':
+      case 'Half':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
-            {/* Left Goal Area */}
-            <rect x={pad} y={cy - 160} width={180} height={320} />
-            <rect x={pad} y={cy - 80} width={70} height={160} />
-            <circle cx={pad + 110} cy={cy} r={4} fill={lc} />
-            <path d={`M ${pad + 180} ${cy - 70} A 80 80 0 0 1 ${pad + 180} ${cy + 70}`} />
-            {/* Midfield line on right */}
-            <line x1={width - pad} y1={pad} x2={width - pad} y2={height - pad} strokeWidth={lw * 1.5} />
-            {/* Wing channels */}
-            <line x1={pad} y1={pad + innerH * 0.22} x2={width - pad} y2={pad + innerH * 0.22} strokeDasharray="6,6" opacity={0.5} />
-            <line x1={pad} y1={height - pad - innerH * 0.22} x2={width - pad} y2={height - pad - innerH * 0.22} strokeDasharray="6,6" opacity={0.5} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            {/* Top Midfield line & center circle arc */}
+            <line x1={pad} y1={pad + 50} x2={width - pad} y2={pad + 50} />
+            <circle cx={cx} cy={pad + 50} r={70} />
+            <circle cx={cx} cy={pad + 50} r={3.2} fill={lc} />
+            {/* Bottom Goal Area */}
+            <rect x={cx - 130} y={height - pad - 140} width={260} height={140} />
+            <rect x={cx - 55} y={height - pad - 50} width={110} height={50} />
+            <circle cx={cx} cy={height - pad - 95} r={3.2} fill={lc} />
+            <path d={`M ${cx - 55} ${height - pad - 140} A 60 60 0 0 1 ${cx + 55} ${height - pad - 140}`} />
           </g>
         );
 
-      case 'TwoThirdsHorizontal':
+      // 6. 半场 (进攻) (Image 1, Item 6)
+      case 'HalfAttack':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
-            <line x1={pad + innerW * 0.67} y1={pad} x2={pad + innerW * 0.67} y2={height - pad} strokeWidth={lw * 1.5} />
-            <rect x={pad} y={cy - 140} width={140} height={280} />
-            <circle cx={pad + 90} cy={cy} r={4} fill={lc} />
-            <path d={`M ${pad + 140} ${cy - 60} A 70 70 0 0 1 ${pad + 140} ${cy + 60}`} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            {/* Top Goal Area */}
+            <rect x={cx - 130} y={pad} width={260} height={140} />
+            <rect x={cx - 55} y={pad} width={110} height={50} />
+            <circle cx={cx} cy={pad + 95} r={3.2} fill={lc} />
+            <path d={`M ${cx - 55} ${pad + 140} A 60 60 0 0 0 ${cx + 55} ${pad + 140}`} />
+            {/* Bottom Midfield line & center circle */}
+            <line x1={pad} y1={height - pad - 50} x2={width - pad} y2={height - pad - 50} />
+            <circle cx={cx} cy={height - pad - 50} r={70} />
+            <circle cx={cx} cy={height - pad - 50} r={3.2} fill={lc} />
           </g>
         );
 
+      // 7. 五人制球场 (Image 1, Item 7)
+      case 'Futsal':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <line x1={cx} y1={pad} x2={cx} y2={height - pad} />
+            <circle cx={cx} cy={cy} r={65} />
+            <circle cx={cx} cy={cy} r={3.2} fill={lc} />
+            {/* Left D-zone */}
+            <path d={`M ${pad} ${cy - 120} A 120 120 0 0 1 ${pad} ${cy + 120}`} />
+            <circle cx={pad + 100} cy={cy} r={3.2} fill={lc} />
+            {/* Right D-zone */}
+            <path d={`M ${width - pad} ${cy - 120} A 120 120 0 0 0 ${width - pad} ${cy + 120}`} />
+            <circle cx={width - pad - 100} cy={cy} r={3.2} fill={lc} />
+          </g>
+        );
+
+      // 8. 空白正方形 (Image 1, Item 8)
       case 'SquareBox':
+      case 'Box':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={8} />
-            <line x1={cx} y1={pad} x2={cx} y2={height - pad} strokeDasharray="4,4" opacity={0.4} />
-            <line x1={pad} y1={cy} x2={width - pad} y2={cy} strokeDasharray="4,4" opacity={0.4} />
-            <circle cx={cx} cy={cy} r={6} fill={lc} opacity={0.6} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
           </g>
         );
 
+      // 9. 空白长方形 (Image 2, Item 1)
       case 'RectangleBox':
       case 'AdvRectangle':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={8} />
-            <line x1={cx} y1={pad} x2={cx} y2={height - pad} strokeDasharray="6,6" opacity={0.5} />
-            <line x1={pad} y1={cy} x2={width - pad} y2={cy} strokeDasharray="6,6" opacity={0.5} />
-            {pitchType === 'AdvRectangle' && (
-              <>
-                <circle cx={cx} cy={cy} r={80} strokeDasharray="4,4" opacity={0.5} />
-                <rect x={pad + 60} y={pad + 50} width={innerW - 120} height={innerH - 100} strokeDasharray="3,3" opacity={0.4} />
-              </>
-            )}
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
           </g>
         );
 
+      // 10. 空白长方形 (竖版) (Image 2, Item 2)
+      case 'RectangleVertical':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+          </g>
+        );
+
+      // 11. 双长方形 (竖版) (Image 2, Item 3)
+      case 'DualRectangleVertical':
       case 'DualRectangle':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW * 0.46} height={innerH} rx={6} />
-            <rect x={width - pad - innerW * 0.46} y={pad} width={innerW * 0.46} height={innerH} rx={6} />
-            {/* Zone channels */}
-            <line x1={cx} y1={pad} x2={cx} y2={height - pad} strokeDasharray="4,4" opacity={0.6} />
+            <rect x={pad + 35} y={pad} width={345} height={innerH} rx={2} />
+            <rect x={width - pad - 380} y={pad} width={345} height={innerH} rx={2} />
           </g>
         );
 
+      // 12. 完整球场 (纵向) (Image 2, Item 4)
+      case 'Portrait':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
+            <circle cx={cx} cy={cy} r={75} />
+            <circle cx={cx} cy={cy} r={3.2} fill={lc} />
+
+            {/* Top Goal Area */}
+            <rect x={cx - 120} y={pad} width={240} height={130} />
+            <rect x={cx - 55} y={pad} width={110} height={48} />
+            <circle cx={cx} cy={pad + 85} r={3.2} fill={lc} />
+            <path d={`M ${cx - 50} ${pad + 130} A 55 55 0 0 0 ${cx + 50} ${pad + 130}`} />
+
+            {/* Bottom Goal Area */}
+            <rect x={cx - 120} y={height - pad - 130} width={240} height={130} />
+            <rect x={cx - 55} y={height - pad - 48} width={110} height={48} />
+            <circle cx={cx} cy={height - pad - 85} r={3.2} fill={lc} />
+            <path d={`M ${cx - 50} ${height - pad - 130} A 55 55 0 0 1 ${cx + 50} ${height - pad - 130}`} />
+
+            {/* Corners */}
+            <path d={`M ${pad} ${pad + 14} A 14 14 0 0 0 ${pad + 14} ${pad}`} />
+            <path d={`M ${width - pad} ${pad + 14} A 14 14 0 0 1 ${width - pad - 14} ${pad}`} />
+            <path d={`M ${pad} ${height - pad - 14} A 14 14 0 0 1 ${pad + 14} ${height - pad}`} />
+            <path d={`M ${width - pad} ${height - pad - 14} A 14 14 0 0 0 ${width - pad - 14} ${height - pad}`} />
+          </g>
+        );
+
+      // 13. 三分之二场 (防守) (Image 2, Item 5)
+      case 'TwoThirdsDefend':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            {/* Midfield line at ~26% from top */}
+            <line x1={pad} y1={pad + 150} x2={width - pad} y2={pad + 150} />
+            <circle cx={cx} cy={pad + 150} r={70} />
+            <circle cx={cx} cy={pad + 150} r={3.2} fill={lc} />
+            {/* Defending Goal Area */}
+            <rect x={cx - 130} y={height - pad - 140} width={260} height={140} />
+            <rect x={cx - 55} y={height - pad - 50} width={110} height={50} />
+            <circle cx={cx} cy={height - pad - 95} r={3.2} fill={lc} />
+            <path d={`M ${cx - 55} ${height - pad - 140} A 60 60 0 0 1 ${cx + 55} ${height - pad - 140}`} />
+          </g>
+        );
+
+      // 14. 三分之二场 (进攻) (Image 2, Item 6)
+      case 'TwoThirdsAttack':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            {/* Attacking Goal Area */}
+            <rect x={cx - 130} y={pad} width={260} height={140} />
+            <rect x={cx - 55} y={pad} width={110} height={50} />
+            <circle cx={cx} cy={pad + 95} r={3.2} fill={lc} />
+            <path d={`M ${cx - 55} ${pad + 140} A 60 60 0 0 0 ${cx + 55} ${pad + 140}`} />
+            {/* Midfield line at ~26% from bottom */}
+            <line x1={pad} y1={height - pad - 150} x2={width - pad} y2={height - pad - 150} />
+            <circle cx={cx} cy={height - pad - 150} r={70} />
+            <circle cx={cx} cy={height - pad - 150} r={3.2} fill={lc} />
+          </g>
+        );
+
+      // 15. 三分之二场 (横向) (Image 2, Item 7)
+      case 'TwoThirdsHorizontal':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            {/* Goal Area on Left */}
+            <rect x={pad} y={cy - 120} width={130} height={240} />
+            <rect x={pad} y={cy - 55} width={48} height={110} />
+            <circle cx={pad + 85} cy={cy} r={3.2} fill={lc} />
+            <path d={`M ${pad + 130} ${cy - 50} A 55 55 0 0 1 ${pad + 130} ${cy + 50}`} />
+            {/* Midfield line on Right */}
+            <line x1={width - pad - 170} y1={pad} x2={width - pad - 170} y2={height - pad} />
+            <circle cx={width - pad - 170} cy={cy} r={75} />
+            <circle cx={width - pad - 170} cy={cy} r={3.2} fill={lc} />
+          </g>
+        );
+
+      // 16. 五人制球场 (纵向) (Image 2, Item 8)
+      case 'FutsalVertical':
+        return (
+          <g stroke={lc} strokeWidth={lw} fill="none">
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
+            <circle cx={cx} cy={cy} r={65} />
+            <circle cx={cx} cy={cy} r={3.2} fill={lc} />
+            {/* Top D-zone */}
+            <path d={`M ${cx - 120} ${pad} A 120 120 0 0 1 ${cx + 120} ${pad}`} />
+            <circle cx={cx} cy={pad + 100} r={3.2} fill={lc} />
+            {/* Bottom D-zone */}
+            <path d={`M ${cx - 120} ${height - pad} A 120 120 0 0 0 ${cx + 120} ${height - pad}`} />
+            <circle cx={cx} cy={height - pad - 100} r={3.2} fill={lc} />
+          </g>
+        );
+
+      // 17. 三角形 (Image 3, Item 1)
       case 'Triangle':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <polygon points={`${cx},${pad + 20} ${width - pad - 30},${height - pad - 20} ${pad + 30},${height - pad - 20}`} />
-            <circle cx={cx} cy={cy + 30} r={40} strokeDasharray="4,4" opacity={0.4} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <polygon points={`${cx},${pad + 65} ${width - pad - 95},${height - pad - 55} ${pad + 95},${height - pad - 55}`} />
           </g>
         );
 
-      case 'Diamond':
+      // 18. 圆形 (Image 3, Item 2)
+      case 'Circle':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <polygon points={`${cx},${pad + 20} ${width - pad - 30},${cy} ${cx},${height - pad - 20} ${pad + 30},${cy}`} />
-            <line x1={cx} y1={pad + 20} x2={cx} y2={height - pad - 20} strokeDasharray="4,4" opacity={0.4} />
-            <line x1={pad + 30} y1={cy} x2={width - pad - 30} y2={cy} strokeDasharray="4,4" opacity={0.4} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
+            <circle cx={cx} cy={cy} r={165} />
           </g>
         );
 
-      case 'Trapezoid':
+      // 19. 田字形 (Image 3, Item 3)
+      case 'FourGrids':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
-            <polygon points={`${pad + innerW * 0.2},${pad + 30} ${width - pad - innerW * 0.2},${pad + 30} ${width - pad - 20},${height - pad - 20} ${pad + 20},${height - pad - 20}`} />
-            <line x1={cx} y1={pad + 30} x2={cx} y2={height - pad - 20} strokeDasharray="4,4" opacity={0.4} />
-          </g>
-        );
-
-      case 'GridType1':
-      case 'GridType2':
-      case 'GridType3':
-      case 'GridType4':
-      case 'GridType5':
-        return (
-          <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={6} />
-            {/* 3x3 or 4x3 Grid matrix */}
-            <line x1={pad + innerW * 0.33} y1={pad} x2={pad + innerW * 0.33} y2={height - pad} strokeDasharray="4,4" opacity={0.7} />
-            <line x1={pad + innerW * 0.66} y1={pad} x2={pad + innerW * 0.66} y2={height - pad} strokeDasharray="4,4" opacity={0.7} />
-            <line x1={pad} y1={pad + innerH * 0.5} x2={width - pad} y2={pad + innerH * 0.5} strokeDasharray="4,4" opacity={0.7} />
-            <circle cx={cx} cy={cy} r={50} strokeDasharray="3,3" opacity={0.5} />
-          </g>
-        );
-
-      default:
-        return (
-          <g stroke={lc} strokeWidth={lw} fill="none">
-            <rect x={pad} y={pad} width={innerW} height={innerH} rx={4} />
+            <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
             <line x1={cx} y1={pad} x2={cx} y2={height - pad} />
-            <circle cx={cx} cy={cy} r={80} />
+            <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
           </g>
         );
+
+      // 20. 类型一 (Image 3, Item 4)
+      case 'TacticalZone1':
+      case 'GridType1':
+        return renderFullPitchMarkings(
+          <line
+            x1={pad}
+            y1={cy}
+            x2={width - pad}
+            y2={cy}
+            stroke={lc}
+            strokeWidth={2.2}
+            strokeDasharray="6,6"
+            opacity={0.85}
+          />
+        );
+
+      // 21. 类型二 (Image 4, Item 1)
+      case 'TacticalZone2':
+      case 'GridType2':
+        return renderFullPitchMarkings(
+          <g stroke={lc} strokeWidth={2.2} strokeDasharray="6,6" opacity={0.85}>
+            <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
+            <line x1={pad + innerW * 0.333} y1={pad} x2={pad + innerW * 0.333} y2={height - pad} />
+            <line x1={pad + innerW * 0.666} y1={pad} x2={pad + innerW * 0.666} y2={height - pad} />
+          </g>
+        );
+
+      // 22. 类型三 (Image 4, Item 2)
+      case 'TacticalZone3':
+      case 'GridType3':
+        return renderFullPitchMarkings(
+          <g stroke={lc} strokeWidth={2.2} strokeDasharray="6,6" opacity={0.85}>
+            <line x1={pad} y1={cy - 120} x2={width - pad} y2={cy - 120} />
+            <line x1={pad} y1={cy + 120} x2={width - pad} y2={cy + 120} />
+          </g>
+        );
+
+      // 23. 类型四 (Image 4, Item 3)
+      case 'TacticalZone4':
+      case 'GridType4':
+        return renderFullPitchMarkings(
+          <g stroke={lc} strokeWidth={2.2} strokeDasharray="6,6" opacity={0.85}>
+            <line x1={pad} y1={cy - 55} x2={width - pad} y2={cy - 55} />
+            <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
+            <line x1={pad} y1={cy + 55} x2={width - pad} y2={cy + 55} />
+          </g>
+        );
+
+      // 24. 类型五 (Image 4, Item 4)
+      case 'TacticalZone5':
+      case 'GridType5':
+        return renderFullPitchMarkings(
+          <g stroke={lc} strokeWidth={2.2} strokeDasharray="6,6" opacity={0.85}>
+            <line x1={pad} y1={pad + innerH * 0.20} x2={width - pad} y2={pad + innerH * 0.20} />
+            <line x1={pad} y1={pad + innerH * 0.40} x2={width - pad} y2={pad + innerH * 0.40} />
+            <line x1={pad} y1={pad + innerH * 0.60} x2={width - pad} y2={pad + innerH * 0.60} />
+            <line x1={pad} y1={pad + innerH * 0.80} x2={width - pad} y2={pad + innerH * 0.80} />
+          </g>
+        );
+
+      // 25. 类型六 (Image 4, Item 5)
+      case 'TacticalZone6':
+        return renderFullPitchMarkings(
+          <g stroke={lc} strokeWidth={2.2} strokeDasharray="6,6" opacity={0.85}>
+            {/* 4 horizontal lines (5 corridors) */}
+            <line x1={pad} y1={pad + innerH * 0.20} x2={width - pad} y2={pad + innerH * 0.20} />
+            <line x1={pad} y1={pad + innerH * 0.40} x2={width - pad} y2={pad + innerH * 0.40} />
+            <line x1={pad} y1={pad + innerH * 0.60} x2={width - pad} y2={pad + innerH * 0.60} />
+            <line x1={pad} y1={pad + innerH * 0.80} x2={width - pad} y2={pad + innerH * 0.80} />
+            {/* 4 vertical lines */}
+            <line x1={pad + innerW * 0.166} y1={pad} x2={pad + innerW * 0.166} y2={height - pad} />
+            <line x1={pad + innerW * 0.333} y1={pad} x2={pad + innerW * 0.333} y2={height - pad} />
+            <line x1={pad + innerW * 0.666} y1={pad} x2={pad + innerW * 0.666} y2={height - pad} />
+            <line x1={pad + innerW * 0.833} y1={pad} x2={pad + innerW * 0.833} y2={height - pad} />
+          </g>
+        );
+
+      // 26. 类型七 (Image 4, Item 6)
+      case 'TacticalZone7':
+        return renderFullPitchMarkings(
+          <g stroke={lc} strokeWidth={2.2} strokeDasharray="6,6" opacity={0.85}>
+            <line x1={pad} y1={cy - 120} x2={width - pad} y2={cy - 120} />
+            <line x1={pad} y1={cy + 120} x2={width - pad} y2={cy + 120} />
+            <line x1={pad + innerW * 0.333} y1={pad} x2={pad + innerW * 0.333} y2={height - pad} />
+            <line x1={pad + innerW * 0.666} y1={pad} x2={pad + innerW * 0.666} y2={height - pad} />
+          </g>
+        );
+
+      // Fallback
+      default:
+        return renderFullPitchMarkings();
     }
   };
 

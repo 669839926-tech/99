@@ -482,17 +482,21 @@ export interface FinanceTransaction {
 export type PitchType = 
   | 'Full' | 'Half' | 'Box' | 'Portrait' | 'Midfield' | 'DefensiveThird' | 'AttackingThird'
   | 'HalfDefend' | 'HalfAttack' | 'Futsal' | 'FutsalVertical' | 'SquareBox' | 'RectangleBox' 
+  | 'RectangleVertical' | 'DualRectangleVertical'
   | 'AdvRectangle' | 'DualRectangle' | 'TwoThirdsDefend' | 'TwoThirdsAttack' | 'TwoThirdsHorizontal'
-  | 'Triangle' | 'Diamond' | 'Trapezoid' | 'GridType1' | 'GridType2' | 'GridType3' | 'GridType4' | 'GridType5';
+  | 'Triangle' | 'Circle' | 'Diamond' | 'Trapezoid' | 'FourGrids'
+  | 'TacticalZone1' | 'TacticalZone2' | 'TacticalZone3' | 'TacticalZone4' | 'TacticalZone5' | 'TacticalZone6' | 'TacticalZone7'
+  | 'GridType1' | 'GridType2' | 'GridType3' | 'GridType4' | 'GridType5';
 
 export type PitchTheme = 'Grass' | 'Blue' | 'Grey' | 'White' | 'Black' | 'VibrantGreen';
 
 export type ElementType = 
   | 'PlayerCircle' | 'PlayerPin' | 'GK' | 'Coach' | 'Referee' | 'Defender'
+  | 'PlayerRing' | 'PlayerCross' | 'PlayerNeutral' | 'PlayerTopView' | 'PlayerShoulders' | 'PlayerTeardrop' | 'PlayerSquare' | 'PlayerTriangle' | 'PlayerArchGK' | 'PlayerTarget'
   | 'Ball' 
   | 'Cone' | 'Marker' | 'Pole' 
   | 'AgilityRing' | 'Ladder' | 'Hurdle' | 'Mannequin' | 'Rebounder' 
-  | 'Goal' | 'MiniGoal' 
+  | 'Goal' | 'MiniGoal' | 'MinimalGoal' 
   | 'Text' | 'AreaSquare' | 'AreaRect' | 'AreaCircle' | 'AreaTriangle' | 'AreaDiamond'
   | 'BadgeNumber' | 'DistanceMeter' | 'Vest' | 'Chute';
 

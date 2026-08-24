@@ -140,10 +140,10 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
     }
   };
 
-  // When inside canvas editor (Video 5)
+  // When inside canvas editor (Video 5) - Full Screen Experience (Image 2)
   if (currentMode === 'editor') {
     return (
-      <div className="h-[calc(100vh-4.5rem)] rounded-3xl overflow-hidden shadow-2xl border border-gray-800">
+      <div className="fixed inset-0 z-50 bg-gray-950 overflow-hidden">
         <DiagramCanvasEditor
           initialDesign={editingDesign}
           pitchType={selectedPitchType}
