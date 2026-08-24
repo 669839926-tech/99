@@ -660,10 +660,18 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
 
   // Export Overall Character Badges Leaderboard & Club History to Excel
   const handleExportOverallLeaderboardExcel = () => {
+    // 仅筛选已实际参赛/已产生评定记录的球员，排除未参赛球员
+    const activeParticipants = badgeWallData.filter(item => item.totalAssessments > 0);
+
+    if (activeParticipants.length === 0) {
+      alert('暂无已参加比赛评定的球员记录！');
+      return;
+    }
+
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: 全员品质勋章总榜
-    const leaderboardRows = badgeWallData.map((item, index) => {
+    // Sheet 1: 参评球员品质勋章总榜（仅包含已参赛评定球员）
+    const leaderboardRows = activeParticipants.map((item, index) => {
       const team = teams.find(t => t.id === item.player.teamId);
       let honorTitle = '积极参评球员';
       if (item.outstandingBadges >= 3) {
@@ -700,7 +708,7 @@ export const PlayerCharacterModule: React.FC<PlayerCharacterModuleProps> = ({
     });
 
     const wsLeaderboard = XLSX.utils.json_to_sheet(leaderboardRows);
-    XLSX.utils.book_append_sheet(wb, wsLeaderboard, '全员品质勋章总榜');
+    XLSX.utils.book_append_sheet(wb, wsLeaderboard, '品质勋章总榜');
 
     // Sheet 2: 全部历史比赛评定明细流水
     const allHistoryRows = characterAssessments
