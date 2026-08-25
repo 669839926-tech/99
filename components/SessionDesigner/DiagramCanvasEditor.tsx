@@ -843,6 +843,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
   const [isDrawingLine, setIsDrawingLine] = useState(false);
   const [lineStartPoint, setLineStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [lineCurrentPoint, setLineCurrentPoint] = useState<{ x: number; y: number } | null>(null);
+  const [isCapturing, setIsCapturing] = useState(false);
 
   // Active ruler resize state (for DistanceMeter dragging to stretch/shrink)
   const [activeRulerResize, setActiveRulerResize] = useState<{
@@ -1824,14 +1825,38 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
   // Export / Save
   const handleSaveDiagram = async (publish = false) => {
+    // Automatically deselect all elements & lines so the diagram is cleanly saved
+    setSelectedElementIds([]);
+    setSelectedLineIds([]);
+    setIsMarqueeSelecting(false);
+    setMarqueeBox(null);
+    setIsDrawingLine(false);
+    setIsCapturing(true);
+
+    // Yield a frame for React to flush the deselected UI to the DOM
+    await new Promise(resolve => setTimeout(resolve, 80));
+
     let previewDataUrl = '';
     if (canvasRef.current) {
       try {
-        const canvas = await html2canvas(canvasRef.current, { scale: 1.5, useCORS: true });
+        const canvas = await html2canvas(canvasRef.current, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: null,
+          logging: false,
+          ignoreElements: (el) =>
+            el.classList.contains('selection-indicator') ||
+            el.classList.contains('line-handle') ||
+            el.classList.contains('marquee-box')
+        });
         previewDataUrl = canvas.toDataURL('image/png');
       } catch (err) {
         console.warn('Canvas export preview warning:', err);
+      } finally {
+        setIsCapturing(false);
       }
+    } else {
+      setIsCapturing(false);
     }
 
     const designToSave: DrillDesign = {
@@ -1860,14 +1885,34 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
   const handleExportPNG = async () => {
     if (!canvasRef.current) return;
+    setSelectedElementIds([]);
+    setSelectedLineIds([]);
+    setIsMarqueeSelecting(false);
+    setMarqueeBox(null);
+    setIsDrawingLine(false);
+    setIsCapturing(true);
+
+    await new Promise(resolve => setTimeout(resolve, 80));
+
     try {
-      const canvas = await html2canvas(canvasRef.current, { scale: 2, useCORS: true });
+      const canvas = await html2canvas(canvasRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+        ignoreElements: (el) =>
+          el.classList.contains('selection-indicator') ||
+          el.classList.contains('line-handle') ||
+          el.classList.contains('marquee-box')
+      });
       const link = document.createElement('a');
       link.download = `${title || '战术示意图'}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
     } catch {
       alert('导出图片失败，请稍后重试');
+    } finally {
+      setIsCapturing(false);
     }
   };
 
@@ -1913,7 +1958,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'PlayerCross':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 32 32">
+          <svg className="w-6 h-6" viewBox="0 0 32 32">
             <path d="M7 7 L25 25 M25 7 L7 25" stroke={color} strokeWidth="3.6" strokeLinecap="round" />
           </svg>
         );
@@ -1932,7 +1977,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'PlayerTopView':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 36 36">
+          <svg className="w-6 h-6" viewBox="0 0 36 36">
             <circle cx="18" cy="17" r="5.5" fill="none" stroke={color} strokeWidth="3" />
             <path d="M9 25 C9 12, 27 12, 27 25" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" />
           </svg>
@@ -1941,7 +1986,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'PlayerShoulders':
         innerContent = (
-          <svg className="w-7 h-5 drop-shadow-sm" viewBox="0 0 44 28">
+          <svg className="w-7 h-5" viewBox="0 0 44 28">
             <ellipse cx="10" cy="14" rx="7.5" ry="3.8" fill={color} opacity="0.6" />
             <ellipse cx="34" cy="14" rx="7.5" ry="3.8" fill={color} opacity="0.6" />
             <circle cx="22" cy="14" r="7.5" fill={color} stroke="white" strokeWidth="1" />
@@ -1951,7 +1996,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'PlayerTeardrop':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 36 36">
+          <svg className="w-6 h-6" viewBox="0 0 36 36">
             <path d="M18 6 C12 6, 8 10.5, 8 16.5 C8 23.5, 18 30, 18 30 C18 30, 28 23.5, 28 16.5 C28 10.5, 24 6, 18 6 Z" fill={color} stroke="white" strokeWidth="1" />
             <circle cx="18" cy="15" r="3.5" fill="white" />
           </svg>
@@ -1969,7 +2014,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'PlayerTriangle':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 36 36">
+          <svg className="w-6 h-6" viewBox="0 0 36 36">
             <polygon points="18,7 30,28 6,28" fill="none" stroke={color} strokeWidth="3" strokeLinejoin="round" />
           </svg>
         );
@@ -1977,7 +2022,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'PlayerArchGK':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 36 36">
+          <svg className="w-6 h-6" viewBox="0 0 36 36">
             <path d="M10 26 L10 17 C10 9, 26 9, 26 17 L26 26" fill="none" stroke={color} strokeWidth="3.2" strokeLinecap="round" />
           </svg>
         );
@@ -2052,7 +2097,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Coach':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 36 36">
+          <svg className="w-6 h-6" viewBox="0 0 36 36">
             <polygon points="18,7 30,29 6,29" fill={color} stroke="white" strokeWidth="1" />
             <polygon points="18,7 23.5,17 12.5,17" fill="#1e293b" />
           </svg>
@@ -2061,7 +2106,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Referee':
         innerContent = (
-          <svg className="w-6 h-6 drop-shadow-sm" viewBox="0 0 36 36">
+          <svg className="w-6 h-6" viewBox="0 0 36 36">
             <circle cx="18" cy="18" r="10" fill={color} stroke="white" strokeWidth="1" />
             <path d="M8 18 A10 10 0 0 1 28 18 Z" fill="#1e293b" />
           </svg>
@@ -2069,51 +2114,28 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
         break;
 
       case 'Ball': {
-        const safeId = (el.id || 'ball').replace(/[^a-zA-Z0-9-_]/g, '');
         innerContent = (
-          <svg className="w-7 h-7 drop-shadow select-none" viewBox="0 0 32 32">
-            <defs>
-              <radialGradient id={`ballShd-${safeId}`} cx="36%" cy="32%" r="65%">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="60%" stopColor="#f1f5f9" />
-                <stop offset="85%" stopColor="#cbd5e1" />
-                <stop offset="100%" stopColor="#94a3b8" />
-              </radialGradient>
-              <linearGradient id={`patchGrad-${safeId}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#334155" />
-                <stop offset="100%" stopColor="#0f172a" />
-              </linearGradient>
-            </defs>
-
+          <svg className="w-7 h-7 select-none" viewBox="0 0 32 32">
             {/* Outer Badge Dark Ring & White Fill Base */}
-            <circle cx="16" cy="16" r="14.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2.4" />
-
-            {/* 3D Shaded Soccer Sphere */}
-            <circle cx="16" cy="16" r="10" fill={`url(#ballShd-${safeId})`} stroke="#64748b" strokeWidth="0.5" />
+            <circle cx="16" cy="16" r="14" fill="#ffffff" stroke="#1e293b" strokeWidth="2.2" />
+            <circle cx="16" cy="16" r="10" fill="#f8fafc" stroke="#475569" strokeWidth="0.5" />
 
             {/* Center Pentagon */}
-            <polygon points="16,13 18.8,15 17.7,18.2 14.3,18.2 13.2,15" fill={`url(#patchGrad-${safeId})`} />
+            <polygon points="16,13 18.8,15 17.7,18.2 14.3,18.2 13.2,15" fill="#1e293b" />
 
-            {/* Edge Patches */}
-            <path d="M 14.5 6.2 C 15.5 6 16.5 6 17.5 6.2 L 17 8.5 L 15 8.5 Z" fill={`url(#patchGrad-${safeId})`} />
-            <path d="M 23.5 10.5 C 24.5 12 25 13.5 25.2 15 L 23 15.5 L 21.5 13.2 Z" fill={`url(#patchGrad-${safeId})`} />
-            <path d="M 23.2 21.5 C 22 23.2 20.5 24.5 19 25.2 L 18.2 23 L 20.5 21 Z" fill={`url(#patchGrad-${safeId})`} />
-            <path d="M 8.8 21.5 C 10 23.2 11.5 24.5 13 25.2 L 13.8 23 L 11.5 21 Z" fill={`url(#patchGrad-${safeId})`} />
-            <path d="M 8.5 10.5 C 7.5 12 7 13.5 6.8 15 L 9 15.5 L 10.5 13.2 Z" fill={`url(#patchGrad-${safeId})`} />
+            {/* Perimeter Patches */}
+            <path d="M 14.5 6.2 C 15.5 6 16.5 6 17.5 6.2 L 17 8.5 L 15 8.5 Z" fill="#1e293b" />
+            <path d="M 23.5 10.5 C 24.5 12 25 13.5 25.2 15 L 23 15.5 L 21.5 13.2 Z" fill="#1e293b" />
+            <path d="M 23.2 21.5 C 22 23.2 20.5 24.5 19 25.2 L 18.2 23 L 20.5 21 Z" fill="#1e293b" />
+            <path d="M 8.8 21.5 C 10 23.2 11.5 24.5 13 25.2 L 13.8 23 L 11.5 21 Z" fill="#1e293b" />
+            <path d="M 8.5 10.5 C 7.5 12 7 13.5 6.8 15 L 9 15.5 L 10.5 13.2 Z" fill="#1e293b" />
 
             {/* Seams connecting center pentagon to perimeter patches */}
-            <line x1="16" y1="13" x2="16" y2="8.5" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="18.8" y1="15" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="17.7" y1="18.2" x2="18.2" y2="23" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="14.3" y1="18.2" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="13.2" y1="15" x2="10.5" y2="13.2" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-
-            {/* Perimeter Seams between edge patches */}
-            <line x1="17" y1="8.5" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="23" y1="15.5" x2="20.5" y2="21" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="18.2" y1="23" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="11.5" y1="21" x2="9" y2="15.5" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="10.5" y1="13.2" x2="15" y2="8.5" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
+            <line x1="16" y1="13" x2="16" y2="8.5" stroke="#475569" strokeWidth="0.6" />
+            <line x1="18.8" y1="15" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.6" />
+            <line x1="17.7" y1="18.2" x2="18.2" y2="23" stroke="#475569" strokeWidth="0.6" />
+            <line x1="14.3" y1="18.2" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.6" />
+            <line x1="13.2" y1="15" x2="10.5" y2="13.2" stroke="#475569" strokeWidth="0.6" />
           </svg>
         );
         break;
@@ -2121,7 +2143,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Cone':
         innerContent = (
-          <svg className="w-6 h-7 drop-shadow-sm select-none" viewBox="0 0 32 32">
+          <svg className="w-6 h-7 select-none" viewBox="0 0 32 32">
             {/* Diamond Baseplate */}
             <polygon points="16,19 29,24 16,29 3,24" fill={color} stroke="#000000" strokeOpacity="0.18" strokeWidth="0.8" />
             {/* Tapered Cone Body */}
@@ -2143,7 +2165,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Marker':
         innerContent = (
-          <svg className="w-6 h-5 drop-shadow-sm select-none" viewBox="0 0 32 32">
+          <svg className="w-6 h-5 select-none" viewBox="0 0 32 32">
             {/* Outer Dome Saucer */}
             <path
               d="M 3 20 Q 16 25.5 29 20 L 22.5 10.5 Q 16 8.5 9.5 10.5 Z"
@@ -2165,7 +2187,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Pole':
         innerContent = (
-          <svg className="w-4 h-8 drop-shadow-sm" viewBox="0 0 20 40">
+          <svg className="w-4 h-8" viewBox="0 0 20 40">
             <path d="M10 4 L10 32 M5 37 L15 37 L10 32 Z" fill={color} stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         );
@@ -2173,7 +2195,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'AgilityRing':
         innerContent = (
-          <svg className="w-7 h-5 drop-shadow-sm" viewBox="0 0 36 24">
+          <svg className="w-7 h-5" viewBox="0 0 36 24">
             <ellipse cx="18" cy="12" rx="14" ry="7" fill="none" stroke={color} strokeWidth="2.8" />
           </svg>
         );
@@ -2181,7 +2203,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Ladder':
         innerContent = (
-          <svg className="w-20 h-5 drop-shadow-sm" viewBox="0 0 112 28">
+          <svg className="w-20 h-5" viewBox="0 0 112 28">
             <line x1="4" y1="7" x2="108" y2="7" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
             <line x1="4" y1="21" x2="108" y2="21" stroke={color} strokeWidth="2.2" strokeLinecap="round" />
             {[8, 24, 40, 56, 72, 88, 104].map(px => (
@@ -2193,7 +2215,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Hurdle':
         innerContent = (
-          <svg className="w-7 h-5 drop-shadow-sm" viewBox="0 0 40 24">
+          <svg className="w-7 h-5" viewBox="0 0 40 24">
             <path d="M8 20 L8 7 L32 7 L32 20" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="square" />
             <path d="M5 20 L11 20 M29 20 L35 20" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
           </svg>
@@ -2202,7 +2224,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Mannequin':
         innerContent = (
-          <svg className="w-6 h-12 drop-shadow-sm select-none" viewBox="0 0 26 52">
+          <svg className="w-6 h-12 select-none" viewBox="0 0 26 52">
             {/* Head Handle Loop */}
             <path
               d="M 9 10 L 9 5.5 Q 13 1.5 17 5.5 L 17 10 Z"
@@ -2237,7 +2259,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Rebounder':
         innerContent = (
-          <svg className="w-8 h-5 drop-shadow-sm" viewBox="0 0 48 24">
+          <svg className="w-8 h-5" viewBox="0 0 48 24">
             <polygon points="10,6 38,6 44,18 4,18" fill={color} stroke="white" strokeWidth="1" />
           </svg>
         );
@@ -2245,7 +2267,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'MinimalGoal':
         innerContent = (
-          <svg className="w-12 h-6 drop-shadow-md select-none" viewBox="0 0 64 32">
+          <svg className="w-12 h-6 select-none" viewBox="0 0 64 32">
             <line x1="6" y1="4" x2="6" y2="28" stroke="#ffffff" strokeWidth="3.5" strokeLinecap="round" />
             <line x1="6" y1="4" x2="6" y2="28" stroke={color} strokeWidth="2" strokeLinecap="round" />
             <line x1="6" y1="16" x2="58" y2="16" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
@@ -2260,25 +2282,18 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'MiniGoal':
         innerContent = (
-          <svg className="w-16 h-10 drop-shadow-lg select-none" viewBox="0 0 80 48">
-            <defs>
-              <linearGradient id={`miniGoalNetGrad-${el.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.32" />
-                <stop offset="100%" stopColor="#94a3b8" stopOpacity="0.12" />
-              </linearGradient>
-            </defs>
-
-            {/* Rear Ground Base & Net Shape */}
+          <svg className="w-16 h-10 select-none" viewBox="0 0 80 48">
             <polygon
               points="8,10 72,10 65,42 15,42"
-              fill={`url(#miniGoalNetGrad-${el.id})`}
+              fill="#ffffff"
+              fillOpacity="0.18"
               stroke={color}
               strokeWidth="1"
               strokeDasharray="2,2"
             />
             {/* Rear Ground Bar */}
             <line x1="15" y1="42" x2="65" y2="42" stroke={color} strokeWidth="2.8" strokeLinecap="round" opacity="0.9" />
-            {/* Side Net Stanchions (Curved / Angled 3D depth) */}
+            {/* Side Net Stanchions */}
             <line x1="8" y1="10" x2="15" y2="42" stroke={color} strokeWidth="2.4" strokeLinecap="round" opacity="0.9" />
             <line x1="72" y1="10" x2="65" y2="42" stroke={color} strokeWidth="2.4" strokeLinecap="round" opacity="0.9" />
 
@@ -2317,7 +2332,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
               );
             })}
 
-            {/* Front Goal Mouth Frame (Posts + Crossbar with realistic white highlight) */}
+            {/* Front Goal Mouth Frame */}
             <line x1="8" y1="10" x2="8" y2="18" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" />
             <line x1="8" y1="10" x2="8" y2="18" stroke={color} strokeWidth="2.8" strokeLinecap="round" />
 
@@ -2336,18 +2351,12 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Goal':
         innerContent = (
-          <svg className="w-24 h-13 drop-shadow-xl select-none" viewBox="0 0 128 64">
-            <defs>
-              <linearGradient id={`regGoalNetGrad-${el.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#ffffff" stopOpacity="0.38" />
-                <stop offset="100%" stopColor="#64748b" stopOpacity="0.15" />
-              </linearGradient>
-            </defs>
-
-            {/* Ground Net Area Polygon with translucent fill */}
+          <svg className="w-24 h-13 select-none" viewBox="0 0 128 64">
+            {/* Ground Net Area Polygon */}
             <polygon
               points="10,12 118,12 108,56 20,56"
-              fill={`url(#regGoalNetGrad-${el.id})`}
+              fill="#ffffff"
+              fillOpacity="0.2"
               stroke={color}
               strokeWidth="1.2"
               strokeDasharray="3,2.5"
@@ -2400,7 +2409,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
               );
             })}
 
-            {/* Front Goal Frame (Left Post, Right Post, Crossbar in 3D double layer) */}
+            {/* Front Goal Frame */}
             <line x1="10" y1="12" x2="10" y2="24" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" />
             <line x1="10" y1="12" x2="10" y2="24" stroke={color} strokeWidth="3.2" strokeLinecap="round" />
 
@@ -2447,7 +2456,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
               setEditingElementId(el.id);
               setEditingText(el.label || '1');
             }}
-            className="w-7 h-7 min-w-[28px] min-h-[28px] flex items-center justify-center cursor-pointer select-none drop-shadow-md transition-transform hover:scale-105"
+            className="w-7 h-7 min-w-[28px] min-h-[28px] flex items-center justify-center cursor-pointer select-none transition-transform hover:scale-105"
             title="双击修改编号 (1-99)"
           >
             <svg className="w-7 h-7" viewBox="0 0 32 32">
@@ -2514,7 +2523,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
                   setEditingElementId(el.id);
                   setEditingText(el.label || '5m');
                 }}
-                className="z-10 px-2 py-0.5 text-xs font-mono font-bold tracking-tight whitespace-nowrap cursor-text select-none text-center bg-transparent drop-shadow-sm"
+                className="z-10 px-2 py-0.5 text-xs font-mono font-bold tracking-tight whitespace-nowrap cursor-text select-none text-center bg-transparent"
                 style={{ color: color }}
                 title="双击修改距离 (或使用顶部输入框)"
               >
@@ -2538,18 +2547,18 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
             />
 
             {/* Interactive Stretch/Shrink Handles when Selected */}
-            {isSelected && (
+            {isSelected && !isCapturing && (
               <>
                 <div
                   onMouseDown={e => handleRulerResizeStart(e, el.id, 'left', rulerWidth)}
-                  className="absolute -left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md cursor-ew-resize z-30 hover:scale-125 transition-transform flex items-center justify-center pointer-events-auto"
+                  className="line-handle absolute -left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md cursor-ew-resize z-30 hover:scale-125 transition-transform flex items-center justify-center pointer-events-auto"
                   title="按住左右拖拽收缩/拉长标尺"
                 >
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
                 </div>
                 <div
                   onMouseDown={e => handleRulerResizeStart(e, el.id, 'right', rulerWidth)}
-                  className="absolute -right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md cursor-ew-resize z-30 hover:scale-125 transition-transform flex items-center justify-center pointer-events-auto"
+                  className="line-handle absolute -right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-emerald-500 rounded-full shadow-md cursor-ew-resize z-30 hover:scale-125 transition-transform flex items-center justify-center pointer-events-auto"
                   title="按住左右拖拽收缩/拉长标尺"
                 >
                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
@@ -2584,7 +2593,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
               setEditingElementId(el.id);
               setEditingText(el.label || '文字');
             }}
-            className="px-2 py-0.5 text-xs font-bold whitespace-nowrap cursor-text select-none text-center rounded drop-shadow-sm"
+            className="px-2 py-0.5 text-xs font-bold whitespace-nowrap cursor-text select-none text-center rounded"
             style={{ color: color }}
             title="双击编辑文字"
           >
@@ -2701,8 +2710,8 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
         className={`group relative select-none ${isSelected ? 'z-50' : ''}`}
       >
         {/* Standard Selection Box for Non-Area Elements */}
-        {isSelected && !isArea && (
-          <div className="absolute -inset-1.5 border-2 border-emerald-400/90 rounded-md pointer-events-none shadow-sm animate-in fade-in duration-100">
+        {isSelected && !isCapturing && !isArea && (
+          <div className="selection-indicator absolute -inset-1.5 border-2 border-emerald-400/90 rounded-md pointer-events-none shadow-sm animate-in fade-in duration-100">
             {/* 4 Corner Knots */}
             <span className="absolute -top-1 -left-1 w-1.5 h-1.5 bg-emerald-400 border border-black rounded-full" />
             <span className="absolute -top-1 -right-1 w-1.5 h-1.5 bg-emerald-400 border border-black rounded-full" />
@@ -2712,54 +2721,54 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
         )}
 
         {/* 8-Point Resize Box for Area Elements (Matches Video & Image) */}
-        {isSelected && isArea && (
-          <div className="absolute inset-0 border border-slate-900/60 pointer-events-none">
+        {isSelected && !isCapturing && isArea && (
+          <div className="selection-indicator absolute inset-0 border border-slate-900/60 pointer-events-none">
             {/* Top-Left */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'nw', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="拉伸区域"
             />
             {/* Top-Middle */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'n', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ns-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ns-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="调整高度"
             />
             {/* Top-Right */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'ne', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="拉伸区域"
             />
             {/* Right-Middle */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'e', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ew-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ew-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="调整宽度"
             />
             {/* Bottom-Right */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'se', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="拉伸区域"
             />
             {/* Bottom-Middle */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 's', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ns-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ns-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="调整高度"
             />
             {/* Bottom-Left */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'sw', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="拉伸区域"
             />
             {/* Left-Middle */}
             <div
               onMouseDown={e => handleAreaResizeStart(e, el.id, 'w', shapeWidth, shapeHeight, el.x, el.y)}
-              className="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ew-resize pointer-events-auto hover:scale-125 transition-transform z-50"
+              className="line-handle absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-slate-900 rounded-sm shadow-sm cursor-ew-resize pointer-events-auto hover:scale-125 transition-transform z-50"
               title="调整宽度"
             />
           </div>
@@ -3041,8 +3050,8 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
         />
 
         {/* When Selected: Show Control Guidelines and 3 Interactive Anchor Handles (Matches Image 1 exactly) */}
-        {isSelected && (
-          <g className="pointer-events-auto">
+        {isSelected && !isCapturing && (
+          <g className="line-handle selection-indicator pointer-events-auto">
             {/* Control guideline from Start -> Control -> End */}
             <polyline
               points={`${p0.x.toFixed(1)},${p0.y.toFixed(1)} ${pc.x.toFixed(1)},${pc.y.toFixed(1)} ${p1.x.toFixed(1)},${p1.y.toFixed(1)}`}
@@ -4022,9 +4031,9 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
                 />
 
                 {/* Marquee Selection Drag Box Overlay */}
-                {isMarqueeSelecting && marqueeBox && (
+                {isMarqueeSelecting && marqueeBox && !isCapturing && (
                   <div
-                    className="absolute border-2 border-dashed border-emerald-400 bg-emerald-500/20 rounded-md pointer-events-none z-50 transition-none shadow-md"
+                    className="marquee-box absolute border-2 border-dashed border-emerald-400 bg-emerald-500/20 rounded-md pointer-events-none z-50 transition-none shadow-md"
                     style={{
                       left: `${Math.min(marqueeBox.startX, marqueeBox.currentX)}%`,
                       top: `${Math.min(marqueeBox.startY, marqueeBox.currentY)}%`,

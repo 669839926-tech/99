@@ -52,6 +52,48 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStage, setFilterStage] = useState<string>('all');
 
+  // Synchronize and reset state when modal opens or initialPlan changes
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialPlan) {
+        setTitle(initialPlan.title || '');
+        setDescription(initialPlan.description || '');
+        setTargetAge(initialPlan.targetAge || 'U9 (8-9岁)');
+        setIsPrivate(initialPlan.isPrivate ?? false);
+        const stgs = initialPlan.sessionStages && initialPlan.sessionStages.length > 0
+          ? initialPlan.sessionStages
+          : [
+              { id: 'stg-1', name: '1. 热身环节', duration: 15, focus: '球感熟悉与动态热身', drillIds: [] },
+              { id: 'stg-2', name: '2. 技术环节', duration: 20, focus: '基础动作传控精细化', drillIds: [] },
+              { id: 'stg-3', name: '3. 技能环节', duration: 20, focus: '有防守压迫下的1v1与变向决策', drillIds: [] },
+              { id: 'stg-4', name: '4. 情景对抗', duration: 20, focus: '局部人数优势与攻防转换', drillIds: [] },
+              { id: 'stg-5', name: '5. 小比赛', duration: 15, focus: '全场实战演练与主题战术验收', drillIds: [] }
+            ];
+        setStages(stgs);
+        setActiveStageId(stgs[0]?.id || 'stg-1');
+        setSearchQuery('');
+        setFilterStage('all');
+      } else {
+        // Brand new session plan
+        setTitle('');
+        setDescription('');
+        setTargetAge('U9 (8-9岁)');
+        setIsPrivate(false);
+        const defaultStages = [
+          { id: 'stg-1', name: '1. 热身环节', duration: 15, focus: '球感熟悉与动态热身', drillIds: [] },
+          { id: 'stg-2', name: '2. 技术环节', duration: 20, focus: '基础动作传控精细化', drillIds: [] },
+          { id: 'stg-3', name: '3. 技能环节', duration: 20, focus: '有防守压迫下的1v1与变向决策', drillIds: [] },
+          { id: 'stg-4', name: '4. 情景对抗', duration: 20, focus: '局部人数优势与攻防转换', drillIds: [] },
+          { id: 'stg-5', name: '5. 小比赛', duration: 15, focus: '全场实战演练与主题战术验收', drillIds: [] }
+        ];
+        setStages(defaultStages);
+        setActiveStageId('stg-1');
+        setSearchQuery('');
+        setFilterStage('all');
+      }
+    }
+  }, [isOpen, initialPlan]);
+
   if (!isOpen) return null;
 
   const totalDuration = stages.reduce((sum, s) => sum + (s.duration || 0), 0);

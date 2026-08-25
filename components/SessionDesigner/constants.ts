@@ -132,8 +132,7 @@ export const DRILL_STAGES = [
 ];
 
 export const TRAINING_TOPICS = [
-  '传控', '停球', '运球', '射门', '速度', '突破', 
-  '防守', '空间移动', '发球接应', '协调性', '1v1', '守门', '体能'
+  '运控球', '传接球', '射门', '进攻', '防守', '攻转守', '守转攻', '攻防转换', '空间移动', '定位球', '守门', '1v1', '体能'
 ];
 
 export const AGE_GROUPS = [
@@ -226,7 +225,7 @@ export const INITIAL_PRESET_DRILLS: DrillDesign[] = [
       '射门脚型稳定，果断起脚打门'
     ],
     ageGroups: ['9', '10', '11', '12', '13', '14'],
-    topic: '传控',
+    topic: '传接球',
     drillStage: 'technical',
     durationMinutes: 20,
     fieldLength: 35,

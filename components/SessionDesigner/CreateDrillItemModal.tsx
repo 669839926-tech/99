@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DrillDesign, User } from '../../types';
 import { AGE_GROUPS, TRAINING_TOPICS, DRILL_STAGES } from './constants';
 import {
-  X, Image as ImageIcon, Check, Eye, EyeOff, Save, Layers, Plus, BookOpen, Send
+  X, Image as ImageIcon, Check, Eye, EyeOff, Save, Layers, Plus, BookOpen, Send,
+  HelpCircle, Trash2, ZoomIn, Maximize2, MoveHorizontal
 } from 'lucide-react';
 import { PitchSvgRenderer } from './PitchSvgRenderer';
+import { DiagramPreviewBox } from './DiagramPreviewBox';
+import { SelectDiagramModal } from './SelectDiagramModal';
 
 interface CreateDrillItemModalProps {
   isOpen: boolean;
@@ -15,6 +18,10 @@ interface CreateDrillItemModalProps {
   onOpenPitchSelector: () => void;
   initialDrill?: DrillDesign | null;
 }
+
+const STANDARD_ORGANIZATION = '1. 在20x15米区域内，两端各设一条端线。\n2. 进攻队员从一端运球出发，防守队员在中间限制区内防守。\n3. 进攻队员可利用变速变向突破防守人，或与远端中立队员做撞墙配合后越过端线。\n4. 防守断球后反向进攻端线。';
+const STANDARD_COACHING_POINTS = '1. 运球推进时步频快、重心低，触球点位于脚背外侧或内侧。\n2. 接近防守人前预设变向假动作，拉开防守重心后瞬间加速。\n3. 与中立队友呼应，传球力量精准，出球后迅速前插。';
+const STANDARD_PROGRESSIONS = '1. 限制进攻球员必须在3次触球内完成变向或传球。\n2. 防守队员升级为全场紧逼防守。\n3. 增加第二名防守队员形成局部2v2。';
 
 export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   isOpen,
@@ -28,6 +35,13 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   const [title, setTitle] = useState(initialDrill?.title || '');
   const [description, setDescription] = useState(initialDrill?.description || '');
   const [selectedDiagramId, setSelectedDiagramId] = useState<string | null>(initialDrill?.diagramId || null);
+  const [customUploadedImage, setCustomUploadedImage] = useState<string | null>(initialDrill?.diagramImage || initialDrill?.previewImage || null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>('');
+  const [isDiagramModalOpen, setIsDiagramModalOpen] = useState<boolean>(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
+  const [previewPanelWidthMode, setPreviewPanelWidthMode] = useState<'standard' | 'wide'>('standard');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [selectedAges, setSelectedAges] = useState<string[]>(initialDrill?.ageGroups || ['8', '9', '10']);
   const [selectedTopic, setSelectedTopic] = useState<string>(initialDrill?.topic || '1v1');
   const [selectedStage, setSelectedStage] = useState<string>(initialDrill?.drillStage || 'skill');
@@ -39,27 +53,65 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   const [playerCount, setPlayerCount] = useState<number>(initialDrill?.playerCount || 8);
   const [ballCount, setBallCount] = useState<number>(initialDrill?.ballCount || 6);
   const [coneCount, setConeCount] = useState<number>(initialDrill?.coneCount || 8);
-  const [equipmentNotes, setEquipmentNotes] = useState<string>(initialDrill?.equipmentNotes || '标志盘8个、足球6个、分队背心2色');
+  const [equipmentNotes, setEquipmentNotes] = useState<string>(initialDrill?.equipmentNotes || '');
 
-  // Structured Coaching Fields (组织方法, 指导要点, 变化与进阶)
-  const [activeTemplateTab, setActiveTemplateTab] = useState<'template' | 'blank'>('template');
-  const [organization, setOrganization] = useState<string>(
-    initialDrill?.organization ||
-    '1. 在20x15米区域内，两端各设一条端线。\n2. 进攻队员从一端运球出发，防守队员在中间限制区内防守。\n3. 进攻队员可利用变速变向突破防守人，或与远端中立队员做撞墙配合后越过端线。\n4. 防守断球后反向进攻端线。'
-  );
-  const [coachingPoints, setCoachingPoints] = useState<string>(
-    initialDrill?.coachingPoints ||
-    '1. 运球推进时步频快、重心低，触球点位于脚背外侧或内侧。\n2. 接近防守人前预设变向假动作，拉开防守重心后瞬间加速。\n3. 与中立队友呼应，传球力量精准，出球后迅速前插。'
-  );
-  const [progressions, setProgressions] = useState<string>(
-    initialDrill?.progressions ||
-    '1. 限制进攻球员必须在3次触球内完成变向或传球。\n2. 防守队员升级为全场紧逼防守。\n3. 增加第二名防守队员形成局部2v2。'
-  );
+  // Structured Coaching Fields (组织方法, 指导要点, 变化与进阶) - Default to Blank Template
+  const [activeTemplateTab, setActiveTemplateTab] = useState<'template' | 'blank'>('blank');
+  const [organization, setOrganization] = useState<string>(initialDrill?.organization || '');
+  const [coachingPoints, setCoachingPoints] = useState<string>(initialDrill?.coachingPoints || '');
+  const [progressions, setProgressions] = useState<string>(initialDrill?.progressions || '');
 
   const [isPrivate, setIsPrivate] = useState<boolean>(initialDrill?.isPrivate ?? false);
-  const [showDiagramPicker, setShowDiagramPicker] = useState<boolean>(false);
 
-  if (!isOpen) return null;
+  // Synchronize and reset state when modal opens or initialDrill changes
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialDrill) {
+        setTitle(initialDrill.title || '');
+        setDescription(initialDrill.description || '');
+        setSelectedDiagramId(initialDrill.diagramId || null);
+        setCustomUploadedImage(initialDrill.diagramImage || initialDrill.previewImage || null);
+        setUploadedFileName('');
+        setSelectedAges(initialDrill.ageGroups && initialDrill.ageGroups.length > 0 ? initialDrill.ageGroups : ['8', '9', '10']);
+        setSelectedTopic(initialDrill.topic || '1v1');
+        setSelectedStage(initialDrill.drillStage || 'skill');
+        setDurationMinutes(initialDrill.durationMinutes || 15);
+        setFieldLength(initialDrill.fieldLength || 20);
+        setFieldWidth(initialDrill.fieldWidth || 15);
+        setPlayerCount(initialDrill.playerCount || 8);
+        setBallCount(initialDrill.ballCount || 6);
+        setConeCount(initialDrill.coneCount || 8);
+        setEquipmentNotes(initialDrill.equipmentNotes || '');
+        setOrganization(initialDrill.organization || '');
+        setCoachingPoints(initialDrill.coachingPoints || '');
+        setProgressions(initialDrill.progressions || '');
+        setIsPrivate(initialDrill.isPrivate ?? false);
+        setActiveTemplateTab(initialDrill.organization ? 'template' : 'blank');
+      } else {
+        // Brand new drill item - clean all inputs with blank template default
+        setTitle('');
+        setDescription('');
+        setSelectedDiagramId(null);
+        setCustomUploadedImage(null);
+        setUploadedFileName('');
+        setSelectedAges(['8', '9', '10']);
+        setSelectedTopic('1v1');
+        setSelectedStage('skill');
+        setDurationMinutes(15);
+        setFieldLength(20);
+        setFieldWidth(15);
+        setPlayerCount(8);
+        setBallCount(6);
+        setConeCount(8);
+        setEquipmentNotes('');
+        setOrganization('');
+        setCoachingPoints('');
+        setProgressions('');
+        setIsPrivate(false);
+        setActiveTemplateTab('blank');
+      }
+    }
+  }, [isOpen, initialDrill]);
 
   const toggleAge = (age: string) => {
     if (selectedAges.includes(age)) {
@@ -70,6 +122,60 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   };
 
   const selectedDiagram = existingDiagrams.find(d => d.id === selectedDiagramId);
+  const activeDrillOrDiagram = selectedDiagram || initialDrill;
+
+  // Handle Selection from Diagram Library Modal
+  const handleSelectDiagramFromModal = (diagram: DrillDesign) => {
+    setSelectedDiagramId(diagram.id);
+    setCustomUploadedImage(null); // Clear custom upload when choosing from library
+    
+    // Auto sync equipment counts if present in diagram
+    if (diagram.elements && diagram.elements.length > 0) {
+      const pCount = diagram.elements.filter(e => 
+        e.type.startsWith('Player') || e.type === 'Coach' || e.type === 'Referee'
+      ).length;
+      const bCount = diagram.elements.filter(e => e.type === 'Ball').length;
+      const cCount = diagram.elements.filter(e => e.type === 'Cone' || e.type === 'Marker').length;
+      if (pCount > 0) setPlayerCount(pCount);
+      if (bCount > 0) setBallCount(bCount);
+      if (cCount > 0) setConeCount(cCount);
+    }
+    if (diagram.fieldLength) setFieldLength(diagram.fieldLength);
+    if (diagram.fieldWidth) setFieldWidth(diagram.fieldWidth);
+  };
+
+  // Handle local device image file upload
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择有效的图片文件 (PNG, JPG, JPEG, WEBP, SVG 等)');
+      return;
+    }
+
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const result = uploadEvent.target?.result as string;
+      if (result) {
+        setCustomUploadedImage(result);
+        setSelectedDiagramId(null); // Reset library id since user uploaded a custom file
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset file input value to allow re-uploading same file name if needed
+    e.target.value = '';
+  };
+
+  // Clear diagram / image
+  const handleClearDiagram = () => {
+    setSelectedDiagramId(null);
+    setCustomUploadedImage(null);
+    setUploadedFileName('');
+  };
+
+  if (!isOpen) return null;
 
   const handleSave = (publish = true) => {
     if (!title.trim()) {
@@ -82,19 +188,22 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
       .map(s => s.trim())
       .filter(Boolean);
 
+    const finalPreviewImage = customUploadedImage || selectedDiagram?.previewImage || initialDrill?.previewImage;
+
     const drillItem: DrillDesign = {
       id: initialDrill?.id || `drill-${Date.now()}`,
       title: title.trim(),
       description: description.trim(),
       category: 'drill_item',
       contentType: 'drill',
-      pitchType: selectedDiagram?.pitchType || 'Midfield',
-      pitchTheme: selectedDiagram?.pitchTheme || 'Grass',
-      elements: selectedDiagram?.elements || [],
-      lines: selectedDiagram?.lines || [],
-      keyframes: selectedDiagram?.keyframes || [],
-      previewImage: selectedDiagram?.previewImage || initialDrill?.previewImage,
-      diagramId: selectedDiagramId || undefined,
+      pitchType: selectedDiagram?.pitchType || initialDrill?.pitchType || 'Midfield',
+      pitchTheme: selectedDiagram?.pitchTheme || initialDrill?.pitchTheme || 'Grass',
+      elements: selectedDiagram ? selectedDiagram.elements : (initialDrill?.elements || []),
+      lines: selectedDiagram ? selectedDiagram.lines : (initialDrill?.lines || []),
+      keyframes: selectedDiagram ? selectedDiagram.keyframes : (initialDrill?.keyframes || []),
+      previewImage: finalPreviewImage,
+      diagramImage: customUploadedImage || undefined,
+      diagramId: selectedDiagramId || initialDrill?.diagramId || undefined,
       keyPoints: keyPointsArray,
       ageGroups: selectedAges,
       topic: selectedTopic,
@@ -121,449 +230,784 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
     onClose();
   };
 
+  const hasDiagramOrImage = !!selectedDiagram || !!customUploadedImage || (!!initialDrill?.previewImage && !selectedDiagramId && !customUploadedImage);
+
   return (
-    <div className="fixed inset-0 z-50 bg-gray-950 text-gray-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
-      
-      {/* Top Fullscreen Header Navigation */}
-      <div className="px-6 py-3 bg-gray-900 border-b border-gray-800 flex items-center justify-between shrink-0 select-none">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
-          >
-            <X className="w-4 h-4" />
-            <span>返回/退出</span>
-          </button>
-          
-          <div className="h-5 w-px bg-gray-800" />
-
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-bvb-yellow text-black flex items-center justify-center font-black text-xs shadow-sm">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-black text-white flex items-center gap-2">
-                <span>{initialDrill ? '编辑训练项' : '创建训练项（全屏模式）'}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  球场视窗已开启
-                </span>
-              </h2>
-            </div>
-          </div>
-        </div>
-
-        {/* Header Right Actions */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setIsPrivate(!isPrivate)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
-              isPrivate
-                ? 'bg-gray-800 border-gray-700 text-gray-400'
-                : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
-            }`}
-          >
-            {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            <span>{isPrivate ? '仅自己可见' : '公开至教案库'}</span>
-          </button>
-
-          <button
-            onClick={() => handleSave(false)}
-            className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs rounded-xl border border-gray-700 transition-colors shadow-sm flex items-center gap-1.5"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>保存草稿</span>
-          </button>
-
-          <button
-            onClick={() => handleSave(true)}
-            className="px-4 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-black font-black text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-1.5"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>立即发布训练项</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Fullscreen Split Workspace */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+    <>
+      <div className="fixed inset-0 z-50 bg-gray-950 text-gray-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
         
-        {/* Left/Center Area: Tactical Football Pitch Canvas Display (Image 2 style) */}
-        <div className="flex-1 bg-gray-900 flex flex-col relative overflow-hidden">
-          
-          {/* Canvas Top Bar */}
-          <div className="p-3 px-6 bg-gray-950/90 border-b border-gray-800/80 flex items-center justify-between flex-wrap gap-2 z-20">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black text-gray-200 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-emerald-400" />
-                <span>关联战术示意图 / 动态场地</span>
-              </span>
-              {selectedDiagram && (
-                <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2.5 py-0.5 rounded-md border border-emerald-800/60">
-                  {selectedDiagram.title}
-                </span>
-              )}
-            </div>
+        {/* Hidden File Input for Device Image Upload */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageFileChange}
+        />
+
+        {/* Top Fullscreen Header Navigation */}
+        <div className="px-6 py-3 bg-gray-900 border-b border-gray-800 flex items-center justify-between shrink-0 select-none">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+            >
+              <X className="w-4 h-4" />
+              <span>返回/退出</span>
+            </button>
+            
+            <div className="h-5 w-px bg-gray-800" />
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowDiagramPicker(!showDiagramPicker)}
-                className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl border border-gray-700 transition-colors shadow-sm"
-              >
-                {showDiagramPicker ? '收起图库' : '从我的示意图库选择'}
-              </button>
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenPitchSelector();
-                }}
-                className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-colors shadow-sm flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>新建示意图</span>
-              </button>
+              <div className="w-7 h-7 rounded-lg bg-bvb-yellow text-black flex items-center justify-center font-black text-xs shadow-sm">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black text-white flex items-center gap-2">
+                  <span>{initialDrill ? '编辑训练项' : '创建训练项（全屏模式）'}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    球场视窗已开启
+                  </span>
+                </h2>
+              </div>
             </div>
           </div>
 
-          {/* Expandable Diagram Picker Drawer */}
-          {showDiagramPicker && (
-            <div className="p-4 bg-gray-950 border-b border-gray-800 z-30 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-48 overflow-y-auto">
-              {existingDiagrams.map(d => (
-                <div
-                  key={d.id}
-                  onClick={() => {
-                    setSelectedDiagramId(d.id);
-                    setShowDiagramPicker(false);
-                  }}
-                  className={`p-2 rounded-xl border cursor-pointer transition-all ${
-                    selectedDiagramId === d.id
-                      ? 'border-emerald-500 bg-emerald-950/50 ring-2 ring-emerald-500/30'
-                      : 'border-gray-800 bg-gray-900 hover:border-gray-700'
-                  }`}
-                >
-                  <div className="aspect-[16/10] bg-gray-950 rounded-lg overflow-hidden mb-1 flex items-center justify-center">
-                    {d.previewImage ? (
-                      <img src={d.previewImage} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <PitchSvgRenderer pitchType={d.pitchType} pitchTheme={d.pitchTheme} className="w-full h-full" />
-                    )}
-                  </div>
-                  <span className="text-[11px] font-bold text-gray-300 block truncate">{d.title}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Header Right Actions */}
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setIsPrivate(!isPrivate)}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                isPrivate
+                  ? 'bg-gray-800 border-gray-700 text-gray-400'
+                  : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+              }`}
+            >
+              {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span>{isPrivate ? '仅自己可见' : '公开至教案库'}</span>
+            </button>
 
-          {/* Pitch Display Viewport */}
-          <div className="flex-1 flex items-center justify-center p-6 overflow-auto relative">
+            <button
+              onClick={() => handleSave(false)}
+              className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs rounded-xl border border-gray-700 transition-colors shadow-sm flex items-center gap-1.5"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>保存草稿</span>
+            </button>
+
+            <button
+              onClick={() => handleSave(true)}
+              className="px-4 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-black font-black text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-1.5"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>立即发布训练项</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Main Fullscreen Split Workspace */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          
+          {/* Left Companion Area: Tactical Pitch Diagram Preview & High-Fidelity Workspace */}
+          <div className={`w-full ${previewPanelWidthMode === 'wide' ? 'lg:w-[580px] xl:w-[680px] 2xl:w-[780px]' : 'lg:w-[460px] xl:w-[540px] 2xl:w-[620px]'} bg-gray-950 border-r border-gray-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar transition-all duration-200`}>
             
-            {/* Top-Left pitch overlay badge */}
-            <div className="absolute top-4 left-6 z-10 flex items-center gap-2">
-              <span className="px-2.5 py-1 bg-gray-950/80 border border-gray-800 rounded-lg text-xs font-bold text-gray-300 backdrop-blur-sm">
-                📐 场地规格: {fieldLength}米 × {fieldWidth}米
-              </span>
-              <span className="px-2.5 py-1 bg-gray-950/80 border border-gray-800 rounded-lg text-xs font-bold text-gray-300 backdrop-blur-sm">
-                👥 人数: {playerCount}人
-              </span>
+            {/* Companion Top Bar */}
+            <div className="p-3.5 px-4 bg-gray-900/90 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2 sticky top-0 z-20 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-emerald-400" />
+                <span className="text-xs font-black text-gray-200">战术示意图</span>
+                <span className="text-[10px] text-gray-500 font-mono">
+                  {previewPanelWidthMode === 'wide' ? '(宽屏视野)' : '(标准视野)'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {/* Toggle Width Mode */}
+                <button
+                  type="button"
+                  onClick={() => setPreviewPanelWidthMode(prev => prev === 'wide' ? 'standard' : 'wide')}
+                  className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm flex items-center gap-1"
+                  title={previewPanelWidthMode === 'wide' ? '切换为标准宽度' : '拓展为更宽视野'}
+                >
+                  <MoveHorizontal className="w-3 h-3 text-emerald-400" />
+                  <span>{previewPanelWidthMode === 'wide' ? '适中' : '更宽'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsLightboxOpen(true)}
+                  className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm flex items-center gap-1"
+                  title="全屏超清放大查看"
+                >
+                  <ZoomIn className="w-3 h-3 text-blue-400" />
+                  <span>放大</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDiagramModalOpen(true)}
+                  className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm"
+                  title="从示意图库中选择"
+                >
+                  图库
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm"
+                  title="上传电脑中的图片"
+                >
+                  上传
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenPitchSelector();
+                  }}
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm flex items-center gap-1"
+                  title="新建战术图"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>新建</span>
+                </button>
+              </div>
             </div>
 
-            {/* Tactical Pitch Box */}
-            <div className="w-[720px] h-[480px] sm:w-[780px] sm:h-[520px] relative rounded-2xl overflow-hidden shadow-2xl border-4 border-gray-800 bg-gray-950 shrink-0">
-              <PitchSvgRenderer
-                pitchType={selectedDiagram?.pitchType || 'Midfield'}
-                pitchTheme={selectedDiagram?.pitchTheme || 'Grass'}
-                showGrid={true}
-                className="w-full h-full"
-              />
-
-              {/* Associated Diagram Elements Preview */}
-              {selectedDiagram && selectedDiagram.elements && (
-                <div className="absolute inset-0 pointer-events-none">
-                  {selectedDiagram.elements.map(el => (
-                    <div
-                      key={el.id}
-                      className="absolute -translate-x-1/2 -translate-y-1/2 flex items-center justify-center"
-                      style={{
-                        left: `${el.x}%`,
-                        top: `${el.y}%`,
-                        transform: `translate(-50%, -50%) rotate(${el.rotation || 0}deg) scale(${el.scale || 1})`
-                      }}
+            {/* High-Fidelity Tactical Diagram Preview Area */}
+            <div className="p-4 space-y-4 flex flex-col items-center">
+              
+              {/* Diagram Card Container */}
+              <div className="w-full bg-gray-900/90 rounded-2xl p-3.5 border border-gray-800 shadow-xl flex flex-col items-center">
+                
+                {/* Diagram Title & Type Badge */}
+                <div className="w-full flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-800 text-xs font-bold">
+                  <span className="text-emerald-400 truncate max-w-[240px]">
+                    {customUploadedImage 
+                      ? (uploadedFileName || '设备中上传的示意图') 
+                      : (selectedDiagram?.title || initialDrill?.title || '战术示意图')}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-300 bg-gray-950 px-2 py-0.5 rounded-md border border-gray-800 text-[10.5px]">
+                      {customUploadedImage ? '本地图片' : (activeDrillOrDiagram?.pitchType || '标准场地')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsLightboxOpen(true)}
+                      className="p-1 hover:bg-gray-800 text-gray-400 hover:text-emerald-400 rounded-md transition-colors"
+                      title="点击全屏放大"
                     >
-                      <div
-                        className="w-7 h-7 rounded-full border-2 border-white shadow-md flex items-center justify-center font-black text-[11px] text-white"
-                        style={{ backgroundColor: el.color || '#eab308' }}
-                      >
-                        {el.label || ''}
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* High-Proportion Diagram Renderer with Click-to-Zoom */}
+                <div 
+                  onClick={() => setIsLightboxOpen(true)}
+                  className="w-full aspect-[16/10] flex items-center justify-center overflow-hidden rounded-xl bg-gray-950 border border-gray-800 relative cursor-zoom-in group shadow-inner"
+                  title="点击查看全屏超清大图"
+                >
+                  {customUploadedImage ? (
+                    <img 
+                      src={customUploadedImage} 
+                      alt="Uploaded Diagram" 
+                      className="w-full h-full object-contain bg-black/40 group-hover:scale-[1.02] transition-transform duration-200"
+                    />
+                  ) : activeDrillOrDiagram?.previewImage ? (
+                    <img 
+                      src={activeDrillOrDiagram.previewImage} 
+                      alt="" 
+                      className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
+                    />
+                  ) : activeDrillOrDiagram?.elements && activeDrillOrDiagram.elements.length > 0 ? (
+                    <DiagramPreviewBox
+                      diagram={activeDrillOrDiagram}
+                      pitchType={activeDrillOrDiagram?.pitchType || 'Midfield'}
+                      pitchTheme={activeDrillOrDiagram?.pitchTheme || 'Grass'}
+                      elements={activeDrillOrDiagram?.elements}
+                      lines={activeDrillOrDiagram?.lines}
+                      previewImage={activeDrillOrDiagram?.previewImage}
+                      showGrid={true}
+                      size="auto"
+                      className="w-full max-w-full h-full group-hover:scale-[1.01] transition-transform duration-200"
+                    />
+                  ) : (
+                    <PitchSvgRenderer
+                      pitchType={activeDrillOrDiagram?.pitchType || 'Midfield'}
+                      pitchTheme={activeDrillOrDiagram?.pitchTheme || 'Grass'}
+                      className="w-full h-full group-hover:scale-[1.01] transition-transform duration-200"
+                    />
+                  )}
+
+                  {/* Hover Floating Hint */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 backdrop-blur-sm text-white text-xs font-bold px-3 py-1.5 rounded-full border border-gray-700 flex items-center gap-1.5 shadow-2xl">
+                      <ZoomIn className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>点击全屏超清放大</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pitch Spec Cards Below Diagram */}
+                <div className="w-full mt-3 grid grid-cols-4 gap-2 text-xs font-bold">
+                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
+                    <span className="text-gray-500 text-[10px] mb-0.5">场地规格</span>
+                    <span className="text-amber-400 font-mono text-[11px]">{fieldLength}×{fieldWidth}m</span>
+                  </div>
+                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
+                    <span className="text-gray-500 text-[10px] mb-0.5">参训人数</span>
+                    <span className="text-emerald-400 font-mono text-[11px]">{playerCount}人</span>
+                  </div>
+                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
+                    <span className="text-gray-500 text-[10px] mb-0.5">器材配置</span>
+                    <span className="text-cyan-400 font-mono text-[11px]">{ballCount}球 · {coneCount}盘</span>
+                  </div>
+                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
+                    <span className="text-gray-500 text-[10px] mb-0.5">训练时长</span>
+                    <span className="text-blue-400 font-mono text-[11px]">{durationMinutes}分钟</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick tips */}
+              <div className="w-full p-3 bg-gray-900/40 rounded-xl border border-gray-800/60 text-xs text-gray-400 leading-relaxed flex items-start gap-2">
+                <span className="text-emerald-400 font-bold shrink-0">💡</span>
+                <span>
+                  左侧示意图已自适应高清晰度展示；点击示意图或右上角放大镜可进入全屏高分辨率视图。
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Main Area: Primary Form Editor Workspace (Spacious, Clear & Fast) */}
+          <div className="flex-1 bg-gray-900 flex flex-col overflow-y-auto custom-scrollbar">
+            
+            <div className="p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-6">
+              
+              {/* Section 1: Title & Description */}
+              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-800/80 pb-3">
+                  <div className="w-2 h-4 bg-emerald-500 rounded-full" />
+                  <h3 className="text-sm font-black text-white">训练项基本信息</h3>
+                </div>
+
+                <div className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-black text-gray-300 mb-1.5">
+                      训练项标题 <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={e => setTitle(e.target.value)}
+                      placeholder="例如: 技能: 1v1+1 (回避防守人) 运球变向加速突破训练"
+                      className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm font-bold text-white focus:border-emerald-500 focus:outline-none transition-all placeholder:text-gray-600 shadow-inner"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-gray-300 mb-1.5">
+                      训练项简介与核心目标
+                    </label>
+                    <textarea
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      placeholder="简述该训练项的训练目标、针对痛点与关键战术意图..."
+                      rows={2}
+                      className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all resize-none placeholder:text-gray-600 leading-relaxed shadow-inner"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Diagram Selection Area (Image 2 style) */}
+              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-4 bg-emerald-400 rounded-full" />
+                    <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+                      <span>示意图</span>
+                      <div className="group relative cursor-pointer">
+                        <HelpCircle className="w-3.5 h-3.5 text-gray-400 hover:text-gray-200 transition-colors" />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 text-[11px] text-gray-300 rounded-lg shadow-xl z-30 pointer-events-none">
+                          如果添加仅自己可见的示意图，取消仅自己可见后请重新添加
+                        </div>
+                      </div>
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenPitchSelector();
+                    }}
+                    className="text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-colors flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>创建示意图</span>
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-gray-400">
+                  如果添加仅自己可见的示意图，取消仅自己可见后请重新添加
+                </p>
+
+                {/* If already selected or uploaded, show high-fidelity active card */}
+                {hasDiagramOrImage ? (
+                  <div className="p-4 rounded-2xl bg-gray-900/90 border border-emerald-500/40 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="w-24 h-16 rounded-xl bg-gray-950 border border-gray-800 overflow-hidden shrink-0 flex items-center justify-center">
+                        {customUploadedImage ? (
+                          <img src={customUploadedImage} alt="Uploaded" className="w-full h-full object-cover" />
+                        ) : activeDrillOrDiagram?.previewImage ? (
+                          <img src={activeDrillOrDiagram.previewImage} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <PitchSvgRenderer pitchType={activeDrillOrDiagram?.pitchType || 'Midfield'} pitchTheme="Grass" className="w-full h-full" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0">
+                        <h4 className="text-xs sm:text-sm font-black text-white truncate mb-1">
+                          {customUploadedImage 
+                            ? (uploadedFileName || '设备中上传的示意图') 
+                            : (selectedDiagram?.title || initialDrill?.title || '已关联战术图')}
+                        </h4>
+                        <div className="flex items-center gap-2 text-[10px] text-gray-400 flex-wrap">
+                          <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                            {customUploadedImage ? '设备图片' : (selectedDiagram?.pitchType || '标准场地')}
+                          </span>
+                          <span>规格: {fieldLength}×{fieldWidth}米</span>
+                          <span>·</span>
+                          <span>{playerCount}人</span>
+                        </div>
                       </div>
                     </div>
-                  ))}
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setIsDiagramModalOpen(true)}
+                        className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl border border-gray-700 transition-colors shadow-sm"
+                      >
+                        更换示意图
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl border border-gray-700 transition-colors shadow-sm"
+                      >
+                        重新上传
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearDiagram}
+                        className="p-1.5 bg-gray-800/80 hover:bg-red-950/50 hover:text-red-400 text-gray-400 rounded-xl border border-gray-700 hover:border-red-800/60 transition-colors"
+                        title="移除示意图"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Two-Card Choice Grid (Image 2 style) */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    
+                    {/* Left Card: Upload Device Image */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-emerald-500/80 bg-gray-900/60 hover:bg-gray-900 transition-all flex flex-col items-center justify-center gap-2.5 group cursor-pointer"
+                    >
+                      <div className="w-11 h-11 rounded-2xl bg-gray-800 group-hover:bg-emerald-950/80 text-gray-300 group-hover:text-emerald-400 flex items-center justify-center transition-colors border border-gray-700 group-hover:border-emerald-700/60">
+                        <ImageIcon className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-black text-gray-200 group-hover:text-emerald-400 transition-colors">
+                        点击添加设备中的图片
+                      </span>
+                      <span className="text-[10px] text-gray-500">
+                        支持 PNG、JPG、WEBP、SVG 等格式图片
+                      </span>
+                    </button>
+
+                    {/* Right Card: Select Created Diagram */}
+                    <button
+                      type="button"
+                      onClick={() => setIsDiagramModalOpen(true)}
+                      className="p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-emerald-500/80 bg-gray-900/60 hover:bg-gray-900 transition-all flex flex-col items-center justify-center gap-2.5 group cursor-pointer"
+                    >
+                      <div className="w-11 h-11 rounded-2xl bg-gray-800 group-hover:bg-emerald-950/80 text-gray-300 group-hover:text-emerald-400 flex items-center justify-center transition-colors border border-gray-700 group-hover:border-emerald-700/60">
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <span className="text-xs font-black text-gray-200 group-hover:text-emerald-400 transition-colors">
+                        点击选择已创建的示意图
+                      </span>
+                      <span className="text-[10px] text-gray-500">
+                        按最新创建排序 · 支持官方与个人库快速检索
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Age, Topic & Stage Classification */}
+              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-5">
+                <div className="flex items-center gap-2 border-b border-gray-800/80 pb-3">
+                  <div className="w-2 h-4 bg-bvb-yellow rounded-full" />
+                  <h3 className="text-sm font-black text-white">分类与属性配置</h3>
                 </div>
+
+                {/* Age selector */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black text-gray-300">适用年龄段 (岁)</span>
+                    <span className="text-[11px] text-gray-400">已选: {selectedAges.join(', ')} 岁</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {AGE_GROUPS.map(age => {
+                      const isSelected = selectedAges.includes(age);
+                      return (
+                        <button
+                          key={age}
+                          type="button"
+                          onClick={() => toggleAge(age)}
+                          className={`min-w-[34px] h-8 px-2 rounded-xl font-black text-xs transition-all ${
+                            isSelected
+                              ? 'bg-bvb-yellow text-black shadow-md scale-105 ring-2 ring-yellow-400/40'
+                              : 'bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800'
+                          }`}
+                        >
+                          {age}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Topic selector */}
+                <div>
+                  <span className="block text-xs font-black text-gray-300 mb-2">训练主题</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {TRAINING_TOPICS.map(topic => {
+                      const isSelected = selectedTopic === topic;
+                      return (
+                        <button
+                          key={topic}
+                          type="button"
+                          onClick={() => setSelectedTopic(topic)}
+                          className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/40'
+                              : 'bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800'
+                          }`}
+                        >
+                          {topic}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Training Stage */}
+                <div>
+                  <span className="block text-xs font-black text-gray-300 mb-2">训练环节</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {DRILL_STAGES.map(stage => {
+                      const isSelected = selectedStage === stage.id;
+                      return (
+                        <button
+                          key={stage.id}
+                          type="button"
+                          onClick={() => setSelectedStage(stage.id)}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
+                            isSelected
+                              ? `${stage.color} ring-2 ring-emerald-500/40 text-white shadow-md`
+                              : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
+                          }`}
+                        >
+                          <span>{stage.name}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Basic Numeric Parameters */}
+              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-800/80 pb-3">
+                  <div className="w-2 h-4 bg-blue-500 rounded-full" />
+                  <h3 className="text-sm font-black text-white">场地规格与器材配置</h3>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
+                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">预计时长(分)</label>
+                    <input
+                      type="number"
+                      value={durationMinutes}
+                      onChange={e => setDurationMinutes(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
+                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">场地长(米)</label>
+                    <input
+                      type="number"
+                      value={fieldLength}
+                      onChange={e => setFieldLength(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
+                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">场地宽(米)</label>
+                    <input
+                      type="number"
+                      value={fieldWidth}
+                      onChange={e => setFieldWidth(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
+                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">队员数(人)</label>
+                    <input
+                      type="number"
+                      value={playerCount}
+                      onChange={e => setPlayerCount(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-emerald-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
+                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">足球数(个)</label>
+                    <input
+                      type="number"
+                      value={ballCount}
+                      onChange={e => setBallCount(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
+                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">标志盘(个)</label>
+                    <input
+                      type="number"
+                      value={coneCount}
+                      onChange={e => setConeCount(parseInt(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-amber-400 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-gray-300 block mb-1.5">所需器材及背心备注</label>
+                  <input
+                    type="text"
+                    value={equipmentNotes}
+                    onChange={e => setEquipmentNotes(e.target.value)}
+                    placeholder="例如: 标志盘8个、足球6个、分队背心2色、敏捷梯1条"
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-medium text-gray-200 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Section 5: Teaching Steps & Content Breakdown */}
+              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-5">
+                <div className="flex items-center justify-between border-b border-gray-800/80 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-4 bg-purple-500 rounded-full" />
+                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-emerald-400" />
+                      <span>教案结构与指导要点</span>
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-1 bg-gray-900 p-1 rounded-xl text-xs font-bold border border-gray-800">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTemplateTab('template');
+                        if (!organization) setOrganization(STANDARD_ORGANIZATION);
+                        if (!coachingPoints) setCoachingPoints(STANDARD_COACHING_POINTS);
+                        if (!progressions) setProgressions(STANDARD_PROGRESSIONS);
+                      }}
+                      className={`px-3 py-1 rounded-lg transition-colors ${
+                        activeTemplateTab === 'template' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                      }`}
+                    >
+                      标准教案模板
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTemplateTab('blank');
+                        setOrganization('');
+                        setCoachingPoints('');
+                        setProgressions('');
+                      }}
+                      className={`px-3 py-1 rounded-lg transition-colors ${
+                        activeTemplateTab === 'blank' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                      }`}
+                    >
+                      空白模板
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-gray-200 mb-1.5 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60 flex items-center justify-center text-[10px]">1</span>
+                      <span>组织方法 (场地布置与步骤流程)</span>
+                    </label>
+                    <textarea
+                      value={organization}
+                      onChange={e => setOrganization(e.target.value)}
+                      rows={4}
+                      placeholder="详细列出每一步训练的站位与跑动组织流程..."
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-inner"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-gray-200 mb-1.5 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-bvb-yellow/20 text-yellow-300 border border-yellow-500/40 flex items-center justify-center text-[10px]">2</span>
+                      <span>指导要点 (技术关键与心理意识)</span>
+                    </label>
+                    <textarea
+                      value={coachingPoints}
+                      onChange={e => setCoachingPoints(e.target.value)}
+                      rows={4}
+                      placeholder="教练员指导口令与关键技术纠错要点..."
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-inner"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-black text-gray-200 mb-1.5 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-blue-950 text-blue-400 border border-blue-800/60 flex items-center justify-center text-[10px]">3</span>
+                      <span>变化与进阶 (升降级与防守强度调整)</span>
+                    </label>
+                    <textarea
+                      value={progressions}
+                      onChange={e => setProgressions(e.target.value)}
+                      rows={3}
+                      placeholder="进阶规则（如触球次数限制、增加防守人、弱侧跑位）..."
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-inner"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* Independent Select Diagram Modal (Image 3 style) */}
+      <SelectDiagramModal
+        isOpen={isDiagramModalOpen}
+        onClose={() => setIsDiagramModalOpen(false)}
+        onSelect={handleSelectDiagramFromModal}
+        existingDiagrams={existingDiagrams}
+        selectedDiagramId={selectedDiagramId}
+        onOpenPitchSelector={() => {
+          setIsDiagramModalOpen(false);
+          onClose();
+          onOpenPitchSelector();
+        }}
+      />
+
+      {/* High-Resolution Fullscreen Diagram Lightbox / Modal */}
+      {isLightboxOpen && (
+        <div 
+          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <div 
+            className="relative max-w-6xl w-full max-h-[92vh] bg-gray-950 border border-gray-800 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top Lightbox Header */}
+            <div className="w-full flex items-center justify-between pb-3 mb-3 border-b border-gray-800">
+              <div className="flex items-center gap-2.5">
+                <ImageIcon className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-black text-white">
+                  {customUploadedImage 
+                    ? (uploadedFileName || '设备中上传的示意图') 
+                    : (selectedDiagram?.title || initialDrill?.title || '战术示意图全屏预览')}
+                </h3>
+                <span className="text-xs text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/80">
+                  {customUploadedImage ? '本地图片' : (activeDrillOrDiagram?.pitchType || '标准场地')}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsLightboxOpen(false)}
+                className="p-2 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl transition-colors"
+                title="关闭预览"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Lightbox Large Image Display */}
+            <div className="w-full flex-1 max-h-[70vh] flex items-center justify-center overflow-hidden rounded-2xl bg-gray-900 border border-gray-800/80 p-2">
+              {customUploadedImage ? (
+                <img 
+                  src={customUploadedImage} 
+                  alt="Uploaded Diagram Fullscreen" 
+                  className="max-w-full max-h-[66vh] object-contain rounded-xl shadow-lg"
+                />
+              ) : activeDrillOrDiagram?.previewImage ? (
+                <img 
+                  src={activeDrillOrDiagram.previewImage} 
+                  alt="" 
+                  className="max-w-full max-h-[66vh] object-contain rounded-xl shadow-lg"
+                />
+              ) : activeDrillOrDiagram?.elements && activeDrillOrDiagram.elements.length > 0 ? (
+                <div className="w-full h-full max-h-[66vh] flex items-center justify-center">
+                  <DiagramPreviewBox
+                    diagram={activeDrillOrDiagram}
+                    pitchType={activeDrillOrDiagram?.pitchType || 'Midfield'}
+                    pitchTheme={activeDrillOrDiagram?.pitchTheme || 'Grass'}
+                    elements={activeDrillOrDiagram?.elements}
+                    lines={activeDrillOrDiagram?.lines}
+                    previewImage={activeDrillOrDiagram?.previewImage}
+                    showGrid={true}
+                    size="responsive"
+                    className="w-auto h-full max-h-[66vh] aspect-[16/10]"
+                  />
+                </div>
+              ) : (
+                <PitchSvgRenderer
+                  pitchType={activeDrillOrDiagram?.pitchType || 'Midfield'}
+                  pitchTheme={activeDrillOrDiagram?.pitchTheme || 'Grass'}
+                  className="w-full h-full max-h-[66vh]"
+                />
               )}
             </div>
 
-            {/* Bottom floating pitch info */}
-            <div className="absolute bottom-4 left-6 z-10 flex items-center gap-2 text-xs font-bold text-gray-400 bg-gray-950/80 px-3 py-1.5 rounded-xl border border-gray-800">
-              <span>⚽ 足球: {ballCount}个</span>
-              <span>·</span>
-              <span>🔶 标志盘: {coneCount}个</span>
-              <span>·</span>
-              <span>⏱️ 预计时长: {durationMinutes}分钟</span>
+            {/* Bottom Spec Pills */}
+            <div className="w-full mt-3.5 flex items-center justify-between flex-wrap gap-2 text-xs font-bold text-gray-400">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span>场地: <strong className="text-amber-400">{fieldLength}×{fieldWidth}米</strong></span>
+                <span>·</span>
+                <span>参训人数: <strong className="text-emerald-400">{playerCount}人</strong></span>
+                <span>·</span>
+                <span>器材: <strong className="text-cyan-400">{ballCount}球 / {coneCount}标志盘</strong></span>
+                <span>·</span>
+                <span>训练时长: <strong className="text-blue-400">{durationMinutes}分钟</strong></span>
+              </div>
+
+              <div className="text-[11px] text-gray-500">
+                点击背景或右上角关闭全屏
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Right Sidebar Area: Structured Drill Parameters & Teaching Steps */}
-        <div className="w-full lg:w-[480px] bg-gray-950 border-l border-gray-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
-          
-          <div className="p-5 space-y-5">
-            
-            {/* Title & Description */}
-            <div className="space-y-2.5">
-              <div>
-                <label className="block text-xs font-black text-gray-300 mb-1">
-                  训练项标题 <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                  placeholder="例如: 技能: 1v1+1 (回避防守人) 运球变向加速突破训练"
-                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-bold text-white focus:border-emerald-500 focus:outline-none transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-gray-300 mb-1">训练项简介</label>
-                <textarea
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="简述该训练项的目标与针对的核心痛点..."
-                  rows={2}
-                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all resize-none"
-                />
-              </div>
-            </div>
-
-            {/* Age & Topic & Stage */}
-            <div className="space-y-3 bg-gray-900/60 p-3.5 rounded-2xl border border-gray-800">
-              {/* Age selector */}
-              <div>
-                <span className="block text-[11px] font-bold text-gray-400 mb-1.5">适用年龄段 (岁)</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {AGE_GROUPS.map(age => {
-                    const isSelected = selectedAges.includes(age);
-                    return (
-                      <button
-                        key={age}
-                        onClick={() => toggleAge(age)}
-                        className={`w-7 h-7 rounded-lg font-black text-xs transition-all ${
-                          isSelected
-                            ? 'bg-bvb-yellow text-black shadow-md scale-105'
-                            : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
-                        }`}
-                      >
-                        {age}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Topic selector */}
-              <div>
-                <span className="block text-[11px] font-bold text-gray-400 mb-1.5">训练主题</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {TRAINING_TOPICS.map(topic => {
-                    const isSelected = selectedTopic === topic;
-                    return (
-                      <button
-                        key={topic}
-                        onClick={() => setSelectedTopic(topic)}
-                        className={`px-2.5 py-1 rounded-lg font-bold text-xs transition-all ${
-                          isSelected
-                            ? 'bg-emerald-600 text-white shadow-sm'
-                            : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
-                        }`}
-                      >
-                        {topic}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Training Stage */}
-              <div>
-                <span className="block text-[11px] font-bold text-gray-400 mb-1.5">训练环节</span>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                  {DRILL_STAGES.map(stage => {
-                    const isSelected = selectedStage === stage.id;
-                    return (
-                      <button
-                        key={stage.id}
-                        onClick={() => setSelectedStage(stage.id)}
-                        className={`py-1.5 px-2 rounded-xl border text-[11px] font-black transition-all flex items-center justify-center gap-1 ${
-                          isSelected
-                            ? `${stage.color} ring-2 ring-emerald-500/30 text-white`
-                            : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
-                        }`}
-                      >
-                        <span>{stage.name}</span>
-                        {isSelected && <Check className="w-3 h-3" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Basic Numeric Parameters */}
-            <div className="bg-gray-900/60 p-3.5 rounded-2xl border border-gray-800 space-y-2.5">
-              <span className="text-[11px] font-bold text-gray-400 block">基础参数设置</span>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-1">时长(分)</label>
-                  <input
-                    type="number"
-                    value={durationMinutes}
-                    onChange={e => setDurationMinutes(parseInt(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-1">场地长(米)</label>
-                  <input
-                    type="number"
-                    value={fieldLength}
-                    onChange={e => setFieldLength(parseInt(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-1">场地宽(米)</label>
-                  <input
-                    type="number"
-                    value={fieldWidth}
-                    onChange={e => setFieldWidth(parseInt(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-1">队员数(人)</label>
-                  <input
-                    type="number"
-                    value={playerCount}
-                    onChange={e => setPlayerCount(parseInt(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-1">足球数(个)</label>
-                  <input
-                    type="number"
-                    value={ballCount}
-                    onChange={e => setBallCount(parseInt(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-gray-400 block mb-1">标志盘(个)</label>
-                  <input
-                    type="number"
-                    value={coneCount}
-                    onChange={e => setConeCount(parseInt(e.target.value) || 0)}
-                    className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-bold text-white focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-[10px] text-gray-400 block mb-1">所需器材及背心备注</label>
-                <input
-                  type="text"
-                  value={equipmentNotes}
-                  onChange={e => setEquipmentNotes(e.target.value)}
-                  placeholder="例如: 标志盘8个、足球6个、分队背心2色"
-                  className="w-full px-2.5 py-1.5 bg-gray-900 border border-gray-700 rounded-lg text-xs font-medium text-gray-200 focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-            </div>
-
-            {/* Teaching Steps: 组织方法, 指导要点, 变化与进阶 */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-800 pb-2">
-                <span className="text-xs font-black text-gray-200 flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-emerald-400" />
-                  <span>教案要点结构</span>
-                </span>
-                <div className="flex items-center gap-1 bg-gray-900 p-0.5 rounded-lg text-xs font-bold">
-                  <button
-                    onClick={() => setActiveTemplateTab('template')}
-                    className={`px-2.5 py-0.5 rounded-md transition-colors ${
-                      activeTemplateTab === 'template' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400'
-                    }`}
-                  >
-                    标准教案
-                  </button>
-                  <button
-                    onClick={() => {
-                      setActiveTemplateTab('blank');
-                      setOrganization('');
-                      setCoachingPoints('');
-                      setProgressions('');
-                    }}
-                    className={`px-2.5 py-0.5 rounded-md transition-colors ${
-                      activeTemplateTab === 'blank' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400'
-                    }`}
-                  >
-                    空白模板
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-gray-300 mb-1">
-                  1. 组织方法 (场地布置与步骤流程)
-                </label>
-                <textarea
-                  value={organization}
-                  onChange={e => setOrganization(e.target.value)}
-                  rows={3}
-                  placeholder="详细列出每一步训练的站位与跑动组织流程..."
-                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-gray-300 mb-1">
-                  2. 指导要点 (技术关键与心理意识)
-                </label>
-                <textarea
-                  value={coachingPoints}
-                  onChange={e => setCoachingPoints(e.target.value)}
-                  rows={3}
-                  placeholder="教练员指导口令与关键技术纠错要点..."
-                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-black text-gray-300 mb-1">
-                  3. 变化与进阶 (升降级与防守强度调整)
-                </label>
-                <textarea
-                  value={progressions}
-                  onChange={e => setProgressions(e.target.value)}
-                  rows={2}
-                  placeholder="进阶规则（如触球次数限制、增加防守人、弱侧跑位）..."
-                  className="w-full px-3.5 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed"
-                />
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-      </div>
-    </div>
+      )}
+    </>
   );
 };

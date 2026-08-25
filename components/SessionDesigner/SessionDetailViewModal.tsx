@@ -1,6 +1,7 @@
 import React from 'react';
 import { DrillDesign } from '../../types';
 import { PitchSvgRenderer } from './PitchSvgRenderer';
+import { DiagramPreviewBox } from './DiagramPreviewBox';
 import {
   X, Printer, Layers, BookOpen
 } from 'lucide-react';
@@ -86,12 +87,17 @@ export const SessionDetailViewModal: React.FC<SessionDetailViewModalProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             
             {/* Left Diagram / Pitch Box */}
-            <div className="lg:col-span-6 bg-gray-950 rounded-2xl overflow-hidden shadow-lg border-2 border-gray-900 aspect-[16/10] relative flex items-center justify-center">
-              {item.previewImage ? (
-                <img src={item.previewImage} alt="" className="w-full h-full object-contain" />
-              ) : (
-                <PitchSvgRenderer pitchType={item.pitchType || 'Midfield'} pitchTheme={item.pitchTheme || 'Grass'} className="w-full h-full" />
-              )}
+            <div className="lg:col-span-6 flex items-center justify-center">
+              <DiagramPreviewBox
+                diagram={item}
+                pitchType={item.pitchType || 'Midfield'}
+                pitchTheme={item.pitchTheme || 'Grass'}
+                elements={item.elements}
+                lines={item.lines}
+                previewImage={item.previewImage}
+                showGrid={true}
+                className="w-full max-w-[540px] max-h-[420px] aspect-auto"
+              />
             </div>
 
             {/* Right Meta & Parameters Box */}
