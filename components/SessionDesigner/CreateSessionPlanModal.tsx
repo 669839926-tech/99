@@ -4,9 +4,10 @@ import { DRILL_STAGES } from './constants';
 import {
   X, Plus, Trash2, ArrowUp, ArrowDown, Eye, EyeOff, Save,
   Search, BookOpen, Clock, Layers, Check,
-  FileText, Send
+  FileText, Send, ZoomIn, Maximize2
 } from 'lucide-react';
-import { PitchSvgRenderer } from './PitchSvgRenderer';
+import { DiagramPreviewBox } from './DiagramPreviewBox';
+import { PublishApprovalModal, PublishChoice } from './PublishApprovalModal';
 
 interface CreateSessionPlanModalProps {
   isOpen: boolean;
@@ -31,6 +32,10 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
   const [description, setDescription] = useState(initialPlan?.description || '');
   const [targetAge, setTargetAge] = useState(initialPlan?.targetAge || 'U9 (8-9岁)');
   const [isPrivate, setIsPrivate] = useState(initialPlan?.isPrivate ?? false);
+  const [showPublishApprovalModal, setShowPublishApprovalModal] = useState<boolean>(false);
+
+  // Drill preview / enlarge detail modal state
+  const [previewDrill, setPreviewDrill] = useState<DrillDesign | null>(null);
 
   // Stages State (Video 4 defaults to 5 stages)
   const [stages, setStages] = useState<SessionPlanStage[]>(
@@ -173,7 +178,12 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
     return true;
   });
 
-  const handleSave = (publish = true) => {
+  const handlePerformSave = (options: {
+    isPrivateChoice: boolean;
+    approvalStatusChoice: 'approved' | 'pending' | 'draft';
+    isDraftChoice: boolean;
+    submissionNotes?: string;
+  }) => {
     if (!title.trim()) {
       alert('请输入教案名称');
       return;
@@ -200,13 +210,59 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
       createdAt: initialPlan?.createdAt || new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
       authorId: currentUser?.id,
-      authorName: currentUser?.name,
-      isPrivate,
-      isDraft: !publish
+      authorName: currentUser?.name || (currentUser?.role === 'director' ? '青训总监' : '教练员'),
+      authorRole: currentUser?.role || 'coach',
+      isPrivate: options.isPrivateChoice,
+      approvalStatus: options.approvalStatusChoice,
+      approvalFeedback: options.submissionNotes,
+      isDraft: options.isDraftChoice
     };
 
     onSave(planItem);
     onClose();
+  };
+
+  const handleSave = (publish = true) => {
+    if (!title.trim()) {
+      alert('请输入教案名称');
+      return;
+    }
+
+    if (!publish) {
+      handlePerformSave({
+        isPrivateChoice: true,
+        approvalStatusChoice: 'draft',
+        isDraftChoice: true
+      });
+      return;
+    }
+
+    if (currentUser?.role === 'director') {
+      handlePerformSave({
+        isPrivateChoice: false,
+        approvalStatusChoice: 'approved',
+        isDraftChoice: false
+      });
+    } else {
+      setShowPublishApprovalModal(true);
+    }
+  };
+
+  const handleConfirmPublishChoice = (choice: PublishChoice, notes?: string) => {
+    if (choice === 'private') {
+      handlePerformSave({
+        isPrivateChoice: true,
+        approvalStatusChoice: 'draft',
+        isDraftChoice: false
+      });
+    } else {
+      handlePerformSave({
+        isPrivateChoice: false,
+        approvalStatusChoice: 'pending',
+        isDraftChoice: false,
+        submissionNotes: notes
+      });
+    }
   };
 
   return (
@@ -433,17 +489,35 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
                       stageDrills.map(drill => (
                         <div
                           key={drill.id}
-                          className="flex items-center gap-3 bg-gray-950 p-2 rounded-xl border border-gray-800"
+                          className="flex items-center gap-3 bg-gray-950 p-2 rounded-xl border border-gray-800 hover:border-gray-700 transition-colors"
                         >
-                          <div className="w-14 h-10 bg-gray-900 rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                          <div
+                            onClick={() => setPreviewDrill(drill)}
+                            title="点击放大查看示意图与完整训练项"
+                            className="relative w-16 h-11 bg-gray-900 rounded-lg overflow-hidden shrink-0 flex items-center justify-center cursor-pointer border border-gray-800 hover:border-emerald-500 group/leftthumb transition-all"
+                          >
                             {drill.previewImage ? (
                               <img src={drill.previewImage} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              <PitchSvgRenderer pitchType={drill.pitchType} pitchTheme={drill.pitchTheme} className="w-full h-full" />
+                              <DiagramPreviewBox
+                                diagram={drill}
+                                pitchType={drill.pitchType}
+                                pitchTheme={drill.pitchTheme}
+                                elements={drill.elements}
+                                lines={drill.lines}
+                                showGrid={false}
+                                className="w-full h-full"
+                              />
                             )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/leftthumb:opacity-100 transition-opacity flex items-center justify-center">
+                              <ZoomIn className="w-3.5 h-3.5 text-bvb-yellow" />
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <h5 className="text-xs font-black text-white truncate">{drill.title}</h5>
+                          <div
+                            onClick={() => setPreviewDrill(drill)}
+                            className="flex-1 min-w-0 cursor-pointer"
+                          >
+                            <h5 className="text-xs font-black text-white truncate hover:text-bvb-yellow transition-colors">{drill.title}</h5>
                             <div className="flex items-center gap-2 text-[10px] text-gray-400 mt-0.5">
                               <span>{drill.durationMinutes || 15}分钟</span>
                               <span>·</span>
@@ -556,7 +630,7 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
             </div>
 
             {/* Drills Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-y-auto flex-1 custom-scrollbar">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 overflow-y-auto flex-1 custom-scrollbar">
               {filteredDrills.length > 0 ? (
                 filteredDrills.map(drill => {
                   const currentStage = stages.find(s => s.id === activeStageId);
@@ -565,19 +639,44 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
                   return (
                     <div
                       key={drill.id}
-                      className="p-3 bg-gray-950 rounded-2xl border border-gray-800 hover:border-gray-700 hover:shadow-md transition-all flex flex-col justify-between gap-2.5"
+                      className="p-3 bg-gray-950 rounded-2xl border border-gray-800 hover:border-gray-700 hover:shadow-md transition-all flex flex-col justify-between gap-3"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="w-24 h-16 bg-gray-900 rounded-xl overflow-hidden shadow-inner shrink-0 flex items-center justify-center">
+                        {/* Enlarged tactical diagram thumbnail with click-to-enlarge action */}
+                        <div
+                          onClick={() => setPreviewDrill(drill)}
+                          title="点击放大查看示意图与完整训练项"
+                          className="relative w-32 sm:w-36 h-22 sm:h-24 bg-gray-900 rounded-xl overflow-hidden shadow-inner shrink-0 flex items-center justify-center cursor-pointer border border-gray-800 hover:border-emerald-500/80 group/thumb transition-all hover:scale-[1.02]"
+                        >
                           {drill.previewImage ? (
-                            <img src={drill.previewImage} alt="" className="w-full h-full object-cover" />
+                            <img src={drill.previewImage} alt={drill.title} className="w-full h-full object-cover" />
                           ) : (
-                            <PitchSvgRenderer pitchType={drill.pitchType} pitchTheme={drill.pitchTheme} className="w-full h-full" />
+                            <DiagramPreviewBox
+                              diagram={drill}
+                              pitchType={drill.pitchType}
+                              pitchTheme={drill.pitchTheme}
+                              elements={drill.elements}
+                              lines={drill.lines}
+                              showGrid={false}
+                              className="w-full h-full"
+                            />
                           )}
+                          {/* Hover Zoom-in Cue */}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center gap-1 text-white backdrop-blur-[1px]">
+                            <ZoomIn className="w-4 h-4 text-bvb-yellow" />
+                            <span className="text-[10px] font-bold text-white tracking-tight">点击放大</span>
+                          </div>
                         </div>
+
+                        {/* Title and metadata badges */}
                         <div className="flex-1 min-w-0">
-                          <h4 className="text-xs font-black text-white leading-tight line-clamp-2">{drill.title}</h4>
-                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                          <h4
+                            onClick={() => setPreviewDrill(drill)}
+                            className="text-xs font-black text-white leading-snug line-clamp-2 cursor-pointer hover:text-bvb-yellow transition-colors"
+                          >
+                            {drill.title}
+                          </h4>
+                          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-300 border border-blue-800/60">
                               {drill.topic || '综合'}
                             </span>
@@ -591,18 +690,11 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
                         </div>
                       </div>
 
-                      {/* Coaching summary snippet */}
-                      {drill.coachingPoints && (
-                        <p className="text-[10px] text-gray-400 line-clamp-1 bg-gray-900/60 px-2 py-1 rounded-lg">
-                          💡 {drill.coachingPoints.replace(/\n/g, ' ')}
-                        </p>
-                      )}
-
                       {/* Action Button */}
                       <button
                         onClick={() => handleAddDrillToStage(drill.id)}
                         disabled={isAlreadyAdded}
-                        className={`w-full py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                        className={`w-full py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all ${
                           isAlreadyAdded
                             ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-black cursor-default'
                             : 'bg-bvb-yellow hover:bg-yellow-400 text-black shadow-sm active:scale-95'
@@ -640,6 +732,222 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
         </div>
 
       </div>
+
+      {/* Full Drill Content & Large Tactical Diagram Preview Modal */}
+      {previewDrill && (
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-gray-900 border border-gray-700 text-gray-100 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-3.5 border-b border-gray-800 bg-gray-950 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-bvb-yellow text-black flex items-center justify-center font-black shadow-md">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white">{previewDrill.title}</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/60">
+                      训练项详情与示意图
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-0.5">
+                    环节分类: {previewDrill.drillStage || '通用训练'} · 作者: {previewDrill.authorName || '青训教练组'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setPreviewDrill(null)}
+                className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body: Two columns layout */}
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Left: Large Tactical Diagram Preview */}
+                <div className="lg:col-span-6 flex flex-col items-center justify-center">
+                  <div className="w-full flex items-center justify-between mb-2">
+                    <span className="text-xs font-black text-gray-300 flex items-center gap-1.5">
+                      <Maximize2 className="w-3.5 h-3.5 text-bvb-yellow" />
+                      <span>战术场地示意图（大图）</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-gray-400 bg-gray-950 px-2 py-0.5 rounded-md border border-gray-800">
+                      {previewDrill.pitchType || '标准半场'} · {previewDrill.pitchTheme || '草地绿'}
+                    </span>
+                  </div>
+
+                  <div className="w-full flex items-center justify-center bg-gray-950 p-2 rounded-2xl border border-gray-800">
+                    <DiagramPreviewBox
+                      diagram={previewDrill}
+                      pitchType={previewDrill.pitchType}
+                      pitchTheme={previewDrill.pitchTheme}
+                      elements={previewDrill.elements}
+                      lines={previewDrill.lines}
+                      previewImage={previewDrill.previewImage}
+                      showGrid={true}
+                      className="w-full max-w-[500px] max-h-[380px] shadow-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Right: Meta & Badges */}
+                <div className="lg:col-span-6 space-y-4">
+                  {/* Parameter Badges */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">
+                      <span className="text-[10px] text-blue-400 font-bold block">训练主题</span>
+                      <span className="text-xs font-black text-white">{previewDrill.topic || '综合'}</span>
+                    </div>
+                    <div className="bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">
+                      <span className="text-[10px] text-emerald-400 font-bold block">训练时长</span>
+                      <span className="text-xs font-black text-white">{previewDrill.durationMinutes || 15} 分钟</span>
+                    </div>
+                    <div className="bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">
+                      <span className="text-[10px] text-purple-400 font-bold block">参与人数</span>
+                      <span className="text-xs font-black text-white">{previewDrill.playerCount || 8} 人</span>
+                    </div>
+                    <div className="bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">
+                      <span className="text-[10px] text-amber-400 font-bold block">场地尺寸</span>
+                      <span className="text-xs font-black text-white">{previewDrill.fieldLength || 20}x{previewDrill.fieldWidth || 15} 米</span>
+                    </div>
+                    <div className="bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">
+                      <span className="text-[10px] text-rose-400 font-bold block">足球数量</span>
+                      <span className="text-xs font-black text-white">{previewDrill.ballCount || 6} 个</span>
+                    </div>
+                    <div className="bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">
+                      <span className="text-[10px] text-teal-400 font-bold block">标志物</span>
+                      <span className="text-xs font-black text-white">{previewDrill.coneCount || 8} 个</span>
+                    </div>
+                  </div>
+
+                  {/* Age groups chips */}
+                  {previewDrill.ageGroups && previewDrill.ageGroups.length > 0 && (
+                    <div className="bg-gray-950 p-3 rounded-xl border border-gray-800">
+                      <span className="text-[11px] font-bold text-gray-400 block mb-1.5">适用年龄段:</span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {previewDrill.ageGroups.map(a => (
+                          <span key={a} className="px-2.5 py-0.5 rounded-lg bg-gray-800 text-yellow-400 text-xs font-mono font-bold">
+                            {a} 岁
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {previewDrill.description && (
+                    <div className="bg-gray-950 p-3.5 rounded-xl border border-gray-800">
+                      <h4 className="text-xs font-black text-gray-300 mb-1">训练简述</h4>
+                      <p className="text-xs text-gray-400 leading-relaxed">{previewDrill.description}</p>
+                    </div>
+                  )}
+
+                  {/* Equipment notes */}
+                  {previewDrill.equipmentNotes && (
+                    <div className="bg-gray-950 p-3 rounded-xl border border-gray-800">
+                      <h4 className="text-xs font-black text-gray-300 mb-1">所需器材备注</h4>
+                      <p className="text-xs text-gray-400 leading-relaxed">{previewDrill.equipmentNotes}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Drill Structured Sections (组织方法, 指导要点, 变化进阶) */}
+              <div className="space-y-3 pt-2 border-t border-gray-800">
+                {previewDrill.organization && (
+                  <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800">
+                    <h4 className="text-xs font-black text-blue-400 flex items-center gap-1.5 mb-2">
+                      <span className="w-5 h-5 rounded-lg bg-blue-900/80 text-blue-200 text-[10px] flex items-center justify-center font-bold">1</span>
+                      <span>组织方法 (步骤与站位)</span>
+                    </h4>
+                    <p className="text-xs text-gray-300 whitespace-pre-line leading-relaxed pl-6">{previewDrill.organization}</p>
+                  </div>
+                )}
+
+                {previewDrill.coachingPoints && (
+                  <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800">
+                    <h4 className="text-xs font-black text-emerald-400 flex items-center gap-1.5 mb-2">
+                      <span className="w-5 h-5 rounded-lg bg-emerald-900/80 text-emerald-200 text-[10px] flex items-center justify-center font-bold">2</span>
+                      <span>指导要点 (技术关键与心理)</span>
+                    </h4>
+                    <p className="text-xs text-gray-300 whitespace-pre-line leading-relaxed pl-6">{previewDrill.coachingPoints}</p>
+                  </div>
+                )}
+
+                {previewDrill.progressions && (
+                  <div className="bg-gray-950 p-4 rounded-2xl border border-gray-800">
+                    <h4 className="text-xs font-black text-purple-400 flex items-center gap-1.5 mb-2">
+                      <span className="w-5 h-5 rounded-lg bg-purple-900/80 text-purple-200 text-[10px] flex items-center justify-center font-bold">3</span>
+                      <span>变化与进阶 (规则与防守调整)</span>
+                    </h4>
+                    <p className="text-xs text-gray-300 whitespace-pre-line leading-relaxed pl-6">{previewDrill.progressions}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            {(() => {
+              const currentStage = stages.find(s => s.id === activeStageId);
+              const isAlreadyAdded = currentStage?.drillIds.includes(previewDrill.id);
+
+              return (
+                <div className="px-6 py-3.5 border-t border-gray-800 bg-gray-950 flex items-center justify-between">
+                  <div className="text-xs text-gray-400">
+                    当前选定环节: <span className="font-black text-emerald-400">{currentStage?.name || '未选环节'}</span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setPreviewDrill(null)}
+                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-xl transition-colors"
+                    >
+                      关闭预览
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        handleAddDrillToStage(previewDrill.id);
+                      }}
+                      disabled={isAlreadyAdded}
+                      className={`px-5 py-2 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-md transition-all ${
+                        isAlreadyAdded
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold cursor-default'
+                          : 'bg-bvb-yellow hover:bg-yellow-400 text-black active:scale-95'
+                      }`}
+                    >
+                      {isAlreadyAdded ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>已加入当前环节</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="w-4 h-4" />
+                          <span>加入此环节 ({currentStage?.name?.slice(0, 7) || '当前环节'})</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Publish Approval Workflow Modal */}
+      <PublishApprovalModal
+        isOpen={showPublishApprovalModal}
+        onClose={() => setShowPublishApprovalModal(false)}
+        onConfirm={handleConfirmPublishChoice}
+        contentTypeName="教案"
+        title={title}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

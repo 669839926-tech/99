@@ -6,6 +6,7 @@ import { DiagramCanvasEditor } from './SessionDesigner/DiagramCanvasEditor';
 import { CreateDrillItemModal } from './SessionDesigner/CreateDrillItemModal';
 import { CreateSessionPlanModal } from './SessionDesigner/CreateSessionPlanModal';
 import { SessionDetailViewModal } from './SessionDesigner/SessionDetailViewModal';
+import { RenameUploadedDiagramModal } from './SessionDesigner/RenameUploadedDiagramModal';
 import { INITIAL_PRESET_DRILLS, INITIAL_PRESET_PLANS } from './SessionDesigner/constants';
 import { X, Save, FileText } from 'lucide-react';
 
@@ -14,13 +15,15 @@ interface SessionDesignerProps {
   onSaveDesign: (design: DrillDesign) => void;
   onDeleteDesign: (id: string) => void;
   currentUser: User | null;
+  initialFilter?: string;
 }
 
 export const SessionDesigner: React.FC<SessionDesignerProps> = ({
   designs,
   onSaveDesign,
   onDeleteDesign,
-  currentUser
+  currentUser,
+  initialFilter
 }) => {
   // Combine stored designs with initial presets if empty
   const activeDesigns = designs && designs.length > 0
@@ -37,6 +40,8 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
   const [isCreateSessionModalOpen, setIsCreateSessionModalOpen] = useState(false);
   const [isCreateOtherModalOpen, setIsCreateOtherModalOpen] = useState(false);
   const [viewingDetailItem, setViewingDetailItem] = useState<DrillDesign | null>(null);
+  const [editingUploadedDiagram, setEditingUploadedDiagram] = useState<DrillDesign | null>(null);
+  const [isRenameUploadedModalOpen, setIsRenameUploadedModalOpen] = useState(false);
 
   // Active pitch selection when entering canvas editor
   const [selectedPitchType, setSelectedPitchType] = useState<PitchType>('Midfield');
@@ -100,7 +105,12 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
 
   // Common Actions
   const handleEditItem = (item: DrillDesign) => {
-    if (item.category === 'session_plan' || item.contentType === 'session_plan') {
+    const isUploaded = Boolean(item.isUploadedImage);
+
+    if (isUploaded) {
+      setEditingUploadedDiagram(item);
+      setIsRenameUploadedModalOpen(true);
+    } else if (item.category === 'session_plan' || item.contentType === 'session_plan') {
       setEditingDesign(item);
       setIsCreateSessionModalOpen(true);
     } else if (item.category === 'drill_item' || item.contentType === 'drill') {
@@ -128,6 +138,19 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
     if (window.confirm('确定要删除该条教案内容吗？')) {
       onDeleteDesign(id);
       if (viewingDetailItem?.id === id) {
+        setViewingDetailItem(null);
+      }
+    }
+  };
+
+  const handleBatchSaveDesigns = (updatedDesigns: DrillDesign[]) => {
+    updatedDesigns.forEach(d => onSaveDesign(d));
+  };
+
+  const handleBatchDeleteDesigns = (ids: string[]) => {
+    if (window.confirm(`确定要批量删除选中的 ${ids.length} 项教案内容吗？此操作无法撤销。`)) {
+      ids.forEach(id => onDeleteDesign(id));
+      if (viewingDetailItem && ids.includes(viewingDetailItem.id)) {
         setViewingDetailItem(null);
       }
     }
@@ -164,6 +187,7 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
       <ContentLibraryHub
         designs={activeDesigns}
         currentUser={currentUser}
+        initialFilter={initialFilter}
         onOpenPitchSelector={() => setIsPitchSelectorOpen(true)}
         onOpenCreateDrillModal={() => {
           setEditingDesign(null);
@@ -178,6 +202,9 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
         onViewDetail={item => setViewingDetailItem(item)}
         onDuplicateItem={handleDuplicateItem}
         onDeleteItem={handleDeleteItem}
+        onSaveDesign={onSaveDesign}
+        onBatchSaveDesigns={handleBatchSaveDesigns}
+        onBatchDeleteDesigns={handleBatchDeleteDesigns}
         onToggleFavorite={handleToggleFavorite}
       />
 
@@ -186,6 +213,9 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
         isOpen={isPitchSelectorOpen}
         onClose={() => setIsPitchSelectorOpen(false)}
         onSelect={handleSelectPitchAndStartDrawing}
+        onUploadImageDiagram={(uploadedDiagram) => {
+          onSaveDesign(uploadedDiagram);
+        }}
       />
 
       {/* Modal 2: Create Drill Item (Video 3) */}
@@ -197,12 +227,15 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
         }}
         onSave={handleSaveDrillItem}
         currentUser={currentUser}
-        existingDiagrams={activeDesigns.filter(d => d.category === 'diagram' || d.contentType === 'diagram' || (d.elements && d.elements.length > 0))}
+        existingDiagrams={activeDesigns.filter(d => d.category === 'diagram' || d.contentType === 'diagram' || (d.elements && d.elements.length > 0) || !!d.previewImage)}
         onOpenPitchSelector={() => {
           setIsCreateDrillModalOpen(false);
           setIsPitchSelectorOpen(true);
         }}
         initialDrill={editingDesign}
+        onSaveUploadedDiagram={(uploadedDiagram) => {
+          onSaveDesign(uploadedDiagram);
+        }}
       />
 
       {/* Modal 3: Create Session Plan (Video 4) */}
@@ -229,6 +262,19 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
         onEdit={item => {
           setViewingDetailItem(null);
           handleEditItem(item);
+        }}
+      />
+
+      {/* Modal 4.5: Rename Uploaded Diagram Modal (Only Edit Name/Description, prevent canvas overwrite) */}
+      <RenameUploadedDiagramModal
+        isOpen={isRenameUploadedModalOpen}
+        diagram={editingUploadedDiagram}
+        onClose={() => {
+          setIsRenameUploadedModalOpen(false);
+          setEditingUploadedDiagram(null);
+        }}
+        onSave={(updatedDiagram) => {
+          onSaveDesign(updatedDiagram);
         }}
       />
 

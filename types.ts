@@ -566,10 +566,16 @@ export interface DrillDesign {
     updatedAt?: string;
     authorId?: string;
     authorName?: string;
+    authorRole?: UserRole;
+    approvalStatus?: 'approved' | 'pending' | 'rejected' | 'draft';
+    approvalFeedback?: string;
+    approvedBy?: string;
+    approvedAt?: string;
     isPrivate?: boolean;
     folderId?: string;
     isFavorite?: boolean;
     isDraft?: boolean;
+    isUploadedImage?: boolean;
     tags?: string[];
     
     // Drill Item specific

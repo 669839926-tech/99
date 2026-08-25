@@ -9,6 +9,7 @@ import {
   Maximize2
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import { PublishApprovalModal, PublishChoice } from './PublishApprovalModal';
 
 // 7 Preset colors matching Image 2
 const IMAGE_PRESET_COLORS = [
@@ -520,20 +521,13 @@ const EQUIPMENT_ITEMS: EquipmentItemDef[] = [
     label: '足球',
     name: '足球',
     renderIcon: () => (
-      <svg className="w-7 h-7 drop-shadow-sm select-none" viewBox="0 0 32 32">
-        <circle cx="16" cy="16" r="14.5" fill="#ffffff" stroke="#232d3f" strokeWidth="2.2" />
-        <circle cx="16" cy="16" r="10" fill="#f8fafc" stroke="#475569" strokeWidth="0.6" />
-        <polygon points="16,13 18.8,15 17.7,18.2 14.3,18.2 13.2,15" fill="#1e293b" />
-        <path d="M 14.5 6.2 C 15.5 6 16.5 6 17.5 6.2 L 17 8.5 L 15 8.5 Z" fill="#1e293b" />
-        <path d="M 23.5 10.5 C 24.5 12 25 13.5 25.2 15 L 23 15.5 L 21.5 13.2 Z" fill="#1e293b" />
-        <path d="M 23.2 21.5 C 22 23.2 20.5 24.5 19 25.2 L 18.2 23 L 20.5 21 Z" fill="#1e293b" />
-        <path d="M 8.8 21.5 C 10 23.2 11.5 24.5 13 25.2 L 13.8 23 L 11.5 21 Z" fill="#1e293b" />
-        <path d="M 8.5 10.5 C 7.5 12 7 13.5 6.8 15 L 9 15.5 L 10.5 13.2 Z" fill="#1e293b" />
-        <line x1="16" y1="13" x2="16" y2="8.5" stroke="#475569" strokeWidth="0.6" />
-        <line x1="18.8" y1="15" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.6" />
-        <line x1="17.7" y1="18.2" x2="18.2" y2="23" stroke="#475569" strokeWidth="0.6" />
-        <line x1="14.3" y1="18.2" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.6" />
-        <line x1="13.2" y1="15" x2="10.5" y2="13.2" stroke="#475569" strokeWidth="0.6" />
+      <svg className="w-7 h-7 drop-shadow-sm select-none" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="47.5" fill="#000000" />
+        <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" fill="#ffffff" />
+        <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(72 50 50)" fill="#ffffff" />
+        <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(144 50 50)" fill="#ffffff" />
+        <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(216 50 50)" fill="#ffffff" />
+        <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(288 50 50)" fill="#ffffff" />
       </svg>
     )
   }
@@ -792,6 +786,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
   const [title, setTitle] = useState(initialDesign?.title || '未命名战术示意图');
   const [description] = useState(initialDesign?.description || '');
   const [isPrivate, setIsPrivate] = useState(initialDesign?.isPrivate ?? false);
+  const [showPublishApprovalModal, setShowPublishApprovalModal] = useState(false);
 
   // Active elements & lines
   const [elements, setElements] = useState<DesignElement[]>(initialDesign?.elements || []);
@@ -1250,7 +1245,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
       x: 50,
       y: 50,
       rotation: 0,
-      scale: defaultElementScale,
+      scale: type === 'Ball' ? 0.55 : defaultElementScale,
       color: elementColor,
       label: finalLabel,
       shapeWidth: type === 'DistanceMeter' ? 160 : isArea ? defaultW : undefined,
@@ -1336,7 +1331,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
         x: clampedX,
         y: clampedY,
         rotation: 0,
-        scale: defaultElementScale,
+        scale: item.type === 'Ball' ? 0.55 : defaultElementScale,
         color: elementColor,
         label: finalLabel,
         shapeWidth: item.type === 'DistanceMeter' ? 160 : isArea ? defaultW : undefined,
@@ -1823,8 +1818,13 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
     }
   };
 
-  // Export / Save
-  const handleSaveDiagram = async (publish = false) => {
+  // Export / Save Core Execution
+  const handlePerformSave = async (options: {
+    isPrivateChoice: boolean;
+    approvalStatusChoice: 'approved' | 'pending' | 'draft';
+    isDraftChoice: boolean;
+    submissionNotes?: string;
+  }) => {
     // Automatically deselect all elements & lines so the diagram is cleanly saved
     setSelectedElementIds([]);
     setSelectedLineIds([]);
@@ -1875,12 +1875,57 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
       createdAt: initialDesign?.createdAt || new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
       authorId: currentUser?.id,
-      authorName: currentUser?.name,
-      isPrivate,
-      isDraft: !publish
+      authorName: currentUser?.name || (currentUser?.role === 'director' ? '青训总监' : '教练员'),
+      authorRole: currentUser?.role || 'coach',
+      isPrivate: options.isPrivateChoice,
+      approvalStatus: options.approvalStatusChoice,
+      approvalFeedback: options.submissionNotes,
+      isDraft: options.isDraftChoice
     };
 
     onSave(designToSave);
+  };
+
+  const handleSaveDiagram = async (publish = false) => {
+    if (!publish) {
+      // Direct draft save
+      await handlePerformSave({
+        isPrivateChoice: true,
+        approvalStatusChoice: 'draft',
+        isDraftChoice: true
+      });
+      return;
+    }
+
+    // Publish action
+    if (currentUser?.role === 'director') {
+      // Director publishes directly to Content Library
+      await handlePerformSave({
+        isPrivateChoice: false,
+        approvalStatusChoice: 'approved',
+        isDraftChoice: false
+      });
+    } else {
+      // Non-director coach needs to choose between private or submit for director review
+      setShowPublishApprovalModal(true);
+    }
+  };
+
+  const handleConfirmPublishChoice = async (choice: PublishChoice, notes?: string) => {
+    if (choice === 'private') {
+      await handlePerformSave({
+        isPrivateChoice: true,
+        approvalStatusChoice: 'draft',
+        isDraftChoice: false
+      });
+    } else {
+      await handlePerformSave({
+        isPrivateChoice: false,
+        approvalStatusChoice: 'pending',
+        isDraftChoice: false,
+        submissionNotes: notes
+      });
+    }
   };
 
   const handleExportPNG = async () => {
@@ -1921,7 +1966,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
     const isSelected = selectedElementIds.includes(el.id);
     const isFixedBlack = FIXED_BLACK_EQUIPMENT_TYPES.includes(el.type);
     const color = isFixedBlack ? '#111827' : (el.color || '#ef4444');
-    const elementScale = typeof el.scale === 'number' && !isNaN(el.scale) ? el.scale : defaultElementScale;
+    const elementScale = typeof el.scale === 'number' && !isNaN(el.scale) ? el.scale : (el.type === 'Ball' ? 0.55 : defaultElementScale);
 
     const isArea = el.type === 'AreaSquare' || el.type === 'AreaRect' || el.type === 'AreaCircle' || el.type === 'AreaTriangle' || el.type === 'AreaDiamond' || el.type.startsWith('Area');
     const shapeWidth = el.shapeWidth || (el.type === 'AreaRect' ? 160 : el.type === 'AreaTriangle' ? 130 : 120);
@@ -2115,27 +2160,13 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
 
       case 'Ball': {
         innerContent = (
-          <svg className="w-7 h-7 select-none" viewBox="0 0 32 32">
-            {/* Outer Badge Dark Ring & White Fill Base */}
-            <circle cx="16" cy="16" r="14" fill="#ffffff" stroke="#1e293b" strokeWidth="2.2" />
-            <circle cx="16" cy="16" r="10" fill="#f8fafc" stroke="#475569" strokeWidth="0.5" />
-
-            {/* Center Pentagon */}
-            <polygon points="16,13 18.8,15 17.7,18.2 14.3,18.2 13.2,15" fill="#1e293b" />
-
-            {/* Perimeter Patches */}
-            <path d="M 14.5 6.2 C 15.5 6 16.5 6 17.5 6.2 L 17 8.5 L 15 8.5 Z" fill="#1e293b" />
-            <path d="M 23.5 10.5 C 24.5 12 25 13.5 25.2 15 L 23 15.5 L 21.5 13.2 Z" fill="#1e293b" />
-            <path d="M 23.2 21.5 C 22 23.2 20.5 24.5 19 25.2 L 18.2 23 L 20.5 21 Z" fill="#1e293b" />
-            <path d="M 8.8 21.5 C 10 23.2 11.5 24.5 13 25.2 L 13.8 23 L 11.5 21 Z" fill="#1e293b" />
-            <path d="M 8.5 10.5 C 7.5 12 7 13.5 6.8 15 L 9 15.5 L 10.5 13.2 Z" fill="#1e293b" />
-
-            {/* Seams connecting center pentagon to perimeter patches */}
-            <line x1="16" y1="13" x2="16" y2="8.5" stroke="#475569" strokeWidth="0.6" />
-            <line x1="18.8" y1="15" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.6" />
-            <line x1="17.7" y1="18.2" x2="18.2" y2="23" stroke="#475569" strokeWidth="0.6" />
-            <line x1="14.3" y1="18.2" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.6" />
-            <line x1="13.2" y1="15" x2="10.5" y2="13.2" stroke="#475569" strokeWidth="0.6" />
+          <svg className="w-7 h-7 select-none" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="47.5" fill="#000000" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(72 50 50)" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(144 50 50)" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(216 50 50)" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(288 50 50)" fill="#ffffff" />
           </svg>
         );
         break;
@@ -4158,6 +4189,16 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Coach Publish Approval Workflow Modal */}
+      <PublishApprovalModal
+        isOpen={showPublishApprovalModal}
+        onClose={() => setShowPublishApprovalModal(false)}
+        onConfirm={handleConfirmPublishChoice}
+        contentTypeName="示意图"
+        title={title}
+        currentUser={currentUser}
+      />
     </div>
   );
 };

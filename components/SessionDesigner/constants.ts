@@ -196,6 +196,10 @@ export const INITIAL_PRESET_DRILLS: DrillDesign[] = [
     coachingPoints: '1. 运球推进时步频快、重心低，触球点位于脚背外侧或内侧。\n2. 接近防守人前预设变向假动作，拉开防守重心后瞬间加速。\n3. 与中立队友呼应，传球力量精准，出球后迅速前插。',
     progressions: '1. 限制进攻球员必须在3次触球内完成变向或传球。\n2. 防守队员升级为全场紧逼防守。\n3. 增加第二名防守队员形成局部2v2。',
     createdAt: '2026-04-03',
+    authorId: 'u1',
+    authorName: '青训总监',
+    authorRole: 'director',
+    approvalStatus: 'approved',
     isPrivate: false
   },
   {
@@ -238,6 +242,10 @@ export const INITIAL_PRESET_DRILLS: DrillDesign[] = [
     coachingPoints: '1. 传球脚法与时机，跑位要与传球同步。\n2. 射门动作干脆，支撑脚站位准确。',
     progressions: '1. 防守人由半消极升级为全对抗。\n2. 增加弱侧边路包抄队员。',
     createdAt: '2026-04-03',
+    authorId: 'u1',
+    authorName: '青训总监',
+    authorRole: 'director',
+    approvalStatus: 'approved',
     isPrivate: false
   }
 ];
@@ -304,6 +312,10 @@ export const INITIAL_PRESET_PLANS: DrillDesign[] = [
       }
     ],
     createdAt: '2026-04-03',
+    authorId: 'u1',
+    authorName: '青训总监',
+    authorRole: 'director',
+    approvalStatus: 'approved',
     isPrivate: false
   }
 ];

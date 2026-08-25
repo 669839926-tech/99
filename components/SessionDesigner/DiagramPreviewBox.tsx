@@ -232,7 +232,7 @@ export const DiagramPreviewBox: React.FC<DiagramPreviewBoxProps> = ({
   const renderElement = (el: DesignElement) => {
     const isFixedBlack = FIXED_BLACK_EQUIPMENT_TYPES.includes(el.type);
     const color = isFixedBlack ? '#111827' : (el.color || '#ef4444');
-    const elementScale = typeof el.scale === 'number' && !isNaN(el.scale) ? el.scale : 1;
+    const elementScale = typeof el.scale === 'number' && !isNaN(el.scale) ? el.scale : (el.type === 'Ball' ? 0.55 : 1);
 
     const isArea = el.type === 'AreaSquare' || el.type === 'AreaRect' || el.type === 'AreaCircle' || el.type === 'AreaTriangle' || el.type === 'AreaDiamond' || el.type.startsWith('Area');
     const shapeWidth = el.shapeWidth || (el.type === 'AreaRect' ? 160 : el.type === 'AreaTriangle' ? 130 : 120);
@@ -376,39 +376,14 @@ export const DiagramPreviewBox: React.FC<DiagramPreviewBoxProps> = ({
         break;
 
       case 'Ball': {
-        const safeId = (el.id || 'ball').replace(/[^a-zA-Z0-9-_]/g, '');
         innerContent = (
-          <svg className="w-7 h-7 drop-shadow select-none" viewBox="0 0 32 32">
-            <defs>
-              <radialGradient id={`prevBallShd-${safeId}`} cx="36%" cy="32%" r="65%">
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="60%" stopColor="#f1f5f9" />
-                <stop offset="85%" stopColor="#cbd5e1" />
-                <stop offset="100%" stopColor="#94a3b8" />
-              </radialGradient>
-              <linearGradient id={`prevPatchGrad-${safeId}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#334155" />
-                <stop offset="100%" stopColor="#0f172a" />
-              </linearGradient>
-            </defs>
-            <circle cx="16" cy="16" r="14.5" fill="#ffffff" stroke="#1e293b" strokeWidth="2.4" />
-            <circle cx="16" cy="16" r="10" fill={`url(#prevBallShd-${safeId})`} stroke="#64748b" strokeWidth="0.5" />
-            <polygon points="16,13 18.8,15 17.7,18.2 14.3,18.2 13.2,15" fill={`url(#prevPatchGrad-${safeId})`} />
-            <path d="M 14.5 6.2 C 15.5 6 16.5 6 17.5 6.2 L 17 8.5 L 15 8.5 Z" fill={`url(#prevPatchGrad-${safeId})`} />
-            <path d="M 23.5 10.5 C 24.5 12 25 13.5 25.2 15 L 23 15.5 L 21.5 13.2 Z" fill={`url(#prevPatchGrad-${safeId})`} />
-            <path d="M 23.2 21.5 C 22 23.2 20.5 24.5 19 25.2 L 18.2 23 L 20.5 21 Z" fill={`url(#prevPatchGrad-${safeId})`} />
-            <path d="M 8.8 21.5 C 10 23.2 11.5 24.5 13 25.2 L 13.8 23 L 11.5 21 Z" fill={`url(#prevPatchGrad-${safeId})`} />
-            <path d="M 8.5 10.5 C 7.5 12 7 13.5 6.8 15 L 9 15.5 L 10.5 13.2 Z" fill={`url(#prevPatchGrad-${safeId})`} />
-            <line x1="16" y1="13" x2="16" y2="8.5" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="18.8" y1="15" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="17.7" y1="18.2" x2="18.2" y2="23" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="14.3" y1="18.2" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="13.2" y1="15" x2="10.5" y2="13.2" stroke="#475569" strokeWidth="0.65" strokeOpacity="0.7" />
-            <line x1="17" y1="8.5" x2="21.5" y2="13.2" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="23" y1="15.5" x2="20.5" y2="21" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="18.2" y1="23" x2="13.8" y2="23" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="11.5" y1="21" x2="9" y2="15.5" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
-            <line x1="10.5" y1="13.2" x2="15" y2="8.5" stroke="#475569" strokeWidth="0.55" strokeOpacity="0.6" />
+          <svg className="w-7 h-7 select-none" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="47.5" fill="#000000" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(72 50 50)" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(144 50 50)" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(216 50 50)" fill="#ffffff" />
+            <path d="M 42 67 L 58 67 Q 61.5 67 62.5 70 L 69.5 83 Q 71 86 67.5 88 A 41.5 41.5 0 0 1 32.5 88 Q 29 86 30.5 83 L 37.5 70 Q 38.5 67 42 67 Z" transform="rotate(288 50 50)" fill="#ffffff" />
           </svg>
         );
         break;

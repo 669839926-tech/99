@@ -8,6 +8,7 @@ import {
 import { PitchSvgRenderer } from './PitchSvgRenderer';
 import { DiagramPreviewBox } from './DiagramPreviewBox';
 import { SelectDiagramModal } from './SelectDiagramModal';
+import { PublishApprovalModal, PublishChoice } from './PublishApprovalModal';
 
 interface CreateDrillItemModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ interface CreateDrillItemModalProps {
   existingDiagrams: DrillDesign[];
   onOpenPitchSelector: () => void;
   initialDrill?: DrillDesign | null;
+  onSaveUploadedDiagram?: (diagram: DrillDesign) => void;
 }
 
 const STANDARD_ORGANIZATION = '1. 在20x15米区域内，两端各设一条端线。\n2. 进攻队员从一端运球出发，防守队员在中间限制区内防守。\n3. 进攻队员可利用变速变向突破防守人，或与远端中立队员做撞墙配合后越过端线。\n4. 防守断球后反向进攻端线。';
@@ -30,7 +32,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   currentUser,
   existingDiagrams,
   onOpenPitchSelector,
-  initialDrill
+  initialDrill,
+  onSaveUploadedDiagram
 }) => {
   const [title, setTitle] = useState(initialDrill?.title || '');
   const [description, setDescription] = useState(initialDrill?.description || '');
@@ -40,6 +43,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   const [isDiagramModalOpen, setIsDiagramModalOpen] = useState<boolean>(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
   const [previewPanelWidthMode, setPreviewPanelWidthMode] = useState<'standard' | 'wide'>('standard');
+  const [showPublishApprovalModal, setShowPublishApprovalModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedAges, setSelectedAges] = useState<string[]>(initialDrill?.ageGroups || ['8', '9', '10']);
@@ -113,11 +117,34 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
     }
   }, [isOpen, initialDrill]);
 
+  const [lastAgeClick, setLastAgeClick] = useState<string | null>(null);
+
   const toggleAge = (age: string) => {
-    if (selectedAges.includes(age)) {
-      setSelectedAges(selectedAges.filter(a => a !== age));
+    // If no previous age is active or if user clicked the same age, set single selection
+    if (!lastAgeClick || lastAgeClick === age) {
+      if (selectedAges.length === 1 && selectedAges[0] === age) {
+        setSelectedAges([]);
+        setLastAgeClick(null);
+      } else {
+        setSelectedAges([age]);
+        setLastAgeClick(age);
+      }
+      return;
+    }
+
+    // Two different ages clicked: calculate inclusive span between them
+    const idx1 = AGE_GROUPS.indexOf(lastAgeClick);
+    const idx2 = AGE_GROUPS.indexOf(age);
+
+    if (idx1 !== -1 && idx2 !== -1) {
+      const start = Math.min(idx1, idx2);
+      const end = Math.max(idx1, idx2);
+      const range = AGE_GROUPS.slice(start, end + 1);
+      setSelectedAges(range);
+      setLastAgeClick(null); // Reset click anchor after forming range
     } else {
-      setSelectedAges([...selectedAges, age]);
+      setSelectedAges([age]);
+      setLastAgeClick(age);
     }
   };
 
@@ -161,6 +188,33 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
       if (result) {
         setCustomUploadedImage(result);
         setSelectedDiagramId(null); // Reset library id since user uploaded a custom file
+
+        // Also persist this newly uploaded image diagram to the library
+        if (onSaveUploadedDiagram) {
+          const cleanFileName = file.name.replace(/\.[^/.]+$/, '');
+          const newDiagram: DrillDesign = {
+            id: `uploaded-diagram-${Date.now()}`,
+            title: cleanFileName || '本地导入示意图',
+            description: `从设备导入的战术示意图 (${file.name})`,
+            category: 'diagram',
+            contentType: 'diagram',
+            pitchType: 'Full',
+            pitchTheme: 'Grass',
+            elements: [],
+            lines: [],
+            previewImage: result,
+            diagramImage: result,
+            keyPoints: ['本地导入示意图'],
+            createdAt: new Date().toISOString().split('T')[0],
+            isUploadedImage: true,
+            fieldLength: 20,
+            fieldWidth: 15,
+            playerCount: 8,
+            ballCount: 6,
+            coneCount: 8
+          };
+          onSaveUploadedDiagram(newDiagram);
+        }
       }
     };
     reader.readAsDataURL(file);
@@ -177,7 +231,12 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSave = (publish = true) => {
+  const handlePerformSave = (options: {
+    isPrivateChoice: boolean;
+    approvalStatusChoice: 'approved' | 'pending' | 'draft';
+    isDraftChoice: boolean;
+    submissionNotes?: string;
+  }) => {
     if (!title.trim()) {
       alert('请输入训练项标题');
       return;
@@ -221,13 +280,61 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
       createdAt: initialDrill?.createdAt || new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
       authorId: currentUser?.id,
-      authorName: currentUser?.name,
-      isPrivate,
-      isDraft: !publish
+      authorName: currentUser?.name || (currentUser?.role === 'director' ? '青训总监' : '教练员'),
+      authorRole: currentUser?.role || 'coach',
+      isPrivate: options.isPrivateChoice,
+      approvalStatus: options.approvalStatusChoice,
+      approvalFeedback: options.submissionNotes,
+      isDraft: options.isDraftChoice
     };
 
     onSave(drillItem);
     onClose();
+  };
+
+  const handleSave = (publish = true) => {
+    if (!title.trim()) {
+      alert('请输入训练项标题');
+      return;
+    }
+
+    if (!publish) {
+      // Save draft
+      handlePerformSave({
+        isPrivateChoice: true,
+        approvalStatusChoice: 'draft',
+        isDraftChoice: true
+      });
+      return;
+    }
+
+    // Publish action
+    if (currentUser?.role === 'director') {
+      handlePerformSave({
+        isPrivateChoice: false,
+        approvalStatusChoice: 'approved',
+        isDraftChoice: false
+      });
+    } else {
+      setShowPublishApprovalModal(true);
+    }
+  };
+
+  const handleConfirmPublishChoice = (choice: PublishChoice, notes?: string) => {
+    if (choice === 'private') {
+      handlePerformSave({
+        isPrivateChoice: true,
+        approvalStatusChoice: 'draft',
+        isDraftChoice: false
+      });
+    } else {
+      handlePerformSave({
+        isPrivateChoice: false,
+        approvalStatusChoice: 'pending',
+        isDraftChoice: false,
+        submissionNotes: notes
+      });
+    }
   };
 
   const hasDiagramOrImage = !!selectedDiagram || !!customUploadedImage || (!!initialDrill?.previewImage && !selectedDiagramId && !customUploadedImage);
@@ -1008,6 +1115,16 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
           </div>
         </div>
       )}
+
+      {/* Publish Approval Workflow Modal */}
+      <PublishApprovalModal
+        isOpen={showPublishApprovalModal}
+        onClose={() => setShowPublishApprovalModal(false)}
+        onConfirm={handleConfirmPublishChoice}
+        contentTypeName="训练项"
+        title={title}
+        currentUser={currentUser}
+      />
     </>
   );
 };

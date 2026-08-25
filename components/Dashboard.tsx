@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction } from '../types';
+import { Player, Match, TrainingSession, Team, User, Announcement, FinanceTransaction, DrillDesign, Tactic, SalarySettings } from '../types';
 import { Users as UsersIcon, Trophy, Calendar, Cake, Activity, ChevronDown, Download, Loader2, Megaphone, Plus, Trash2, X, AlertTriangle, ClipboardCheck, Edit2, ArrowRight, Shirt, Clock, LayoutList, CheckCircle, Ban, Wallet, Sparkles, Camera, FileDown, FileSpreadsheet, Quote, ShieldCheck, PartyPopper, Star, Triangle, Pencil, UserCheck } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -22,6 +22,8 @@ interface DashboardProps {
   appLogo?: string;
   tactics?: Tactic[];
   salarySettings?: SalarySettings;
+  designs?: DrillDesign[];
+  onSaveDesign?: (design: DrillDesign) => void;
 }
 
 type TimeRange = 'month' | 'quarter' | 'year' | 'custom';
@@ -85,7 +87,7 @@ const getPlayerRenewalLevelDetails = (player: Player, trainings: TrainingSession
 const Dashboard: React.FC<DashboardProps> = ({ 
     players, matches, trainings, teams, currentUser, onNavigate,
     announcements = [], transactions = [], onAddAnnouncement, onDeleteAnnouncement, appLogo,
-    tactics = [], salarySettings
+    tactics = [], salarySettings, designs = []
 }) => {
   // Date Range State
   const [attendanceRange, setAttendanceRange] = useState<TimeRange>('month');
@@ -168,13 +170,17 @@ const Dashboard: React.FC<DashboardProps> = ({
     const reviews = displayPlayers.reduce((acc, p) => acc + (p.reviews?.filter(r => r.status === 'Submitted').length || 0), 0);
     const stats = displayPlayers.filter(p => p.statsStatus === 'Submitted').length;
     const logs = displayTrainings.filter(t => t.submissionStatus === 'Submitted').length;
+    const pendingContentItems = isDirector ? (designs || []).filter(d => d.approvalStatus === 'pending') : [];
+    const content = pendingContentItems.length;
     return {
       reviews,
       stats,
       logs,
-      total: reviews + stats + logs
+      content,
+      pendingContentItems,
+      total: reviews + stats + logs + content
     };
-  }, [displayPlayers, displayTrainings]);
+  }, [displayPlayers, displayTrainings, designs, isDirector]);
 
   // 教练端：计算待阅读的审核意见
   const unreadReviews = useMemo(() => {
@@ -968,27 +974,81 @@ const Dashboard: React.FC<DashboardProps> = ({
             )}
 
             {isDirector && pendingTasks.total > 0 ? (
-                <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6">
-                    <div className="flex justify-between items-center mb-4">
+                <div className="bg-white rounded-xl shadow-md border-l-4 border-bvb-yellow p-4 md:p-6 space-y-4">
+                    <div className="flex justify-between items-center">
                         <h3 className="font-black text-sm md:text-lg text-gray-800 flex items-center">
                             <ClipboardCheck className="w-4 h-4 md:w-6 md:h-6 mr-1.5 md:mr-2 text-bvb-yellow" /> 待办审核事项
                         </h3>
                         <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">{pendingTasks.total} 个待处理</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 md:gap-4">
-                        <div onClick={() => onNavigate?.('players', 'pending_reviews')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-4">
+                        <div onClick={() => onNavigate?.('players', 'pending_reviews')} className="bg-gray-50 p-2.5 md:p-4 rounded-xl flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group text-center shadow-2xs">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">球员点评</span>
-                            <span className="text-xl md:text-2xl font-black text-blue-600导致-none">{pendingTasks.reviews}</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.reviews}</span>
                         </div>
-                        <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
+                        <div onClick={() => onNavigate?.('players', 'pending_stats')} className="bg-gray-50 p-2.5 md:p-4 rounded-xl flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group text-center shadow-2xs">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">数据更新</span>
-                            <span className="text-xl md:text-2xl font-black text-blue-600导致-none">{pendingTasks.stats}</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.stats}</span>
                         </div>
-                        <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-2.5 md:p-4 rounded-lg flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 transition-all group text-center">
+                        <div onClick={() => onNavigate?.('training', 'pending_logs')} className="bg-gray-50 p-2.5 md:p-4 rounded-xl flex flex-col items-center border border-gray-100 cursor-pointer hover:bg-blue-50 hover:border-blue-200 transition-all group text-center shadow-2xs">
                             <span className="text-[8px] md:text-[10px] font-black text-gray-400 uppercase mb-1 group-hover:text-blue-600">训练日志</span>
-                            <span className="text-xl md:text-2xl font-black text-blue-600导致-none">{pendingTasks.logs}</span>
+                            <span className="text-xl md:text-2xl font-black text-blue-600 leading-none">{pendingTasks.logs}</span>
+                        </div>
+                        <div onClick={() => onNavigate?.('design', 'pending')} className="bg-amber-50/70 p-2.5 md:p-4 rounded-xl flex flex-col items-center border border-amber-200 cursor-pointer hover:bg-amber-100 hover:border-amber-300 transition-all group text-center shadow-2xs">
+                            <div className="flex items-center gap-1 mb-1">
+                                <ShieldCheck className="w-3 h-3 text-amber-600" />
+                                <span className="text-[8px] md:text-[10px] font-black text-amber-700 uppercase group-hover:text-amber-900">教案内容审批</span>
+                            </div>
+                            <span className="text-xl md:text-2xl font-black text-amber-700 leading-none">{pendingTasks.content}</span>
                         </div>
                     </div>
+
+                    {/* Pending Content Items Quick List for Director */}
+                    {pendingTasks.content > 0 && (
+                        <div className="pt-2 border-t border-gray-100 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                                    <span>教练员提交待审批教案/训练项/示意图 ({pendingTasks.content})</span>
+                                </span>
+                                <button
+                                    onClick={() => onNavigate?.('design', 'pending')}
+                                    className="text-[11px] font-black text-emerald-700 hover:text-emerald-800 flex items-center gap-1 hover:underline cursor-pointer"
+                                >
+                                    <span>前往教案库审核入库</span>
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                {pendingTasks.pendingContentItems.slice(0, 3).map(item => {
+                                    const isSession = item.category === 'session_plan' || item.contentType === 'session_plan';
+                                    const isDrill = item.category === 'drill_item' || item.contentType === 'drill';
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            onClick={() => onNavigate?.('design', 'pending')}
+                                            className="p-2.5 bg-gray-50 hover:bg-emerald-50/80 border border-gray-200 hover:border-emerald-300 rounded-xl cursor-pointer transition-all flex items-center justify-between gap-2 group"
+                                        >
+                                            <div className="min-w-0 flex items-center gap-2">
+                                                <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${
+                                                    isSession ? 'bg-yellow-100 text-yellow-800' :
+                                                    isDrill ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                                                }`}>
+                                                    {isSession ? '教案' : isDrill ? '训练项' : '示意图'}
+                                                </span>
+                                                <span className="text-xs font-bold text-gray-800 group-hover:text-emerald-800 truncate">
+                                                    {item.title}
+                                                </span>
+                                            </div>
+                                            <span className="text-[10px] font-medium text-gray-400 shrink-0">
+                                                {item.authorName || '教练员'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : isDirector ? (
                 <div className="bg-white rounded-xl shadow-md border-l-4 border-gray-200 p-4 md:p-6 flex items-center justify-center">

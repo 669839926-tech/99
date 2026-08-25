@@ -1,25 +1,106 @@
-import React, { useState } from 'react';
-import { PitchType, PitchTheme } from '../../types';
+import React, { useState, useRef } from 'react';
+import { PitchType, PitchTheme, DrillDesign } from '../../types';
 import { PITCH_THEMES, PITCH_LAYOUTS } from './constants';
 import { PitchSvgRenderer } from './PitchSvgRenderer';
-import { X, Layers, Box, Check, Compass, Sparkles } from 'lucide-react';
+import { X, Layers, Box, Check, Compass, Sparkles, Upload } from 'lucide-react';
 
 interface PitchSelectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (pitchType: PitchType, pitchTheme: PitchTheme, is3D: boolean) => void;
+  onUploadImageDiagram?: (diagram: DrillDesign) => void;
+  currentUser?: User | null;
 }
 
 export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
   isOpen,
   onClose,
-  onSelect
+  onSelect,
+  onUploadImageDiagram,
+  currentUser
 }) => {
   const [selectedTheme, setSelectedTheme] = useState<PitchTheme>('White'); // Default to clean white/black high-contrast classic style or switchable to Grass
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // State for naming uploaded diagram
+  const [pendingUpload, setPendingUpload] = useState<{
+    base64: string;
+    fileName: string;
+    title: string;
+    description: string;
+  } | null>(null);
 
   if (!isOpen) return null;
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('请选择有效的图片文件 (PNG, JPG, JPEG, WEBP, SVG 等)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64 = uploadEvent.target?.result as string;
+      if (base64) {
+        const cleanFileName = file.name.replace(/\.[^/.]+$/, '');
+        setPendingUpload({
+          base64,
+          fileName: file.name,
+          title: cleanFileName || '本地导入示意图',
+          description: `从本地设备上传的战术示意图 (${file.name})`
+        });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleConfirmUpload = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingUpload) return;
+    if (!pendingUpload.title.trim()) {
+      alert('请输入示意图名称');
+      return;
+    }
+
+    const newUploadedDiagram: DrillDesign = {
+      id: `uploaded-diagram-${Date.now()}`,
+      title: pendingUpload.title.trim(),
+      description: pendingUpload.description.trim(),
+      category: 'diagram',
+      contentType: 'diagram',
+      pitchType: 'Full',
+      pitchTheme: 'Grass',
+      elements: [],
+      lines: [],
+      previewImage: pendingUpload.base64,
+      diagramImage: pendingUpload.base64,
+      keyPoints: ['本地导入示意图'],
+      createdAt: new Date().toISOString().split('T')[0],
+      isUploadedImage: true,
+      fieldLength: 20,
+      fieldWidth: 15,
+      playerCount: 8,
+      ballCount: 6,
+      coneCount: 8,
+      authorId: currentUser?.id,
+      authorName: currentUser?.name || (currentUser?.role === 'director' ? '青训总监' : '教练员'),
+      authorRole: currentUser?.role || 'coach',
+      approvalStatus: currentUser?.role === 'director' ? 'approved' : 'pending',
+      isPrivate: currentUser?.role !== 'director'
+    };
+
+    if (onUploadImageDiagram) {
+      onUploadImageDiagram(newUploadedDiagram);
+    }
+    setPendingUpload(null);
+    onClose();
+  };
 
   const filteredLayouts = PITCH_LAYOUTS.filter(layout => {
     if (selectedCategory === 'all') return true;
@@ -143,26 +224,47 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
             </div>
           </div>
 
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-gray-100">
-            {[
-              { id: 'all', label: '全部场地 (26)' },
-              { id: 'standard', label: '基础与攻防' },
-              { id: 'box', label: '空白与几何' },
-              { id: 'tactical', label: '战术分区' }
-            ].map(cat => (
+          {/* Category Tabs & Upload Local Image Action */}
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 flex-wrap">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {[
+                { id: 'all', label: '全部场地 (26)' },
+                { id: 'standard', label: '基础与攻防' },
+                { id: 'box', label: '空白与几何' },
+                { id: 'tactical', label: '战术分区' }
+              ].map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`px-3 py-1 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
+                    selectedCategory === cat.id
+                      ? 'bg-bvb-black text-bvb-yellow shadow-sm'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Upload Button */}
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
               <button
-                key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
-                  selectedCategory === cat.id
-                    ? 'bg-bvb-black text-bvb-yellow shadow-sm'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                }`}
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all hover:shadow-md cursor-pointer"
               >
-                {cat.label}
+                <Upload className="w-3.5 h-3.5" />
+                <span>上传本地图片示意图</span>
               </button>
-            ))}
+            </div>
           </div>
         </div>
 
@@ -233,6 +335,88 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Upload Naming Modal Step */}
+      {pendingUpload && (
+        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-gray-50 via-white to-gray-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <Upload className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-gray-900">导入示意图命名</h3>
+                  <p className="text-[10px] text-gray-500">{pendingUpload.fileName}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPendingUpload(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmUpload} className="p-6 space-y-4">
+              {/* Image Preview */}
+              <div className="relative rounded-2xl overflow-hidden border border-gray-200 bg-gray-950 aspect-[16/10] flex items-center justify-center shadow-inner">
+                <img
+                  src={pendingUpload.base64}
+                  alt={pendingUpload.title}
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-gray-800 mb-1.5">
+                  示意图名称 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={pendingUpload.title}
+                  onChange={(e) => setPendingUpload({ ...pendingUpload, title: e.target.value })}
+                  placeholder="请输入示意图名称..."
+                  autoFocus
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-sm font-bold text-gray-900 outline-none transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-gray-800 mb-1.5">
+                  备注说明 (选填)
+                </label>
+                <textarea
+                  value={pendingUpload.description}
+                  onChange={(e) => setPendingUpload({ ...pendingUpload, description: e.target.value })}
+                  placeholder="可填写该示意图的战术要点或使用说明..."
+                  rows={2}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 text-xs text-gray-700 outline-none transition-all resize-none"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPendingUpload(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-black transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>保存并导入内容库</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
