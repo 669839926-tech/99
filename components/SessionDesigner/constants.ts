@@ -3,11 +3,14 @@ import { PitchType, PitchTheme, DrillDesign } from '../../types';
 export interface PitchThemeConfig {
   id: PitchTheme;
   name: string;
+  isVip?: boolean;
   bgColor: string;
   lineColor: string;
   stripeColor?: string;
   previewBg: string;
   isStripe?: boolean;
+  containerBg: string;
+  dotColor: string;
 }
 
 export const PITCH_THEMES: PitchThemeConfig[] = [
@@ -16,48 +19,63 @@ export const PITCH_THEMES: PitchThemeConfig[] = [
     name: '经典白',
     bgColor: '#ffffff',
     lineColor: '#1f2937',
-    previewBg: '#ffffff'
+    previewBg: '#ffffff',
+    containerBg: '#ffffff',
+    dotColor: '#e5e7eb'
   },
   {
     id: 'Black',
     name: '极简黑白',
-    bgColor: '#111827',
-    lineColor: '#ffffff',
-    previewBg: '#111827'
+    bgColor: '#ffffff',
+    lineColor: '#1e293b',
+    previewBg: '#ffffff',
+    containerBg: '#ffffff',
+    dotColor: '#e2e8f0'
   },
   {
     id: 'Grey',
     name: '灰色',
-    bgColor: '#4b5563',
-    lineColor: '#e5e7eb',
-    previewBg: '#4b5563'
+    isVip: true,
+    bgColor: '#475569',
+    lineColor: '#ffffff',
+    previewBg: 'linear-gradient(135deg, #475569 0%, #334155 100%)',
+    containerBg: '#f1f5f9',
+    dotColor: '#cbd5e1'
   },
   {
     id: 'Grass',
     name: '经典草地',
-    bgColor: '#2f855a',
+    isVip: true,
+    bgColor: '#72a35c',
+    stripeColor: '#86b86f',
     lineColor: '#ffffff',
-    stripeColor: '#276749',
-    previewBg: '#2f855a',
-    isStripe: true
+    previewBg: '#72a35c',
+    isStripe: true,
+    containerBg: '#eaf3e7',
+    dotColor: '#cee3c9'
   },
   {
     id: 'Blue',
     name: '天青蓝',
-    bgColor: '#1e40af',
+    isVip: true,
+    bgColor: '#0059b3',
+    stripeColor: '#006edc',
     lineColor: '#ffffff',
-    stripeColor: '#1d4ed8',
-    previewBg: '#1e40af',
-    isStripe: true
+    previewBg: 'linear-gradient(135deg, #0059b3 0%, #003d80 100%)',
+    isStripe: true,
+    containerBg: '#ebf4ff',
+    dotColor: '#bfdbfe'
   },
   {
     id: 'VibrantGreen',
-    name: '青翠绿',
-    bgColor: '#15803d',
+    name: '青草绿',
+    isVip: true,
+    bgColor: '#20b76e',
     lineColor: '#ffffff',
-    stripeColor: '#166534',
-    previewBg: '#15803d',
-    isStripe: true
+    previewBg: 'linear-gradient(135deg, #20b76e 0%, #16a34a 100%)',
+    isStripe: false,
+    containerBg: '#dcf5e7',
+    dotColor: '#b5ebd0'
   }
 ];
 
@@ -70,17 +88,17 @@ export interface PitchLayoutConfig {
 }
 
 export const PITCH_LAYOUTS: PitchLayoutConfig[] = [
-  // Page 1 (Image 1)
+  // Page 1
   { id: 'Midfield', name: '中场', category: 'standard', aspectRatio: '16/10' },
-  { id: 'DefensiveThird', name: '防守三区', category: 'standard', aspectRatio: '16/10' },
-  { id: 'AttackingThird', name: '进攻三区', category: 'standard', aspectRatio: '16/10' },
-  { id: 'Full', name: '完整球场', category: 'standard', aspectRatio: '16/10' },
+  { id: 'DefensiveThird', name: '防守三区', category: 'standard', isVip: true, aspectRatio: '16/10' },
+  { id: 'AttackingThird', name: '进攻三区', category: 'standard', isVip: true, aspectRatio: '16/10' },
+  { id: 'Full', name: '完整球场', category: 'standard', isVip: true, aspectRatio: '16/10' },
   { id: 'HalfDefend', name: '半场（防守）', category: 'half', aspectRatio: '1/1' },
   { id: 'HalfAttack', name: '半场（进攻）', category: 'half', aspectRatio: '1/1' },
   { id: 'Futsal', name: '五人制球场', category: 'standard', aspectRatio: '16/10' },
   { id: 'SquareBox', name: '空白正方形', category: 'box', aspectRatio: '1/1' },
 
-  // Page 2 (Image 2)
+  // Page 2
   { id: 'RectangleBox', name: '空白长方形', category: 'box', aspectRatio: '16/10' },
   { id: 'RectangleVertical', name: '空白长方形（竖版）', category: 'box', isVip: true, aspectRatio: '10/16' },
   { id: 'DualRectangleVertical', name: '双长方形（竖版）', category: 'box', isVip: true, aspectRatio: '16/10' },

@@ -43,8 +43,21 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
   // Background pattern with grass stripes if applicable
   const renderBackground = () => {
     if (theme.isStripe && theme.stripeColor) {
-      const stripesCount = 10;
-      const stripeSize = isVertical || isSquare || isTwoThirdsVertical ? height / stripesCount : width / stripesCount;
+      const isHorizontalStripes =
+        isVertical ||
+        isSquare ||
+        isTwoThirdsVertical ||
+        pitchType === 'Midfield' ||
+        pitchType === 'DefensiveThird' ||
+        pitchType === 'AttackingThird';
+
+      const stripesCount =
+        pitchType === 'Midfield' || pitchType === 'DefensiveThird' || pitchType === 'AttackingThird' || isSquare
+          ? 6
+          : (isTwoThirdsVertical || pitchType === 'TwoThirdsHorizontal' ? 8 : 10);
+
+      const stripeSize = isHorizontalStripes ? height / stripesCount : width / stripesCount;
+
       return (
         <g>
           <rect width={width} height={height} fill={theme.bgColor} />
@@ -52,12 +65,11 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
             i % 2 === 1 ? (
               <rect
                 key={i}
-                x={isVertical || isSquare || isTwoThirdsVertical ? 0 : i * stripeSize}
-                y={isVertical || isSquare || isTwoThirdsVertical ? i * stripeSize : 0}
-                width={isVertical || isSquare || isTwoThirdsVertical ? width : stripeSize}
-                height={isVertical || isSquare || isTwoThirdsVertical ? stripeSize : height}
+                x={isHorizontalStripes ? 0 : i * stripeSize}
+                y={isHorizontalStripes ? i * stripeSize : 0}
+                width={isHorizontalStripes ? width : stripeSize}
+                height={isHorizontalStripes ? stripeSize : height}
                 fill={theme.stripeColor}
-                opacity={0.35}
               />
             ) : null
           ))}
@@ -177,16 +189,16 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
       case 'Full':
         return renderFullPitchMarkings();
 
-      // 5. 半场 (防守) (Image 1, Item 5)
+      // 5. 半场 (防守) (Image 1, Item 5 -> Image 2 left)
       case 'HalfDefend':
       case 'Half':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
             <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
-            {/* Top Midfield line & center circle arc */}
-            <line x1={pad} y1={pad + 50} x2={width - pad} y2={pad + 50} />
-            <circle cx={cx} cy={pad + 50} r={70} />
-            <circle cx={cx} cy={pad + 50} r={3.2} fill={lc} />
+            {/* Top Midfield line & center circle arc (semi-circle curving down into pitch) */}
+            <line x1={pad} y1={pad + 45} x2={width - pad} y2={pad + 45} />
+            <path d={`M ${cx - 65} ${pad + 45} A 65 65 0 0 0 ${cx + 65} ${pad + 45}`} />
+            
             {/* Bottom Goal Area */}
             <rect x={cx - 130} y={height - pad - 140} width={260} height={140} />
             <rect x={cx - 55} y={height - pad - 50} width={110} height={50} />
@@ -195,7 +207,7 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
           </g>
         );
 
-      // 6. 半场 (进攻) (Image 1, Item 6)
+      // 6. 半场 (进攻) (Image 1, Item 6 -> Image 2 right)
       case 'HalfAttack':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
@@ -205,10 +217,10 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
             <rect x={cx - 55} y={pad} width={110} height={50} />
             <circle cx={cx} cy={pad + 95} r={3.2} fill={lc} />
             <path d={`M ${cx - 55} ${pad + 140} A 60 60 0 0 0 ${cx + 55} ${pad + 140}`} />
-            {/* Bottom Midfield line & center circle */}
-            <line x1={pad} y1={height - pad - 50} x2={width - pad} y2={height - pad - 50} />
-            <circle cx={cx} cy={height - pad - 50} r={70} />
-            <circle cx={cx} cy={height - pad - 50} r={3.2} fill={lc} />
+            
+            {/* Bottom Midfield line & center circle arc (semi-circle curving up into pitch) */}
+            <line x1={pad} y1={height - pad - 45} x2={width - pad} y2={height - pad - 45} />
+            <path d={`M ${cx - 65} ${height - pad - 45} A 65 65 0 0 1 ${cx + 65} ${height - pad - 45}`} />
           </g>
         );
 
@@ -345,20 +357,19 @@ export const PitchSvgRenderer: React.FC<PitchSvgRendererProps> = ({
           </g>
         );
 
-      // 16. 五人制球场 (纵向) (Image 2, Item 8)
+      // 16. 五人制球场 (纵向) (Image 4)
       case 'FutsalVertical':
         return (
           <g stroke={lc} strokeWidth={lw} fill="none">
             <rect x={pad} y={pad} width={innerW} height={innerH} rx={2} />
             <line x1={pad} y1={cy} x2={width - pad} y2={cy} />
-            <circle cx={cx} cy={cy} r={65} />
-            <circle cx={cx} cy={cy} r={3.2} fill={lc} />
-            {/* Top D-zone */}
-            <path d={`M ${cx - 120} ${pad} A 120 120 0 0 1 ${cx + 120} ${pad}`} />
-            <circle cx={cx} cy={pad + 100} r={3.2} fill={lc} />
-            {/* Bottom D-zone */}
-            <path d={`M ${cx - 120} ${height - pad} A 120 120 0 0 0 ${cx + 120} ${height - pad}`} />
-            <circle cx={cx} cy={height - pad - 100} r={3.2} fill={lc} />
+            <circle cx={cx} cy={cy} r={60} />
+            {/* Top D-zone (curves into pitch downwards) */}
+            <path d={`M ${cx - 100} ${pad} A 100 100 0 0 0 ${cx + 100} ${pad}`} />
+            <circle cx={cx} cy={pad + 120} r={3.2} fill={lc} />
+            {/* Bottom D-zone (curves into pitch upwards) */}
+            <path d={`M ${cx - 100} ${height - pad} A 100 100 0 0 1 ${cx + 100} ${height - pad}`} />
+            <circle cx={cx} cy={height - pad - 120} r={3.2} fill={lc} />
           </g>
         );
 

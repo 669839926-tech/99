@@ -96,52 +96,73 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
             </button>
           </div>
 
-          {/* Theme Color Bar & Category Tabs */}
-          <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t border-gray-200">
-            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
-              {[
-                { id: 'all', label: '全部场地 (26)' },
-                { id: 'standard', label: '基础与攻防' },
-                { id: 'box', label: '空白与几何' },
-                { id: 'tactical', label: '战术分区' }
-              ].map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategory(cat.id)}
-                  className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
-                    selectedCategory === cat.id
-                      ? 'bg-bvb-black text-bvb-yellow shadow-sm'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[11px] font-bold text-gray-400 mr-1">主题配色:</span>
+          {/* Theme Color Bar */}
+          <div className="pt-2 border-t border-gray-200">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3">
               {PITCH_THEMES.map(theme => {
                 const isSelected = selectedTheme === theme.id;
                 return (
                   <button
                     key={theme.id}
                     onClick={() => setSelectedTheme(theme.id)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-black transition-all ${
-                      isSelected
-                        ? 'border-emerald-600 bg-white shadow-sm ring-2 ring-emerald-500/20 text-gray-900 scale-105'
-                        : 'border-gray-200 bg-white/80 hover:bg-white text-gray-600'
-                    }`}
+                    className="flex flex-col items-start gap-1 group text-left transition-transform hover:-translate-y-0.5"
                   >
-                    <span
-                      className="w-3.5 h-3.5 rounded-md border border-black/15 shadow-inner inline-block"
-                      style={{ backgroundColor: theme.previewBg }}
-                    />
-                    <span>{theme.name}</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-bold text-gray-700 group-hover:text-gray-900">
+                        {theme.name}
+                      </span>
+                      {theme.isVip && (
+                        <span className="inline-flex items-center justify-center px-1 py-0.2 rounded text-[9px] font-black italic bg-amber-500 text-white leading-none">
+                          VIP
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className={`relative w-full h-10 sm:h-11 rounded-lg overflow-hidden border transition-all ${
+                        isSelected
+                          ? 'border-emerald-600 ring-2 ring-emerald-500/30 shadow-sm'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                      style={{
+                        background:
+                          theme.id === 'Grass'
+                            ? 'repeating-linear-gradient(90deg, #72a35c, #72a35c 9px, #86b86f 9px, #86b86f 18px)'
+                            : theme.previewBg,
+                        borderColor: theme.id === 'Black' ? '#1f2937' : undefined
+                      }}
+                    >
+                      {isSelected && (
+                        <div className="absolute bottom-0 right-0 w-0 h-0 border-solid border-t-transparent border-l-transparent border-r-[#ea580c] border-b-[#ea580c] border-t-[10px] border-l-[10px] border-r-[10px] border-b-[10px] flex items-end justify-end">
+                          <Check className="w-2.5 h-2.5 text-white absolute -right-2 -bottom-2" />
+                        </div>
+                      )}
+                    </div>
                   </button>
                 );
               })}
             </div>
+          </div>
+
+          {/* Category Tabs */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-gray-100">
+            {[
+              { id: 'all', label: '全部场地 (26)' },
+              { id: 'standard', label: '基础与攻防' },
+              { id: 'box', label: '空白与几何' },
+              { id: 'tactical', label: '战术分区' }
+            ].map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1 rounded-xl text-xs font-black transition-all ${
+                  selectedCategory === cat.id
+                    ? 'bg-bvb-black text-bvb-yellow shadow-sm'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -149,6 +170,7 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
         <div className="p-4 sm:p-6 overflow-y-auto flex-1 custom-scrollbar bg-gray-50/40">
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 sm:gap-4">
             {filteredLayouts.map(layout => {
+              const currentThemeConfig = PITCH_THEMES.find(t => t.id === selectedTheme) || PITCH_THEMES[0];
               return (
                 <div
                   key={layout.id}
@@ -158,8 +180,15 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
                   }}
                   className="group relative bg-white rounded-xl sm:rounded-2xl border border-gray-200 hover:border-emerald-500 overflow-hidden flex flex-col items-stretch cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
                 >
-                  {/* SVG Pitch Canvas Card Preview */}
-                  <div className="w-full aspect-[16/10] bg-[#fafafa] flex items-center justify-center p-2.5 sm:p-3.5 group-hover:bg-emerald-50/30 transition-colors">
+                  {/* SVG Pitch Canvas Card Preview with Themed Dot Matrix */}
+                  <div
+                    className="w-full aspect-[16/10] flex items-center justify-center p-2.5 sm:p-3.5 transition-colors"
+                    style={{
+                      backgroundColor: currentThemeConfig.containerBg,
+                      backgroundImage: `radial-gradient(${currentThemeConfig.dotColor} 1.2px, transparent 1.2px)`,
+                      backgroundSize: '10px 10px'
+                    }}
+                  >
                     <div className="w-full h-full flex items-center justify-center max-w-[200px] max-h-[120px]">
                       <PitchSvgRenderer
                         pitchType={layout.id}

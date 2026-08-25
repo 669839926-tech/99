@@ -498,9 +498,10 @@ export type ElementType =
   | 'AgilityRing' | 'Ladder' | 'Hurdle' | 'Mannequin' | 'Rebounder' 
   | 'Goal' | 'MiniGoal' | 'MinimalGoal' 
   | 'Text' | 'AreaSquare' | 'AreaRect' | 'AreaCircle' | 'AreaTriangle' | 'AreaDiamond'
-  | 'BadgeNumber' | 'DistanceMeter' | 'Vest' | 'Chute';
+  | 'BadgeNumber' | 'DistanceMeter' | 'Vest' | 'Chute'
+  | 'Decision' | 'DiagonalProtection';
 
-export type LineType = 'Pass' | 'Run' | 'Dribble' | 'DribbleWave2' | 'Boundary' | 'CurvePass' | 'Shot';
+export type LineType = 'Pass' | 'Run' | 'Dribble' | 'DribbleWave2' | 'Boundary' | 'CurvePass' | 'Shot' | 'Connection';
 
 export interface DesignElement {
     id: string;
