@@ -578,9 +578,13 @@ export interface DrillDesign {
     isUploadedImage?: boolean;
     tags?: string[];
     
-    // Drill Item specific
+    // Drill Item & Session Plan Topic Binding
     ageGroups?: string[];
     topic?: string;
+    topicCode?: string;
+    topicCategory?: string;
+    topicType?: 'tech' | 'scenario';
+    topicLabel?: string;
     drillStage?: 'warmup' | 'technical' | 'skill' | 'opposed' | 'scrimmage' | string;
     durationMinutes?: number;
     fieldLength?: number;

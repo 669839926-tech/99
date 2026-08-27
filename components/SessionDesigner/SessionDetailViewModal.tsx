@@ -131,7 +131,7 @@ export const SessionDetailViewModal: React.FC<SessionDetailViewModalProps> = ({
     : planStages.filter(s => s.id === selectedStageTab);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:z-auto">
+    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:z-auto">
       {/* CSS for print media formatting */}
       <style>{`
         @media print {
@@ -746,7 +746,7 @@ export const SessionDetailViewModal: React.FC<SessionDetailViewModalProps> = ({
 
       {/* Full Drill Detail & Large Tactical Diagram Preview Modal */}
       {previewDrill && (
-        <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-[210] bg-black/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-gray-900 border border-gray-700 text-gray-100 rounded-3xl w-full max-w-5xl overflow-hidden shadow-2xl flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="px-6 py-3.5 border-b border-gray-800 bg-gray-950 flex items-center justify-between">

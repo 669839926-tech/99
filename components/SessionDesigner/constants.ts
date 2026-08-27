@@ -252,8 +252,152 @@ export const INITIAL_PRESET_DRILLS: DrillDesign[] = [
 
 export const INITIAL_PRESET_PLANS: DrillDesign[] = [
   {
+    id: 'plan-preset-qgqm',
+    title: '球感启蒙',
+    topic: '球感启蒙',
+    topicCode: 'YK1',
+    topicCategory: '运控球',
+    topicType: 'tech',
+    topicLabel: '[基础技术] 运控球',
+    category: 'session_plan',
+    contentType: 'session_plan',
+    pitchType: 'Full',
+    pitchTheme: 'Grass',
+    elements: [],
+    lines: [],
+    description: '建立多部位触球能力与人球结合感觉，提高弱侧脚触球频次，消除对球的不确定感。',
+    keyPoints: [
+      '双脚脚内侧、脚外侧、脚底交替触球',
+      '重心降低，保持膝关节微屈',
+      '触球节奏轻柔连贯，触球后快速调整步频'
+    ],
+    totalDuration: 90,
+    targetAge: 'U8 (6-8岁)',
+    sessionStages: [
+      {
+        id: 'stg-qg1',
+        name: '1. 热身环节',
+        duration: 15,
+        focus: '球感熟悉与身体灵活性热身',
+        drillIds: [],
+        coachNotes: '脚内侧扣球、脚底拉球与轻跳结合'
+      },
+      {
+        id: 'stg-qg2',
+        name: '2. 技术环节',
+        duration: 20,
+        focus: '多部位原地与行进间触球组合练习',
+        drillIds: [],
+        coachNotes: '每人一球，限制区域内听口令变向'
+      },
+      {
+        id: 'stg-qg3',
+        name: '3. 技能环节',
+        duration: 20,
+        focus: '红绿灯变向与护球游戏',
+        drillIds: ['drill-preset-1'],
+        coachNotes: '观察周围空间，不与其他队员发生碰撞'
+      },
+      {
+        id: 'stg-qg4',
+        name: '4. 情景对抗',
+        duration: 20,
+        focus: '1v1 抓尾巴与狭小空间运球摆脱',
+        drillIds: [],
+        coachNotes: '利用身体和变向护球'
+      },
+      {
+        id: 'stg-qg5',
+        name: '5. 小比赛',
+        duration: 15,
+        focus: '3v3 多小球门实战赛',
+        drillIds: [],
+        coachNotes: '鼓励多带球突破与尝试变向'
+      }
+    ],
+    createdAt: '2026-04-03',
+    authorId: 'u1',
+    authorName: '青训总监',
+    authorRole: 'director',
+    approvalStatus: 'approved',
+    isPrivate: false
+  },
+  {
+    id: 'plan-preset-sm1',
+    title: '正脚背射门',
+    topic: '正脚背射门',
+    topicCode: 'SM1',
+    topicCategory: '射门',
+    topicType: 'tech',
+    topicLabel: '[基础技术] 射门',
+    category: 'session_plan',
+    contentType: 'session_plan',
+    pitchType: 'Full',
+    pitchTheme: 'Grass',
+    elements: [],
+    lines: [],
+    description: '掌握正脚背射门的支撑脚站位、摆腿发力与脚踝锁死要领，提升射门力量与命中率。',
+    keyPoints: [
+      '支撑脚距离球侧面一拳半，脚尖指向球门',
+      '击球瞬间脚踝紧绷锁死，正脚背坚决击打球中下部',
+      '击球后顺势随前摆动，身体前倾压住重心'
+    ],
+    totalDuration: 90,
+    targetAge: 'U9 (8-9岁)',
+    sessionStages: [
+      {
+        id: 'stg-sm1',
+        name: '1. 热身环节',
+        duration: 15,
+        focus: '射门动作动力定型与下肢关节动态激活',
+        drillIds: [],
+        coachNotes: '原地模拟摆腿与支撑腿下蹲缓冲'
+      },
+      {
+        id: 'stg-sm2',
+        name: '2. 技术环节',
+        duration: 20,
+        focus: '固定球与微动球正脚背抽射打靶',
+        drillIds: ['drill-preset-2'],
+        coachNotes: '严格纠正脚踝松弛与身体后仰问题'
+      },
+      {
+        id: 'stg-sm3',
+        name: '3. 技能环节',
+        duration: 20,
+        focus: '迎球推传后接顺势正脚背大力低射',
+        drillIds: [],
+        coachNotes: '强调两步助跑节奏与触球准确性'
+      },
+      {
+        id: 'stg-sm4',
+        name: '4. 情景对抗',
+        duration: 20,
+        focus: '2v1 快速推进并在防守封堵前起脚打门',
+        drillIds: [],
+        coachNotes: '创造射门角度后坚决果断起脚'
+      },
+      {
+        id: 'stg-sm5',
+        name: '5. 小比赛',
+        duration: 15,
+        focus: '5v5 快速终结赛（半场内起脚进球算2分）',
+        drillIds: [],
+        coachNotes: '鼓励进入射门区后果断终结'
+      }
+    ],
+    createdAt: '2026-04-03',
+    authorId: 'u1',
+    authorName: '青训总监',
+    authorRole: 'director',
+    approvalStatus: 'approved',
+    isPrivate: false
+  },
+  {
     id: 'plan-preset-1',
     title: 'U9梯队: 进攻三区变向突破与二人传切主题课',
+    topic: '二人传切与1v1突破',
+    topicCategory: '进攻',
     category: 'session_plan',
     contentType: 'session_plan',
     pitchType: 'Full',

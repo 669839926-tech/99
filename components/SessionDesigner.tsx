@@ -8,6 +8,7 @@ import { CreateSessionPlanModal } from './SessionDesigner/CreateSessionPlanModal
 import { SessionDetailViewModal } from './SessionDesigner/SessionDetailViewModal';
 import { RenameUploadedDiagramModal } from './SessionDesigner/RenameUploadedDiagramModal';
 import { INITIAL_PRESET_DRILLS, INITIAL_PRESET_PLANS } from './SessionDesigner/constants';
+import { BasicTechItem, ScenarioTheme } from '../src/philosophyData';
 import { X, Save, FileText } from 'lucide-react';
 
 interface SessionDesignerProps {
@@ -16,6 +17,8 @@ interface SessionDesignerProps {
   onDeleteDesign: (id: string) => void;
   currentUser: User | null;
   initialFilter?: string;
+  basicTechThemes?: BasicTechItem[];
+  scenarioThemes?: ScenarioTheme[];
 }
 
 export const SessionDesigner: React.FC<SessionDesignerProps> = ({
@@ -23,7 +26,9 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
   onSaveDesign,
   onDeleteDesign,
   currentUser,
-  initialFilter
+  initialFilter,
+  basicTechThemes,
+  scenarioThemes
 }) => {
   // Combine stored designs with initial presets if empty
   const activeDesigns = designs && designs.length > 0
@@ -105,7 +110,12 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
 
   // Common Actions
   const handleEditItem = (item: DrillDesign) => {
-    const isUploaded = Boolean(item.isUploadedImage);
+    const isUploaded = Boolean(
+      item.isUploadedImage ||
+      ((item.category === 'diagram' || item.contentType === 'diagram') &&
+       Boolean(item.previewImage || item.diagramImage) &&
+       (!item.elements || item.elements.length === 0))
+    );
 
     if (isUploaded) {
       setEditingUploadedDiagram(item);
@@ -252,6 +262,8 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
           setIsCreateDrillModalOpen(true);
         }}
         initialPlan={editingDesign}
+        basicTechThemes={basicTechThemes}
+        scenarioThemes={scenarioThemes}
       />
 
       {/* Modal 4: Full Detail & Print Modal */}

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan, Match } from '../types';
-import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink, FileSpreadsheet, UserPlus } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink, FileSpreadsheet, UserPlus, Sparkles, Eye, BookOpen } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { exportToPDF } from '../services/pdfService';
@@ -9,6 +9,9 @@ import * as XLSX from 'xlsx';
 import { BasicTechItem, ScenarioTheme, BASIC_TECH_THEMES, SCENARIO_THEMES } from '../src/philosophyData';
 import MatchEditModal from './MatchEditModal';
 import { MOCK_USERS } from '../constants';
+import { ThemeSelectorModal } from './ThemeSelectorModal';
+import { INITIAL_PRESET_PLANS } from './SessionDesigner/constants';
+import { SessionDetailViewModal } from './SessionDesigner/SessionDetailViewModal';
 
 const getLogOperatorName = (s: TrainingSession, usersList?: User[]): string => {
   if (s.logCoachName) return s.logCoachName;
@@ -61,293 +64,12 @@ interface TrainingPlannerProps {
   onAddMatch?: (match: Match) => void;
 }
 
-interface ThemeSelectorModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelect: (focus: string, content: string) => void;
-  basicTechThemes?: BasicTechItem[];
-  scenarioThemes?: ScenarioTheme[];
-}
-
 const getLocalDateString = () => {
     const d = new Date();
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
-};
-
-const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
-  isOpen,
-  onClose,
-  onSelect,
-  basicTechThemes = BASIC_TECH_THEMES,
-  scenarioThemes = SCENARIO_THEMES
-}) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'tech' | 'scenario'>('all');
-  const [selectedTechCategory, setSelectedTechCategory] = useState<string>('all');
-  const [selectedScenarioStage, setSelectedScenarioStage] = useState<string>('all');
-
-  const techCategories = useMemo(() => {
-    const list = (basicTechThemes || BASIC_TECH_THEMES).map(t => t.focus);
-    return Array.from(new Set(list)).filter(Boolean);
-  }, [basicTechThemes]);
-
-  const scenarioStages = useMemo(() => {
-    const list = (scenarioThemes || SCENARIO_THEMES).map(s => s.stage);
-    return Array.from(new Set(list)).filter(Boolean);
-  }, [scenarioThemes]);
-
-  const handleTabChange = (tab: 'all' | 'tech' | 'scenario') => {
-    setActiveTab(tab);
-    setSelectedTechCategory('all');
-    setSelectedScenarioStage('all');
-  };
-
-  if (!isOpen) return null;
-
-  const techItems = (basicTechThemes || BASIC_TECH_THEMES).map(t => ({
-    type: 'tech' as const,
-    key: `tech-${t.code}`,
-    code: t.code,
-    category: t.focus,
-    subCategory: t.focus,
-    theme: t.theme,
-    focusLabel: `[基础技术] ${t.focus}`,
-    displayTag: '基础技术',
-    description: t.objective || '',
-    teachingPoints: t.teachingPoints || '',
-  }));
-
-  const scenarioItems = (scenarioThemes || SCENARIO_THEMES).map(s => ({
-    type: 'scenario' as const,
-    key: `scenario-${s.code}`,
-    code: s.code,
-    category: `${s.stage} · ${s.moment}`,
-    subCategory: s.stage,
-    theme: s.theme,
-    focusLabel: `[比赛场景] ${s.stage} · ${s.moment}`,
-    displayTag: '比赛场景',
-    description: s.objective || '',
-    teachingPoints: s.cue || '',
-  }));
-
-  const allItems = [...techItems, ...scenarioItems];
-
-  const filteredItems = allItems.filter(item => {
-    const matchesSearch = 
-      item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.theme.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-    if (!matchesSearch) return false;
-
-    if (activeTab === 'tech') {
-      if (item.type !== 'tech') return false;
-      if (selectedTechCategory !== 'all' && item.subCategory !== selectedTechCategory) return false;
-    } else if (activeTab === 'scenario') {
-      if (item.type !== 'scenario') return false;
-      if (selectedScenarioStage !== 'all' && item.subCategory !== selectedScenarioStage) return false;
-    } else {
-      // activeTab === 'all'
-      if (selectedTechCategory !== 'all' && item.type === 'tech' && item.subCategory !== selectedTechCategory) return false;
-      if (selectedScenarioStage !== 'all' && item.type === 'scenario' && item.subCategory !== selectedScenarioStage) return false;
-    }
-    return true;
-  });
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-        <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
-          <div>
-            <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
-              <span className="text-bvb-yellow">★</span>
-              选择俱乐部体系库核心主题
-            </h3>
-            <p className="text-gray-400 text-xs mt-0.5">从俱乐部标准技术库与比赛场景库中统一检索与选择核心训练主题</p>
-          </div>
-          <button onClick={onClose} className="p-1 px-2 hover:bg-gray-800 rounded text-gray-400 hover:text-white transition-colors">
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-3 items-center justify-between shrink-0">
-          <div className="flex gap-1.5 p-1 bg-gray-200/60 rounded-xl w-full sm:w-auto">
-            <button
-              onClick={() => handleTabChange('all')}
-              className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'all'
-                  ? 'bg-white shadow-sm text-bvb-black'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              全部体系 ({allItems.length})
-            </button>
-            <button
-              onClick={() => handleTabChange('tech')}
-              className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'tech'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-blue-600'
-              }`}
-            >
-              基础技术 ({techItems.length})
-            </button>
-            <button
-              onClick={() => handleTabChange('scenario')}
-              className={`flex-1 sm:flex-none py-1.5 px-4 rounded-lg text-xs font-bold transition-all ${
-                activeTab === 'scenario'
-                  ? 'bg-green-600 text-white shadow-sm'
-                  : 'text-gray-500 hover:text-green-600'
-              }`}
-            >
-              比赛场景 ({scenarioItems.length})
-            </button>
-          </div>
-
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="搜索编码、主题、大类..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 bg-white rounded-xl text-xs font-bold outline-none ring-bvb-yellow focus:ring-1 focus:border-bvb-yellow"
-            />
-          </div>
-        </div>
-
-        {/* 筛选过滤条: 技术分类 & 比赛阶段 */}
-        {((activeTab === 'tech' || activeTab === 'all') && techCategories.length > 0) && (
-          <div className="px-4 py-2 bg-slate-50 border-b border-gray-100 flex flex-wrap gap-1.5 items-center shrink-0">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider mr-1">技术分类:</span>
-            <button
-              type="button"
-              onClick={() => setSelectedTechCategory('all')}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                selectedTechCategory === 'all'
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              全部技术
-            </button>
-            {techCategories.map(cat => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedTechCategory(cat)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                  selectedTechCategory === cat
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {((activeTab === 'scenario' || activeTab === 'all') && scenarioStages.length > 0) && (
-          <div className="px-4 py-2 bg-slate-50 border-b border-gray-100 flex flex-wrap gap-1.5 items-center shrink-0">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider mr-1">比赛阶段:</span>
-            <button
-              type="button"
-              onClick={() => setSelectedScenarioStage('all')}
-              className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                selectedScenarioStage === 'all'
-                  ? 'bg-green-600 text-white shadow-xs'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-              }`}
-            >
-              全部阶段
-            </button>
-            {scenarioStages.map(stage => (
-              <button
-                key={stage}
-                type="button"
-                onClick={() => setSelectedScenarioStage(stage)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                  selectedScenarioStage === stage
-                    ? 'bg-green-600 text-white shadow-xs'
-                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
-                }`}
-              >
-                {stage}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 bg-gray-50/50">
-          {filteredItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-              <Search className="w-10 h-10 mb-2 stroke-1" />
-              <p className="text-xs font-bold font-mono">没有找到匹配的核心训练主题</p>
-            </div>
-          ) : (
-            filteredItems.map(item => (
-              <div
-                key={item.key}
-                onClick={() => {
-                  onSelect(item.focusLabel, `${item.theme} (${item.code})`);
-                  onClose();
-                }}
-                className="group cursor-pointer hover:scale-[1.005] transition-all duration-150 relative bg-white border border-gray-200 hover:border-bvb-yellow rounded-xl p-3 shadow-sm hover:shadow-md flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between"
-              >
-                <div
-                  className={`absolute left-0 top-0 bottom-0 w-1.5 rounded-l-xl ${
-                    item.type === 'tech' ? 'bg-blue-500' : 'bg-green-500'
-                  }`}
-                />
-                
-                <div className="pl-2 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono px-1.5 py-0.5 rounded text-[10px] font-black tracking-wider uppercase text-white bg-bvb-black">
-                      {item.code}
-                    </span>
-                    <span className="text-xs font-black text-gray-800">{item.theme}</span>
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                        item.type === 'tech'
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'bg-green-50 text-green-600'
-                      }`}
-                    >
-                      {item.category}
-                    </span>
-                  </div>
-                  {item.description && (
-                    <p className="text-[11px] text-gray-500 font-medium line-clamp-2">
-                      <span className="font-extrabold text-gray-600">目标: </span>
-                      {item.description}
-                    </p>
-                  )}
-                  {item.teachingPoints && (
-                    <p className="text-[10px] text-gray-400 line-clamp-1">
-                      <span className="font-extrabold text-gray-500">提示: </span>
-                      {item.teachingPoints}
-                    </p>
-                  )}
-                </div>
-
-                <button
-                  type="button"
-                  className="shrink-0 self-end sm:self-center px-4 py-1.5 bg-gray-50 hover:bg-bvb-yellow hover:text-bvb-black text-gray-700 rounded-lg text-xs font-black transition-colors border border-gray-100 group-hover:bg-bvb-yellow group-hover:text-bvb-black"
-                >
-                  选择
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
-  );
 };
 
 type TimeScope = 'month' | 'quarter' | 'year';
@@ -1029,7 +751,7 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, allSessions = [], onUpdate, onDuplicate, onDelete, onClose }) => {
+const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, allSessions = [], allAvailableDesigns = [], onViewPlanDetail, onUpdate, onDuplicate, onDelete, onClose }) => {
     const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
     const teamPlayers = useMemo(() => players.filter((p: Player) => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find((t: Team) => t.id === session.teamId), [teams, session.teamId]);
@@ -1067,6 +789,25 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
         }
         return copy;
     });
+
+    const linkedDesign = useMemo(() => {
+        if (!allAvailableDesigns || allAvailableDesigns.length === 0) return null;
+        if (localSession.linkedDesignId) {
+            const found = allAvailableDesigns.find((d: DrillDesign) => d.id === localSession.linkedDesignId);
+            if (found) return found;
+        }
+        const sTitle = (localSession.title || '').trim().toLowerCase();
+        const sFocus = (localSession.focus || '').trim().toLowerCase();
+        return allAvailableDesigns.find((d: DrillDesign) => {
+            const dTitle = (d.title || '').trim().toLowerCase();
+            const dTopic = (d.topic || '').trim().toLowerCase();
+            const dCode = (d.topicCode || '').trim().toLowerCase();
+            if (sTitle && (dTitle === sTitle || dTitle.includes(sTitle) || sTitle.includes(dTitle))) return true;
+            if (dCode && sTitle.includes(dCode)) return true;
+            if (dTopic && sFocus && (dTopic.includes(sFocus) || sFocus.includes(dTopic))) return true;
+            return false;
+        }) || null;
+    }, [allAvailableDesigns, localSession.linkedDesignId, localSession.title, localSession.focus]);
 
     const guestAttendanceRecords = useMemo(() => {
         const teamPlayerIds = new Set(teamPlayers.map(p => p.id));
@@ -1611,6 +1352,40 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                     </div>
                                 </div>
 
+                                {/* Linked Lesson Plan Card */}
+                                {linkedDesign && (
+                                    <div className="bg-gradient-to-r from-amber-50 to-yellow-50/70 border border-amber-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-bvb-black text-bvb-yellow rounded-xl shadow-xs shrink-0">
+                                                <BookOpen className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="text-[9px] font-black uppercase text-amber-900 bg-amber-200/80 px-1.5 py-0.5 rounded">
+                                                        选入训练教案
+                                                    </span>
+                                                    {linkedDesign.topicCode && (
+                                                        <span className="text-[9px] font-mono font-black text-white bg-bvb-black px-1.5 py-0.5 rounded">
+                                                            {linkedDesign.topicCode}
+                                                        </span>
+                                                    )}
+                                                    <span className="font-extrabold text-xs md:text-sm text-gray-900">{linkedDesign.title}</span>
+                                                </div>
+                                                <p className="text-[11px] text-gray-600 font-medium mt-0.5 line-clamp-1">
+                                                    {linkedDesign.description || '包含热身、技能、战术对抗等5大完整环节与训练图解'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => onViewPlanDetail?.(linkedDesign)}
+                                            className="px-3.5 py-2 bg-bvb-yellow hover:bg-yellow-400 text-bvb-black font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 shrink-0 transition-all active:scale-95 cursor-pointer"
+                                        >
+                                            <Eye className="w-4 h-4" /> 查看教案内容与图解
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Integrated pedagogical prompt card */}
                                 {(() => {
                                     const match = localSession.title?.match(/\(([^)]+)\)/);
@@ -1718,9 +1493,20 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
                                 )}
 
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1">
-                                        <List className="w-3 h-3" /> 训练项目清单 (Drills)
-                                    </label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                                            <List className="w-3 h-3" /> 训练项目清单 (Drills)
+                                        </label>
+                                        {linkedDesign && (
+                                            <button
+                                                type="button"
+                                                onClick={() => onViewPlanDetail?.(linkedDesign)}
+                                                className="text-xs font-black text-amber-800 hover:text-amber-950 bg-amber-100/90 hover:bg-amber-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-all shadow-2xs cursor-pointer"
+                                            >
+                                                <Eye className="w-3.5 h-3.5" /> 查看选入教案环节详解
+                                            </button>
+                                        )}
+                                    </div>
                                     <div className="space-y-2 mb-3">
                                         {localSession.drills.map((drill, idx) => (
                                             <div key={idx} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-lg border border-gray-100 group">
@@ -3001,12 +2787,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [isAddThemeSelectorOpen, setIsAddThemeSelectorOpen] = useState(false);
   const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
+  const [designSearchTerm, setDesignSearchTerm] = useState('');
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
   const [duplicateDate, setDuplicateDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [editingMatchForModal, setEditingMatchForModal] = useState<Match | null>(null);
+  const [viewingPlanDetail, setViewingPlanDetail] = useState<DrillDesign | null>(null);
   
   const [statsTeamFilter, setStatsTeamFilter] = useState<string>('all');
 
@@ -3421,13 +3209,59 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         setCurrentDate(d);
   };
 
+  // 全量教案库：仅包含完整的教案计划（包含训练环节阶段），排除单项图解或零碎训练项
+  const allAvailableDesigns = useMemo(() => {
+      const combined: DrillDesign[] = [];
+      // 首先加入预设教案库（全是包含5大阶段的标准化完整教案）
+      INITIAL_PRESET_PLANS.forEach(preset => {
+          if (!combined.some(d => d.id === preset.id || d.title === preset.title)) {
+              combined.push(preset);
+          }
+      });
+      // 其次加入教练自定义设计的教案中属于完整教案（包含sessionStages且阶段数>=1）的教案
+      (designs || []).forEach(d => {
+          const isFullPlan = (d.sessionStages && d.sessionStages.length > 0) || d.type === 'session';
+          if (isFullPlan && !combined.some(c => c.id === d.id)) {
+              combined.push(d);
+          }
+      });
+      return combined;
+  }, [designs]);
+
+  // 计算与当前选中的周期训练重点/主题严格或高度匹配的教案列表
+  const matchedDesignsForTheme = useMemo(() => {
+      if (!activeSelectedTheme) return [];
+      const currentTheme = (activeSelectedTheme.theme || '').trim().toLowerCase();
+      const currentContent = (activeSelectedTheme.content || '').trim().toLowerCase();
+      if (!currentTheme && !currentContent) return [];
+
+      return allAvailableDesigns.filter(d => {
+          const dTitle = (d.title || '').trim().toLowerCase();
+          const dTopic = (d.topic || '').trim().toLowerCase();
+          const dLabel = (d.topicLabel || '').trim().toLowerCase();
+          const dCode = (d.topicCode || '').trim().toLowerCase();
+          const dCat = (d.topicCategory || '').trim().toLowerCase();
+
+          if (currentContent && (dTitle.includes(currentContent) || currentContent.includes(dTitle) || dTopic.includes(currentContent) || dLabel.includes(currentContent))) return true;
+          if (currentTheme && (dTitle.includes(currentTheme) || dTopic.includes(currentTheme) || dLabel.includes(currentTheme) || dCode.includes(currentTheme) || dCat.includes(currentTheme))) return true;
+          return false;
+      });
+  }, [allAvailableDesigns, activeSelectedTheme]);
+
   const handleImportDesign = (design: DrillDesign) => {
+      let drillsList: string[] = [];
+      if (design.sessionStages && design.sessionStages.length > 0) {
+          drillsList = design.sessionStages.map(s => `${s.name}${s.duration ? ` (${s.duration}分钟)` : ''}: ${s.focus || '围绕核心主题开展训练'}`);
+      } else if (design.keyPoints && design.keyPoints.length > 0) {
+          drillsList = design.keyPoints;
+      } else if (design.description) {
+          drillsList = [design.description.substring(0, 60) + '...'];
+      }
+
       setFormData(prev => ({
           ...prev,
-          title: design.title,
-          focus: 'Custom',
-          focusCustom: design.category === 'Drill' ? '技术训练' : design.category === 'Tactic' ? '战术演练' : '综合训练',
-          drills: design.keyPoints.length > 0 ? design.keyPoints : [design.description.substring(0, 50) + '...'],
+          title: design.title || prev.title,
+          drills: drillsList.length > 0 ? drillsList : ['热身环节', '技术技能环节', '对抗比赛验收'],
           linkedDesignId: design.id
       }));
       setShowDesignSelectModal(false);
@@ -4852,11 +4686,58 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         </label>
                       </div>
 
-                      {!isAiMode && (
-                        <button type="button" onClick={() => setShowDesignSelectModal(true)} className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors">
-                          <PenTool className="w-4 h-4 mr-2" /> {formData.linkedDesignId ? '已选择教案 (点击重新选择)' : '从教案库导入...'}
-                        </button>
-                      )}
+                      {!isAiMode && (() => {
+                        const linkedPlan = allAvailableDesigns.find(d => d.id === formData.linkedDesignId || (formData.title && d.title === formData.title));
+                        if (linkedPlan) {
+                          return (
+                            <div className="bg-gradient-to-r from-amber-50 to-yellow-50/70 border border-amber-200 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-2xs">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="p-2 bg-bvb-black text-bvb-yellow rounded-lg shrink-0">
+                                  <BookOpen className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-[10px] font-black text-amber-800 uppercase flex items-center gap-1">
+                                    <span>已选入标准教案</span>
+                                    {linkedPlan.topicCode && (
+                                      <span className="bg-bvb-black text-white px-1 py-0.2 rounded font-mono text-[9px]">
+                                        {linkedPlan.topicCode}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-xs font-black text-gray-900 truncate">
+                                    {linkedPlan.title}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                                <button
+                                  type="button"
+                                  onClick={() => setViewingPlanDetail(linkedPlan)}
+                                  className="px-2.5 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-bvb-black text-xs font-black rounded-lg shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> 查看教案内容
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowDesignSelectModal(true)}
+                                  className="px-2.5 py-1.5 bg-white hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-lg border border-gray-200 transition-all cursor-pointer"
+                                >
+                                  更换教案
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setShowDesignSelectModal(true)}
+                            className="w-full flex items-center justify-center p-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 font-bold hover:border-bvb-yellow hover:text-bvb-black transition-colors cursor-pointer"
+                          >
+                            <PenTool className="w-4 h-4 mr-2 text-bvb-yellow" /> 从教案库选入匹配教案...
+                          </button>
+                        );
+                      })()}
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200">
                         <div>
@@ -4997,11 +4878,211 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         {sessionToDuplicate && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"><div className="bg-white rounded-xl shadow-2xl w-full max-sm overflow-hidden animate-in fade-in zoom-in duration-200"><div className="bg-bvb-black p-4 flex justify-between items-center text-white"><h3 className="font-bold flex items-center"><Copy className="w-4 h-4 mr-2 text-bvb-yellow" /> 复制训练计划</h3><button onClick={() => setSessionToDuplicate(null)}><X className="w-5 h-5" /></button></div><div className="p-6 space-y-4"><div className="bg-gray-50 p-3 rounded border border-gray-100"><span className="text-[10px] text-gray-400 font-bold uppercase block mb-1">正在复制</span><div className="font-bold text-gray-800">{sessionToDuplicate.title}</div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-2 flex items-center"><CalendarDays className="w-3 h-3 mr-1 text-bvb-yellow" /> 选择新计划的日期</label><input type="date" className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-bvb-yellow outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition-colors" value={duplicateDate} onChange={e => setDuplicateDate(e.target.value)}/></div><div className="pt-2 flex gap-3"><button onClick={() => setSessionToDuplicate(null)} className="flex-1 py-2 bg-gray-100 text-gray-600 font-bold rounded hover:bg-gray-200 transition-colors">取消</button><button onClick={handleDuplicateConfirm} className="flex-1 py-2 bg-bvb-yellow text-bvb-black font-bold rounded hover:brightness-105 transition-colors shadow-sm">确认复制</button></div></div></div></div>
         )}
-        {showDesignSelectModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]"><div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0"><h3 className="font-bold flex items-center"><PenTool className="w-5 h-5 mr-2 text-bvb-yellow" /> 选择教案</h3><button onClick={() => setShowDesignSelectModal(false)}><X className="w-5 h-5" /></button></div><div className="p-4 flex-1 overflow-y-auto space-y-3">{designs.length > 0 ? designs.map(d => (<button key={d.id} onClick={() => handleImportDesign(d)} className="w-full text-left p-3 border rounded-lg hover:bg-yellow-50 hover:border-bvb-yellow transition-colors group"><div className="flex justify-between items-center"><span className="font-bold text-gray-800">{d.title}</span><span className="text-xs bg-gray-100 px-2 py-0.5 rounded text-gray-500">{d.category}</span></div><p className="text-xs text-gray-400 mt-1 line-clamp-1">{d.description}</p></button>)) : (<div className="text-center py-8 text-gray-400">暂无教案，请先在“教案设计”中创建。</div>)}</div></div></div>
-        )}
+        {showDesignSelectModal && (() => {
+            // 仅筛选匹配当前主题的教案（若有设定当前周期重点/主题），不显示其他无关教案、示意图或训练项
+            const baseList = activeSelectedTheme ? matchedDesignsForTheme : allAvailableDesigns;
+
+            const filteredList = baseList.filter(d => {
+                const q = designSearchTerm.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                    (d.title && d.title.toLowerCase().includes(q)) ||
+                    (d.topic && d.topic.toLowerCase().includes(q)) ||
+                    (d.topicLabel && d.topicLabel.toLowerCase().includes(q)) ||
+                    (d.topicCode && d.topicCode.toLowerCase().includes(q)) ||
+                    (d.description && d.description.toLowerCase().includes(q))
+                );
+            });
+
+            return (
+                <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh] border border-gray-100">
+                        {/* Modal Header */}
+                        <div className="bg-bvb-black p-4 flex justify-between items-center text-white shrink-0">
+                            <div>
+                                <h3 className="font-black text-base md:text-lg flex items-center gap-2">
+                                    <PenTool className="w-5 h-5 text-bvb-yellow" />
+                                    选择主题对应教案
+                                </h3>
+                                <p className="text-[11px] text-gray-400 mt-0.5">
+                                    {activeSelectedTheme 
+                                        ? `仅展示与当前周期主题【${activeSelectedTheme.theme} · ${activeSelectedTheme.content}】精准匹配的标准教案` 
+                                        : '从教案库中选择并导入训练课次结构'}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    setShowDesignSelectModal(false);
+                                    setDesignSearchTerm('');
+                                }}
+                                className="p-1 px-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Active Theme Notice Banner */}
+                        {activeSelectedTheme && (
+                            <div className="px-4 py-2.5 bg-amber-50/95 border-b border-amber-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                                    <div className="text-xs text-amber-900 font-bold truncate">
+                                        <span className="text-amber-700 font-extrabold uppercase mr-1.5">当前训练重点/主题:</span>
+                                        <span className="bg-white text-gray-900 px-2 py-0.5 rounded border border-amber-200 font-black shadow-2xs">
+                                            {activeSelectedTheme.theme} · {activeSelectedTheme.content}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] font-black bg-amber-500 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                                    已为您精准匹配 {filteredList.length} 篇专属教案
+                                </span>
+                            </div>
+                        )}
+
+                        {/* Search & Filter Bar */}
+                        <div className="p-3.5 bg-gray-50 border-b border-gray-100 flex flex-col sm:flex-row gap-2.5 items-center justify-between shrink-0">
+                            <div className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                                <BookOpen className="w-4 h-4 text-bvb-yellow" />
+                                <span>{activeSelectedTheme ? '匹配教案列表' : '全部可用教案'} ({filteredList.length})</span>
+                            </div>
+
+                            <div className="relative w-full sm:w-64">
+                                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="在当前匹配教案中搜索..."
+                                    value={designSearchTerm}
+                                    onChange={e => setDesignSearchTerm(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 focus:outline-none focus:border-bvb-yellow"
+                                />
+                            </div>
+                        </div>
+
+                        {/* List Content */}
+                        <div className="p-4 flex-1 overflow-y-auto space-y-3 bg-gray-50/50">
+                            {filteredList.length === 0 ? (
+                                <div className="text-center py-12 text-gray-400">
+                                    <PenTool className="w-10 h-10 mx-auto mb-2 stroke-1 text-gray-300" />
+                                    <p className="text-xs font-bold text-gray-500">
+                                        {activeSelectedTheme 
+                                            ? `暂无与【${activeSelectedTheme.theme} · ${activeSelectedTheme.content}】完全对应的教案` 
+                                            : '未找到符合条件的教案'}
+                                    </p>
+                                    <p className="text-[11px] text-gray-400 mt-1">您可以前往【教案设计】模块创建并关联此主题的完整教案</p>
+                                </div>
+                            ) : (
+                                filteredList.map(d => {
+                                    const stagesCount = d.sessionStages?.length || 0;
+
+                                    return (
+                                        <div
+                                            key={d.id}
+                                            className="w-full text-left p-3.5 rounded-xl border border-amber-300 bg-white hover:shadow-md ring-1 ring-amber-200/60 transition-all group flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between"
+                                        >
+                                            <div className="flex-1 space-y-1.5">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500 text-white flex items-center gap-1 shadow-2xs">
+                                                        <Sparkles className="w-2.5 h-2.5" /> 主题匹配
+                                                    </span>
+                                                    {d.topicCode && (
+                                                        <span className="font-mono px-1.5 py-0.5 rounded text-[10px] font-black uppercase text-white bg-bvb-black">
+                                                            {d.topicCode}
+                                                        </span>
+                                                    )}
+                                                    <span className="font-extrabold text-sm text-gray-900 group-hover:text-amber-900">
+                                                        {d.title}
+                                                    </span>
+                                                    {d.topic && (
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                            d.topicType === 'tech'
+                                                                ? 'bg-blue-50 text-blue-700 border border-blue-100'
+                                                                : 'bg-green-50 text-green-700 border border-green-100'
+                                                        }`}>
+                                                            {d.topicLabel || d.topic}
+                                                        </span>
+                                                    )}
+                                                    {d.targetAge && (
+                                                        <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                            {d.targetAge}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {d.description && (
+                                                    <p className="text-xs text-gray-500 font-medium line-clamp-1">
+                                                        {d.description}
+                                                    </p>
+                                                )}
+
+                                                {stagesCount > 0 && d.sessionStages && (
+                                                    <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                                        <span className="text-[10px] font-black text-gray-400 uppercase">
+                                                            包含 {stagesCount} 个完整环节:
+                                                        </span>
+                                                        {d.sessionStages.slice(0, 3).map((stg, sIdx) => (
+                                                            <span key={stg.id || sIdx} className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-bold">
+                                                                {stg.name}
+                                                            </span>
+                                                        ))}
+                                                        {stagesCount > 3 && (
+                                                            <span className="text-[10px] text-gray-400 font-bold">
+                                                                +{stagesCount - 3}...
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setViewingPlanDetail(d);
+                                                    }}
+                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-black rounded-xl transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                                                >
+                                                    <Eye className="w-3.5 h-3.5" /> 预览内容
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleImportDesign(d);
+                                                    }}
+                                                    className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer active:scale-95"
+                                                >
+                                                    <Zap className="w-3.5 h-3.5" /> 选入本课
+                                                </button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        })()}
         {selectedSession && (
-            <SessionDetailModal session={selectedSession} teams={teams} players={players} trainingFoci={trainingFoci} focusSubjects={focusSubjects} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} currentUser={currentUser} users={users} allSessions={userManagedSessions} onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} onClose={() => setSelectedSession(null)} />
+            <SessionDetailModal 
+                session={selectedSession} 
+                teams={teams} 
+                players={players} 
+                trainingFoci={trainingFoci} 
+                focusSubjects={focusSubjects} 
+                basicTechThemes={basicTechThemes} 
+                scenarioThemes={scenarioThemes} 
+                currentUser={currentUser} 
+                users={users} 
+                allSessions={userManagedSessions} 
+                allAvailableDesigns={allAvailableDesigns}
+                onViewPlanDetail={setViewingPlanDetail}
+                onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} 
+                onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} 
+                onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} 
+                onClose={() => setSelectedSession(null)} 
+            />
         )}
         {editingMatchForModal && (
             <MatchEditModal
@@ -5014,6 +5095,14 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                     setEditingMatchForModal(updated);
                 }}
                 onClose={() => setEditingMatchForModal(null)}
+            />
+        )}
+        {viewingPlanDetail && (
+            <SessionDetailViewModal
+                item={viewingPlanDetail}
+                allDesigns={allAvailableDesigns}
+                onClose={() => setViewingPlanDetail(null)}
+                onEdit={() => {}}
             />
         )}
     </div>

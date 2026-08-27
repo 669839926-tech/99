@@ -4,10 +4,12 @@ import { DRILL_STAGES } from './constants';
 import {
   X, Plus, Trash2, ArrowUp, ArrowDown, Eye, EyeOff, Save,
   Search, BookOpen, Clock, Layers, Check,
-  FileText, Send, ZoomIn, Maximize2
+  FileText, Send, ZoomIn, Maximize2, Sparkles, Bookmark
 } from 'lucide-react';
 import { DiagramPreviewBox } from './DiagramPreviewBox';
 import { PublishApprovalModal, PublishChoice } from './PublishApprovalModal';
+import { ThemeSelectorModal, ThemeDetails } from '../ThemeSelectorModal';
+import { BasicTechItem, ScenarioTheme } from '../../src/philosophyData';
 
 interface CreateSessionPlanModalProps {
   isOpen: boolean;
@@ -17,6 +19,8 @@ interface CreateSessionPlanModalProps {
   availableDrills: DrillDesign[];
   onOpenCreateDrillModal: () => void;
   initialPlan?: DrillDesign | null;
+  basicTechThemes?: BasicTechItem[];
+  scenarioThemes?: ScenarioTheme[];
 }
 
 export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
@@ -26,13 +30,33 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
   currentUser,
   availableDrills,
   onOpenCreateDrillModal,
-  initialPlan
+  initialPlan,
+  basicTechThemes,
+  scenarioThemes
 }) => {
   const [title, setTitle] = useState(initialPlan?.title || '');
   const [description, setDescription] = useState(initialPlan?.description || '');
   const [targetAge, setTargetAge] = useState(initialPlan?.targetAge || 'U9 (8-9岁)');
   const [isPrivate, setIsPrivate] = useState(initialPlan?.isPrivate ?? false);
   const [showPublishApprovalModal, setShowPublishApprovalModal] = useState<boolean>(false);
+
+  // Topic binding state from Philosophy Library
+  const [boundTopic, setBoundTopic] = useState<{
+    code?: string;
+    theme?: string;
+    category?: string;
+    type?: 'tech' | 'scenario';
+    label?: string;
+  } | null>(
+    initialPlan?.topic ? {
+      code: initialPlan.topicCode,
+      theme: initialPlan.topic,
+      category: initialPlan.topicCategory,
+      type: initialPlan.topicType,
+      label: initialPlan.topicLabel
+    } : null
+  );
+  const [isThemeSelectorOpen, setIsThemeSelectorOpen] = useState(false);
 
   // Drill preview / enlarge detail modal state
   const [previewDrill, setPreviewDrill] = useState<DrillDesign | null>(null);
@@ -65,6 +89,17 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
         setDescription(initialPlan.description || '');
         setTargetAge(initialPlan.targetAge || 'U9 (8-9岁)');
         setIsPrivate(initialPlan.isPrivate ?? false);
+        if (initialPlan.topic) {
+          setBoundTopic({
+            code: initialPlan.topicCode,
+            theme: initialPlan.topic,
+            category: initialPlan.topicCategory,
+            type: initialPlan.topicType,
+            label: initialPlan.topicLabel
+          });
+        } else {
+          setBoundTopic(null);
+        }
         const stgs = initialPlan.sessionStages && initialPlan.sessionStages.length > 0
           ? initialPlan.sessionStages
           : [
@@ -84,6 +119,7 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
         setDescription('');
         setTargetAge('U9 (8-9岁)');
         setIsPrivate(false);
+        setBoundTopic(null);
         const defaultStages = [
           { id: 'stg-1', name: '1. 热身环节', duration: 15, focus: '球感熟悉与动态热身', drillIds: [] },
           { id: 'stg-2', name: '2. 技术环节', duration: 20, focus: '基础动作传控精细化', drillIds: [] },
@@ -98,6 +134,29 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
       }
     }
   }, [isOpen, initialPlan]);
+
+  const handleSelectTheme = (focusLabel: string, contentStr: string, details?: ThemeDetails) => {
+    if (details) {
+      setTitle(details.theme); // Directly name the plan after the selected theme (e.g. "球感启蒙")
+      setBoundTopic({
+        code: details.code,
+        theme: details.theme,
+        category: details.category,
+        type: details.type,
+        label: details.focusLabel
+      });
+      if (!description.trim() && details.description) {
+        setDescription(details.description);
+      }
+    } else {
+      const cleanTheme = contentStr.split(' (')[0] || contentStr;
+      setTitle(cleanTheme);
+      setBoundTopic({
+        theme: cleanTheme,
+        label: focusLabel
+      });
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -201,6 +260,11 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
       lines: [],
       targetAge,
       totalDuration,
+      topic: boundTopic?.theme || undefined,
+      topicCode: boundTopic?.code || undefined,
+      topicCategory: boundTopic?.category || undefined,
+      topicType: boundTopic?.type || undefined,
+      topicLabel: boundTopic?.label || undefined,
       sessionStages: stages,
       keyPoints: [
         `总时长: ${totalDuration}分钟`,
@@ -334,17 +398,60 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
           {/* Name Input */}
           <div className="md:col-span-4">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-bold text-gray-300">教案名称</label>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[11px] font-bold text-gray-300">教案名称</label>
+                <button
+                  type="button"
+                  onClick={() => setIsThemeSelectorOpen(true)}
+                  className="px-2 py-0.5 rounded-lg bg-bvb-yellow hover:bg-yellow-400 text-black text-[10px] font-black flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer"
+                  title="从俱乐部体系库选择比赛场景或基础技术主题并联动命名"
+                >
+                  <Sparkles className="w-2.5 h-2.5" />
+                  <span>体系库联动</span>
+                </button>
+              </div>
               <span className="text-[10px] text-gray-500 font-mono">{title.length}/40</span>
             </div>
-            <input
-              type="text"
-              maxLength={40}
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="例如: U9梯队: 进攻三区变向突破与二人传切主题课"
-              className="w-full px-3 py-1.5 bg-gray-950 border border-gray-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all"
-            />
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                maxLength={40}
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="例如: 球感启蒙 或 进攻三区二人传切..."
+                className="w-full pl-3 pr-20 py-1.5 bg-gray-950 border border-gray-800 rounded-xl text-xs font-bold text-white focus:outline-none focus:border-emerald-500 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setIsThemeSelectorOpen(true)}
+                className="absolute right-1 px-2 py-0.5 text-[10px] font-black text-emerald-400 hover:text-emerald-300 hover:bg-emerald-950/60 rounded-lg flex items-center gap-1 transition-colors border border-transparent hover:border-emerald-800"
+              >
+                <BookOpen className="w-3 h-3 text-emerald-400" />
+                <span>选择主题</span>
+              </button>
+            </div>
+            {boundTopic && (
+              <div className="mt-1.5 flex items-center gap-1.5 bg-emerald-950/80 border border-emerald-800/90 px-2.5 py-1 rounded-lg text-[10.5px] animate-in fade-in duration-150">
+                <Bookmark className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span className="text-emerald-400 font-bold shrink-0">已绑定:</span>
+                {boundTopic.code && (
+                  <span className="font-mono bg-emerald-900 text-emerald-200 px-1.5 py-0.2 rounded font-black text-[9.5px]">
+                    {boundTopic.code}
+                  </span>
+                )}
+                <span className="text-emerald-200 font-bold truncate">
+                  {boundTopic.label ? `${boundTopic.label} · ` : ''}{boundTopic.theme}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setBoundTopic(null)}
+                  className="ml-auto text-gray-400 hover:text-red-400 p-0.5 transition-colors"
+                  title="解除绑定"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Description Input */}
@@ -947,6 +1054,17 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
         contentTypeName="教案"
         title={title}
         currentUser={currentUser}
+      />
+
+      {/* Philosophy Library Theme Selector Modal */}
+      <ThemeSelectorModal
+        isOpen={isThemeSelectorOpen}
+        onClose={() => setIsThemeSelectorOpen(false)}
+        onSelect={handleSelectTheme}
+        basicTechThemes={basicTechThemes}
+        scenarioThemes={scenarioThemes}
+        title="选择俱乐部体系库训练主题（教案联动）"
+        subtitle="选择对应比赛场景或基础技术主题后，教案将自动命名并与该主题绑定"
       />
     </div>
   );

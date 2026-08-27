@@ -1253,8 +1253,15 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                                 <span>{isPlan ? '教案' : isDrill ? '训练项' : '示意图'}</span>
                               </span>
 
-                              {/* Approval Status / Origin Badge */}
-                              {item.approvalStatus === 'pending' ? (
+                              {/* Approval Status / Origin Badge (示意图不显示总监标准标识) */}
+                              {isDirectorCreated(item) ? (
+                                (isPlan || isDrill) ? (
+                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-yellow-400/90 text-gray-950 flex items-center gap-1 shadow-2xs">
+                                    <ShieldCheck className="w-2.5 h-2.5" />
+                                    <span>总监标准</span>
+                                  </span>
+                                ) : null
+                              ) : item.approvalStatus === 'pending' ? (
                                 <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
                                   <Clock className="w-2.5 h-2.5" />
                                   <span>待总监审批</span>
@@ -1346,7 +1353,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                             </button>
                           ) : (
                             <span
-                              title="仅总监或原作者可编辑修改（可在教案中自由选用）"
+                              title="青训总监标准内容，仅总监可编辑修改（教练员可在教案中自由选用）"
                               className="p-1.5 text-gray-300 cursor-not-allowed flex items-center justify-center"
                             >
                               <Lock className="w-4 h-4" />
@@ -1441,8 +1448,15 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                               {isSessionPlan ? '教案' : isDrill ? '训练项' : '示意图'}
                             </span>
 
-                            {/* Horizontal and neat status badge */}
-                            {item.approvalStatus === 'pending' ? (
+                            {/* Horizontal and neat status badge (示意图不显示总监标准标识) */}
+                            {isDirectorCreated(item) ? (
+                              (isSessionPlan || isDrill) ? (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-400 text-gray-950 shadow-xs flex items-center gap-0.5 whitespace-nowrap shrink-0 border border-yellow-500/40">
+                                  <ShieldCheck className="w-2.5 h-2.5 shrink-0" />
+                                  <span>总监标准</span>
+                                </span>
+                              ) : null
+                            ) : item.approvalStatus === 'pending' ? (
                               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-xs flex items-center gap-0.5 whitespace-nowrap shrink-0">
                                 <Clock className="w-2.5 h-2.5 shrink-0" />
                                 <span>待审批</span>
@@ -1548,7 +1562,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                                 </button>
                               ) : (
                                 <span
-                                  title="仅总监或原作者可编辑修改（可在教案中自由选用）"
+                                  title="青训总监标准内容，仅总监可编辑修改（教练员可在教案中自由选用）"
                                   className="p-1 text-gray-300 cursor-not-allowed flex items-center justify-center"
                                 >
                                   <Lock className="w-3.5 h-3.5" />
