@@ -219,11 +219,20 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
     }));
   };
 
-  // Filter Drills in Right Panel
+  // Filter Drills in Right Panel (Strictly Training Items only, no Diagrams or Session Plans)
+  const isDrillItem = (d: DrillDesign) => {
+    if (d.category === 'session_plan' || d.contentType === 'session_plan') return false;
+    if (d.category === 'diagram' || d.contentType === 'diagram') return false;
+    return d.category === 'drill_item' || d.contentType === 'drill' || d.category === 'Drill';
+  };
+
   const filteredDrills = availableDrills.filter(drill => {
-    if (drill.category === 'session_plan') return false;
+    if (!isDrillItem(drill)) return false;
     if (drillTab === 'my' && drill.authorId && currentUser && drill.authorId !== currentUser.id) return false;
     if (drillTab === 'favorites' && !drill.isFavorite) return false;
+    if (drillTab === 'library') {
+      if (drill.approvalStatus === 'rejected' || drill.approvalStatus === 'pending' || drill.isDraft) return false;
+    }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -697,7 +706,7 @@ export const CreateSessionPlanModal: React.FC<CreateSessionPlanModalProps> = ({
               {[
                 { id: 'my', label: '我的训练项' },
                 { id: 'favorites', label: '我的收藏' },
-                { id: 'library', label: '全部教案库' }
+                { id: 'library', label: '公共训练库' }
               ].map(tab => (
                 <button
                   key={tab.id}

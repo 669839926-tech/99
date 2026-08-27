@@ -39,6 +39,21 @@ const DEFAULT_FOLDERS = [
   { id: 'f-warmup', name: '常用高频热身套路' }
 ];
 
+// Check if item was created by youth academy director
+const isDirectorCreated = (item: DrillDesign) => {
+  return item.authorRole === 'director' || item.authorId === 'u1' || (!item.authorId && !item.authorRole);
+};
+
+// Check if item is an approved public library item
+const isPublicApproved = (d: DrillDesign) => {
+  return (d.approvalStatus === 'approved' || isDirectorCreated(d)) &&
+    d.approvalStatus !== 'rejected' &&
+    d.approvalStatus !== 'pending' &&
+    d.approvalStatus !== 'draft' &&
+    !d.isDraft &&
+    !d.isPrivate;
+};
+
 export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
   designs,
   currentUser,
@@ -121,11 +136,6 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
 
   // User Role & Permissions Helpers
   const isDirector = currentUser?.role === 'director';
-  
-  // Check if item was created by youth academy director
-  const isDirectorCreated = (item: DrillDesign) => {
-    return item.authorRole === 'director' || item.authorId === 'u1' || (!item.authorId && !item.authorRole);
-  };
 
   // Check if current user can edit the item
   const canEditItem = (item: DrillDesign) => {
@@ -363,22 +373,29 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
   }, [designs, isDirector, currentUser]);
 
   const approvedLibraryCount = useMemo(() => {
-    return designs.filter(d => {
-      if (d.approvalStatus === 'rejected' || d.approvalStatus === 'pending' || d.approvalStatus === 'draft' || d.isDraft || d.isPrivate) {
-        return false;
-      }
-      return d.approvalStatus === 'approved' || isDirectorCreated(d);
-    }).length;
+    return designs.filter(isPublicApproved).length;
+  }, [designs]);
+
+  const unfiledCount = useMemo(() => {
+    return designs.filter(d => !d.folderId && isPublicApproved(d)).length;
   }, [designs]);
 
   const draftsCount = useMemo(() => {
     return designs.filter(d => {
-      const isDraftOrRejected = d.isDraft || d.approvalStatus === 'draft' || d.approvalStatus === 'rejected' || d.isPrivate;
-      if (!isDraftOrRejected) return false;
-      if (isDirector) return true;
-      return d.authorId === currentUser?.id;
+      // Must NOT be rejected, pending, or approved
+      if (d.approvalStatus === 'rejected' || d.approvalStatus === 'pending' || d.approvalStatus === 'approved') return false;
+      const isDraftItem = d.isDraft || d.approvalStatus === 'draft' || d.isPrivate;
+      if (!isDraftItem) return false;
+      if (isDirector) {
+        return isDirectorCreated(d) || (currentUser?.id && d.authorId === currentUser.id);
+      }
+      return currentUser?.id && d.authorId === currentUser.id;
     }).length;
   }, [designs, isDirector, currentUser]);
+
+  const getFolderCount = (folderId: string) => {
+    return designs.filter(d => d.folderId === folderId && isPublicApproved(d)).length;
+  };
 
   // Filter items based on left sidebar selection + search + type + permissions
   const filteredItems = useMemo(() => {
@@ -387,40 +404,62 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
       if (mainTab === 'favorites' && !item.isFavorite) return false;
       if (mainTab === 'articles' && item.contentType !== 'other' && item.category !== 'Other') return false;
 
-      // Access control: Coaches only see approved library content + their own creations
-      if (!isDirector) {
-        const isOwn = item.authorId && currentUser && item.authorId === currentUser.id;
-        const isApprovedOrDirector = (item.approvalStatus === 'approved' || isDirectorCreated(item)) && item.approvalStatus !== 'rejected' && item.approvalStatus !== 'pending' && !item.isDraft && !item.isPrivate;
-        if (!isOwn && !isApprovedOrDirector) {
+      // 1. Rejected items: ONLY visible to their author in "我创建的" ('mine')
+      if (item.approvalStatus === 'rejected') {
+        if (activeCategory !== 'mine') return false;
+        if (!currentUser?.id || item.authorId !== currentUser.id) return false;
+      }
+
+      // 2. Pending items: visible in "待总监审批" ('pending') or in "我创建的" ('mine' for author / director)
+      if (item.approvalStatus === 'pending') {
+        if (activeCategory === 'pending') {
+          if (!isDirector && item.authorId !== currentUser?.id) return false;
+        } else if (activeCategory === 'mine') {
+          if (isDirector) {
+            if (!isDirectorCreated(item) && item.authorId !== currentUser?.id) return false;
+          } else {
+            if (item.authorId !== currentUser?.id) return false;
+          }
+        } else {
           return false;
         }
       }
 
-      // Left sidebar category filtering
+      // 3. Draft / Private items: visible in "草稿箱" ('drafts') or "我创建的" ('mine') for their author only
+      const isDraftItem = (item.isDraft || item.approvalStatus === 'draft' || item.isPrivate) && item.approvalStatus !== 'approved' && item.approvalStatus !== 'pending' && item.approvalStatus !== 'rejected';
+      if (isDraftItem) {
+        const isOwnDraft = isDirector 
+          ? (isDirectorCreated(item) || (currentUser?.id && item.authorId === currentUser.id))
+          : (currentUser?.id && item.authorId === currentUser.id);
+        if (!isOwnDraft) return false;
+        if (activeCategory !== 'drafts' && activeCategory !== 'mine') return false;
+      }
+
+      // 4. Left sidebar category filtering
       if (activeCategory === 'pending') {
         if (item.approvalStatus !== 'pending') return false;
         if (!isDirector && item.authorId !== currentUser?.id) return false;
       } else if (activeCategory === 'all') {
         // "公共内容库" (Public Repository): STRICTLY approved / director standard items only.
-        // NEVER show rejected, pending, or draft items in the public repository
-        if (item.approvalStatus === 'rejected' || item.approvalStatus === 'pending' || item.approvalStatus === 'draft' || item.isDraft || item.isPrivate) {
-          return false;
-        }
-        if (item.approvalStatus !== 'approved' && !isDirectorCreated(item)) return false;
+        if (!isPublicApproved(item)) return false;
       } else if (activeCategory === 'unfiled') {
+        // "未分组内容": STRICTLY approved / director standard unfiled items only
         if (item.folderId) return false;
+        if (!isPublicApproved(item)) return false;
       } else if (activeCategory === 'drafts') {
-        const isDraftOrRejected = item.isDraft || item.approvalStatus === 'draft' || item.approvalStatus === 'rejected' || item.isPrivate;
-        if (!isDraftOrRejected) return false;
-        if (!isDirector && item.authorId !== currentUser?.id) return false;
+        // "草稿箱": STRICTLY author's own drafts (never rejected or pending items)
+        if (!isDraftItem) return false;
       } else if (activeCategory === 'mine') {
+        // "我创建的": All items created by the user (including approved, pending, rejected, drafts)
         if (isDirector) {
           if (!isDirectorCreated(item) && item.authorId !== currentUser?.id) return false;
         } else {
-          if (currentUser?.id && item.authorId !== currentUser.id) return false;
+          if (!currentUser?.id || item.authorId !== currentUser.id) return false;
         }
       } else if (activeCategory !== 'all' && activeCategory !== 'mine' && activeCategory !== 'unfiled' && activeCategory !== 'drafts' && activeCategory !== 'pending') {
+        // Specific Folder: Must be in that folder AND must be approved/public
         if (item.folderId !== activeCategory) return false;
+        if (!isPublicApproved(item)) return false;
       }
 
       // Content Type filter
@@ -747,7 +786,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                   <span>未分组内容</span>
                 </span>
                 <span className="text-[11px] font-mono opacity-70">
-                  {designs.filter(d => !d.folderId).length}
+                  {unfiledCount}
                 </span>
               </button>
 
@@ -832,7 +871,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
 
                 {/* Folder Items */}
                 {folders.map(f => {
-                  const count = designs.filter(d => d.folderId === f.id).length;
+                  const count = getFolderCount(f.id);
                   const isActive = activeCategory === f.id;
                   const isEditing = editingFolderId === f.id;
 
@@ -1021,7 +1060,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                             <span className="truncate">{f.name}</span>
                           </span>
                           <span className="text-[10px] text-gray-400 font-mono">
-                            {designs.filter(d => d.folderId === f.id).length}
+                            {getFolderCount(f.id)}
                           </span>
                         </button>
                       ))}
@@ -1253,20 +1292,13 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                                 <span>{isPlan ? '教案' : isDrill ? '训练项' : '示意图'}</span>
                               </span>
 
-                              {/* Approval Status / Origin Badge (示意图不显示总监标准标识) */}
-                              {isDirectorCreated(item) ? (
-                                (isPlan || isDrill) ? (
-                                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-yellow-400/90 text-gray-950 flex items-center gap-1 shadow-2xs">
-                                    <ShieldCheck className="w-2.5 h-2.5" />
-                                    <span>总监标准</span>
-                                  </span>
-                                ) : null
-                              ) : item.approvalStatus === 'pending' ? (
+                              {/* Approval Status */}
+                              {item.approvalStatus === 'pending' ? (
                                 <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
                                   <Clock className="w-2.5 h-2.5" />
                                   <span>待总监审批</span>
                                 </span>
-                              ) : item.approvalStatus === 'approved' ? (
+                              ) : item.approvalStatus === 'approved' && !isDirectorCreated(item) ? (
                                 <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                   <CheckCircle2 className="w-2.5 h-2.5" />
                                   <span>已入库</span>
@@ -1353,7 +1385,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                             </button>
                           ) : (
                             <span
-                              title="青训总监标准内容，仅总监可编辑修改（教练员可在教案中自由选用）"
+                              title="公共库收录内容，仅作者或管理员可编辑修改（教练员可在教案中自由选用）"
                               className="p-1.5 text-gray-300 cursor-not-allowed flex items-center justify-center"
                             >
                               <Lock className="w-4 h-4" />
@@ -1448,15 +1480,8 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                               {isSessionPlan ? '教案' : isDrill ? '训练项' : '示意图'}
                             </span>
 
-                            {/* Horizontal and neat status badge (示意图不显示总监标准标识) */}
-                            {isDirectorCreated(item) ? (
-                              (isSessionPlan || isDrill) ? (
-                                <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-400 text-gray-950 shadow-xs flex items-center gap-0.5 whitespace-nowrap shrink-0 border border-yellow-500/40">
-                                  <ShieldCheck className="w-2.5 h-2.5 shrink-0" />
-                                  <span>总监标准</span>
-                                </span>
-                              ) : null
-                            ) : item.approvalStatus === 'pending' ? (
+                            {/* Horizontal and neat status badge */}
+                            {item.approvalStatus === 'pending' ? (
                               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500 text-white shadow-xs flex items-center gap-0.5 whitespace-nowrap shrink-0">
                                 <Clock className="w-2.5 h-2.5 shrink-0" />
                                 <span>待审批</span>
@@ -1562,7 +1587,7 @@ export const ContentLibraryHub: React.FC<ContentLibraryHubProps> = ({
                                 </button>
                               ) : (
                                 <span
-                                  title="青训总监标准内容，仅总监可编辑修改（教练员可在教案中自由选用）"
+                                  title="公共库收录内容，仅作者或管理员可编辑修改（教练员可在教案中自由选用）"
                                   className="p-1 text-gray-300 cursor-not-allowed flex items-center justify-center"
                                 >
                                   <Lock className="w-3.5 h-3.5" />

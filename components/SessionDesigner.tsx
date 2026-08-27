@@ -257,7 +257,7 @@ export const SessionDesigner: React.FC<SessionDesignerProps> = ({
         }}
         onSave={handleSaveSessionPlan}
         currentUser={currentUser}
-        availableDrills={activeDesigns.filter(d => d.category !== 'session_plan' && d.contentType !== 'session_plan')}
+        availableDrills={activeDesigns.filter(d => (d.category === 'drill_item' || d.contentType === 'drill' || d.category === 'Drill') && d.category !== 'diagram' && d.contentType !== 'diagram' && d.category !== 'session_plan' && d.contentType !== 'session_plan')}
         onOpenCreateDrillModal={() => {
           setIsCreateDrillModalOpen(true);
         }}
