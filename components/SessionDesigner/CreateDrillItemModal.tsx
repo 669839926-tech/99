@@ -191,6 +191,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
         // Also persist this newly uploaded image diagram to the library
         if (onSaveUploadedDiagram) {
+          const isDirector = currentUser?.role === 'director' || !currentUser?.role;
           const cleanFileName = file.name.replace(/\.[^/.]+$/, '');
           const newDiagram: DrillDesign = {
             id: `uploaded-diagram-${Date.now()}`,
@@ -211,7 +212,13 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
             fieldWidth: 15,
             playerCount: 8,
             ballCount: 6,
-            coneCount: 8
+            coneCount: 8,
+            authorId: currentUser?.id || 'u1',
+            authorName: currentUser?.name || '青训总监',
+            authorRole: currentUser?.role || 'director',
+            approvalStatus: isDirector ? 'approved' : 'pending',
+            isPrivate: false,
+            isDraft: false
           };
           onSaveUploadedDiagram(newDiagram);
         }
@@ -226,7 +233,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   const handleClearDiagram = () => {
     setSelectedDiagramId(null);
     setCustomUploadedImage(null);
-    setUploadedFileName('');
+    setUploadedFileName(null);
   };
 
   if (!isOpen) return null;
@@ -249,6 +256,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
     const finalPreviewImage = customUploadedImage || selectedDiagram?.previewImage || initialDrill?.previewImage;
 
+    const isDirector = currentUser?.role === 'director' || !currentUser?.role;
     const drillItem: DrillDesign = {
       id: initialDrill?.id || `drill-${Date.now()}`,
       title: title.trim(),
@@ -279,11 +287,11 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
       progressions,
       createdAt: initialDrill?.createdAt || new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
-      authorId: currentUser?.id,
-      authorName: currentUser?.name || (currentUser?.role === 'director' ? '青训总监' : '教练员'),
-      authorRole: currentUser?.role || 'coach',
+      authorId: currentUser?.id || 'u1',
+      authorName: currentUser?.name || '青训总监',
+      authorRole: currentUser?.role || 'director',
       isPrivate: options.isPrivateChoice,
-      approvalStatus: options.approvalStatusChoice,
+      approvalStatus: isDirector && options.approvalStatusChoice !== 'draft' ? 'approved' : options.approvalStatusChoice,
       approvalFeedback: options.submissionNotes,
       isDraft: options.isDraftChoice
     };
@@ -309,7 +317,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
     }
 
     // Publish action
-    if (currentUser?.role === 'director') {
+    const isDirector = currentUser?.role === 'director' || !currentUser?.role;
+    if (isDirector) {
       handlePerformSave({
         isPrivateChoice: false,
         approvalStatusChoice: 'approved',
@@ -341,7 +350,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-gray-950 text-gray-100 flex flex-col overflow-hidden animate-in fade-in duration-200">
+      <div className="fixed inset-0 z-50 bg-slate-100 text-gray-900 flex flex-col overflow-hidden animate-in fade-in duration-200">
         
         {/* Hidden File Input for Device Image Upload */}
         <input
@@ -353,26 +362,26 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
         />
 
         {/* Top Fullscreen Header Navigation */}
-        <div className="px-6 py-3 bg-gray-900 border-b border-gray-800 flex items-center justify-between shrink-0 select-none">
+        <div className="px-6 py-3 bg-white border-b border-gray-200/80 flex items-center justify-between shrink-0 select-none shadow-xs">
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 text-xs font-bold transition-colors flex items-center gap-1.5"
             >
               <X className="w-4 h-4" />
               <span>返回/退出</span>
             </button>
             
-            <div className="h-5 w-px bg-gray-800" />
+            <div className="h-5 w-px bg-gray-200" />
 
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-bvb-yellow text-black flex items-center justify-center font-black text-xs shadow-sm">
+              <div className="w-7 h-7 rounded-lg bg-bvb-yellow text-black flex items-center justify-center font-black text-xs shadow-xs">
                 <Layers className="w-4 h-4" />
               </div>
               <div>
-                <h2 className="text-sm font-black text-white flex items-center gap-2">
+                <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
                   <span>{initialDrill ? '编辑训练项' : '创建训练项（全屏模式）'}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                     球场视窗已开启
                   </span>
                 </h2>
@@ -386,8 +395,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
               onClick={() => setIsPrivate(!isPrivate)}
               className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
                 isPrivate
-                  ? 'bg-gray-800 border-gray-700 text-gray-400'
-                  : 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+                  ? 'bg-gray-100 border-gray-200 text-gray-600'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-700'
               }`}
             >
               {isPrivate ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -396,7 +405,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
             <button
               onClick={() => handleSave(false)}
-              className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs rounded-xl border border-gray-700 transition-colors shadow-sm flex items-center gap-1.5"
+              className="px-3.5 py-1.5 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs rounded-xl border border-gray-200 transition-colors shadow-xs flex items-center gap-1.5"
             >
               <Save className="w-3.5 h-3.5" />
               <span>保存草稿</span>
@@ -404,7 +413,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
             <button
               onClick={() => handleSave(true)}
-              className="px-4 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-black font-black text-xs rounded-xl shadow-lg transition-transform active:scale-95 flex items-center gap-1.5"
+              className="px-4 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-black font-black text-xs rounded-xl shadow-md transition-transform active:scale-95 flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" />
               <span>立即发布训练项</span>
@@ -416,14 +425,14 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           
           {/* Left Companion Area: Tactical Pitch Diagram Preview & High-Fidelity Workspace */}
-          <div className={`w-full ${previewPanelWidthMode === 'wide' ? 'lg:w-[580px] xl:w-[680px] 2xl:w-[780px]' : 'lg:w-[460px] xl:w-[540px] 2xl:w-[620px]'} bg-gray-950 border-r border-gray-800 flex flex-col shrink-0 overflow-y-auto custom-scrollbar transition-all duration-200`}>
+          <div className={`w-full ${previewPanelWidthMode === 'wide' ? 'lg:w-[580px] xl:w-[680px] 2xl:w-[780px]' : 'lg:w-[460px] xl:w-[540px] 2xl:w-[620px]'} bg-slate-50 border-r border-gray-200 flex flex-col shrink-0 overflow-y-auto custom-scrollbar transition-all duration-200`}>
             
             {/* Companion Top Bar */}
-            <div className="p-3.5 px-4 bg-gray-900/90 border-b border-gray-800 flex items-center justify-between flex-wrap gap-2 sticky top-0 z-20 backdrop-blur-sm">
+            <div className="p-3.5 px-4 bg-white/95 border-b border-gray-200 flex items-center justify-between flex-wrap gap-2 sticky top-0 z-20 backdrop-blur-sm shadow-xs">
               <div className="flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs font-black text-gray-200">战术示意图</span>
-                <span className="text-[10px] text-gray-500 font-mono">
+                <ImageIcon className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-black text-gray-900">战术示意图</span>
+                <span className="text-[10px] text-gray-400 font-mono">
                   {previewPanelWidthMode === 'wide' ? '(宽屏视野)' : '(标准视野)'}
                 </span>
               </div>
@@ -433,27 +442,27 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setPreviewPanelWidthMode(prev => prev === 'wide' ? 'standard' : 'wide')}
-                  className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm flex items-center gap-1"
+                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-lg border border-gray-200 transition-colors shadow-xs flex items-center gap-1"
                   title={previewPanelWidthMode === 'wide' ? '切换为标准宽度' : '拓展为更宽视野'}
                 >
-                  <MoveHorizontal className="w-3 h-3 text-emerald-400" />
+                  <MoveHorizontal className="w-3 h-3 text-emerald-600" />
                   <span>{previewPanelWidthMode === 'wide' ? '适中' : '更宽'}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsLightboxOpen(true)}
-                  className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm flex items-center gap-1"
+                  className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-[11px] font-bold rounded-lg border border-gray-200 transition-colors shadow-xs flex items-center gap-1"
                   title="全屏超清放大查看"
                 >
-                  <ZoomIn className="w-3 h-3 text-blue-400" />
+                  <ZoomIn className="w-3 h-3 text-blue-600" />
                   <span>放大</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsDiagramModalOpen(true)}
-                  className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm"
+                  className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 text-[11px] font-bold rounded-lg border border-gray-200 transition-colors shadow-xs"
                   title="从示意图库中选择"
                 >
                   图库
@@ -461,7 +470,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 text-gray-200 text-[11px] font-bold rounded-lg border border-gray-700 transition-colors shadow-sm"
+                  className="px-2.5 py-1 bg-white hover:bg-gray-100 text-gray-700 text-[11px] font-bold rounded-lg border border-gray-200 transition-colors shadow-xs"
                   title="上传电脑中的图片"
                 >
                   上传
@@ -472,7 +481,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                     onClose();
                     onOpenPitchSelector();
                   }}
-                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm flex items-center gap-1"
+                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold rounded-lg transition-colors shadow-xs flex items-center gap-1"
                   title="新建战术图"
                 >
                   <Plus className="w-3 h-3" />
@@ -485,23 +494,23 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
             <div className="p-4 space-y-4 flex flex-col items-center">
               
               {/* Diagram Card Container */}
-              <div className="w-full bg-gray-900/90 rounded-2xl p-3.5 border border-gray-800 shadow-xl flex flex-col items-center">
+              <div className="w-full bg-white rounded-2xl p-3.5 border border-gray-200 shadow-sm flex flex-col items-center">
                 
                 {/* Diagram Title & Type Badge */}
-                <div className="w-full flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-800 text-xs font-bold">
-                  <span className="text-emerald-400 truncate max-w-[240px]">
+                <div className="w-full flex items-center justify-between pb-2.5 mb-2.5 border-b border-gray-100 text-xs font-bold">
+                  <span className="text-gray-900 font-black truncate max-w-[240px]">
                     {customUploadedImage 
                       ? (uploadedFileName || '设备中上传的示意图') 
                       : (selectedDiagram?.title || initialDrill?.title || '战术示意图')}
                   </span>
                   <div className="flex items-center gap-2">
-                    <span className="text-gray-300 bg-gray-950 px-2 py-0.5 rounded-md border border-gray-800 text-[10.5px]">
+                    <span className="text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200 text-[10.5px]">
                       {customUploadedImage ? '本地图片' : (activeDrillOrDiagram?.pitchType || '标准场地')}
                     </span>
                     <button
                       type="button"
                       onClick={() => setIsLightboxOpen(true)}
-                      className="p-1 hover:bg-gray-800 text-gray-400 hover:text-emerald-400 rounded-md transition-colors"
+                      className="p-1 hover:bg-gray-100 text-gray-400 hover:text-emerald-600 rounded-md transition-colors"
                       title="点击全屏放大"
                     >
                       <Maximize2 className="w-3.5 h-3.5" />
@@ -512,7 +521,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                 {/* High-Proportion Diagram Renderer with Click-to-Zoom */}
                 <div 
                   onClick={() => setIsLightboxOpen(true)}
-                  className="w-full aspect-[16/10] flex items-center justify-center overflow-hidden rounded-xl bg-gray-950 border border-gray-800 relative cursor-zoom-in group shadow-inner"
+                  className="w-full aspect-[16/10] flex items-center justify-center overflow-hidden rounded-xl bg-slate-900 border border-gray-300 relative cursor-zoom-in group shadow-inner"
                   title="点击查看全屏超清大图"
                 >
                   {customUploadedImage ? (
@@ -558,28 +567,28 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
                 {/* Pitch Spec Cards Below Diagram */}
                 <div className="w-full mt-3 grid grid-cols-4 gap-2 text-xs font-bold">
-                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
-                    <span className="text-gray-500 text-[10px] mb-0.5">场地规格</span>
-                    <span className="text-amber-400 font-mono text-[11px]">{fieldLength}×{fieldWidth}m</span>
+                  <div className="p-2 bg-slate-50 rounded-xl border border-gray-200 text-gray-700 flex flex-col items-center justify-center">
+                    <span className="text-gray-400 text-[10px] mb-0.5">场地规格</span>
+                    <span className="text-amber-700 font-mono text-[11px] font-black">{fieldLength}×{fieldWidth}m</span>
                   </div>
-                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
-                    <span className="text-gray-500 text-[10px] mb-0.5">参训人数</span>
-                    <span className="text-emerald-400 font-mono text-[11px]">{playerCount}人</span>
+                  <div className="p-2 bg-slate-50 rounded-xl border border-gray-200 text-gray-700 flex flex-col items-center justify-center">
+                    <span className="text-gray-400 text-[10px] mb-0.5">参训人数</span>
+                    <span className="text-emerald-700 font-mono text-[11px] font-black">{playerCount}人</span>
                   </div>
-                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
-                    <span className="text-gray-500 text-[10px] mb-0.5">器材配置</span>
-                    <span className="text-cyan-400 font-mono text-[11px]">{ballCount}球 · {coneCount}盘</span>
+                  <div className="p-2 bg-slate-50 rounded-xl border border-gray-200 text-gray-700 flex flex-col items-center justify-center">
+                    <span className="text-gray-400 text-[10px] mb-0.5">器材配置</span>
+                    <span className="text-blue-700 font-mono text-[11px] font-black">{ballCount}球 · {coneCount}盘</span>
                   </div>
-                  <div className="p-2 bg-gray-950 rounded-xl border border-gray-800 text-gray-300 flex flex-col items-center justify-center">
-                    <span className="text-gray-500 text-[10px] mb-0.5">训练时长</span>
-                    <span className="text-blue-400 font-mono text-[11px]">{durationMinutes}分钟</span>
+                  <div className="p-2 bg-slate-50 rounded-xl border border-gray-200 text-gray-700 flex flex-col items-center justify-center">
+                    <span className="text-gray-400 text-[10px] mb-0.5">训练时长</span>
+                    <span className="text-purple-700 font-mono text-[11px] font-black">{durationMinutes}分钟</span>
                   </div>
                 </div>
               </div>
 
               {/* Quick tips */}
-              <div className="w-full p-3 bg-gray-900/40 rounded-xl border border-gray-800/60 text-xs text-gray-400 leading-relaxed flex items-start gap-2">
-                <span className="text-emerald-400 font-bold shrink-0">💡</span>
+              <div className="w-full p-3 bg-white rounded-xl border border-gray-200/80 text-xs text-gray-500 leading-relaxed flex items-start gap-2 shadow-2xs">
+                <span className="text-emerald-600 font-bold shrink-0">💡</span>
                 <span>
                   左侧示意图已自适应高清晰度展示；点击示意图或右上角放大镜可进入全屏高分辨率视图。
                 </span>
@@ -588,33 +597,33 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
           </div>
 
           {/* Right Main Area: Primary Form Editor Workspace (Spacious, Clear & Fast) */}
-          <div className="flex-1 bg-gray-900 flex flex-col overflow-y-auto custom-scrollbar">
+          <div className="flex-1 bg-slate-100 flex flex-col overflow-y-auto custom-scrollbar">
             
             <div className="p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-6">
               
               {/* Section 1: Title & Description */}
-              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-4">
-                <div className="flex items-center gap-2 border-b border-gray-800/80 pb-3">
+              <div className="bg-white p-5 lg:p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                   <div className="w-2 h-4 bg-emerald-500 rounded-full" />
-                  <h3 className="text-sm font-black text-white">训练项基本信息</h3>
+                  <h3 className="text-sm font-black text-gray-900">训练项基本信息</h3>
                 </div>
 
                 <div className="space-y-3.5">
                   <div>
-                    <label className="block text-xs font-black text-gray-300 mb-1.5">
-                      训练项标题 <span className="text-red-400">*</span>
+                    <label className="block text-xs font-black text-gray-700 mb-1.5">
+                      训练项标题 <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={title}
                       onChange={e => setTitle(e.target.value)}
                       placeholder="例如: 技能: 1v1+1 (回避防守人) 运球变向加速突破训练"
-                      className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-sm font-bold text-white focus:border-emerald-500 focus:outline-none transition-all placeholder:text-gray-600 shadow-inner"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-900 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all placeholder:text-gray-400 shadow-2xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-gray-300 mb-1.5">
+                    <label className="block text-xs font-black text-gray-700 mb-1.5">
                       训练项简介与核心目标
                     </label>
                     <textarea
@@ -622,22 +631,22 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       onChange={e => setDescription(e.target.value)}
                       placeholder="简述该训练项的训练目标、针对痛点与关键战术意图..."
                       rows={2}
-                      className="w-full px-4 py-2.5 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all resize-none placeholder:text-gray-600 leading-relaxed shadow-inner"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all resize-none placeholder:text-gray-400 leading-relaxed shadow-2xs"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 2: Diagram Selection Area (Image 2 style) */}
-              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-4">
-                <div className="flex items-center justify-between border-b border-gray-800/80 pb-3">
+              <div className="bg-white p-5 lg:p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-4 bg-emerald-400 rounded-full" />
-                    <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+                    <div className="w-2 h-4 bg-emerald-500 rounded-full" />
+                    <h3 className="text-sm font-black text-gray-900 flex items-center gap-1.5">
                       <span>示意图</span>
                       <div className="group relative cursor-pointer">
-                        <HelpCircle className="w-3.5 h-3.5 text-gray-400 hover:text-gray-200 transition-colors" />
-                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 text-[11px] text-gray-300 rounded-lg shadow-xl z-30 pointer-events-none">
+                        <HelpCircle className="w-3.5 h-3.5 text-gray-400 hover:text-gray-600 transition-colors" />
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-64 p-2 bg-gray-900 border border-gray-700 text-[11px] text-gray-200 rounded-lg shadow-xl z-30 pointer-events-none">
                           如果添加仅自己可见的示意图，取消仅自己可见后请重新添加
                         </div>
                       </div>
@@ -650,22 +659,22 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       onClose();
                       onOpenPitchSelector();
                     }}
-                    className="text-emerald-400 hover:text-emerald-300 text-xs font-bold transition-colors flex items-center gap-1"
+                    className="text-emerald-600 hover:text-emerald-700 text-xs font-bold transition-colors flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>创建示意图</span>
                   </button>
                 </div>
 
-                <p className="text-[11px] text-gray-400">
+                <p className="text-[11px] text-gray-500">
                   如果添加仅自己可见的示意图，取消仅自己可见后请重新添加
                 </p>
 
                 {/* If already selected or uploaded, show high-fidelity active card */}
                 {hasDiagramOrImage ? (
-                  <div className="p-4 rounded-2xl bg-gray-900/90 border border-emerald-500/40 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-emerald-400/60 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-24 h-16 rounded-xl bg-gray-950 border border-gray-800 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="w-24 h-16 rounded-xl bg-slate-900 border border-gray-300 overflow-hidden shrink-0 flex items-center justify-center">
                         {customUploadedImage ? (
                           <img src={customUploadedImage} alt="Uploaded" className="w-full h-full object-cover" />
                         ) : activeDrillOrDiagram?.previewImage ? (
@@ -676,13 +685,13 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       </div>
 
                       <div className="min-w-0">
-                        <h4 className="text-xs sm:text-sm font-black text-white truncate mb-1">
+                        <h4 className="text-xs sm:text-sm font-black text-gray-900 truncate mb-1">
                           {customUploadedImage 
                             ? (uploadedFileName || '设备中上传的示意图') 
                             : (selectedDiagram?.title || initialDrill?.title || '已关联战术图')}
                         </h4>
-                        <div className="flex items-center gap-2 text-[10px] text-gray-400 flex-wrap">
-                          <span className="text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
+                        <div className="flex items-center gap-2 text-[10px] text-gray-500 flex-wrap">
+                          <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                             {customUploadedImage ? '设备图片' : (selectedDiagram?.pitchType || '标准场地')}
                           </span>
                           <span>规格: {fieldLength}×{fieldWidth}米</span>
@@ -696,21 +705,21 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setIsDiagramModalOpen(true)}
-                        className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl border border-gray-700 transition-colors shadow-sm"
+                        className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors shadow-2xs"
                       >
                         更换示意图
                       </button>
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-bold rounded-xl border border-gray-700 transition-colors shadow-sm"
+                        className="px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl border border-gray-200 transition-colors shadow-2xs"
                       >
                         重新上传
                       </button>
                       <button
                         type="button"
                         onClick={handleClearDiagram}
-                        className="p-1.5 bg-gray-800/80 hover:bg-red-950/50 hover:text-red-400 text-gray-400 rounded-xl border border-gray-700 hover:border-red-800/60 transition-colors"
+                        className="p-1.5 bg-white hover:bg-red-50 text-gray-400 hover:text-red-600 rounded-xl border border-gray-200 hover:border-red-200 transition-colors"
                         title="移除示意图"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -725,15 +734,15 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-emerald-500/80 bg-gray-900/60 hover:bg-gray-900 transition-all flex flex-col items-center justify-center gap-2.5 group cursor-pointer"
+                      className="p-6 rounded-2xl border-2 border-dashed border-gray-300 hover:border-emerald-500 bg-slate-50 hover:bg-white transition-all flex flex-col items-center justify-center gap-2.5 group cursor-pointer"
                     >
-                      <div className="w-11 h-11 rounded-2xl bg-gray-800 group-hover:bg-emerald-950/80 text-gray-300 group-hover:text-emerald-400 flex items-center justify-center transition-colors border border-gray-700 group-hover:border-emerald-700/60">
+                      <div className="w-11 h-11 rounded-2xl bg-white group-hover:bg-emerald-50 text-gray-500 group-hover:text-emerald-600 flex items-center justify-center transition-colors border border-gray-200 group-hover:border-emerald-200 shadow-2xs">
                         <ImageIcon className="w-5 h-5" />
                       </div>
-                      <span className="text-xs font-black text-gray-200 group-hover:text-emerald-400 transition-colors">
+                      <span className="text-xs font-black text-gray-800 group-hover:text-emerald-700 transition-colors">
                         点击添加设备中的图片
                       </span>
-                      <span className="text-[10px] text-gray-500">
+                      <span className="text-[10px] text-gray-400">
                         支持 PNG、JPG、WEBP、SVG 等格式图片
                       </span>
                     </button>
@@ -742,15 +751,15 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setIsDiagramModalOpen(true)}
-                      className="p-6 rounded-2xl border-2 border-dashed border-gray-700 hover:border-emerald-500/80 bg-gray-900/60 hover:bg-gray-900 transition-all flex flex-col items-center justify-center gap-2.5 group cursor-pointer"
+                      className="p-6 rounded-2xl border-2 border-dashed border-gray-300 hover:border-emerald-500 bg-slate-50 hover:bg-white transition-all flex flex-col items-center justify-center gap-2.5 group cursor-pointer"
                     >
-                      <div className="w-11 h-11 rounded-2xl bg-gray-800 group-hover:bg-emerald-950/80 text-gray-300 group-hover:text-emerald-400 flex items-center justify-center transition-colors border border-gray-700 group-hover:border-emerald-700/60">
+                      <div className="w-11 h-11 rounded-2xl bg-white group-hover:bg-emerald-50 text-gray-500 group-hover:text-emerald-600 flex items-center justify-center transition-colors border border-gray-200 group-hover:border-emerald-200 shadow-2xs">
                         <Layers className="w-5 h-5" />
                       </div>
-                      <span className="text-xs font-black text-gray-200 group-hover:text-emerald-400 transition-colors">
+                      <span className="text-xs font-black text-gray-800 group-hover:text-emerald-700 transition-colors">
                         点击选择已创建的示意图
                       </span>
-                      <span className="text-[10px] text-gray-500">
+                      <span className="text-[10px] text-gray-400">
                         按最新创建排序 · 支持官方与个人库快速检索
                       </span>
                     </button>
@@ -759,17 +768,17 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
               </div>
 
               {/* Section 3: Age, Topic & Stage Classification */}
-              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-5">
-                <div className="flex items-center gap-2 border-b border-gray-800/80 pb-3">
+              <div className="bg-white p-5 lg:p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-5">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                   <div className="w-2 h-4 bg-bvb-yellow rounded-full" />
-                  <h3 className="text-sm font-black text-white">分类与属性配置</h3>
+                  <h3 className="text-sm font-black text-gray-900">分类与属性配置</h3>
                 </div>
 
                 {/* Age selector */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-black text-gray-300">适用年龄段 (岁)</span>
-                    <span className="text-[11px] text-gray-400">已选: {selectedAges.join(', ')} 岁</span>
+                    <span className="text-xs font-black text-gray-700">适用年龄段 (岁)</span>
+                    <span className="text-[11px] text-gray-500 font-medium">已选: {selectedAges.join(', ')} 岁</span>
                   </div>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {AGE_GROUPS.map(age => {
@@ -781,8 +790,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                           onClick={() => toggleAge(age)}
                           className={`min-w-[34px] h-8 px-2 rounded-xl font-black text-xs transition-all ${
                             isSelected
-                              ? 'bg-bvb-yellow text-black shadow-md scale-105 ring-2 ring-yellow-400/40'
-                              : 'bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800'
+                              ? 'bg-bvb-yellow text-black shadow-xs scale-105 ring-2 ring-yellow-400/40'
+                              : 'bg-slate-50 hover:bg-gray-100 text-gray-700 border border-gray-200'
                           }`}
                         >
                           {age}
@@ -794,7 +803,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
                 {/* Topic selector */}
                 <div>
-                  <span className="block text-xs font-black text-gray-300 mb-2">训练主题</span>
+                  <span className="block text-xs font-black text-gray-700 mb-2">训练主题</span>
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {TRAINING_TOPICS.map(topic => {
                       const isSelected = selectedTopic === topic;
@@ -805,8 +814,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                           onClick={() => setSelectedTopic(topic)}
                           className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all ${
                             isSelected
-                              ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500/40'
-                              : 'bg-gray-900 hover:bg-gray-800 text-gray-300 border border-gray-800'
+                              ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-500/40'
+                              : 'bg-slate-50 hover:bg-gray-100 text-gray-700 border border-gray-200'
                           }`}
                         >
                           {topic}
@@ -818,7 +827,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
                 {/* Training Stage */}
                 <div>
-                  <span className="block text-xs font-black text-gray-300 mb-2">训练环节</span>
+                  <span className="block text-xs font-black text-gray-700 mb-2">训练环节</span>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {DRILL_STAGES.map(stage => {
                       const isSelected = selectedStage === stage.id;
@@ -829,8 +838,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                           onClick={() => setSelectedStage(stage.id)}
                           className={`py-2 px-2.5 rounded-xl border text-xs font-black transition-all flex items-center justify-center gap-1.5 ${
                             isSelected
-                              ? `${stage.color} ring-2 ring-emerald-500/40 text-white shadow-md`
-                              : 'bg-gray-900 border-gray-800 text-gray-400 hover:bg-gray-800'
+                              ? `${stage.color} ring-2 ring-emerald-500/40 text-white shadow-xs`
+                              : 'bg-slate-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                           }`}
                         >
                           <span>{stage.name}</span>
@@ -843,92 +852,92 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
               </div>
 
               {/* Section 4: Basic Numeric Parameters */}
-              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-4">
-                <div className="flex items-center gap-2 border-b border-gray-800/80 pb-3">
+              <div className="bg-white p-5 lg:p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                   <div className="w-2 h-4 bg-blue-500 rounded-full" />
-                  <h3 className="text-sm font-black text-white">场地规格与器材配置</h3>
+                  <h3 className="text-sm font-black text-gray-900">场地规格与器材配置</h3>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
-                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">预计时长(分)</label>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-gray-200">
+                    <label className="text-[11px] font-bold text-gray-500 block mb-1.5">预计时长(分)</label>
                     <input
                       type="number"
                       value={durationMinutes}
                       onChange={e => setDurationMinutes(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-black text-gray-900 focus:outline-none focus:border-emerald-500 shadow-2xs"
                     />
                   </div>
-                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
-                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">场地长(米)</label>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-gray-200">
+                    <label className="text-[11px] font-bold text-gray-500 block mb-1.5">场地长(米)</label>
                     <input
                       type="number"
                       value={fieldLength}
                       onChange={e => setFieldLength(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-black text-gray-900 focus:outline-none focus:border-emerald-500 shadow-2xs"
                     />
                   </div>
-                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
-                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">场地宽(米)</label>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-gray-200">
+                    <label className="text-[11px] font-bold text-gray-500 block mb-1.5">场地宽(米)</label>
                     <input
                       type="number"
                       value={fieldWidth}
                       onChange={e => setFieldWidth(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-black text-gray-900 focus:outline-none focus:border-emerald-500 shadow-2xs"
                     />
                   </div>
-                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
-                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">队员数(人)</label>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-gray-200">
+                    <label className="text-[11px] font-bold text-gray-500 block mb-1.5">队员数(人)</label>
                     <input
                       type="number"
                       value={playerCount}
                       onChange={e => setPlayerCount(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-emerald-400 focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-black text-emerald-700 focus:outline-none focus:border-emerald-500 shadow-2xs"
                     />
                   </div>
-                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
-                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">足球数(个)</label>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-gray-200">
+                    <label className="text-[11px] font-bold text-gray-500 block mb-1.5">足球数(个)</label>
                     <input
                       type="number"
                       value={ballCount}
                       onChange={e => setBallCount(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-black text-gray-900 focus:outline-none focus:border-emerald-500 shadow-2xs"
                     />
                   </div>
-                  <div className="bg-gray-900/80 p-3 rounded-xl border border-gray-800/80">
-                    <label className="text-[11px] font-bold text-gray-400 block mb-1.5">标志盘(个)</label>
+                  <div className="bg-slate-50 p-3 rounded-xl border border-gray-200">
+                    <label className="text-[11px] font-bold text-gray-500 block mb-1.5">标志盘(个)</label>
                     <input
                       type="number"
                       value={coneCount}
                       onChange={e => setConeCount(parseInt(e.target.value) || 0)}
-                      className="w-full px-3 py-1.5 bg-gray-950 border border-gray-700 rounded-lg text-sm font-black text-amber-400 focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-black text-amber-700 focus:outline-none focus:border-emerald-500 shadow-2xs"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-300 block mb-1.5">所需器材及背心备注</label>
+                  <label className="text-xs font-bold text-gray-700 block mb-1.5">所需器材及背心备注</label>
                   <input
                     type="text"
                     value={equipmentNotes}
                     onChange={e => setEquipmentNotes(e.target.value)}
                     placeholder="例如: 标志盘8个、足球6个、分队背心2色、敏捷梯1条"
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-800 rounded-xl text-xs font-medium text-gray-200 focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-2 bg-slate-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:bg-white focus:outline-none focus:border-emerald-500 shadow-2xs"
                   />
                 </div>
               </div>
 
               {/* Section 5: Teaching Steps & Content Breakdown */}
-              <div className="bg-gray-950 p-5 lg:p-6 rounded-2xl border border-gray-800 shadow-sm space-y-5">
-                <div className="flex items-center justify-between border-b border-gray-800/80 pb-3">
+              <div className="bg-white p-5 lg:p-6 rounded-2xl border border-gray-200/80 shadow-xs space-y-5">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-4 bg-purple-500 rounded-full" />
-                    <h3 className="text-sm font-black text-white flex items-center gap-2">
-                      <BookOpen className="w-4 h-4 text-emerald-400" />
+                    <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-emerald-600" />
                       <span>教案结构与指导要点</span>
                     </h3>
                   </div>
-                  <div className="flex items-center gap-1 bg-gray-900 p-1 rounded-xl text-xs font-bold border border-gray-800">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold border border-gray-200">
                     <button
                       type="button"
                       onClick={() => {
@@ -938,7 +947,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                         if (!progressions) setProgressions(STANDARD_PROGRESSIONS);
                       }}
                       className={`px-3 py-1 rounded-lg transition-colors ${
-                        activeTemplateTab === 'template' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                        activeTemplateTab === 'template' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
                       标准教案模板
@@ -952,7 +961,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                         setProgressions('');
                       }}
                       className={`px-3 py-1 rounded-lg transition-colors ${
-                        activeTemplateTab === 'blank' ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-400 hover:text-gray-300'
+                        activeTemplateTab === 'blank' ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
                       空白模板
@@ -962,8 +971,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-black text-gray-200 mb-1.5 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60 flex items-center justify-center text-[10px]">1</span>
+                    <label className="block text-xs font-black text-gray-800 mb-1.5 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center text-[10px] font-bold">1</span>
                       <span>组织方法 (场地布置与步骤流程)</span>
                     </label>
                     <textarea
@@ -971,13 +980,13 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       onChange={e => setOrganization(e.target.value)}
                       rows={4}
                       placeholder="详细列出每一步训练的站位与跑动组织流程..."
-                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-inner"
+                      className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-2xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-gray-200 mb-1.5 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-bvb-yellow/20 text-yellow-300 border border-yellow-500/40 flex items-center justify-center text-[10px]">2</span>
+                    <label className="block text-xs font-black text-gray-800 mb-1.5 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-yellow-100 text-yellow-900 border border-yellow-300 flex items-center justify-center text-[10px] font-bold">2</span>
                       <span>指导要点 (技术关键与心理意识)</span>
                     </label>
                     <textarea
@@ -985,13 +994,13 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       onChange={e => setCoachingPoints(e.target.value)}
                       rows={4}
                       placeholder="教练员指导口令与关键技术纠错要点..."
-                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-inner"
+                      className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-2xs"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-black text-gray-200 mb-1.5 flex items-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full bg-blue-950 text-blue-400 border border-blue-800/60 flex items-center justify-center text-[10px]">3</span>
+                    <label className="block text-xs font-black text-gray-800 mb-1.5 flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center justify-center text-[10px] font-bold">3</span>
                       <span>变化与进阶 (升降级与防守强度调整)</span>
                     </label>
                     <textarea
@@ -999,7 +1008,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
                       onChange={e => setProgressions(e.target.value)}
                       rows={3}
                       placeholder="进阶规则（如触球次数限制、增加防守人、弱侧跑位）..."
-                      className="w-full px-4 py-3 bg-gray-900 border border-gray-800 rounded-xl text-xs text-gray-200 focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-inner"
+                      className="w-full px-4 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all leading-relaxed shadow-2xs"
                     />
                   </div>
                 </div>
@@ -1028,23 +1037,23 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
       {/* High-Resolution Fullscreen Diagram Lightbox / Modal */}
       {isLightboxOpen && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
+          className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6"
           onClick={() => setIsLightboxOpen(false)}
         >
           <div 
-            className="relative max-w-6xl w-full max-h-[92vh] bg-gray-950 border border-gray-800 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center overflow-hidden"
+            className="relative max-w-6xl w-full max-h-[92vh] bg-white border border-gray-200 rounded-3xl p-4 sm:p-6 shadow-2xl flex flex-col items-center overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Top Lightbox Header */}
-            <div className="w-full flex items-center justify-between pb-3 mb-3 border-b border-gray-800">
+            <div className="w-full flex items-center justify-between pb-3 mb-3 border-b border-gray-200">
               <div className="flex items-center gap-2.5">
-                <ImageIcon className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-base font-black text-white">
+                <ImageIcon className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-base font-black text-gray-900">
                   {customUploadedImage 
                     ? (uploadedFileName || '设备中上传的示意图') 
                     : (selectedDiagram?.title || initialDrill?.title || '战术示意图全屏预览')}
                 </h3>
-                <span className="text-xs text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/80">
+                <span className="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
                   {customUploadedImage ? '本地图片' : (activeDrillOrDiagram?.pitchType || '标准场地')}
                 </span>
               </div>
@@ -1052,7 +1061,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
               <button
                 type="button"
                 onClick={() => setIsLightboxOpen(false)}
-                className="p-2 hover:bg-gray-800 text-gray-400 hover:text-white rounded-xl transition-colors"
+                className="p-2 hover:bg-gray-100 text-gray-500 hover:text-gray-900 rounded-xl transition-colors"
                 title="关闭预览"
               >
                 <X className="w-5 h-5" />
@@ -1060,7 +1069,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
             </div>
 
             {/* Lightbox Large Image Display */}
-            <div className="w-full flex-1 max-h-[70vh] flex items-center justify-center overflow-hidden rounded-2xl bg-gray-900 border border-gray-800/80 p-2">
+            <div className="w-full flex-1 max-h-[70vh] flex items-center justify-center overflow-hidden rounded-2xl bg-slate-900 border border-gray-200 p-2">
               {customUploadedImage ? (
                 <img 
                   src={customUploadedImage} 
@@ -1097,18 +1106,18 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
             </div>
 
             {/* Bottom Spec Pills */}
-            <div className="w-full mt-3.5 flex items-center justify-between flex-wrap gap-2 text-xs font-bold text-gray-400">
+            <div className="w-full mt-3.5 flex items-center justify-between flex-wrap gap-2 text-xs font-bold text-gray-500">
               <div className="flex items-center gap-3 flex-wrap">
-                <span>场地: <strong className="text-amber-400">{fieldLength}×{fieldWidth}米</strong></span>
+                <span>场地: <strong className="text-amber-700">{fieldLength}×{fieldWidth}米</strong></span>
                 <span>·</span>
-                <span>参训人数: <strong className="text-emerald-400">{playerCount}人</strong></span>
+                <span>参训人数: <strong className="text-emerald-700">{playerCount}人</strong></span>
                 <span>·</span>
-                <span>器材: <strong className="text-cyan-400">{ballCount}球 / {coneCount}标志盘</strong></span>
+                <span>器材: <strong className="text-blue-700">{ballCount}球 / {coneCount}标志盘</strong></span>
                 <span>·</span>
-                <span>训练时长: <strong className="text-blue-400">{durationMinutes}分钟</strong></span>
+                <span>训练时长: <strong className="text-purple-700">{durationMinutes}分钟</strong></span>
               </div>
 
-              <div className="text-[11px] text-gray-500">
+              <div className="text-[11px] text-gray-400">
                 点击背景或右上角关闭全屏
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { PitchType, PitchTheme, DrillDesign } from '../../types';
+import { PitchType, PitchTheme, DrillDesign, User } from '../../types';
 import { PITCH_THEMES, PITCH_LAYOUTS } from './constants';
 import { PitchSvgRenderer } from './PitchSvgRenderer';
 import { X, Layers, Box, Check, Compass, Sparkles, Upload } from 'lucide-react';
@@ -68,6 +68,7 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
       return;
     }
 
+    const isDirector = currentUser?.role === 'director' || !currentUser?.role;
     const newUploadedDiagram: DrillDesign = {
       id: `uploaded-diagram-${Date.now()}`,
       title: pendingUpload.title.trim(),
@@ -88,11 +89,12 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
       playerCount: 8,
       ballCount: 6,
       coneCount: 8,
-      authorId: currentUser?.id,
-      authorName: currentUser?.name || (currentUser?.role === 'director' ? '青训总监' : '教练员'),
-      authorRole: currentUser?.role || 'coach',
-      approvalStatus: currentUser?.role === 'director' ? 'approved' : 'pending',
-      isPrivate: currentUser?.role !== 'director'
+      authorId: currentUser?.id || 'u1',
+      authorName: currentUser?.name || '青训总监',
+      authorRole: currentUser?.role || 'director',
+      approvalStatus: isDirector ? 'approved' : 'pending',
+      isPrivate: false,
+      isDraft: false
     };
 
     if (onUploadImageDiagram) {
