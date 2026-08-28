@@ -3,6 +3,7 @@ import { PitchType, PitchTheme, DrillDesign, User } from '../../types';
 import { PITCH_THEMES, PITCH_LAYOUTS } from './constants';
 import { PitchSvgRenderer } from './PitchSvgRenderer';
 import { X, Layers, Box, Check, Compass, Sparkles, Upload } from 'lucide-react';
+import { compressImageFile } from '../../utils/imageCompression';
 
 interface PitchSelectorModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -43,9 +44,8 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const base64 = uploadEvent.target?.result as string;
+    try {
+      const base64 = await compressImageFile(file, { maxWidth: 1024, maxHeight: 768, quality: 0.8 });
       if (base64) {
         const cleanFileName = file.name.replace(/\.[^/.]+$/, '');
         setPendingUpload({
@@ -55,8 +55,9 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
           description: `从本地设备上传的战术示意图 (${file.name})`
         });
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Image compression warning:', err);
+    }
     e.target.value = '';
   };
 
@@ -80,7 +81,6 @@ export const PitchSelectorModal: React.FC<PitchSelectorModalProps> = ({
       elements: [],
       lines: [],
       previewImage: pendingUpload.base64,
-      diagramImage: pendingUpload.base64,
       keyPoints: ['本地导入示意图'],
       createdAt: new Date().toISOString().split('T')[0],
       isUploadedImage: true,

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { PublishApprovalModal, PublishChoice } from './PublishApprovalModal';
+import { compressCanvasToDataUrl } from '../../utils/imageCompression';
 
 // 7 Preset colors matching Image 2
 const IMAGE_PRESET_COLORS = [
@@ -1840,7 +1841,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
     if (canvasRef.current) {
       try {
         const canvas = await html2canvas(canvasRef.current, {
-          scale: 2,
+          scale: 1.2,
           useCORS: true,
           backgroundColor: null,
           logging: false,
@@ -1849,7 +1850,7 @@ export const DiagramCanvasEditor: React.FC<DiagramCanvasEditorProps> = ({
             el.classList.contains('line-handle') ||
             el.classList.contains('marquee-box')
         });
-        previewDataUrl = canvas.toDataURL('image/png');
+        previewDataUrl = compressCanvasToDataUrl(canvas, { maxWidth: 800, maxHeight: 600, quality: 0.8 });
       } catch (err) {
         console.warn('Canvas export preview warning:', err);
       } finally {

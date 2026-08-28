@@ -2,6 +2,7 @@
 import { put, list } from '@vercel/blob';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 
 const DB_FILENAME = 'football_manager_db.json';
 const DB_PREFIX = 'football_manager_db'; 
@@ -149,59 +150,74 @@ const uploadBase64Image = async (base64Data: string, prefix: string, token: stri
   return url;
 };
 
-const optimizeDatabaseImages = async (db: any, token: string): Promise<any> => {
+const compressDataUrlServer = async (dataUrl: string, maxDim = 800, quality = 80): Promise<string> => {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return dataUrl;
+  if (dataUrl.length < 30000 && !dataUrl.includes('image/png')) return dataUrl;
+  const match = dataUrl.match(/^data:([a-zA-Z0-9/+-]+);base64,(.+)$/);
+  if (!match) return dataUrl;
+  try {
+    const buf = Buffer.from(match[2], 'base64');
+    const resized = await sharp(buf)
+      .resize({ width: maxDim, height: maxDim, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality, progressive: true })
+      .toBuffer();
+    return 'data:image/jpeg;base64,' + resized.toString('base64');
+  } catch (err) {
+    console.warn('[Storage API] Sharp compression fallback:', err);
+    return dataUrl;
+  }
+};
+
+const optimizeDatabaseImages = async (db: any, token?: string): Promise<any> => {
   if (!db) return db;
 
   // 1. Optimize appLogo
   if (db.appLogo && typeof db.appLogo === 'string' && db.appLogo.startsWith('data:image/')) {
     try {
-      console.log('[Storage API] Optimizing appLogo from base64...');
-      const url = await uploadBase64Image(db.appLogo, 'app_logo', token);
-      db.appLogo = url;
-      console.log('[Storage API] appLogo optimized:', url);
+      db.appLogo = await compressDataUrlServer(db.appLogo, 400, 85);
+      if (token && token.trim() !== '') {
+        const url = await uploadBase64Image(db.appLogo, 'app_logo', token);
+        db.appLogo = url;
+      }
     } catch (e) {
       console.error('[Storage API] Failed to optimize appLogo:', e);
     }
   }
 
-  // 2. Optimize players
+  // 2. Optimize designs (tactical diagrams)
+  if (db.designs && Array.isArray(db.designs)) {
+    for (let d of db.designs) {
+      if (d && typeof d === 'object') {
+        if (d.previewImage && typeof d.previewImage === 'string' && d.previewImage.length > 30000) {
+          d.previewImage = await compressDataUrlServer(d.previewImage, 800, 75);
+        }
+        if (d.diagramImage && typeof d.diagramImage === 'string') {
+          if (d.diagramImage === d.previewImage || d.diagramImage.length > 30000) {
+            delete d.diagramImage; // Deduplicate redundant field
+          }
+        }
+        if (d.uploadedImage && typeof d.uploadedImage === 'string' && d.uploadedImage.length > 30000) {
+          d.uploadedImage = await compressDataUrlServer(d.uploadedImage, 1024, 80);
+        }
+      }
+    }
+  }
+
+  // 3. Optimize players
   if (db.players && Array.isArray(db.players)) {
-    const uploadTasks: { type: 'image' | 'gallery'; playerIndex: number; galleryIndex?: number; base64: string }[] = [];
-
-    db.players.forEach((player: any, pIdx: number) => {
-      if (player.image && typeof player.image === 'string' && player.image.startsWith('data:image/')) {
-        uploadTasks.push({ type: 'image', playerIndex: pIdx, base64: player.image });
-      }
-      if (player.gallery && Array.isArray(player.gallery)) {
-        player.gallery.forEach((item: any, gIdx: number) => {
-          if (item.url && typeof item.url === 'string' && item.url.startsWith('data:image/')) {
-            uploadTasks.push({ type: 'gallery', playerIndex: pIdx, galleryIndex: gIdx, base64: item.url });
-          }
-        });
-      }
-    });
-
-    if (uploadTasks.length > 0) {
-      console.log(`[Storage API] Found ${uploadTasks.length} new base64 images to upload during save.`);
-      
-      const chunkSize = 10;
-      for (let i = 0; i < uploadTasks.length; i += chunkSize) {
-        const chunk = uploadTasks.slice(i, i + chunkSize);
-        await Promise.all(chunk.map(async (task) => {
-          try {
-            const prefix = task.type === 'image' ? 'player_avatar' : 'player_gallery';
-            const url = await uploadBase64Image(task.base64, prefix, token);
-            if (task.type === 'image') {
-              db.players[task.playerIndex].image = url;
-            } else if (task.type === 'gallery' && task.galleryIndex !== undefined) {
-              db.players[task.playerIndex].gallery[task.galleryIndex].url = url;
+    for (let player of db.players) {
+      if (player && typeof player === 'object') {
+        if (player.image && typeof player.image === 'string' && player.image.startsWith('data:image/')) {
+          player.image = await compressDataUrlServer(player.image, 400, 80);
+        }
+        if (player.gallery && Array.isArray(player.gallery)) {
+          for (let item of player.gallery) {
+            if (item && item.url && typeof item.url === 'string' && item.url.startsWith('data:image/')) {
+              item.url = await compressDataUrlServer(item.url, 800, 80);
             }
-          } catch (uploadErr) {
-            console.error('[Storage API] Failed to upload image on save:', uploadErr);
           }
-        }));
+        }
       }
-      console.log('[Storage API] Base64 images successfully uploaded and URLs replaced.');
     }
   }
 
@@ -406,12 +422,10 @@ export default async function handler(request: any, response: any) {
       }
 
       // Optimize incoming body images before writing
-      if (!isTokenMissing) {
-        try {
-          await optimizeDatabaseImages(body, token);
-        } catch (optErr) {
-          console.error('[Storage API] Image optimization on save failed (non-blocking):', optErr);
-        }
+      try {
+        await optimizeDatabaseImages(body, isTokenMissing ? undefined : token);
+      } catch (optErr) {
+        console.error('[Storage API] Image optimization on save failed (non-blocking):', optErr);
       }
 
       // Always save to local file as primary or backup persistence

@@ -467,12 +467,16 @@ function App() {
         basicTechThemes,
         scenarioThemes,
         philosophyOverview,
-        intramuralTournaments
+        intramuralTournaments,
+        tournaments,
+        characterAssessments
     };
 
     // Mirror in local browser storage synchronously first
     try {
         localStorage.setItem('football_manager_local_cache', JSON.stringify(dataPayload));
+        localStorage.setItem('club_tournament_library_v1', JSON.stringify(tournaments));
+        localStorage.setItem('club_character_assessments_v1', JSON.stringify(characterAssessments));
     } catch (e) {
         console.warn('Failed to cache data in browser storage:', e);
     }
@@ -734,8 +738,8 @@ function App() {
             </div>
           </div>
           <button 
-            onClick={() => initializeCloudData()}
-            className="px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 transition-colors shadow-sm active:scale-95"
+            onClick={() => handleManualSave()}
+            className="px-4 py-2 bg-red-600 text-white text-xs font-black rounded-lg hover:bg-red-700 transition-colors shadow-sm active:scale-95 whitespace-nowrap"
           >
             重试连接
           </button>

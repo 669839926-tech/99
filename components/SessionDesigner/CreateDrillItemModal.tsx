@@ -9,6 +9,7 @@ import { PitchSvgRenderer } from './PitchSvgRenderer';
 import { DiagramPreviewBox } from './DiagramPreviewBox';
 import { SelectDiagramModal } from './SelectDiagramModal';
 import { PublishApprovalModal, PublishChoice } from './PublishApprovalModal';
+import { compressImageFile } from '../../utils/imageCompression';
 
 interface CreateDrillItemModalProps {
   isOpen: boolean;
@@ -172,7 +173,7 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
   };
 
   // Handle local device image file upload
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -182,9 +183,8 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
     }
 
     setUploadedFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (uploadEvent) => {
-      const result = uploadEvent.target?.result as string;
+    try {
+      const result = await compressImageFile(file, { maxWidth: 1024, maxHeight: 768, quality: 0.8 });
       if (result) {
         setCustomUploadedImage(result);
         setSelectedDiagramId(null); // Reset library id since user uploaded a custom file
@@ -204,7 +204,6 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
             elements: [],
             lines: [],
             previewImage: result,
-            diagramImage: result,
             keyPoints: ['本地导入示意图'],
             createdAt: new Date().toISOString().split('T')[0],
             isUploadedImage: true,
@@ -223,8 +222,9 @@ export const CreateDrillItemModal: React.FC<CreateDrillItemModalProps> = ({
           onSaveUploadedDiagram(newDiagram);
         }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.warn('Image upload compression error:', err);
+    }
     // Reset file input value to allow re-uploading same file name if needed
     e.target.value = '';
   };

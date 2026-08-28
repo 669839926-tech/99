@@ -1,4 +1,6 @@
 
+import { sanitizeAndCompressPayload } from '../utils/imageCompression';
+
 export interface AppData {
     players: any[];
     teams: any[];
@@ -27,6 +29,8 @@ export interface AppData {
     scenarioThemes?: any[];
     philosophyOverview?: any;
     intramuralTournaments?: any[];
+    tournaments?: any[];
+    characterAssessments?: any[];
 }
 
 const getApiUrl = (relativePath: string): string => {
@@ -67,19 +71,42 @@ export const loadDataFromCloud = async (retries = 3): Promise<AppData | null> =>
 
 export const saveDataToCloud = async (data: AppData, retries = 2): Promise<any> => {
     let lastError: any = null;
+    
+    // Automatically sanitize & compress any oversized data fields
+    let payloadToSave: any = data;
+    try {
+      payloadToSave = await sanitizeAndCompressPayload(data);
+    } catch (sanitizationErr) {
+      console.warn('Payload pre-compression warning:', sanitizationErr);
+    }
+
     for (let attempt = 0; attempt < retries; attempt++) {
         try {
             const apiUrl = getApiUrl('/api/storage');
             console.log(`Saving data to cloud storage API (attempt ${attempt + 1}/${retries})...`, apiUrl);
             const res = await fetch(apiUrl, {
                 method: 'POST',
-                body: JSON.stringify(data),
+                body: JSON.stringify(payloadToSave),
                 headers: { 'Content-Type': 'application/json' }
             });
             if (!res.ok) {
                 const errorData = await res.json().catch(() => ({}));
                 const errorMessage = errorData.details || errorData.message || `HTTP ${res.status}`;
                 console.error('Failed to save data to cloud storage:', res.status, errorMessage);
+                
+                // If 413 Payload Too Large, attempt aggressive secondary compression before retry
+                if (res.status === 413 && attempt < retries - 1) {
+                  console.log('Detected HTTP 413, performing aggressive compression on payload...');
+                  if (Array.isArray(payloadToSave.designs)) {
+                    payloadToSave.designs = payloadToSave.designs.map((d: any) => ({
+                      ...d,
+                      previewImage: d.previewImage ? d.previewImage.slice(0, 30000) : undefined,
+                      diagramImage: undefined,
+                      uploadedImage: undefined
+                    }));
+                  }
+                }
+                
                 throw new Error(errorMessage);
             }
             const result = await res.json();
