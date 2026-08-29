@@ -6,6 +6,7 @@ import {
   ChevronRight, RefreshCw
 } from 'lucide-react';
 import { exportToImage } from '../services/pdfService';
+import { getPlayerSessionStatus } from '../utils/playerAttendanceUtils';
 
 interface ParentRenewalCardModalProps {
   player: Player;
@@ -59,25 +60,6 @@ const formatBirthDateMonth = (dateStr?: string) => {
   return dateStr;
 };
 
-const parseLocalDate = (dateStr: string) => {
-  if (!dateStr) return new Date();
-  const cleanStr = dateStr.trim().replace(/\//g, '-');
-  const parts = cleanStr.split('-').map(Number);
-  const y = parts[0] || new Date().getFullYear();
-  const m = parts.length >= 2 ? parts[1] - 1 : 0;
-  const d = parts.length >= 3 ? parts[2] : 1;
-  return new Date(y, m, d);
-};
-
-const isBeforeJoinDate = (sessionDateStr: string, joinDateStr?: string) => {
-  if (!joinDateStr) return false;
-  const sDate = parseLocalDate(sessionDateStr);
-  const jDate = parseLocalDate(joinDateStr);
-  sDate.setHours(0, 0, 0, 0);
-  jDate.setHours(0, 0, 0, 0);
-  return sDate < jDate;
-};
-
 export const ParentRenewalCardModal: React.FC<ParentRenewalCardModalProps> = ({
   player,
   teams,
@@ -120,9 +102,8 @@ export const ParentRenewalCardModal: React.FC<ParentRenewalCardModalProps> = ({
   // 3. 统计上次充值日期 (primaryDate) 至今天的参训情况与课时变动
   const periodTrainings = trainings.filter(s => {
     if (!s.date || s.date < primaryDate) return false;
-    if (isBeforeJoinDate(s.date, player.joinDate)) return false;
-    const hasRecord = s.attendance?.some(r => r.playerId === player.id);
-    return s.teamId === player.teamId || hasRecord;
+    const res = getPlayerSessionStatus(player, s);
+    return res.isCounted;
   });
 
   let attendedCount = 0;
@@ -132,11 +113,11 @@ export const ParentRenewalCardModal: React.FC<ParentRenewalCardModalProps> = ({
   let absentCount = 0;
 
   periodTrainings.forEach(s => {
-    const att = s.attendance?.find(a => a.playerId === player.id);
-    const status = att ? att.status : 'Absent';
+    const res = getPlayerSessionStatus(player, s);
+    const status = res.status || 'Absent';
     if (status === 'Present') {
       attendedCount++;
-      consumedCredits += (att?.creditCost ?? 1);
+      consumedCredits += res.creditCost;
     } else if (status === 'Leave') {
       leaveCount++;
     } else if (status === 'Injury') {

@@ -143,6 +143,19 @@ export interface PlayerPointRecord {
     note?: string;
 }
 
+export interface PlayerTeamTransfer {
+  id: string;
+  transferDate: string; // YYYY-MM-DD
+  fromTeamId?: string;
+  fromTeamName?: string;
+  toTeamId: string;
+  toTeamName: string;
+  reason?: string;
+  note?: string;
+  operator?: string;
+  createdAt?: string;
+}
+
 export interface Player {
   id: string;
   teamId: string;
@@ -190,6 +203,8 @@ export interface Player {
   behavioralTraits?: string[];
   coachingReminders?: string[];
   renewalLevel?: 1 | 2 | 3 | 4;
+  // Team Transfer / Career History
+  teamTransferHistory?: PlayerTeamTransfer[];
 }
 
 export type MatchEventType = 'Goal' | 'Assist' | 'YellowCard' | 'RedCard' | 'Sub' | 'OwnGoal';

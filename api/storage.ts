@@ -186,7 +186,7 @@ const optimizeDatabaseImages = async (db: any, token?: string): Promise<any> => 
 
   // 2. Optimize designs (tactical diagrams)
   if (db.designs && Array.isArray(db.designs)) {
-    for (let d of db.designs) {
+    for (const d of db.designs) {
       if (d && typeof d === 'object') {
         if (d.previewImage && typeof d.previewImage === 'string' && d.previewImage.length > 30000) {
           d.previewImage = await compressDataUrlServer(d.previewImage, 800, 75);
@@ -205,13 +205,13 @@ const optimizeDatabaseImages = async (db: any, token?: string): Promise<any> => 
 
   // 3. Optimize players
   if (db.players && Array.isArray(db.players)) {
-    for (let player of db.players) {
+    for (const player of db.players) {
       if (player && typeof player === 'object') {
         if (player.image && typeof player.image === 'string' && player.image.startsWith('data:image/')) {
           player.image = await compressDataUrlServer(player.image, 400, 80);
         }
         if (player.gallery && Array.isArray(player.gallery)) {
-          for (let item of player.gallery) {
+          for (const item of player.gallery) {
             if (item && item.url && typeof item.url === 'string' && item.url.startsWith('data:image/')) {
               item.url = await compressDataUrlServer(item.url, 800, 80);
             }

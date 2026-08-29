@@ -22,6 +22,7 @@ import {
   Tactic, PointItemDefinition, PlayerPointRecord, TournamentItem, PlayerCharacterAssessment 
 } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
+import { recordPlayerTeamTransfer } from './utils/playerAttendanceUtils';
 import { Loader2 } from 'lucide-react';
 
 function App() {
@@ -548,10 +549,23 @@ function App() {
   const handleUpdateTeam = (updatedTeam: Team) => setTeams(prev => prev.map(t => t.id === updatedTeam.id ? updatedTeam : t));
   const handleAddPlayer = (player: Player) => setPlayers(prev => [...prev, player]);
   const handleBulkAddPlayers = (newPlayers: Player[]) => setPlayers(prev => [...prev, ...newPlayers]);
-  const handleUpdatePlayer = (updatedPlayer: Player) => setPlayers(prev => prev.map(p => p.id === updatedPlayer.id ? updatedPlayer : p));
+  const handleUpdatePlayer = (updatedPlayer: Player) => setPlayers(prev => prev.map(p => {
+    if (p.id !== updatedPlayer.id) return p;
+    // Check if team was changed without a matching transfer history record
+    if (p.teamId !== updatedPlayer.teamId) {
+      const hasRecentTransfer = updatedPlayer.teamTransferHistory?.some(
+        t => t.toTeamId === updatedPlayer.teamId && (t.fromTeamId === p.teamId || !t.fromTeamId)
+      );
+      if (!hasRecentTransfer) {
+        return recordPlayerTeamTransfer(updatedPlayer, updatedPlayer.teamId, teams, '球员档案球队调整', undefined, currentUser?.name);
+      }
+    }
+    return updatedPlayer;
+  }));
   const handleDeletePlayer = (playerId: string) => { if(confirm('确定要删除这名球员吗？')) setPlayers(prev => prev.filter(p => p.id !== playerId)); };
   const handleBulkDeletePlayers = (playerIds: string[]) => setPlayers(prev => prev.filter(p => !playerIds.includes(p.id)));
-  const handleTransferPlayers = (playerIds: string[], targetTeamId: string) => setPlayers(prev => prev.map(p => playerIds.includes(p.id) ? { ...p, teamId: targetTeamId } : p));
+  const handleTransferPlayers = (playerIds: string[], targetTeamId: string) => 
+    setPlayers(prev => prev.map(p => playerIds.includes(p.id) ? recordPlayerTeamTransfer(p, targetTeamId, teams, '批量调整梯队归属', undefined, currentUser?.name) : p));
   const handleAddPlayerReview = (playerId: string, review: PlayerReview) => setPlayers(prev => prev.map(p => p.id === playerId ? { ...p, reviews: [...(p.reviews || []), review] } : p));
   const handleAddMatch = (match: Match) => setMatches(prev => [...prev, match]);
   const handleDeleteMatch = (matchId: string) => setMatches(prev => prev.filter(m => m.id !== matchId));

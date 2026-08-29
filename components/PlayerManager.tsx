@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto, Match, PlayerCharacterAssessment } from '../types';
+import { Player, Position, Team, PlayerStats, AttributeConfig, AttributeCategory, TrainingSession, PlayerReview, User, ApprovalStatus, PlayerPhoto, Match, PlayerCharacterAssessment, PlayerTeamTransfer } from '../types';
 import { Search, Plus, Shield, X, Save, Trash2, Edit2, Activity, Brain, Dumbbell, Target, CheckSquare, ArrowRightLeft, Upload, User as UserIcon, CreditCard, Cake, MoreHorizontal, Crown, ChevronDown, Loader2, Sparkles, Download, History, CheckCircle, ClipboardCheck, FileSpreadsheet, RefreshCw, ChevronLeft, ChevronRight, Phone, School, CalendarDays, FileDown, LayoutGrid, LayoutList, Image as ImageIcon, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Weight, Files, Maximize2, Minimize2, Zap, Trophy, Award, Medal, Star } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
 import { generatePlayerReview } from '../services/geminiService';
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
 import { PlayerCharacterMedalsCard } from './PlayerCharacterMedalsCard';
+import { getPlayerSessionStatus, recordPlayerTeamTransfer } from '../utils/playerAttendanceUtils';
 
 // --- Shared Helper Functions ---
 
@@ -142,15 +143,16 @@ const calculateAttendanceRate = (player: Player, trainings: TrainingSession[], s
     if (scope === 'month') { startDate.setMonth(now.getMonth() - 1); } 
     else if (scope === 'quarter') { startDate.setMonth(now.getMonth() - 3); } 
     else { startDate.setFullYear(now.getFullYear() - 1); }
+    const startStr = startDate.toISOString().split('T')[0];
+    const nowStr = now.toISOString().split('T')[0];
+
     const validSessions = trainings.filter(t => {
-        if (player.joinDate && t.date < player.joinDate) {
-            return false;
-        }
-        const tDate = new Date(t.date);
-        return t.teamId === player.teamId && tDate >= startDate && tDate <= now;
+        if (t.date < startStr || t.date > nowStr) return false;
+        const res = getPlayerSessionStatus(player, t);
+        return res.isCounted;
     });
     if (validSessions.length === 0) return 0;
-    const presentCount = validSessions.filter(t => t.attendance?.some(r => r.playerId === player.id && r.status === 'Present')).length;
+    const presentCount = validSessions.filter(t => getPlayerSessionStatus(player, t).status === 'Present').length;
     return Math.round((presentCount / validSessions.length) * 100);
 };
 
@@ -514,6 +516,62 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
     const [isCapturingEvaluationCard, setIsCapturingEvaluationCard] = useState(false);
     const evaluationCardRef = useRef<HTMLDivElement>(null);
 
+    // Team Transfer States
+    const [showAddTransferModal, setShowAddTransferModal] = useState(false);
+    const [newTransferDate, setNewTransferDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [newTransferFromTeamId, setNewTransferFromTeamId] = useState(() => player.teamId || '');
+    const [newTransferToTeamId, setNewTransferToTeamId] = useState('');
+    const [newTransferReason, setNewTransferReason] = useState('梯队归属调整');
+    const [newTransferNote, setNewTransferNote] = useState('');
+    const [updateCurrentTeamCheck, setUpdateCurrentTeamCheck] = useState(true);
+
+    const handleSaveTransferRecord = () => {
+        if (!newTransferToTeamId) {
+            alert('请选择目标调整梯队');
+            return;
+        }
+        const fromTeam = teams.find(t => t.id === newTransferFromTeamId);
+        const toTeam = teams.find(t => t.id === newTransferToTeamId);
+
+        const newRecord: PlayerTeamTransfer = {
+            id: `transfer_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            transferDate: newTransferDate,
+            fromTeamId: newTransferFromTeamId,
+            fromTeamName: fromTeam?.name || (newTransferFromTeamId === 'unassigned' ? '待分配' : '原梯队'),
+            toTeamId: newTransferToTeamId,
+            toTeamName: toTeam?.name || (newTransferToTeamId === 'unassigned' ? '待分配' : '新梯队'),
+            reason: newTransferReason || '梯队归属调整',
+            note: newTransferNote,
+            operatedBy: currentUser?.name,
+            createdAt: new Date().toISOString()
+        };
+
+        const existing = editedPlayer.teamTransferHistory || [];
+        const updatedHistory = [newRecord, ...existing.filter(r => r.id !== newRecord.id)].sort((a, b) => b.transferDate.localeCompare(a.transferDate));
+
+        const updatedPlayer: Player = {
+            ...editedPlayer,
+            teamId: updateCurrentTeamCheck ? newTransferToTeamId : editedPlayer.teamId,
+            teamTransferHistory: updatedHistory
+        };
+
+        setEditedPlayer(updatedPlayer);
+        onUpdatePlayer(updatedPlayer);
+        setShowAddTransferModal(false);
+        setNewTransferNote('');
+    };
+
+    const handleDeleteTransfer = (transferId: string) => {
+        if (!window.confirm('确定要删除这条梯队调整记录吗？')) return;
+        const updatedHistory = (editedPlayer.teamTransferHistory || []).filter(r => r.id !== transferId);
+        const updatedPlayer: Player = {
+            ...editedPlayer,
+            teamTransferHistory: updatedHistory
+        };
+        setEditedPlayer(updatedPlayer);
+        onUpdatePlayer(updatedPlayer);
+    };
+
     useEffect(() => {
         const timer = setInterval(() => {
             setNow(new Date());
@@ -741,12 +799,11 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         const endStr = endDate.toISOString().split('T')[0];
 
         const qTrainings = trainings.filter(t => {
-            if (editedPlayer.joinDate && t.date < editedPlayer.joinDate) {
-                return false;
-            }
-            return t.date >= startStr && t.date <= endStr && t.teamId === editedPlayer.teamId;
+            if (t.date < startStr || t.date > endStr) return false;
+            const res = getPlayerSessionStatus(editedPlayer, t);
+            return res.isCounted;
         });
-        const attSessions = qTrainings.filter(t => t.attendance.some(a => a.playerId === editedPlayer.id && a.status === 'Present'));
+        const attSessions = qTrainings.filter(t => getPlayerSessionStatus(editedPlayer, t).status === 'Present');
         const attRate = qTrainings.length > 0 ? (attSessions.length / qTrainings.length * 100).toFixed(1) : '0';
 
         const focEvents = qTrainings
@@ -1398,6 +1455,122 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
                     </div>
                 </div>
 
+                {/* Team Affiliation & Transfer Pathway Section */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h4 className="font-black text-xs text-gray-700 uppercase tracking-widest px-1 flex items-center gap-2">
+                            <ArrowRightLeft className="w-4 h-4 text-bvb-yellow" />
+                            梯队归属与调整/移交履历
+                        </h4>
+                        {(isDirector || isCoach) && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setNewTransferFromTeamId(editedPlayer.teamId || '');
+                                    setNewTransferToTeamId('');
+                                    setNewTransferDate(new Date().toISOString().split('T')[0]);
+                                    setNewTransferReason('梯队归属调整');
+                                    setNewTransferNote('');
+                                    setShowAddTransferModal(true);
+                                }}
+                                className="px-3 py-1.5 bg-bvb-yellow hover:bg-yellow-400 text-bvb-black font-black text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                登记/补录梯队调整
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Current Team Status Bar */}
+                    <div className="bg-gradient-to-r from-gray-50 via-yellow-50/40 to-gray-50 border border-gray-200/90 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-bvb-black text-bvb-yellow flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                                <Shield className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-500 font-bold">当前归属梯队:</span>
+                                    <span className="text-sm font-black text-gray-900 bg-white px-2.5 py-0.5 rounded-lg border border-gray-200 shadow-2xs">
+                                        {teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                    俱乐部入队日期: <span className="font-mono font-bold text-gray-600">{editedPlayer.joinDate || '未设置'}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-xs text-gray-500 bg-white/90 border border-gray-200/80 rounded-xl px-3 py-2">
+                            <span className="text-green-600 font-bold">● 考勤规则已生效：</span>
+                            <span className="text-[11px] text-gray-600">移交后不计入转队前未参加的原梯队训练，不视为缺席</span>
+                        </div>
+                    </div>
+
+                    {/* Transfer Timeline Cards */}
+                    {(!editedPlayer.teamTransferHistory || editedPlayer.teamTransferHistory.length === 0) ? (
+                        <div className="py-6 text-center bg-gray-50 border border-dashed border-gray-200 rounded-2xl p-4">
+                            <ArrowRightLeft className="w-7 h-7 text-gray-300 mx-auto mb-2" />
+                            <p className="text-xs font-bold text-gray-600">暂无梯队调整记录</p>
+                            <p className="text-[10px] text-gray-400 mt-0.5">球员自入队以来归属于当前梯队。如发生梯队晋升或归属调整，将在此自动生成履历记录。</p>
+                        </div>
+                    ) : (
+                        <div className="relative border-l-2 border-yellow-400 ml-4 pl-6 space-y-3">
+                            {editedPlayer.teamTransferHistory.map((record, rIdx) => (
+                                <div key={record.id || rIdx} className="relative group">
+                                    <div className="absolute -left-[31px] top-2 w-4 h-4 rounded-full bg-bvb-black border-2 border-bvb-yellow shadow-xs group-hover:scale-125 transition-transform" />
+
+                                    <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-2xs hover:border-yellow-400 transition-all space-y-2.5">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2.5 py-0.5 rounded-lg bg-yellow-100 text-yellow-900 font-black text-xs font-mono">
+                                                    📅 {record.transferDate}
+                                                </span>
+                                                <span className="text-xs font-black text-gray-800">
+                                                    {record.reason || '梯队调整'}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                                {record.operatedBy && (
+                                                    <span className="text-[10px] text-gray-400">操作人: {record.operatedBy}</span>
+                                                )}
+                                                {(isDirector || isCoach) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteTransfer(record.id)}
+                                                        className="text-gray-300 hover:text-red-500 p-1 transition-colors cursor-pointer"
+                                                        title="删除此条调整记录"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* From -> To display */}
+                                        <div className="flex items-center gap-3 py-1 flex-wrap">
+                                            <div className="px-3 py-1.5 rounded-xl bg-gray-100 border border-gray-200 text-xs font-black text-gray-700">
+                                                原梯队: <span className="text-gray-900">{record.fromTeamName || '未知梯队'}</span>
+                                            </div>
+                                            <div className="flex items-center text-yellow-500 font-black text-sm">
+                                                ➔
+                                            </div>
+                                            <div className="px-3 py-1.5 rounded-xl bg-yellow-50 border border-yellow-300 text-xs font-black text-yellow-900">
+                                                调整至: <span className="text-bvb-black underline decoration-yellow-400 underline-offset-2">{record.toTeamName || '未知梯队'}</span>
+                                            </div>
+                                        </div>
+
+                                        {record.note && (
+                                            <p className="text-xs bg-gray-50 p-2 rounded-xl text-gray-600 border border-gray-100">
+                                                备注: {record.note}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
                 {/* Career Timeline */}
                 <div className="space-y-4">
                     <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest px-1 flex items-center gap-2">
@@ -1519,12 +1692,11 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
         })();
 
         const quarterTrainings = trainings.filter(t => {
-            if (editedPlayer.joinDate && t.date < editedPlayer.joinDate) {
-                return false;
-            }
-            return t.date >= start && t.date <= end && t.teamId === editedPlayer.teamId;
+            if (t.date < start || t.date > end) return false;
+            const res = getPlayerSessionStatus(editedPlayer, t);
+            return res.isCounted;
         });
-        const attendedSessions = quarterTrainings.filter(t => t.attendance.some(a => a.playerId === editedPlayer.id && a.status === 'Present'));
+        const attendedSessions = quarterTrainings.filter(t => getPlayerSessionStatus(editedPlayer, t).status === 'Present');
         const attendanceRate = quarterTrainings.length > 0 ? (attendedSessions.length / quarterTrainings.length * 100).toFixed(1) : '0';
 
         const focusEvents = quarterTrainings
@@ -2247,7 +2419,13 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
           </div>
           <div className="bg-gray-100 border-b border-gray-200 shrink-0 sticky top-0 z-10"><div className="flex overflow-x-auto no-scrollbar">{[{ id: 'profile', label: '球员画像', icon: UserIcon }, { id: 'radar', label: '球员雷达', icon: Target }, { id: 'career', label: '生涯', icon: Award }, { id: 'reviews', label: '球员跟踪', icon: Search }, { id: 'records', label: '记录', icon: History }, { id: 'gallery', label: '相册', icon: ImageIcon }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-shrink-0 flex items-center px-6 py-4 font-bold text-sm transition-colors border-b-2 ${activeTab === tab.id ? 'border-bvb-yellow text-bvb-black bg-white' : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-gray-50'}`}><tab.icon className={`w-4 h-4 mr-2 ${activeTab === tab.id ? 'text-bvb-yellow fill-current stroke-bvb-black' : ''}`} />{tab.label}</button>))}</div></div>
           <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-white pb-24 md:pb-6">
-             {activeTab === 'profile' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => setEditedPlayer({...editedPlayer, teamId: e.target.value})} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.gender} onChange={e => setEditedPlayer({...editedPlayer, gender: e.target.value})}><option value="男">男</option><option value="女">女</option></select> : <span className="font-bold">{editedPlayer.gender}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{calculateAge(editedPlayer.birthDate) || editedPlayer.age || 0} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => {
+             {activeTab === 'profile' && (<div className="flex flex-col md:flex-row gap-6 h-full animate-in fade-in duration-300"><div className="w-full md:w-1/3 space-y-6"><div className="flex flex-col items-center"><div className="relative group"><img src={editedPlayer.image} alt={editedPlayer.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-bvb-yellow shadow-lg" />{isEditing && (<><div onClick={() => profileImageInputRef.current?.click()} className="absolute inset-0 rounded-full bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer z-10"><Upload className="w-6 h-6 text-white mb-1" /><span className="text-[10px] text-white font-bold">更换头像</span></div><input type="file" ref={profileImageInputRef} className="hidden" accept="image/*" onChange={handleProfileImageChange}/></>)}<div className="absolute bottom-0 right-0 w-10 h-10 bg-bvb-black text-white rounded-full flex items-center justify-center font-black border-2 border-white text-lg overflow-hidden z-20">{isEditing ? <input type="number" className="bg-transparent text-center w-full h-full text-white outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={editedPlayer.number} onChange={(e) => setEditedPlayer({ ...editedPlayer, number: parseInt(e.target.value) || 0 })} /> : editedPlayer.number}</div></div><div className="text-center mt-4 w-full">{isEditing ? <input value={editedPlayer.name} onChange={e => setEditedPlayer({...editedPlayer, name: e.target.value})} className="text-2xl font-black text-center w-full border-b border-gray-300 focus:border-bvb-yellow outline-none mb-2 bg-white"/> : <h3 className="text-2xl font-black text-gray-900">{editedPlayer.name}</h3>}<div className="flex flex-col items-center mt-2 space-y-2">{isEditing ? (<div className="flex flex-col gap-2 w-full max-w-[240px]"><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">主位置</label><PositionSelect value={editedPlayer.position} onChange={val => setEditedPlayer({...editedPlayer, position: val})} className={getPosColor(editedPlayer.position)}/></div><div><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">副位置</label><PositionSelect value={editedPlayer.secondaryPosition || Position.TBD} onChange={val => setEditedPlayer({...editedPlayer, secondaryPosition: val})} className={getPosColorLight(editedPlayer.secondaryPosition || Position.TBD)}/></div><div className="pt-2"><label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">所属梯队</label><select value={editedPlayer.teamId} onChange={e => {
+    const newTeamId = e.target.value;
+    if (newTeamId !== editedPlayer.teamId) {
+        const updated = recordPlayerTeamTransfer(editedPlayer, newTeamId, teams, '球员档案调整梯队', undefined, currentUser?.name);
+        setEditedPlayer(updated);
+    }
+}} className="w-full text-xs bg-white p-2 rounded border font-medium focus:ring-2 focus:ring-bvb-yellow outline-none shrink-0" disabled={isCoach}>{teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}<option value="unassigned">待分配</option></select></div></div>) : (<div className="flex flex-col items-center gap-2"><div className="flex gap-2"><span className={`px-3 py-1 rounded text-xs font-bold uppercase ${getPosColor(editedPlayer.position)}`}>{editedPlayer.position}</span>{editedPlayer.secondaryPosition && editedPlayer.secondaryPosition !== Position.TBD && (<span className={`px-3 py-1 rounded text-xs font-bold uppercase border ${getPosColorLight(editedPlayer.secondaryPosition)}`}>{editedPlayer.secondaryPosition}</span>)}</div><span className="text-sm font-bold text-gray-500">{teams.find(t => t.id === editedPlayer.teamId)?.name || (editedPlayer.teamId === 'unassigned' ? '待分配' : '未知梯队')}</span></div>)}</div>{!isEditing && editedPlayer.nickname && <p className="text-xs text-gray-400 mt-1 font-bold">昵称: {editedPlayer.nickname}</p>}</div></div>{isEditing && (<div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-center justify-between"><span className="text-sm font-bold text-yellow-800 flex items-center"><Crown className="w-4 h-4 mr-2" /> 队长身份</span><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={editedPlayer.isCaptain || false} onChange={(e) => setEditedPlayer({...editedPlayer, isCaptain: e.target.checked})}/><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-bvb-yellow"></div></label></div>)}<div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-4 text-sm"><div className="col-span-2 flex items-center justify-between border-b pb-2"><span className="text-gray-500 flex items-center"><CreditCard className="w-3 h-3 mr-1"/> 身份证</span>{isEditing ? (<input className="font-mono font-bold text-right border-b border-dashed border-gray-300 bg-white focus:ring-0 outline-none p-0 w-44 hover:border-bvb-yellow transition-colors" value={editedPlayer.idCard} onChange={handleIdCardChangeLocal} placeholder="点击修改" maxLength={18}/>) : (<span className="font-mono font-bold">{editedPlayer.idCard || '未录入'}</span>)}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">性别</span>{isEditing ? <select className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.gender} onChange={e => setEditedPlayer({...editedPlayer, gender: e.target.value})}><option value="男">男</option><option value="女">女</option></select> : <span className="font-bold">{editedPlayer.gender}</span>}</div><div className="flex flex-col"><span className="text-gray-500 text-xs">年龄</span><span className="font-bold">{calculateAge(editedPlayer.birthDate) || editedPlayer.age || 0} 岁</span></div><div className="flex flex-col"><span className="text-gray-500 text-xs">出生日期</span>{isEditing ? <input type="date" className="bg-white border rounded text-xs p-1 font-bold" value={editedPlayer.birthDate || ''} onChange={e => {
   const bDate = e.target.value;
   let computedAge = editedPlayer.age;
   if (bDate) {
@@ -2880,6 +3058,124 @@ const PlayerDetailModal: React.FC<PlayerDetailModalProps> = ({
               </div>
           );
       })()}
+
+      {/* Team Transfer Add/Record Modal */}
+      {showAddTransferModal && (
+          <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                  <div className="bg-bvb-black text-white p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                          <ArrowRightLeft className="w-5 h-5 text-bvb-yellow" />
+                          <h3 className="font-black text-base">登记/补录梯队调整记录</h3>
+                      </div>
+                      <button
+                          type="button"
+                          onClick={() => setShowAddTransferModal(false)}
+                          className="text-gray-400 hover:text-white p-1 cursor-pointer"
+                      >
+                          <X className="w-5 h-5" />
+                      </button>
+                  </div>
+
+                  <div className="p-5 space-y-4">
+                      <div>
+                          <label className="block text-xs font-bold text-gray-600 mb-1">调整生效日期</label>
+                          <input
+                              type="date"
+                              value={newTransferDate}
+                              onChange={e => setNewTransferDate(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-mono font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                          />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                          <div>
+                              <label className="block text-xs font-bold text-gray-600 mb-1">原归属梯队</label>
+                              <select
+                                  value={newTransferFromTeamId}
+                                  onChange={e => setNewTransferFromTeamId(e.target.value)}
+                                  className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                              >
+                                  {teams.map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                  <option value="unassigned">待分配</option>
+                              </select>
+                          </div>
+
+                          <div>
+                              <label className="block text-xs font-bold text-gray-600 mb-1">调整至新梯队 *</label>
+                              <select
+                                  value={newTransferToTeamId}
+                                  onChange={e => setNewTransferToTeamId(e.target.value)}
+                                  className="w-full bg-yellow-50 border border-yellow-300 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                              >
+                                  <option value="">请选择新梯队</option>
+                                  {teams.map(t => (
+                                      <option key={t.id} value={t.id}>{t.name}</option>
+                                  ))}
+                                  <option value="unassigned">待分配</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-gray-600 mb-1">调整原因 / 类型</label>
+                          <select
+                              value={newTransferReason}
+                              onChange={e => setNewTransferReason(e.target.value)}
+                              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs font-bold focus:ring-2 focus:ring-bvb-yellow outline-none"
+                          >
+                              <option value="梯队晋升/升组">梯队晋升 / 升组</option>
+                              <option value="挑战队选拔">挑战队选拔 / 移交</option>
+                              <option value="常规班级调整">常规班级调整</option>
+                              <option value="年龄段换组">年龄段换组</option>
+                              <option value="梯队归属调整">梯队归属调整</option>
+                          </select>
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-gray-600 mb-1">备注说明 (选填)</label>
+                          <textarea
+                              value={newTransferNote}
+                              onChange={e => setNewTransferNote(e.target.value)}
+                              placeholder="例：经教练组评估从2015挑战调至2016挑战..."
+                              className="w-full bg-gray-50 border border-gray-200 rounded-xl p-2.5 text-xs focus:ring-2 focus:ring-bvb-yellow outline-none resize-none h-20"
+                          />
+                      </div>
+
+                      <div className="bg-yellow-50/80 border border-yellow-200 p-3 rounded-xl flex items-center justify-between">
+                          <label className="text-xs font-bold text-yellow-900 flex items-center gap-2 cursor-pointer">
+                              <input
+                                  type="checkbox"
+                                  checked={updateCurrentTeamCheck}
+                                  onChange={e => setUpdateCurrentTeamCheck(e.target.checked)}
+                                  className="rounded text-bvb-yellow focus:ring-bvb-yellow w-4 h-4"
+                              />
+                              同步将球员当前梯队更新为目标梯队
+                          </label>
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                          <button
+                              type="button"
+                              onClick={() => setShowAddTransferModal(false)}
+                              className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                          >
+                              取消
+                          </button>
+                          <button
+                              type="button"
+                              onClick={handleSaveTransferRecord}
+                              className="flex-1 py-2.5 bg-bvb-yellow text-bvb-black font-black rounded-xl text-xs hover:bg-yellow-400 shadow-xs cursor-pointer"
+                          >
+                              确认保存调整记录
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
       </>
     );
 };

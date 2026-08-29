@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { exportToPDF } from '../services/pdfService';
 import html2canvas from 'html2canvas';
 import { ParentRenewalCardModal } from './ParentRenewalCardModal';
+import { getPlayerSessionStatus } from '../utils/playerAttendanceUtils';
 
 interface DashboardProps {
   players: Player[];
@@ -38,15 +39,6 @@ const parseLocalDate = (dateStr: string) => {
     const m = parts.length >= 2 ? parts[1] - 1 : 0;
     const d = parts.length >= 3 ? parts[2] : 1;
     return new Date(y, m, d);
-};
-
-const isBeforeJoinDate = (sessionDateStr: string, joinDateStr?: string) => {
-    if (!joinDateStr) return false;
-    const sDate = parseLocalDate(sessionDateStr);
-    const jDate = parseLocalDate(joinDateStr);
-    sDate.setHours(0, 0, 0, 0);
-    jDate.setHours(0, 0, 0, 0);
-    return sDate < jDate;
 };
 
 const getPlayerRenewalLevelDetails = (player: Player, trainings: TrainingSession[]) => {
@@ -353,15 +345,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     const sortedCompleted = [...checkedTrainings].sort((a, b) => a.date.localeCompare(b.date));
 
     displayPlayers.forEach(p => {
-        // 包含该球员有出勤记录的所有场次，或者属于他当前梯队的场次
-        const pSessions = sortedCompleted.filter(s => s.teamId === p.teamId || s.attendance?.some(att => att.playerId === p.id));
+        // 包含该球员属于该场次或有出勤记录的场次
+        const pSessions = sortedCompleted.filter(s => {
+            const res = getPlayerSessionStatus(p, s);
+            return res.isCounted;
+        });
         const playerNotes = pSessions.map(s => {
-            const record = s.attendance?.find(att => att.playerId === p.id);
+            const res = getPlayerSessionStatus(p, s);
             return {
                 id: s.id,
                 title: s.title,
                 date: s.date,
-                status: record ? record.status : 'Absent'
+                status: res.status || 'Absent'
             };
         });
 
@@ -423,9 +418,10 @@ const Dashboard: React.FC<DashboardProps> = ({
         const matchDate = d >= start && d <= end;
         if (!matchDate) return false;
 
-        // NEW RULE: If individual mode, exclude sessions prior to their joinDate
-        if (playerObj && isBeforeJoinDate(s.date, playerObj.joinDate)) {
-            return false;
+        // NEW RULE: If individual mode, check eligibility via getPlayerSessionStatus
+        if (playerObj) {
+            const res = getPlayerSessionStatus(playerObj, s);
+            if (!res.isCounted) return false;
         }
 
         const hasRecord = attendancePlayerId !== 'all' && s.attendance?.some(r => r.playerId === attendancePlayerId);
@@ -447,15 +443,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (analysisView === 'session') {
         data = filteredSessions.map(s => {
              let rate = 0;
-             if (isIndividualMode) {
-                 // 个人模式：检查该球员在该场次是否签到
-                 const playerRecord = s.attendance?.find(r => r.playerId === attendancePlayerId);
-                 rate = playerRecord?.status === 'Present' ? 100 : 0;
+             if (isIndividualMode && playerObj) {
+                 // 个人模式：检查该球员在该场次是否出勤
+                 const res = getPlayerSessionStatus(playerObj, s);
+                 rate = res.status === 'Present' ? 100 : 0;
              } else {
-                 // 全队模式：统计该场次到课率（排除在该场次之后注册的新球员）
-                 const potentialCount = displayPlayers.filter(p => p.teamId === s.teamId && !isBeforeJoinDate(s.date, p.joinDate)).length;
+                 // 全队模式：统计该场次到课率（排除未在该梯队或未注册的新球员）
+                 const potentialPlayers = displayPlayers.filter(p => {
+                     const res = getPlayerSessionStatus(p, s);
+                     return res.isCounted;
+                 });
                  const presentCount = s.attendance?.filter(r => r.status === 'Present').length || 0;
-                 rate = potentialCount > 0 ? Math.round((presentCount / potentialCount) * 100) : 0;
+                 rate = potentialPlayers.length > 0 ? Math.round((presentCount / potentialPlayers.length) * 100) : 0;
              }
              grandTotalRate += rate;
              grandTotalCount++;
@@ -469,14 +468,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             const key = attendanceRange === 'year' ? `${date.getMonth() + 1}月` : `${date.getMonth() + 1}月W${Math.ceil(date.getDate() / 7)}`;
             
             let rate = 0;
-            if (isIndividualMode) {
-                const playerRecord = session.attendance?.find(r => r.playerId === attendancePlayerId);
-                rate = playerRecord?.status === 'Present' ? 100 : 0;
+            if (isIndividualMode && playerObj) {
+                const res = getPlayerSessionStatus(playerObj, session);
+                rate = res.status === 'Present' ? 100 : 0;
             } else {
-                // 全队模式：统计该周/月的到课率（排除在该场次之后注册的新球员）
-                const sessionTeamPlayersCount = displayPlayers.filter(p => p.teamId === session.teamId && !isBeforeJoinDate(session.date, p.joinDate)).length;
+                // 全队模式：统计该周/月的到课率（排除不计入该场次的球员）
+                const potentialPlayers = displayPlayers.filter(p => {
+                    const res = getPlayerSessionStatus(p, session);
+                    return res.isCounted;
+                });
                 const presentCount = session.attendance?.filter(r => r.status === 'Present').length || 0;
-                rate = sessionTeamPlayersCount > 0 ? (presentCount / sessionTeamPlayersCount) * 100 : 0;
+                rate = potentialPlayers.length > 0 ? (presentCount / potentialPlayers.length) * 100 : 0;
             }
 
             if (!groupedData[key]) groupedData[key] = { totalRate: 0, count: 0 };
@@ -494,30 +496,24 @@ const Dashboard: React.FC<DashboardProps> = ({
     let aggAbsent = 0;
 
     const exportList = teamPlayers.map(p => {
-         // 包含该球员有出勤记录的所有场次，或者属于他当前梯队的场次
+         // 包含该球员属于该场次或有出勤记录的场次
          const pSessions = (displayTrainings || []).filter(s => {
-             if (isBeforeJoinDate(s.date, p.joinDate)) {
-                 return false;
-             }
              const d = parseLocalDate(s.date);
              const matchDate = d >= start && d <= end;
              if (!matchDate) return false;
              
-             const hasRecord = s.attendance?.some(r => r.playerId === p.id);
-             const isCurrentTeam = s.teamId === p.teamId;
-             
-             return isCurrentTeam || hasRecord;
+             const res = getPlayerSessionStatus(p, s);
+             return res.isCounted;
          });
          
          const pPresent = pSessions.reduce((acc, t) => {
-             const record = t.attendance?.find(r => r.playerId === p.id && r.status === 'Present');
-             return acc + (record ? (record.creditCost ?? 1) : 0);
+             const res = getPlayerSessionStatus(p, t);
+             return acc + (res.status === 'Present' ? res.creditCost : 0);
          }, 0);
-         const pPresentSessions = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Present')).length;
-         const pLeave = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Leave')).length;
-         const pInjury = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Injury')).length;
-         const pAbsent = pSessions.filter(t => t.attendance?.some(r => r.playerId === p.id && r.status === 'Absent')).length;
-         const pNoRecord = pSessions.filter(t => !t.attendance?.some(r => r.playerId === p.id)).length;
+         const pPresentSessions = pSessions.filter(t => getPlayerSessionStatus(p, t).status === 'Present').length;
+         const pLeave = pSessions.filter(t => getPlayerSessionStatus(p, t).status === 'Leave').length;
+         const pInjury = pSessions.filter(t => getPlayerSessionStatus(p, t).status === 'Injury').length;
+         const pAbsent = pSessions.filter(t => getPlayerSessionStatus(p, t).status === 'Absent').length;
          
          const rate = pSessions.length > 0 ? Math.round((pPresentSessions / pSessions.length) * 100) : 0;
          
@@ -526,29 +522,23 @@ const Dashboard: React.FC<DashboardProps> = ({
              aggPresent += pPresent;
              aggLeave += pLeave;
              aggInjury += pInjury;
-             aggAbsent += (pAbsent + pNoRecord);
+             aggAbsent += pAbsent;
          }
 
-         return { ...p, present: pPresent, leave: pLeave, injury: pInjury, absent: pAbsent + pNoRecord, total: pSessions.length, rate };
+         return { ...p, present: pPresent, leave: pLeave, injury: pInjury, absent: pAbsent, total: pSessions.length, rate };
     }).sort((a,b) => b.rate - a.rate);
 
     const exportSessions = filteredSessions.map(s => {
-         const recordedPlayerIds = s.attendance?.map(r => r.playerId) || [];
          const sTeamPlayers = displayPlayers.filter(p => {
-             if (p.teamId === s.teamId || recordedPlayerIds.includes(p.id)) {
-                 if (isBeforeJoinDate(s.date, p.joinDate) && !recordedPlayerIds.includes(p.id)) {
-                     return false;
-                 }
-                 return true;
-             }
-             return false;
+             const res = getPlayerSessionStatus(p, s);
+             return res.isCounted;
          });
          const total = sTeamPlayers.length;
          const present = s.attendance?.filter(r => r.status === 'Present').length || 0;
          const leave = s.attendance?.filter(r => r.status === 'Leave').length || 0;
          const injury = s.attendance?.filter(r => r.status === 'Injury').length || 0;
          const absentRecords = s.attendance?.filter(r => r.status === 'Absent').length || 0;
-         const noRecords = total - (present + leave + injury + absentRecords);
+         const noRecords = total > (present + leave + injury + absentRecords) ? total - (present + leave + injury + absentRecords) : 0;
 
          const getPlayerNamesByStatus = (status: string) => {
              if (status === 'Absent') {
@@ -595,17 +585,23 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (!player) return null;
       const start = dateRange.start;
       const end = dateRange.end;
-      const sessionRecords = displayTrainings.filter(s => {
-          if (isBeforeJoinDate(s.date, player.joinDate)) {
-              return false;
-          }
+      const sessionRecords = (displayTrainings || []).filter(s => {
           const d = parseLocalDate(s.date);
-          const hasRecord = s.attendance?.some(r => r.playerId === player.id);
-          return d >= start && d <= end && (s.teamId === player.teamId || hasRecord);
+          if (d < start || d > end) return false;
+          const res = getPlayerSessionStatus(player, s);
+          return res.isCounted;
       }).map(s => {
-          const record = s.attendance?.find(r => r.playerId === player.id);
+          const res = getPlayerSessionStatus(player, s);
           const teamName = teams.find(t => t.id === s.teamId)?.name || '';
-          return { id: s.id, date: s.date, title: s.title, focus: s.focus, status: record?.status || 'Absent', creditCost: record?.creditCost ?? 1, teamName };
+          return { 
+              id: s.id, 
+              date: s.date, 
+              title: s.title, 
+              focus: s.focus, 
+              status: res.status || 'Absent', 
+              creditCost: res.creditCost, 
+              teamName 
+          };
       });
       const present = sessionRecords.reduce((acc, r) => {
           if (r.status === 'Present') {

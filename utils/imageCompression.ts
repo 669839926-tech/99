@@ -131,7 +131,7 @@ export const compressCanvasToDataUrl = (
   };
 
   try {
-    let { width, height } = canvas;
+    const { width, height } = canvas;
     if (width > maxWidth || height > maxHeight) {
       const ratio = Math.min(maxWidth / width, maxHeight / height);
       const scaledWidth = Math.round(width * ratio);
