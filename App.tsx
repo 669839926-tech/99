@@ -19,7 +19,8 @@ import {
   RechargeRecord, User, Match, Announcement, DrillDesign, FinanceTransaction, 
   RolePermissions, FinanceCategoryDefinition, TechTestDefinition, SalarySettings, 
   PeriodizationPlan, AccountingRecord, PhilosophyDocument, IntramuralTournament, 
-  Tactic, PointItemDefinition, PlayerPointRecord, TournamentItem, PlayerCharacterAssessment 
+  Tactic, PointItemDefinition, PlayerPointRecord, TournamentItem, PlayerCharacterAssessment,
+  TeamLog 
 } from './types';
 import { loadDataFromCloud, saveDataToCloud } from './services/storageService';
 import { recordPlayerTeamTransfer } from './utils/playerAttendanceUtils';
@@ -60,6 +61,7 @@ function App() {
   const [intramuralTournaments, setIntramuralTournaments] = useState<IntramuralTournament[]>([]);
   const [tournaments, setTournaments] = useState<TournamentItem[]>(MOCK_TOURNAMENTS);
   const [characterAssessments, setCharacterAssessments] = useState<PlayerCharacterAssessment[]>([]);
+  const [teamLogs, setTeamLogs] = useState<TeamLog[]>([]);
 
   // Persistence State
   const [isInitializing, setIsInitializing] = useState(true);
@@ -255,6 +257,9 @@ function App() {
                 }
             }
         }
+        if (data.teamLogs && Array.isArray(data.teamLogs)) {
+            setTeamLogs(data.teamLogs);
+        }
     };
 
     try {
@@ -345,7 +350,8 @@ function App() {
             philosophyOverview,
             intramuralTournaments,
             tournaments,
-            characterAssessments
+            characterAssessments,
+            teamLogs
         };
 
         // Mirror in local browser storage synchronously first
@@ -376,7 +382,7 @@ function App() {
     }, 2000);
 
     return () => clearTimeout(timer);
-  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, intramuralTournaments, tournaments, characterAssessments, isInitializing]);
+  }, [players, teams, matches, trainings, attributeConfig, announcements, appLogo, users, designs, transactions, permissions, financeCategories, techTests, salarySettings, periodizationPlans, accountingRecords, tactics, pointItemDefinitions, playerPointRecords, travelingPlayerIds, philosophyDocs, matchPrinciples, basicTechThemes, scenarioThemes, philosophyOverview, intramuralTournaments, tournaments, characterAssessments, teamLogs, isInitializing]);
 
   const handleRestoreSystem = (data: any) => {
     if (!data) return;
@@ -428,6 +434,7 @@ function App() {
     if (Array.isArray(data.scenarioThemes)) setScenarioThemes(data.scenarioThemes);
     if (data.philosophyOverview) setPhilosophyOverview(data.philosophyOverview);
     if (Array.isArray(data.intramuralTournaments)) setIntramuralTournaments(data.intramuralTournaments);
+    if (Array.isArray(data.teamLogs)) setTeamLogs(data.teamLogs);
 
     setTimeout(() => {
         setIsInitializing(false);
@@ -470,7 +477,8 @@ function App() {
         philosophyOverview,
         intramuralTournaments,
         tournaments,
-        characterAssessments
+        characterAssessments,
+        teamLogs
     };
 
     // Mirror in local browser storage synchronously first
@@ -619,6 +627,9 @@ function App() {
   const handleAddTraining = (session: TrainingSession) => setTrainings(prev => [...prev, session]);
   const handleDeleteTraining = (sessionId: string) => setTrainings(prev => prev.filter(t => t.id !== sessionId));
   const handleUpdateAttendance = (session: TrainingSession, newAttendance: AttendanceRecord[]) => setTrainings(prev => prev.map(t => t.id === session.id ? { ...session, attendance: newAttendance } : t));
+  const handleAddTeamLog = (log: TeamLog) => setTeamLogs(prev => [log, ...prev]);
+  const handleUpdateTeamLog = (updatedLog: TeamLog) => setTeamLogs(prev => prev.map(l => l.id === updatedLog.id ? updatedLog : l));
+  const handleDeleteTeamLog = (logId: string) => setTeamLogs(prev => prev.filter(l => l.id !== logId));
   const handleUpdateAttributeConfig = (newConfig: AttributeConfig) => setAttributeConfig(newConfig);
 
   // Accounting Records Handlers
@@ -669,7 +680,7 @@ function App() {
       case 'design':
         return <SessionDesigner designs={designs} onSaveDesign={handleSaveDesign} onDeleteDesign={handleDeleteDesign} currentUser={currentUser} initialFilter={navigationParams.filter} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} />;
       case 'training':
-        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} users={users} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} matches={matches} onUpdateMatch={handleUpdateMatch} onAddMatch={handleAddMatch} />;
+        return <TrainingPlanner teams={teams} players={derivedPlayers} trainings={trainings} drillLibrary={attributeConfig.drillLibrary} trainingFoci={attributeConfig.trainingFoci} focusSubjects={attributeConfig.focusSubjects} designs={designs} currentUser={currentUser} users={users} onAddTraining={handleAddTraining} onUpdateTraining={handleUpdateAttendance} onDeleteTraining={handleDeleteTraining} initialFilter={navigationParams.filter} appLogo={appLogo} periodizationPlans={periodizationPlans} onUpdatePeriodization={handleUpdatePeriodization} basicTechThemes={basicTechThemes} scenarioThemes={scenarioThemes} matches={matches} onUpdateMatch={handleUpdateMatch} onAddMatch={handleAddMatch} teamLogs={teamLogs} onAddTeamLog={handleAddTeamLog} onUpdateTeamLog={handleUpdateTeamLog} onDeleteTeamLog={handleDeleteTeamLog} />;
       case 'matches':
         return <MatchPlanner 
           matches={matches} 

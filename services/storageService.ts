@@ -31,6 +31,7 @@ export interface AppData {
     intramuralTournaments?: any[];
     tournaments?: any[];
     characterAssessments?: any[];
+    teamLogs?: any[];
 }
 
 const getApiUrl = (relativePath: string): string => {

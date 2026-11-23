@@ -872,3 +872,28 @@ export interface PlayerCharacterAssessment {
   updatedAt: string;
 }
 
+// ==========================================
+// 球队日志 (Team Training & Management Logs)
+// ==========================================
+export type TeamLogCategory = 'daily' | 'training' | 'management' | 'match' | 'parent' | 'evaluation' | 'other';
+
+export interface TeamLog {
+  id: string;
+  teamId: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  category: TeamLogCategory;
+  content: string;
+  highlights?: string;
+  issuesAndNextSteps?: string;
+  relatedPlayerIds?: string[];
+  authorId?: string;
+  authorName: string;
+  directorComment?: string;
+  directorCommentBy?: string;
+  directorCommentAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+

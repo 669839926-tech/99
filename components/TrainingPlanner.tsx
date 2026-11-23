@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan, Match } from '../types';
+import { TrainingSession, Team, Player, AttendanceRecord, AttendanceStatus, User, DrillDesign, PeriodizationPlan, WeeklyPlan, Match, TeamLog } from '../types';
 import { Calendar as CalendarIcon, Clock, Zap, Loader2, Book, CheckCircle, Plus, ChevronLeft, ChevronRight, UserCheck, X, AlertCircle, Ban, PieChart as PieChartIcon, List, FileText, Send, ShieldCheck, RefreshCw, Target, Copy, Download, Trash2, PenTool, CalendarDays, Settings2, LayoutList, Quote, Bell, TableProperties, Edit2, Save, ClipboardCopy, ClipboardPaste, Star, Brain, History, TrendingUp, Search, Users as UsersIcon, Trophy, ExternalLink, FileSpreadsheet, UserPlus, Sparkles, Eye, BookOpen } from 'lucide-react';
 import { generateTrainingPlan } from '../services/geminiService';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -12,6 +12,7 @@ import { MOCK_USERS } from '../constants';
 import { ThemeSelectorModal } from './ThemeSelectorModal';
 import { INITIAL_PRESET_PLANS } from './SessionDesigner/constants';
 import { SessionDetailViewModal } from './SessionDesigner/SessionDetailViewModal';
+import TrainingLogsHub from './TrainingLogsHub';
 
 const getLogOperatorName = (s: TrainingSession, usersList?: User[]): string => {
   if (s.logCoachName) return s.logCoachName;
@@ -62,6 +63,10 @@ interface TrainingPlannerProps {
   matches?: Match[];
   onUpdateMatch?: (match: Match) => void;
   onAddMatch?: (match: Match) => void;
+  teamLogs?: TeamLog[];
+  onAddTeamLog?: (log: TeamLog) => void;
+  onUpdateTeamLog?: (log: TeamLog) => void;
+  onDeleteTeamLog?: (id: string) => void;
 }
 
 const getLocalDateString = () => {
@@ -73,7 +78,7 @@ const getLocalDateString = () => {
 };
 
 type TimeScope = 'month' | 'quarter' | 'year';
-type ViewType = 'calendar' | 'list' | 'periodization' | 'focus';
+type ViewType = 'calendar' | 'list' | 'periodization' | 'logs';
 
 const parseLocalDate = (dateStr: string) => {
     if (!dateStr) return new Date();
@@ -751,8 +756,8 @@ const WeeklyPlanEditor: React.FC<WeeklyPlanEditorProps> = ({
     );
 };
 
-const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, allSessions = [], allAvailableDesigns = [], onViewPlanDetail, onUpdate, onDuplicate, onDelete, onClose }) => {
-    const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>('attendance');
+const SessionDetailModal: React.FC<any> = ({ session, initialTab = 'attendance', teams, players, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, currentUser, users, allSessions = [], allAvailableDesigns = [], onViewPlanDetail, onUpdate, onDuplicate, onDelete, onClose }) => {
+    const [activeTab, setActiveTab] = useState<'info' | 'attendance' | 'log'>(initialTab);
     const teamPlayers = useMemo(() => players.filter((p: Player) => p.teamId === session.teamId), [players, session.teamId]);
     const team = useMemo(() => teams.find((t: Team) => t.id === session.teamId), [teams, session.teamId]);
 
@@ -2775,20 +2780,25 @@ const SessionDetailModal: React.FC<any> = ({ session, teams, players, basicTechT
 };
 
 const TrainingPlanner: React.FC<TrainingPlannerProps> = ({ 
-    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, users = [], onAddTraining, onUpdateTraining, onDeleteTraining, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, matches = [], onUpdateMatch 
+    trainings, teams, players, trainingFoci = [], focusSubjects = {}, designs = [], currentUser, users = [], onAddTraining, onUpdateTraining, onDeleteTraining, initialFilter, periodizationPlans = [], onUpdatePeriodization, basicTechThemes = BASIC_TECH_THEMES, scenarioThemes = SCENARIO_THEMES, matches = [], onUpdateMatch, teamLogs = [], onAddTeamLog, onUpdateTeamLog, onDeleteTeamLog 
 }) => {
   const isDirector = currentUser?.role === 'director';
   const isCoach = currentUser?.role === 'coach';
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [timeScope, setTimeScope] = useState<TimeScope>('month');
-  const [viewType, setViewType] = useState<ViewType>('calendar');
+  const [viewType, setViewType] = useState<ViewType>(() =>
+    initialFilter === 'pending_logs' || initialFilter === 'logs' || initialFilter === 'focus'
+      ? 'logs'
+      : 'calendar'
+  );
   const [selectedDate, setSelectedDate] = useState<string | null>(new Date().toISOString().split('T')[0]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isAddThemeSelectorOpen, setIsAddThemeSelectorOpen] = useState(false);
   const [showDesignSelectModal, setShowDesignSelectModal] = useState(false);
   const [designSearchTerm, setDesignSearchTerm] = useState('');
   const [selectedSession, setSelectedSession] = useState<TrainingSession | null>(null);
+  const [sessionModalInitialTab, setSessionModalInitialTab] = useState<'info' | 'attendance' | 'log'>('attendance');
   const [isExporting, setIsExporting] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const [sessionToDuplicate, setSessionToDuplicate] = useState<TrainingSession | null>(null);
@@ -2802,10 +2812,11 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
   const [periodizationClipboard, setPeriodizationClipboard] = useState<WeeklyPlan | null>(null);
   const [selectedThemeId, setSelectedThemeId] = useState<string>('main');
 
-  // 球员关注追踪子模块状态
-  const [focusSearchTerm, setFocusSearchTerm] = useState('');
-  const [focusListMode, setFocusListMode] = useState<'focused' | 'unfocused'>('focused');
-  const [selectedFocusPlayerId, setSelectedFocusPlayerId] = useState<string | null>(null);
+  useEffect(() => {
+    if (initialFilter === 'pending_logs' || initialFilter === 'logs' || initialFilter === 'focus') {
+      setViewType('logs');
+    }
+  }, [initialFilter]);
 
   const userManagedSessions = useMemo(() => {
       if (isDirector || !currentUser?.teamIds || currentUser.teamIds.length === 0) return trainings;
@@ -3095,65 +3106,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       }
   }, [activeSelectedTheme, showAddModal, trainingFoci]);
 
-  // 球员关注追踪视图逻辑
-  const focusedPlayersSummary = useMemo(() => {
-    const focusMap: Record<string, { player: Player; stats: any; history: any[]; isLastWeekFocused: boolean; hasUnresolved: boolean }> = {};
-    const relevantTrainings = userManagedSessions.filter(s => statsTeamFilter === 'all' || s.teamId === statsTeamFilter);
-    
-    // 计算上周的时间范围
-    const today = new Date();
-    const day = today.getDay();
-    const diffToLastMonday = (day === 0 ? 6 : day - 1) + 7;
-    const lastMonday = new Date(today);
-    lastMonday.setDate(today.getDate() - diffToLastMonday);
-    lastMonday.setHours(0, 0, 0, 0);
-    const lastSunday = new Date(lastMonday);
-    lastSunday.setDate(lastMonday.getDate() + 6);
-    lastSunday.setHours(23, 59, 59, 999);
-
-    relevantTrainings.forEach(s => {
-        if (s.focusedPlayerIds) {
-            const sessionDate = parseLocalDate(s.date);
-            const inLastWeek = sessionDate >= lastMonday && sessionDate <= lastSunday;
-
-            s.focusedPlayerIds.forEach(pid => {
-                const notes = s.focusedPlayerNotes?.[pid] || { technical: '', mental: '', resolved: false };
-                if (!focusMap[pid]) {
-                    const p = players.find(p => p.id === pid);
-                    if (p) {
-                        focusMap[pid] = { 
-                            player: p, 
-                            stats: calculateFocusStats(pid, userManagedSessions),
-                            history: [],
-                            isLastWeekFocused: false,
-                            hasUnresolved: false
-                        };
-                    }
-                }
-                if (focusMap[pid]) {
-                    if (inLastWeek) focusMap[pid].isLastWeekFocused = true;
-                    if (!notes.resolved) focusMap[pid].hasUnresolved = true;
-                    focusMap[pid].history.push({
-                        id: s.id,
-                        date: s.date,
-                        title: s.title,
-                        notes: notes,
-                        session: s
-                    });
-                }
-            });
-        }
-    });
-
-    return Object.values(focusMap)
-        .filter(entry => entry.player.name.includes(focusSearchTerm))
-        .sort((a, b) => {
-            if (a.isLastWeekFocused !== b.isLastWeekFocused) return a.isLastWeekFocused ? -1 : 1;
-            if (a.hasUnresolved !== b.hasUnresolved) return a.hasUnresolved ? -1 : 1;
-            return b.stats.year - a.stats.year;
-        });
-  }, [userManagedSessions, players, focusSearchTerm, statsTeamFilter]);
-
   const focusedPlayerIdsThisMonth = useMemo(() => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -3168,31 +3120,6 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
     });
     return focused;
   }, [userManagedSessions]);
-
-  const monthlyFocusStats = useMemo(() => {
-    const teamPlayers = players.filter(p => statsTeamFilter === 'all' ? (isDirector || !currentUser?.teamIds || currentUser.teamIds.length === 0 ? p.teamId !== 'unassigned' : availableTeams.some(at => at.id === p.teamId)) : p.teamId === statsTeamFilter);
-    if (teamPlayers.length === 0) return { coverage: 0, focusedCount: 0, totalCount: 0, unfocusedPlayers: [] };
-
-    const focusedInMonthForTeam = new Set<string>();
-    teamPlayers.forEach(p => {
-        if (focusedPlayerIdsThisMonth.has(p.id)) {
-            focusedInMonthForTeam.add(p.id);
-        }
-    });
-
-    const unfocusedPlayers = teamPlayers.filter(p => !focusedInMonthForTeam.has(p.id))
-        .filter(p => p.name.includes(focusSearchTerm));
-    const focusedCount = focusedInMonthForTeam.size;
-    const totalCount = teamPlayers.length;
-    const coverage = totalCount > 0 ? (focusedCount / totalCount) * 100 : 0;
-
-    return {
-      coverage,
-      focusedCount,
-      totalCount,
-      unfocusedPlayers
-    };
-  }, [players, statsTeamFilter, focusSearchTerm, focusedPlayerIdsThisMonth, availableTeams, currentUser, isDirector]);
 
   const handlePrevPeriod = () => {
         const d = new Date(currentDate);
@@ -3301,272 +3228,43 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
       );
   };
 
-  const renderFocusView = () => {
+  const renderLogsView = () => {
     return (
-        <div className="flex flex-col lg:flex-row h-full gap-6 animate-in fade-in duration-500">
-            {/* 球员关注列表 */}
-            <div className="w-full lg:w-96 flex flex-col gap-4 shrink-0">
-                {/* Monthly Coverage Stat */}
-                <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                    <div className="flex justify-between items-end mb-2">
-                        <div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">本月关注覆盖率</p>
-                            <h3 className="text-2xl font-black text-bvb-black">{monthlyFocusStats.coverage.toFixed(0)}%</h3>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">已关注 / 总人数</p>
-                            <p className="text-sm font-black text-gray-600">{monthlyFocusStats.focusedCount} / {monthlyFocusStats.totalCount}</p>
-                        </div>
-                    </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                            className="h-full bg-bvb-yellow transition-all duration-1000 ease-out" 
-                            style={{ width: `${monthlyFocusStats.coverage}%` }}
-                        />
-                    </div>
-                </div>
-
-                <div className="flex bg-gray-100 p-1 rounded-xl">
-                    <button 
-                        onClick={() => setFocusListMode('focused')}
-                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${focusListMode === 'focused' ? 'bg-white text-bvb-black shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        关注历史 ({focusedPlayersSummary.length})
-                    </button>
-                    <button 
-                        onClick={() => setFocusListMode('unfocused')}
-                        className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${focusListMode === 'unfocused' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                        本月未关注 ({monthlyFocusStats.unfocusedPlayers.length})
-                    </button>
-                </div>
-
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input 
-                        className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-bvb-yellow outline-none shadow-sm"
-                        placeholder="搜索球员追踪成长..."
-                        value={focusSearchTerm}
-                        onChange={e => setFocusSearchTerm(e.target.value)}
-                    />
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pb-20 md:pb-4">
-                    {focusListMode === 'focused' ? (
-                        focusedPlayersSummary.map(entry => {
-                            const isSelected = selectedFocusPlayerId === entry.player.id;
-                            return (
-                                <div 
-                                    key={entry.player.id} 
-                                    onClick={() => setSelectedFocusPlayerId(entry.player.id)}
-                                    className={`p-2.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'} ${entry.isLastWeekFocused && !isSelected ? 'ring-1 ring-green-400 ring-offset-1' : ''}`}
-                                >
-                                    {entry.isLastWeekFocused && (
-                                        <div className="absolute -top-1.5 -right-1.5 bg-green-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 animate-bounce">
-                                            上周关注
-                                        </div>
-                                    )}
-                                    {entry.hasUnresolved && (
-                                        <div className={`absolute -top-1.5 left-2 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10 ${isSelected ? 'bg-red-600 ring-1 ring-white' : 'bg-red-500'}`}>
-                                            未解决
-                                        </div>
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative">
-                                            <img src={entry.player.image} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" />
-                                            <div className="absolute -bottom-1 -right-1 p-0.5 bg-bvb-yellow rounded-full border border-white"><Star className="w-2 h-2 text-bvb-black fill-current" /></div>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-black text-xs truncate flex items-center gap-1.5">
-                                                <span>{entry.player.name}</span>
-                                                {isNewPlayerThisMonth(entry.player) && (
-                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border inline-flex items-center ${isSelected ? 'bg-amber-950/40 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse'}`}>新入队</span>
-                                                )}
-                                            </h4>
-                                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{entry.player.number} • {teams.find(t => t.id === entry.player.teamId)?.name}</p>
-                                        </div>
-                                        <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'text-bvb-yellow' : 'text-gray-300 group-hover:translate-x-1'}`} />
-                                    </div>
-                                    <div className={`grid grid-cols-3 gap-1 mt-2 pt-2 border-t ${isSelected ? 'border-white/10' : 'border-gray-50'}`}>
-                                        <div className="text-center">
-                                            <p className="text-[7px] font-black uppercase opacity-60">本月</p>
-                                            <p className="text-xs font-black tabular-nums">{entry.stats.month}</p>
-                                        </div>
-                                        <div className="text-center border-x border-white/5">
-                                            <p className="text-[7px] font-black uppercase opacity-60">本季</p>
-                                            <p className="text-xs font-black tabular-nums">{entry.stats.quarter}</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-[7px] font-black uppercase opacity-60">年度</p>
-                                            <p className={`text-xs font-black tabular-nums ${isSelected ? 'text-bvb-yellow' : 'text-bvb-black'}`}>{entry.stats.year}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    ) : (
-                        monthlyFocusStats.unfocusedPlayers.map(player => {
-                            const isSelected = selectedFocusPlayerId === player.id;
-                            return (
-                                <div 
-                                    key={player.id} 
-                                    onClick={() => setSelectedFocusPlayerId(player.id)}
-                                    className={`p-2.5 rounded-xl border-2 transition-all cursor-pointer relative group ${isSelected ? 'bg-bvb-black border-bvb-black text-white shadow-lg' : 'bg-white border-gray-100 text-gray-800 hover:border-bvb-yellow/50'}`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative">
-                                            <img src={player.image} className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm" />
-                                            <div className="absolute -bottom-1 -right-1 p-0.5 bg-gray-200 rounded-full border border-white"><UsersIcon className="w-2 h-2 text-gray-500" /></div>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-black text-xs truncate flex items-center gap-1.5">
-                                                <span>{player.name}</span>
-                                                {isNewPlayerThisMonth(player) && (
-                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border ${isSelected ? 'bg-amber-950/40 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-600 border-amber-200 animate-pulse'}`}>新入队</span>
-                                                )}
-                                            </h4>
-                                            <p className={`text-[9px] font-bold uppercase tracking-widest ${isSelected ? 'text-gray-400' : 'text-gray-400'}`}>#{player.number} • {teams.find(t => t.id === player.teamId)?.name}</p>
-                                        </div>
-                                        <div className="flex flex-col items-end gap-1 shrink-0 select-none">
-                                            <div className="text-[8px] font-black uppercase text-red-500 bg-red-50 px-1.5 py-0.5 rounded">本月未关注</div>
-                                            {isNewPlayerThisMonth(player) && (
-                                                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full border tracking-wider uppercase animate-pulse ${isSelected ? 'bg-amber-400 text-bvb-black border-transparent' : 'bg-amber-500 text-white border-transparent'}`}>重点关注 ⭐</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                    {focusListMode === 'focused' && focusedPlayersSummary.length === 0 && (
-                        <div className="py-20 text-center text-gray-400 flex flex-col items-center gap-4">
-                            <History className="w-12 h-12 opacity-10" />
-                            <p className="text-xs font-black uppercase tracking-widest">暂无重点关注球员记录</p>
-                        </div>
-                    )}
-                    {focusListMode === 'unfocused' && monthlyFocusStats.unfocusedPlayers.length === 0 && (
-                        <div className="py-20 text-center text-green-500 flex flex-col items-center gap-4">
-                            <CheckCircle className="w-12 h-12 opacity-20" />
-                            <p className="text-xs font-black uppercase tracking-widest">本月已完成全员关注覆盖</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            {/* 球员成长追踪时间轴 */}
-            <div className="flex-1 flex flex-col bg-white rounded-3xl border border-gray-200 overflow-hidden shadow-sm">
-                {selectedFocusPlayerId ? (
-                    <React.Fragment>
-                        {(() => {
-                            const entry = focusedPlayersSummary.find(e => e.player.id === selectedFocusPlayerId);
-                            if (!entry) return null;
-                            const history = [...entry.history].sort((a,b) => b.date.localeCompare(a.date));
-                            return (
-                                <React.Fragment>
-                                    <div className="p-6 md:p-8 bg-gray-50 border-b flex justify-between items-end shrink-0">
-                                        <div className="flex items-center gap-5">
-                                            <img src={entry.player.image} className="w-20 h-20 rounded-3xl object-cover border-4 border-white shadow-xl rotate-[-2deg]" />
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <h3 className="text-2xl font-black text-gray-800">{entry.player.name}</h3>
-                                                    <Star className="w-5 h-5 text-bvb-yellow fill-current" />
-                                                </div>
-                                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Growth & Psychological Tracking Portal</p>
-                                                <div className="flex gap-4 mt-4">
-                                                    <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">年度关注频次</span><span className="text-lg font-black text-bvb-black">{entry.stats.year} 次</span></div>
-                                                    <div className="w-px h-8 bg-gray-200"></div>
-                                                    <div className="flex flex-col"><span className="text-[8px] font-black text-gray-400 uppercase">最后关注日期</span><span className="text-lg font-black text-gray-800">{history[0]?.date || '-'}</span></div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <button 
-                                            onClick={async () => {
-                                                setIsExporting(true);
-                                                try { await exportToPDF('focus-tracking-export', `${entry.player.name}_重点关注成长报告`); }
-                                                catch { alert('导出失败'); } finally { setIsExporting(false); }
-                                            }}
-                                            className="hidden md:flex items-center gap-2 px-6 py-2.5 bg-bvb-black text-white font-black rounded-xl hover:bg-gray-800 shadow-lg transition-all text-xs italic uppercase tracking-widest"
-                                        >
-                                            {isExporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <Download className="w-4 h-4 text-bvb-yellow"/>}
-                                            Export Profile
-                                        </button>
-                                    </div>
-                                    <div id="focus-tracking-export" className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar">
-                                        <div className="relative space-y-8">
-                                            <div className="absolute left-[23px] top-4 bottom-4 w-1 bg-gray-100 rounded-full"></div>
-                                            {history.map((h, idx) => (
-                                                <div key={h.id} className="relative pl-14 animate-in slide-in-from-left-4" style={{ animationDelay: `${idx * 100}ms` }}>
-                                                    <div className="absolute left-0 top-0 w-12 h-12 bg-white rounded-2xl border-4 border-gray-50 shadow-md flex items-center justify-center z-10">
-                                                        <span className="text-[10px] font-black text-gray-400 font-mono leading-none">{h.date.split('-').slice(1).join('/')}</span>
-                                                    </div>
-                                                    <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-6 hover:bg-white hover:shadow-md transition-all group">
-                                                        <div className="flex justify-between items-start mb-4">
-                                                            <h5 className="font-black text-lg text-gray-800 group-hover:text-bvb-black transition-colors">{h.title}</h5>
-                                                            <div className="flex items-center gap-2">
-                                                                {!h.notes.resolved && (
-                                                                    <span className="flex items-center gap-1 text-[10px] font-black text-red-600 uppercase bg-red-50 px-2 py-1 rounded border border-red-100">
-                                                                        <AlertCircle className="w-3 h-3" /> 未解决
-                                                                    </span>
-                                                                )}
-                                                                {h.notes.resolved ? (
-                                                                    <span className="flex items-center gap-1 text-[10px] font-black text-green-600 uppercase bg-green-50 px-2 py-1 rounded border border-green-100">
-                                                                        <CheckCircle className="w-3 h-3" /> 已解决
-                                                                    </span>
-                                                                ) : (
-                                                                    <button 
-                                                                        onClick={() => {
-                                                                            const updatedSession = { ...h.session };
-                                                                            if (updatedSession.focusedPlayerNotes && updatedSession.focusedPlayerNotes[entry.player.id]) {
-                                                                                updatedSession.focusedPlayerNotes[entry.player.id] = {
-                                                                                    ...updatedSession.focusedPlayerNotes[entry.player.id],
-                                                                                    resolved: true
-                                                                                };
-                                                                                onUpdateTraining(updatedSession, updatedSession.attendance);
-                                                                            }
-                                                                        }}
-                                                                        className="flex items-center gap-1 text-[10px] font-black text-bvb-black uppercase bg-bvb-yellow px-2 py-1 rounded border border-bvb-black/10 hover:bg-yellow-400 transition-colors"
-                                                                    >
-                                                                        标记已解决
-                                                                    </button>
-                                                                )}
-                                                                <span className="text-[10px] font-black text-gray-400 uppercase bg-white px-2 py-1 rounded border border-gray-100">Training Record</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-bvb-black uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <Target className="w-3.5 h-3.5 text-bvb-yellow" /> 技术表现评价
-                                                                </label>
-                                                                <div className="text-sm text-gray-600 leading-relaxed italic bg-white p-3 rounded-xl border border-gray-50 min-h-[60px]">
-                                                                    {h.notes.technical || '-- 暂无技战术层反馈记录 --'}
-                                                                </div>
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1.5">
-                                                                    <Brain className="w-3.5 h-3.5 text-indigo-400" /> 心理/态度评估
-                                                                </label>
-                                                                <div className="text-sm text-gray-600 leading-relaxed italic bg-white p-3 rounded-xl border border-gray-50 min-h-[60px]">
-                                                                    {h.notes.mental || '-- 暂无心理层面评估记录 --'}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </React.Fragment>
-                            );
-                        })()}
-                    </React.Fragment>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-gray-300 p-10">
-                        <UsersIcon className="w-20 h-20 opacity-10 mb-6" />
-                        <h4 className="text-xl font-black text-gray-400 uppercase italic tracking-tighter mb-2">Focus Player Analytics</h4>
-                        <p className="text-sm font-bold text-center max-w-xs uppercase tracking-widest opacity-60">请从左侧列表中选择一名关注球员查看其历史成长轨迹及反馈。</p>
-                    </div>
-                )}
-            </div>
-        </div>
+      <TrainingLogsHub
+        teams={teams}
+        availableTeams={availableTeams}
+        players={players}
+        sessions={userManagedSessions}
+        teamLogs={teamLogs}
+        currentUser={currentUser}
+        users={users}
+        statsTeamFilter={statsTeamFilter}
+        onChangeTeamFilter={setStatsTeamFilter}
+        currentDate={currentDate}
+        onChangeCurrentDate={setCurrentDate}
+        timeScope={timeScope}
+        dateLabel={dateLabel}
+        initialLogSubFilter={initialFilter}
+        onOpenSessionLog={(s) => {
+          setSessionModalInitialTab('log');
+          setSelectedSession(s);
+        }}
+        onCreateSessionOnDate={(dateStr, teamId) => {
+          setSelectedDate(dateStr);
+          setFormData((prev) => ({
+            ...prev,
+            date: dateStr,
+            teamId: teamId || prev.teamId || availableTeams[0]?.id || '',
+          }));
+          setShowAddModal(true);
+        }}
+        onUpdateTraining={onUpdateTraining}
+        onAddTeamLog={(log) => onAddTeamLog?.(log)}
+        onUpdateTeamLog={(log) => onUpdateTeamLog?.(log)}
+        onDeleteTeamLog={(id) => onDeleteTeamLog?.(id)}
+        getLogOperatorName={getLogOperatorName}
+        getCheckInAssistantNames={getCheckInAssistantNames}
+      />
     );
   };
 
@@ -4289,8 +3987,8 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                         <button onClick={() => setViewType('periodization')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'periodization' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
                             <TableProperties className="w-3 h-3 md:w-3.5 md:h-3.5" /> 周期
                         </button>
-                        <button onClick={() => setViewType('focus')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'focus' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
-                            <Star className="w-3 h-3 md:w-3.5 md:h-3.5" /> 关注
+                        <button onClick={() => setViewType('logs')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] md:text-xs font-black transition-all ${viewType === 'logs' ? 'bg-white shadow text-bvb-black' : 'text-gray-400'}`}>
+                            <FileText className="w-3 h-3 md:w-3.5 md:h-3.5" /> 日志
                         </button>
                     </div>
                     <div className="h-4 w-px bg-gray-300 mx-1"></div>
@@ -4399,10 +4097,10 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                  {viewType === 'calendar' ? renderCalendarView() : 
                   viewType === 'list' ? renderListView() : 
                   viewType === 'periodization' ? renderPeriodizationView() :
-                  renderFocusView()}
+                  renderLogsView()}
              </div>
              
-             {viewType !== 'periodization' && viewType !== 'focus' && (
+             {viewType !== 'periodization' && viewType !== 'logs' && (
              <div className="w-full lg:w-[240px] flex flex-col gap-6 shrink-0 mt-6 lg:mt-0">
                  <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm min-h-[300px]">
                     <h4 className="font-black text-gray-800 mb-4 text-[10px] uppercase tracking-widest flex justify-between items-center border-b pb-3 border-gray-50">
@@ -5066,7 +4764,9 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
         })()}
         {selectedSession && (
             <SessionDetailModal 
+                key={`${selectedSession.id}-${sessionModalInitialTab}`}
                 session={selectedSession} 
+                initialTab={sessionModalInitialTab}
                 teams={teams} 
                 players={players} 
                 trainingFoci={trainingFoci} 
@@ -5081,7 +4781,7 @@ const TrainingPlanner: React.FC<TrainingPlannerProps> = ({
                 onUpdate={(s: TrainingSession, att: AttendanceRecord[]) => { onUpdateTraining(s, att); setSelectedSession(s); }} 
                 onDuplicate={(s: TrainingSession) => { setSessionToDuplicate(s); setDuplicateDate(new Date().toISOString().split('T')[0]); }} 
                 onDelete={(id: string) => { onDeleteTraining(id); setSelectedSession(null); }} 
-                onClose={() => setSelectedSession(null)} 
+                onClose={() => { setSelectedSession(null); setSessionModalInitialTab('attendance'); }} 
             />
         )}
         {editingMatchForModal && (
